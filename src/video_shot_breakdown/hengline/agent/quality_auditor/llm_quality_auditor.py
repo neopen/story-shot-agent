@@ -107,7 +107,7 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseAgent):
 
         # 构建审查提示词
         user_prompt = self._build_audit_prompt(instructions)
-        system_prompt = self._get_audit_system_prompt()
+        system_prompt = self._get_prompt_template("quality_auditor_system")
 
         debug("调用LLM进行质量审查")
 
@@ -157,7 +157,7 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseAgent):
 
         fragments_text = "\n".join(fragments_list)
 
-        prompt_template = self._get_prompt_template("quality_auditor")
+        prompt_template = self._get_prompt_template("quality_auditor_user")
 
         return prompt_template.format(
             title=instructions.project_info.get("title", "未命名项目"),
@@ -165,23 +165,6 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseAgent):
             total_duration=instructions.project_info.get("total_duration", 0.0),
             fragments_list=fragments_text
         )
-
-    def _get_audit_system_prompt(self) -> str:
-        """获取审查系统提示词"""
-        return """你是一位资深的电影导演和AI提示词专家。
-            请对提供的AI视频生成指令进行专业审查，重点关注以下方面：
-            
-            1. 截断问题：提示词是否完整，有无被截断
-            2. 场景问题：场景引用是否有效，场景转换是否合理
-            3. 气象问题：天气描述是否一致，有无逻辑矛盾
-            4. 角色问题：角色特征是否一致，角色关系是否清晰
-            5. 动作问题：动作描述是否连贯，有无跳跃
-            6. 提示词质量：描述是否清晰具体
-            7. 时长问题：每个片段时长是否合理（0.5-5秒）
-            8. 风格问题：视觉风格是否一致
-            
-            请给出客观、准确的评估，避免过度敏感的判断。
-            """
 
     def _extract_json_from_text(self, text: str) -> Dict:
         """从文本中提取JSON"""

@@ -1,8 +1,28 @@
 version: "1.2"
 
-quality_auditor:
-  name: "quality_auditor_prompt"
-  description: "作为电影导演和AI提示词专家审查分镜内容"
+quality_auditor_system:
+  name: "quality_auditor_system"
+  description: "系统提示，指导AI如何审查分镜内容的质量，确保生成指令的合理性和一致性"
+  template: |
+    你是一位资深的电影导演和AI提示词专家。
+    请对提供的AI视频生成指令进行专业审查，重点关注以下方面：
+    
+    1. 截断问题：提示词是否完整，有无被截断
+    2. 场景问题：场景引用是否有效，场景转换是否合理
+    3. 气象问题：天气描述是否一致，有无逻辑矛盾
+    4. 角色问题：角色特征是否一致，角色关系是否清晰，角色服装分配是否正确
+    5. 动作问题：动作描述是否连贯，有无跳跃
+    6. 提示词质量：描述是否清晰具体
+    7. 时长问题：每个片段时长是否合理（1-5.5秒）
+    8. 风格问题：视觉风格是否一致
+    9. 道具一致性：关键道具（书名、借阅卡、票根等）是否在所有片段中保持一致
+    10. 台词完整性：关键台词是否完整出现，未被省略或概括
+    
+    请给出客观、准确的评估，避免过度敏感的判断。
+
+quality_auditor_user:
+  name: "quality_auditor_user"
+  description: "用户提示，提供分镜内容的详细信息，指导AI进行全面审查并给出具体的修复建议"
   template: |
     请对以下AI视频生成指令进行全面审查：
 
@@ -15,48 +35,50 @@ quality_auditor:
     {fragments_list}
 
     请检查以下方面：
-    1. 提示词是否清晰具体？是否有截断?
-    2. 时长是否合理（每个片段0.5-5秒）？
-    3. 风格、场景、角色等是否一致？
-    4. 是否有明显的问题或矛盾？
-    5. 气象/时间逻辑一致性
-    6. 角色连续性、动作连贯性
-    7. 其他可能影响生成质量的问题
-    8. 提供具体的修复建议
-    9. 总结审查结果，给出整体质量评估
+      1. 提示词是否清晰具体？是否有截断？
+      2. 时长是否合理（每个片段0.5-5.5秒）？
+      3. 风格、场景、角色等是否一致？
+      4. 是否有明显的问题或矛盾？
+      5. 气象/时间逻辑一致性
+      6. 角色连续性、动作连贯性
+      7. 角色服装一致性：每个角色的服装颜色、款式是否在所有片段中保持一致？
+      8. 角色服装分配正确性：是否将A角色的服装特征错误分配给B角色？
+      9. 台词完整性：所有对话是否完整呈现，无省略？
+      10. 其他可能影响生成质量的问题
+      11. 提供具体的修复建议
+      12. 总结审查结果，给出整体质量评估
     
     返回格式必须严格遵循JSON，使用以下枚举KEY值：
-
-    status字段必须使用以下KEY值之一：
-    - PASSED: 通过
-    - NEEDS_REVIEW: 需要审查
-    - WARNING: 有警告
-    - FAILED: 失败
-    
-    type字段必须使用以下KEY值之一：
-    - TRUNCATION: 截断问题
-    - SCENE: 场景问题
-    - WEATHER: 气象问题
-    - CHARACTER: 角色问题
-    - ACTION: 动作问题
-    - PROMPT: 提示词质量问题
-    - DURATION: 时长问题
-    - STYLE: 风格问题
-    - OTHER: 其他问题
-    
-    severity字段必须使用以下KEY值之一：
-    - INFO: 信息级别，不影响执行
-    - WARNING: 警告级别，建议修复
-    - MODERATE: 中度问题，需要调整
-    - MAJOR: 主要问题，需要重新处理
-    - CRITICAL: 严重问题，需要人工干预
-    - ERROR: 错误级别，无法继续
+      status字段必须使用以下KEY值之一：
+      - PASSED: 通过
+      - NEEDS_REVIEW: 需要审查
+      - WARNING: 有警告
+      - FAILED: 失败
+      
+      type字段必须使用以下KEY值之一：
+      - TRUNCATION: 截断问题
+      - SCENE: 场景问题
+      - WEATHER: 气象问题
+      - CHARACTER: 角色问题
+      - ACTION: 动作问题
+      - PROMPT: 提示词质量问题
+      - DURATION: 时长问题
+      - STYLE: 风格问题
+      - OTHER: 其他问题
+      
+      severity字段必须使用以下KEY值之一：
+      - INFO: 信息级别，不影响执行
+      - WARNING: 警告级别，建议修复
+      - MODERATE: 中度问题，需要调整
+      - MAJOR: 主要问题，需要重新处理
+      - CRITICAL: 严重问题，需要人工干预
+      - ERROR: 错误级别，无法继续
     
     {{
       "status": "PASSED",
       "issues": [
         {{
-          "type": "TRUNCATION",
+          "type": "CHARACTER",
           "description": "问题描述",
           "severity": "WARNING",
           "fragment_id": "涉及片段ID",
@@ -67,4 +89,4 @@ quality_auditor:
       "summary": "审查总结"
     }}
 
-    直接返回JSON，不要其他解释性文字。
+    直接返回JSON，不要添加其他任何解释性文字和特殊符号。

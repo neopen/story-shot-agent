@@ -82,6 +82,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
                         "prev_shot": shot_sequence.shots[shot_idx - 1] if shot_idx > 0 else None,
                         "next_shot": shot_sequence.shots[shot_idx + 1] if shot_idx < len(shot_sequence.shots) - 1 else None,
                         "scene_context": scene_context,
+                        "shot_sequence": shot_sequence,
                         "current_time": current_time,
                         "fragment_offset": fragment_id_counter,
                         "overall_weather": self.overall_weather
@@ -422,6 +423,9 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
         scene_context = context.get("scene_context", {})
         overall_weather = context.get("overall_weather", "overcast")
 
+        shot_sequence = context.get("shot_sequence")
+        key_props_info = self._extract_key_props_from_sequence(shot_sequence)
+
         # 构建详细上下文
         scene_info = ""
         if shot.scene_id and shot.scene_id in scene_context.get("scenes", {}):
@@ -452,8 +456,113 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
             min_segment=self.min_split_segment,
             max_segment=self.max_split_segment,
             overall_weather=overall_weather,
-            continuity_notes=self._get_continuity_notes(shot, context)
+            continuity_notes=self._get_continuity_notes(shot, context),
+            key_props_info=key_props_info  # 传递全剧关键信息
         )
+
+    def _extract_key_props_from_sequence(self, shot_sequence: ShotSequence) -> str:
+        """从整个镜头序列中提取关键道具和信息"""
+        if not shot_sequence:
+            return "无"
+
+        all_descriptions = " ".join([shot.description for shot in shot_sequence.shots])
+
+        key_info = []
+
+        # 1. 提取所有书名号内的内容（如《飞鸟集》）
+        book_titles = set(re.findall(r'《([^》]+)》', all_descriptions))
+        if book_titles:
+            key_info.append(f"书名：{', '.join(book_titles)}")
+
+        # 2. 提取借阅卡/卡片类文字
+        card_patterns = [
+            r'借阅卡[：:][^，。\n]+',
+            r'library card[：:][^,.\n]+',
+            r'卡片[：:][^，。\n]+'
+        ]
+        for pattern in card_patterns:
+            cards = set(re.findall(pattern, all_descriptions))
+            if cards:
+                key_info.append(f"卡片文字：{', '.join(cards)}")
+
+        # 3. 提取日期信息（如下周三）
+        date_patterns = [
+            r'下周[一二三四五六日]',
+            r'下个星期',
+            r'next \w+',
+            r'\d{1,2}月\d{1,2}日'
+        ]
+        for pattern in date_patterns:
+            dates = set(re.findall(pattern, all_descriptions, re.IGNORECASE))
+            if dates:
+                key_info.append(f"日期：{', '.join(dates)}")
+
+        # 4. 提取颜色+服装的组合（如黄色雨衣）
+        color_pattern = r'(红|橙|黄|绿|青|蓝|紫|黑|白|灰|褐|金|银)([色]?)\s*([^，。\s]{1,4}(?:衣|服|衫|裤|裙|帽|鞋|袋))'
+        colors = set(re.findall(color_pattern, all_descriptions))
+        if colors:
+            color_phrases = [''.join(c).strip() for c in colors]
+            key_info.append(f"角色服装：{', '.join(color_phrases)}")
+
+        # 5. 提取所有台词（引号内的内容）
+        quote_patterns = [
+            r'"([^"]{5,})"',
+            r"'([^']{5,})'",
+            r'“([^”]{5,})”'
+        ]
+        for pattern in quote_patterns:
+            dialogues = set(re.findall(pattern, all_descriptions))
+            if dialogues:
+                # 只保留较长的台词（避免提取零散词汇）
+                long_dialogues = [d for d in dialogues if len(d) > 8]
+                if long_dialogues:
+                    key_info.append("重要台词：" + "；".join(long_dialogues[:3]))  # 最多3条
+
+        # 6. 提取特殊道具（票根、防水袋等）
+        special_props = []
+        prop_keywords = ['票根', '防水袋', '毛巾', '手帕', '诗集', '书']
+        for keyword in prop_keywords:
+            if keyword in all_descriptions:
+                # 提取包含该关键词的短句
+                sentences = re.split(r'[。；]', all_descriptions)
+                for sent in sentences:
+                    if keyword in sent and len(sent) < 50:
+                        special_props.append(sent.strip())
+
+        if special_props:
+            # 去重
+            unique_props = []
+            for prop in special_props:
+                if prop not in unique_props:
+                    unique_props.append(prop)
+            key_info.append("关键道具：" + "；".join(unique_props[:3]))
+
+        # 7. 提取主要角色及其特征
+        characters = {}
+        if hasattr(shot_sequence, 'shots'):
+            for shot in shot_sequence.shots:
+                if shot.main_character and shot.main_character not in characters:
+                    # 从描述中提取该角色的特征
+                    desc = shot.description
+                    char_name = shot.main_character
+                    # 查找角色附近的服装描述
+                    if char_name in desc:
+                        idx = desc.find(char_name)
+                        nearby = desc[max(0, idx - 20):min(len(desc), idx + 50)]
+                        characters[char_name] = nearby
+
+        if characters:
+            char_desc = []
+            for name, desc in characters.items():
+                # 提取简短的描述
+                short_desc = desc[:30] + "..." if len(desc) > 30 else desc
+                char_desc.append(f"{name}：{short_desc}")
+            key_info.append("角色特征：" + "；".join(char_desc[:2]))
+
+        if not key_info:
+            return "无特殊关键信息"
+
+        return "\n    ".join(key_info)
 
 
     def _get_continuity_notes(self, shot: ShotInfo, context: Dict) -> str:
