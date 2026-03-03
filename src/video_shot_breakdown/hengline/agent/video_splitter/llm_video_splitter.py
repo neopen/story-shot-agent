@@ -430,11 +430,11 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
 
         prev_context = ""
         if prev_shot:
-            prev_context = f"{prev_shot.description[:100]} ({prev_shot.duration}s)"
+            prev_context = f"{prev_shot.description} ({prev_shot.duration}s)"
 
         next_context = ""
         if next_shot:
-            next_context = f"{next_shot.description[:100]} ({next_shot.duration}s)"
+            next_context = f"{next_shot.description} ({next_shot.duration}s)"
 
         user_template = self._get_prompt_template("video_splitter_user")
 
