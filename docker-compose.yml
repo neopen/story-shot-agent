@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  video-shot-agent:
+    build: .
+    image: video-shot-agent:latest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      API__HOST: "0.0.0.0"
+      API__PORT: "8000"
+    # If you want logs or persistent data, mount volumes below
+    # volumes:
+    #   - ./logs:/app/logs
+

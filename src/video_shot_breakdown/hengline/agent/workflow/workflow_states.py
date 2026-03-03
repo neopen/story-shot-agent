@@ -108,6 +108,7 @@ class NodeLoopState(BaseModel):
     current_node: Optional[PipelineNode] = None # 当前节点
     total_retries: int = 0  # 全局重试统计
     node_loop_details: list = []  # 每个节点的循环详情日志
+    recovery_flags: Dict[str, Any] = {}  # 每个节点的恢复标记
 
 
 

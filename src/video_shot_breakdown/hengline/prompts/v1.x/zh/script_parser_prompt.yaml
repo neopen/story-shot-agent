@@ -2,9 +2,9 @@
 version: "1.0"
 
 
-script_parser:
+script_parser_system:
   name: "base_script_parser_prompt"
-  description: "多格式剧本解析基础模板"
+  description: "系统提示词基础模板，适用于多种剧本格式的解析"
   template: |
     你是一个专业的剧本解析AI。请将输入的剧本内容解析为结构化的JSON格式。
 
@@ -132,3 +132,17 @@ dialogue_only_script:
       - 识别说话者和听众
       - 补充缺失的环境和背景信息
 
+
+script_parser_user:
+  name: "script_parser_user"
+  description: "用户输入提示词模板，适用于剧本解析任务"
+  template: |
+    请解析以下剧本内容，提取各部分的详细信息，返回完整的JSON解析结果。
+
+    {script_text}
+
+    注意：请严格按照系统提示词的要求进行解析，确保输出的JSON格式正确且包含所有必要字段，确保：
+      1. JSON格式正确
+      2. 包含所有提取的信息
+      3. 角色名称保持一致
+      4. 场景按时间顺序排列

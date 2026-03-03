@@ -374,7 +374,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
 
         # 准备提示词
         user_prompt = self._get_enhanced_prompt_template(context)
-        system_prompt = self._get_system_prompt()
+        system_prompt = self._get_prompt_template("video_splitter_system")
 
         debug(f"调用LLM分割镜头 {shot.id}")
         start_time = time.time()
@@ -430,18 +430,15 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
 
         prev_context = ""
         if prev_shot:
-            prev_context = f"前一个镜头: {prev_shot.description[:100]} ({prev_shot.duration}s)"
+            prev_context = f"{prev_shot.description} ({prev_shot.duration}s)"
 
         next_context = ""
         if next_shot:
-            next_context = f"后一个镜头: {next_shot.description[:100]} ({next_shot.duration}s)"
+            next_context = f"{next_shot.description} ({next_shot.duration}s)"
 
-        # 添加气象提示
-        weather_hint = f"注意：整个视频的基调是{overall_weather}，请保持天气一致性。"
+        user_template = self._get_prompt_template("video_splitter_user")
 
-        prompt_template = self._get_prompt_template("video_splitter")
-
-        return prompt_template.format(
+        return user_template.format(
             shot_id=shot.id,
             description=shot.description,
             duration=shot.duration,
@@ -453,21 +450,10 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
             split_threshold=self.split_threshold,
             min_segment=self.min_split_segment,
             max_segment=self.max_split_segment,
-            continuity_notes=self._get_continuity_notes(shot, context) + f" {weather_hint}"
+            overall_weather=overall_weather,
+            continuity_notes=self._get_continuity_notes(shot, context)
         )
 
-    def _get_system_prompt(self) -> str:
-        """获取系统提示词"""
-        return """你是一位顶尖的电影剪辑师和分镜设计师，精通视觉叙事和节奏控制。
-        你的任务是将较长的视频镜头智能地分割为适合AI视频生成的片段（每个片段通常2-5秒）。
-
-        请遵循以下原则：
-        1. 保持连贯性：分割点应该选择在动作自然停顿、对话间隙、场景转换处
-        2. 保持一致性：确保角色外观、场景布置、灯光风格在分割后保持一致
-        3. 叙事流畅：分割后的片段应该能连贯地讲述原镜头的故事
-        4. 节奏控制：根据内容调整片段时长，动作场景可以短一些，对话场景可以长一些
-
-        请基于镜头内容和前后文关系，给出最合理的分割方案。"""
 
     def _get_continuity_notes(self, shot: ShotInfo, context: Dict) -> str:
         """生成连续性说明"""
@@ -536,7 +522,10 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
                 warning(f"分割总时长({total_duration}s)与镜头时长({shot.duration}s)不匹配")
 
     def _create_fragments_from_decision(self, decision: Dict, context: Dict) -> List[VideoFragment]:
-        """根据LLM决策创建片段"""
+        """
+        根据LLM决策创建片段
+        核心改动：使用原始描述，不让LLM重新生成描述
+        """
         shot = context["shot"]
         current_time = context["current_time"]
         fragment_offset = context["fragment_offset"]
@@ -546,6 +535,9 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
 
         if decision.get("needs_split", False):
             segments = decision["segments"]
+
+            # 保存原始描述
+            original_desc = shot.description
 
             for seg_idx, segment in enumerate(segments):
                 fragment_id = f"frag_{fragment_offset + len(fragments) + 1:03d}_s{seg_idx + 1}"
@@ -561,18 +553,21 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
                     element_ids=shot.element_ids if seg_idx == 0 else [],
                     start_time=round(segment_start_time, 2),
                     duration=segment["duration"],
-                    description=segment.get("description", f"{shot.description} - 部分{seg_idx + 1}"),
+                    # 关键修改：使用原始描述，而不是segment.get("description")
+                    description=original_desc,
                     continuity_notes={
                         "main_character": shot.main_character,
                         "location": f"场景{shot.scene_id}",
                         "continuity_id": f"{shot.id}_seq{seg_idx + 1}",
                         "prev_fragment": fragments[-1].id if fragments else None,
                         "split_reason": decision.get("reason", "AI智能分割"),
-                        "weather": overall_weather
+                        "weather": overall_weather,
+                        "segment_hint": f"部分{seg_idx + 1}/{len(segments)}"
                     },
                     metadata={
                         "split_by": "ai",
                         "original_shot": shot.id,
+                        "original_description": original_desc,  # 保存原始描述
                         "segment_index": seg_idx,
                         "total_segments": len(segments),
                         "ai_decision": decision.get("reason", ""),
@@ -581,7 +576,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
                 )
                 fragments.append(fragment)
         else:
-            # 不分割
+            # 不分割 - 直接使用原始描述
             fragment_id = f"frag_{fragment_offset + 1:03d}"
             fragment = VideoFragment(
                 id=fragment_id,
@@ -589,7 +584,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
                 element_ids=shot.element_ids,
                 start_time=current_time,
                 duration=min(shot.duration, self.max_split_segment),
-                description=shot.description,
+                description=shot.description,  # 直接使用原始描述
                 continuity_notes={
                     "main_character": shot.main_character,
                     "location": f"场景{shot.scene_id}",
@@ -600,6 +595,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
                 metadata={
                     "split_by": "ai",
                     "original_shot": shot.id,
+                    "original_description": shot.description,
                     "segment_index": 0,
                     "total_segments": 1,
                     "ai_decision": decision.get("reason", ""),

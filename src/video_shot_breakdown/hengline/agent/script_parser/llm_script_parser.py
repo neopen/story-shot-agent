@@ -58,7 +58,8 @@ class LLMScriptParser(BaseScriptParser, BaseAgent):
         )
 
         # 构建用户提示词
-        user_prompt = self._build_user_prompt(script_text, script_format)
+        prompt_template = self._build_user_prompt(script_text, script_format)
+        user_prompt = prompt_template.format(script_text=script_text)
 
         debug(f"AI系统提示词（摘要）: {system_prompt[:150]}...")
         debug(f"AI用户提示词（摘要）: {user_prompt[:150]}...")
@@ -83,7 +84,7 @@ class LLMScriptParser(BaseScriptParser, BaseAgent):
 
     def _get_default_prompt(self) -> str:
         """获取默认系统提示词"""
-        return self._get_prompt_template("script_parser")
+        return self._get_prompt_template("script_parser_system")
 
     def _get_natural_language_prompt(self) -> str:
         """自然语言描述的系统提示词"""
@@ -107,27 +108,16 @@ class LLMScriptParser(BaseScriptParser, BaseAgent):
 
     def _build_user_prompt(self, text: str, format_type: ScriptType) -> str:
         """构建用户提示词"""
-        format_instructions = {
-            ScriptType.NATURAL_LANGUAGE: "这是一个自然语言描述的剧本，请从中提取结构化信息。",
-            ScriptType.STANDARD_SCRIPT: "这是一个标准格式的剧本，请按照剧本格式规范解析。",
-            ScriptType.AI_STORYBOARD: "这是一个AI生成的分镜脚本，请解析镜头描述。",
-            ScriptType.STRUCTURED_SCENE: "这是一个结构化场景描述，请提取各部分的详细信息。",
-            ScriptType.DIALOGUE_ONLY: "这是一个纯对话剧本，请补充推断的场景和动作信息。"
-        }
+        # format_instructions = {
+        #     ScriptType.NATURAL_LANGUAGE: "这是一个自然语言描述的剧本，请从中提取结构化信息。",
+        #     ScriptType.STANDARD_SCRIPT: "这是一个标准格式的剧本，请按照剧本格式规范解析。",
+        #     ScriptType.AI_STORYBOARD: "这是一个AI生成的分镜脚本，请解析镜头描述。",
+        #     ScriptType.STRUCTURED_SCENE: "这是一个结构化场景描述，请提取各部分的详细信息。",
+        #     ScriptType.DIALOGUE_ONLY: "这是一个纯对话剧本，请补充推断的场景和动作信息。"
+        # }
+        # instruction = format_instructions.get(format_type, "请解析以下剧本内容：")
 
-        instruction = format_instructions.get(format_type, "请解析以下剧本内容：")
-
-        return f"""{instruction}
-            剧本内容：
-            {text}
-        
-            text
-        
-            请返回完整的JSON解析结果。确保：
-                1. JSON格式正确
-                2. 包含所有提取的信息
-                3. 角色名称保持一致
-                4. 场景按时间顺序排列"""
+        return self._get_prompt_template("script_parser_user")
 
     def _parse_llm_response(self, ai_response: str) -> Dict[str, Any]:
         """解析AI返回的JSON响应"""

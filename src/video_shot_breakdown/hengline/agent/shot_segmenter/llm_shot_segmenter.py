@@ -72,14 +72,14 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
         ])
 
         # 准备提示词
-        user_prompt = self._get_prompt_template("shot_segmenter").format(
+        user_prompt = self._get_prompt_template("shot_segmenter_user").format(
             location=scene.location,
             time_of_day=scene.time_of_day or "未指定",
             description=scene.description or "无描述",
             elements_list=elements_list
         )
 
-        system_prompt = "你是一位顶尖的电影分镜师，精通分镜设计和视觉叙事，能将结构化的叙事单元拆分为不同的镜头节点。"
+        system_prompt = self._get_prompt_template("shot_segmenter_system")
 
         # 调用LLM
         response = self._call_llm_chat_with_retry(self.llm_client, system_prompt, user_prompt)

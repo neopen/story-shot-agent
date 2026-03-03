@@ -54,20 +54,25 @@ class LLMPromptConverter(BasePromptConverter, BaseAgent):
     def _convert_fragment_with_llm(self, fragment: VideoFragment) -> AIVideoPrompt:
         """使用LLM转换单个片段"""
         # 准备提示词
-        user_prompt = self._get_prompt_template("prompt_converter").format(
+        user_prompt = self._get_prompt_template("prompt_converter_user")
+
+        prompt_template = user_prompt.format(
             fragment_id=fragment.id,
             description=fragment.description,
             duration=fragment.duration,
-            character=fragment.continuity_notes.get("main_character", "角色"),
-            location=fragment.continuity_notes.get("location", "场景"),
-            model=self.config.target_model
+            character=fragment.continuity_notes.get("main_character", ""),
+            location=fragment.continuity_notes.get("location", ""),
+            dm_model=self.config.target_model,
+            video_style=self.config.default_style,
+            max_length=self.config.max_prompt_length,
+            min_length=self.config.min_prompt_length
         )
 
         # 调用LLM
-        system_prompt = "你是一位顶尖的AI视频转换大师，可以将视频片段的描述转换为适合扩散模型的提示词描述。"
+        system_prompt = self._get_prompt_template("prompt_converter_system")
 
         # 调用LLM
-        result = self._call_llm_parse_with_retry(self.llm_client, system_prompt, user_prompt)
+        result = self._call_llm_parse_with_retry(self.llm_client, system_prompt, prompt_template)
 
         # 创建提示词对象
         return AIVideoPrompt(
