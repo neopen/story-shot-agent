@@ -7,7 +7,7 @@ version = {attr = "video_shot_breakdown.__version__"}
 
 [project]
 name = "hengshot"
-version = "0.1.1"
+version = "0.1.3"
 description = "长剧本分镜智能体：基于AI的长视频分镜头检测与分析工具"
 readme = "README.md"
 authors = [
