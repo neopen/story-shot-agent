@@ -16,8 +16,10 @@ from video_shot_breakdown.logger import info, warning, error, debug
 class WorkflowOutputFixer:
     """修复workflow输出中的片段序列问题"""
 
-    def __init__(self):
+    def __init__(self, is_debug: bool = False):
         self.fix_history = []
+        # 为True时，返回各个阶段完整的数据处理结果
+        self.is_debug = is_debug
 
     async def enhanced_workflow_invoke(self, workflow, initial_state: WorkflowState) -> Dict[str, Any]:
         """
@@ -283,14 +285,21 @@ class WorkflowOutputFixer:
             # 提取需要的数据
             inner_data = {}
 
+            # 添加instructions（如果存在）
+            if 'instructions' in state_dict:
+                inner_data["instructions"] = state_dict['instructions']
+
             # 1. 添加修复后的fragment_sequence
-            inner_data["fragment_sequence"] = self._prepare_fragment_sequence_data(correct_fragment_sequence)
+            if self.is_debug:
+                inner_data["fragment_sequence"] = self._prepare_fragment_sequence_data(correct_fragment_sequence)
 
             # 2. 添加其他必要的数据
-            self._add_other_data(state_dict, inner_data, correct_fragment_sequence)
+            if self.is_debug:
+                self._add_other_data(state_dict, inner_data, correct_fragment_sequence)
 
             # 3. 添加处理统计
-            inner_data["processing_stats"] = self._build_processing_stats(state_dict, correct_fragment_sequence)
+            if self.is_debug:
+                inner_data["processing_stats"] = self._build_processing_stats(state_dict, correct_fragment_sequence)
 
             # 4. 设置data.data
             result["data"] = inner_data
@@ -357,15 +366,6 @@ class WorkflowOutputFixer:
             # 添加script_analysis
             if 'parsed_script' in state_dict:
                 inner_data["script_analysis"] = state_dict['parsed_script']
-
-            # 添加instructions（如果存在）
-            if 'instructions' in state_dict:
-                inner_data["instructions"] = state_dict['instructions']
-
-                # 更新instructions中的片段数量
-                if isinstance(inner_data["instructions"], dict):
-                    if 'project_info' in inner_data["instructions"]:
-                        inner_data["instructions"]["project_info"]["total_fragments"] = len(fragment_sequence.fragments)
 
             # 添加audit_report（如果存在）
             if 'audit_report' in state_dict:
