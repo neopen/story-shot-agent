@@ -69,7 +69,8 @@ class RuleVideoSplitter(BaseVideoSplitter):
                 element_ids=shot.element_ids,
                 start_time=start_time,
                 duration=shot.duration,
-                description=self._generate_fragment_description(shot),
+                # description=self._generate_fragment_description(shot),
+                description=shot.description,
                 continuity_notes={
                     "main_character": shot.main_character,
                     "location": f"场景{shot.scene_id}",
@@ -117,9 +118,9 @@ class RuleVideoSplitter(BaseVideoSplitter):
         # 添加镜头类型信息
         type_mapping = ShotType.get_type_mapping()
 
-        shot_type_desc = type_mapping.get(shot.shot_type.value, shot.shot_type.value)
+        shot_type_desc = type_mapping.get(shot.shot_type, shot.shot_type.value)
 
-        if len(base_desc) > 40:
-            base_desc = base_desc[:37] + "..."
+        # if len(base_desc) > 40:
+        #     base_desc = base_desc[:37] + "..."
 
         return f"{shot_type_desc}：{base_desc}"

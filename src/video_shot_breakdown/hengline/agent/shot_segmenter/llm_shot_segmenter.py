@@ -73,7 +73,7 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
 
         # 准备元素列表文本
         elements_list = "\n".join([
-            f"{i + 1}. [{elem.type}] {elem.character or '场景'}: {elem.content} (时长: {elem.duration}秒)"
+            f"{elem.id}. [{elem.type}] {elem.character or '场景'}: {elem.content} (时长: {elem.duration}秒)"
             for i, elem in enumerate(scene.elements)
         ])
 

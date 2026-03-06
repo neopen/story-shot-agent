@@ -30,7 +30,7 @@ script_parser_system:
               "scene_type": "indoor/outdoor/cafe/park/street/living_room/rainy_outdoor/night_outdoor/other",
               "env_sounds": [
                 {{
-                  "sound_type": "rain/wind/thunder/water_drip/footstep/traffic/crowd/music/tv_noise/bird/silence/other",
+                  "sound_type": "rain/wind/thunder/water_drip/footstep/traffic/crowd/music/paper_rustle/tv_noise/bird/silence/other",
                   "intensity": 0.0-1.0,
                   "continuous": true/false,
                   "description": "声音描述",

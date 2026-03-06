@@ -22,9 +22,9 @@ class ShotType(str, Enum):
     @staticmethod
     def get_type_mapping():
         return {
-            ShotType.CLOSE_UP.value: "特写",
-            ShotType.MEDIUM_SHOT.value: "中景",
-            ShotType.WIDE_SHOT.value: "全景",
+            ShotType.CLOSE_UP: "特写",
+            ShotType.MEDIUM_SHOT: "中景",
+            ShotType.WIDE_SHOT: "全景",
         }
 
 

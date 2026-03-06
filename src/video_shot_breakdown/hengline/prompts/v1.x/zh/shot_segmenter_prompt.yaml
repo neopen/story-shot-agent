@@ -89,7 +89,7 @@ shot_segmenter_user:
       "shot_type": "wide_shot/medium_shot/close_up",
       "main_character": "主要角色（如果有）",
       "confidence": 置信度评分（0.0-1.0，表示分镜决策置信度）,
-      "element_ids": ["对应元素ID"]
+      "element_ids": ["元素列表中对应的元素ID，如：elem_001，elem_002"]
     }}
     
     直接返回合法的JSON结构，不要添加其他任何解释性文字和特殊符号。

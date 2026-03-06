@@ -27,6 +27,7 @@ class SoundType(str, Enum):
     MUSIC = "music"  # 背景音乐
     TV_NOISE = "tv_noise"  # 电视噪音
     BIRD = "bird"  # 鸟叫声
+    paper_rustle = "paper_rustle"  # 纸张摩擦声
     SILENCE = "silence"  # 安静/无声
     OTHER = "other"  # 其他未分类的声音
 
