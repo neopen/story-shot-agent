@@ -5,7 +5,7 @@
 @Github: https://github.com/HengLine/video-shot-agent
 @Time: 2025/10/24 14:21
 """
-from video_shot_breakdown.hengline.tools.action_duration_tool import ActionDurationEstimatorTool
+from hengshot.hengline.tools.action_duration_tool import ActionDurationEstimatorTool
 from typing import List, Dict, Any
 import json
 

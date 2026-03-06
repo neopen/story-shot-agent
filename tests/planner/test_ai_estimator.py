@@ -5,15 +5,15 @@
 @Github: https://github.com/HengLine/video-shot-agent
 @Time: 2026/1/14 21:13
 """
-from video_shot_breakdown.hengline.agent.script_parser2.script_parser_models import UnifiedScript
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.ai_action_estimator import AIActionDurationEstimator
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.ai_dialogue_estimator import AIDialogueDurationEstimator
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.ai_scene_estimator import AISceneDurationEstimator
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.estimator_factory import estimator_factory
-from video_shot_breakdown.hengline.agent.shot_generator_bak.llm_temporal_planner import LLMTemporalPlanner
-from video_shot_breakdown.hengline.agent.temporal_planner.temporal_planner_model import ElementType
-from video_shot_breakdown.hengline.prompts.temporal_planner_prompt import PromptConfig
-from video_shot_breakdown.utils.obj_utils import dict_to_dataclass
+from hengshot.hengline.agent.script_parser2.script_parser_models import UnifiedScript
+from hengshot.hengline.agent.shot_generator_bak.estimator.ai_action_estimator import AIActionDurationEstimator
+from hengshot.hengline.agent.shot_generator_bak.estimator.ai_dialogue_estimator import AIDialogueDurationEstimator
+from hengshot.hengline.agent.shot_generator_bak.estimator.ai_scene_estimator import AISceneDurationEstimator
+from hengshot.hengline.agent.shot_generator_bak.estimator.estimator_factory import estimator_factory
+from hengshot.hengline.agent.shot_generator_bak.llm_temporal_planner import LLMTemporalPlanner
+from hengshot.hengline.agent.temporal_planner.temporal_planner_model import ElementType
+from hengshot.hengline.prompts.temporal_planner_prompt import PromptConfig
+from hengshot.utils.obj_utils import dict_to_dataclass
 
 
 def demonstrate_complete_system():

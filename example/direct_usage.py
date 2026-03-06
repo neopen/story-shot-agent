@@ -7,11 +7,12 @@
 """
 import asyncio
 
-from video_shot_breakdown.hengline import generate_storyboard
+from hengshot.hengline import generate_storyboard
 
 """
-# 1. 安装依赖
-pip install video-shot-breakdown  # 假设这是你的包名
+# 1. 下载安装依赖
+https://github.com/HengLine/video-shot-agent/releases/download/v0.1.3-beta/hengshot-0.1.3-py3-none-any.whl
+pip install hengshot-0.1.3-py3-none-any.whl  # 假设这是你的包名
 
 # 2. 设置API密钥（如果需要LLM）
 export OPENAI_API_KEY="your-api-key"  # 或其他LLM配置
@@ -67,7 +68,7 @@ async def batch_processing():
 
 async def with_custom_config():
     """使用自定义配置"""
-    from video_shot_breakdown.hengline.hengline_config import HengLineConfig
+    from hengshot.hengline.hengline_config import HengLineConfig
 
     # 创建自定义配置
     custom_config = HengLineConfig(

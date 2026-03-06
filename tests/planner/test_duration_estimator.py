@@ -11,11 +11,11 @@ import re
 from datetime import datetime
 from typing import List, Dict, Any
 
-from video_shot_breakdown.hengline.agent.script_parser2.script_parser_models import Scene, Dialogue, Action
-from video_shot_breakdown.hengline.agent.shot_generator_bak.base_temporal_planner import BaseTemporalPlanner
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.base_estimator import EstimationError, EstimationErrorLevel
-from video_shot_breakdown.hengline.agent.temporal_planner.temporal_planner_model import DurationEstimation, ElementType
-from video_shot_breakdown.hengline.prompts.temporal_planner_prompt import DurationPromptTemplates
+from hengshot.hengline.agent.script_parser2.script_parser_models import Scene, Dialogue, Action
+from hengshot.hengline.agent.shot_generator_bak.base_temporal_planner import BaseTemporalPlanner
+from hengshot.hengline.agent.shot_generator_bak.estimator.base_estimator import EstimationError, EstimationErrorLevel
+from hengshot.hengline.agent.temporal_planner.temporal_planner_model import DurationEstimation, ElementType
+from hengshot.hengline.prompts.temporal_planner_prompt import DurationPromptTemplates
 
 
 class AIDurationEstimator(BaseTemporalPlanner):

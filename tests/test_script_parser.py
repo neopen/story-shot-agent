@@ -9,12 +9,12 @@ import json
 import os
 import sys
 
-from video_shot_breakdown.hengline.client.client_factory import get_default_llm
+from hengshot.hengline.client.client_factory import get_default_llm
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from video_shot_breakdown.hengline.agent.script_parser_agent import ScriptParserAgent
+from hengshot.hengline.agent.script_parser_agent import ScriptParserAgent
 
 
 def example_basic_script_parsing():

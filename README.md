@@ -133,15 +133,15 @@ curl --location --request POST 'http://localhost:8000/api/v1/storyboard' \
 获取任务结果：
 
 ```sh
-# hengline202602061816441424 为任务提交成功后返回的 task_id
-curl --location --request GET 'http://localhost:8000/api/v1/result/hengline202602061816441424'
+# HL202603061937129004 为任务提交成功后返回的 task_id
+curl --location --request GET 'http://localhost:8000/api/v1/result/HL202603061937129004'
 ```
 
 查看任务状态：
 
 ```sh
-# hengline202602061816441424 为任务提交成功后返回的 task_id
-curl --location --request GET 'http://localhost:8000/api/v1/status/hengline202602061816441424'
+# HL202603061937129004 为任务提交成功后返回的 task_id
+curl --location --request GET 'http://localhost:8000/api/v1/status/HL202603061937129004'
 ```
 
 
@@ -156,7 +156,7 @@ curl --location --request GET 'http://localhost:8000/api/v1/status/hengline20260
 }
 ```
 
-输出：结构化分镜结果
+输出：结构化分镜结果（`audio_prompt` 为音频提示词信息）
 
 ```json
 {
@@ -242,6 +242,8 @@ curl --location --request GET 'http://localhost:8000/api/v1/status/hengline20260
 # 下载 whl 包，选择指定版本（v0.1.1-beta）
 # https://github.com/HengLine/video-shot-agent/releases/download/v0.1.1-beta/hengshot-0.1.1-py3-none-any.whl
 pip install hengshot-0.1.1-py3-none-any.whl
+# 安装指定LLM 包
+# pip install langchain-openai
 ```
 
 **环境配置**：
@@ -271,6 +273,9 @@ pip install hengshot-0.1.1-py3-none-any.whl
 ### 1. 作为Python库使用
 
 ```python
+from hengshot.hengline import generate_storyboard
+from hengshot.hengline.hengline_config import HengLineConfig
+
 async def basic_usage():
     """基础用法示例"""
     script = """
@@ -304,6 +309,9 @@ async def basic_usage():
 可以通过 HTTP API 将剧本分镜智能体集成到各种 Web 应用中：
 
 ```python
+from hengshot.hengline import generate_storyboard
+from hengshot.hengline.hengline_config import HengLineConfig
+
 @app.post("/api/generate-storyboard")
 async def generate_storyboard_endpoint(script_text: str):
     """
@@ -333,6 +341,9 @@ async def generate_storyboard_endpoint(script_text: str):
 可以将剧本分镜智能体作为 LangGraph 工作流中的一个节点：
 
 ```python
+from hengshot.hengline import generate_storyboard
+from hengshot.hengline.hengline_config import HengLineConfig
+
 # 定义状态结构
 class StoryboardState(BaseModel):
     script_text: str = Field(description="输入剧本文本")
@@ -399,49 +410,7 @@ async def run_langgraph_example():
 
 如：上游是剧本创作智能体，下游是 文生视频+剪辑 智能。
 
-```python
-@dataclass
-class A2ATask:
-    """A2A任务数据类"""
-    task_id: str
-    script_content: str
-    priority: int = 1
-    metadata: Dict[str, Any] = None
 
-
-class StoryboardA2AAgent:
-    """分镜生成的A2A代理"""
-
-    def __init__(self, agent_id: str):
-        self.agent_id = agent_id
-        self.task_queue = []
-
-    async def process_task(self, task: A2ATask) -> Dict[str, Any]:
-        """
-        处理A2A任务
-        """
-        try:
-            # 调用分镜生成智能体
-            result = await generate_storyboard(
-                script_text=task.script_content,
-                task_id=task.task_id
-            )
-
-            return {
-                "agent_id": self.agent_id,
-                "task_id": task.task_id,
-                "status": "completed",
-                "result": result,
-                "metadata": task.metadata or {}
-            }
-        except Exception as e:
-            return {
-                "agent_id": self.agent_id,
-                "task_id": task.task_id,
-                "status": "failed",
-                "error": str(e)
-            }
-```
 
 
 

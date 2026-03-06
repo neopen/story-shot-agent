@@ -5,8 +5,8 @@
 @Github: https://github.com/HengLine/video-shot-agent
 @Time: 2026/1/26 23:15
 """
-from video_shot_breakdown.hengline.agent.shot_segmenter.shot_segmenter_models import ShotSequence
-from video_shot_breakdown.hengline.agent.video_splitter.video_splitter_models import FragmentSequence
+from hengshot.hengline.agent.shot_segmenter.shot_segmenter_models import ShotSequence
+from hengshot.hengline.agent.video_splitter.video_splitter_models import FragmentSequence
 
 
 # MVP分段核心逻辑（伪代码）

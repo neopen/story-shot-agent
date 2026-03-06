@@ -7,9 +7,9 @@
 """
 import logging
 
-from video_shot_breakdown.hengline.agent.base_models import ElementType
-from video_shot_breakdown.hengline.agent.script_parser.script_parser_models import BaseElement, SceneInfo, CharacterInfo, ParsedScript
-from video_shot_breakdown.hengline.agent.shot_segmenter.rule_shot_segmenter import RuleShotSegmenter
+from hengshot.hengline.agent.base_models import ElementType
+from hengshot.hengline.agent.script_parser.script_parser_models import BaseElement, SceneInfo, CharacterInfo, ParsedScript
+from hengshot.hengline.agent.shot_segmenter.rule_shot_segmenter import RuleShotSegmenter
 
 
 # 使用示例

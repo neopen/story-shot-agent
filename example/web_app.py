@@ -8,7 +8,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from video_shot_breakdown.hengline import generate_storyboard
+from hengshot.hengline import generate_storyboard
 
 app = FastAPI(title="视频分镜生成API")
 

@@ -7,11 +7,11 @@
 """
 import json
 
-from video_shot_breakdown.hengline.agent.script_parser2.script_parser_models import UnifiedScript
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.estimator_factory import estimator_factory
-from video_shot_breakdown.hengline.agent.shot_generator_bak.hybrid_temporal_planner import HybridTemporalPlanner
-from video_shot_breakdown.hengline.client.client_factory import get_default_llm
-from video_shot_breakdown.utils.obj_utils import dict_to_dataclass
+from hengshot.hengline.agent.script_parser2.script_parser_models import UnifiedScript
+from hengshot.hengline.agent.shot_generator_bak.estimator.estimator_factory import estimator_factory
+from hengshot.hengline.agent.shot_generator_bak.hybrid_temporal_planner import HybridTemporalPlanner
+from hengshot.hengline.client.client_factory import get_default_llm
+from hengshot.utils.obj_utils import dict_to_dataclass
 
 """
 更新使用示例

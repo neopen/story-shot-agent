@@ -7,6 +7,7 @@ langgraph==0.6.11
 # langchain-wenxin
 langchain-deepseek
 langchain-ollama
+langchain-openai
 chromadb
 llama-index-core==0.14.4
 llama-index-embeddings-openai

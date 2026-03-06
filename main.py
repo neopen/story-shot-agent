@@ -19,10 +19,10 @@ import sys
 from pathlib import Path
 
 from scripts.setup_env import AppBaseEnv
-from video_shot_breakdown.app import app
-from video_shot_breakdown.config import settings
-from video_shot_breakdown.logger import debug, info, error, get_logging_manager
-from video_shot_breakdown.utils.log_utils import print_log_exception
+from hengshot.app import app
+from hengshot.config.config import settings
+from hengshot.logger import debug, info, error, get_logging_manager
+from hengshot.utils.log_utils import print_log_exception
 
 # 设置编码为UTF-8以确保中文显示正常
 sys.stdout.reconfigure(encoding='utf-8')

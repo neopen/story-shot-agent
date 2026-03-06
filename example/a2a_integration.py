@@ -8,7 +8,7 @@
 from dataclasses import dataclass
 from typing import Dict, Any
 
-from video_shot_breakdown.hengline import generate_storyboard
+from hengshot.hengline import generate_storyboard
 
 
 @dataclass

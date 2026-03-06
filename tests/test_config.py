@@ -7,8 +7,6 @@
 """
 import os
 
-from dotenv import dotenv_values
-
 """
 @FileName: config.py
 @Description: 配置管理模块 - 严格遵循 env > yaml > default 优先级
@@ -16,7 +14,7 @@ from dotenv import dotenv_values
 @Time: 2026/01
 """
 from pathlib import Path
-from typing import Optional, Any, Tuple, Dict
+from typing import Optional, Any
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -24,15 +22,10 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 # ==================== 路径配置 ====================
 # 确定项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
-CONFIG_DIR = PROJECT_ROOT / "config"
-ENV_FILE = PROJECT_ROOT / ".env"
+ENV_FILE = Path.cwd() / ".env"
 
 print(f"项目根目录: {PROJECT_ROOT}")
-print(f"配置目录: {CONFIG_DIR}")
 print(f".env 文件: {ENV_FILE}")
-
-# 确保目录存在
-CONFIG_DIR.mkdir(exist_ok=True)
 
 
 class LLMProviderConfig(BaseModel):
@@ -87,6 +80,7 @@ class EmbeddingProviderConfig(BaseModel):
             return os.getenv(env_var, "")
         return v
 
+
 class LLMConfig(BaseModel):
     """LLM主配置"""
     default: LLMProviderConfig = Field(default_factory=LLMProviderConfig)
@@ -97,6 +91,7 @@ class EmbeddingConfig(BaseModel):
     """嵌入模型主配置"""
     default: EmbeddingProviderConfig = Field(default_factory=EmbeddingProviderConfig)
     fallback: EmbeddingProviderConfig = Field(default_factory=EmbeddingProviderConfig)
+
 
 # ====== 2. 自定义环境变量源：智能转换键名 ======
 # class SmartEnvSettingsSource(PydanticBaseSettingsSource):
@@ -161,6 +156,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 
 def test_print_config():
     """测试打印配置"""

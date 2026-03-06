@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict
 
 from example.direct_usage import basic_usage
-from video_shot_breakdown.hengline import generate_storyboard
+from hengshot.hengline import generate_storyboard
 
 
 class StoryboardManager:

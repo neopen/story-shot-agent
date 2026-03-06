@@ -7,7 +7,7 @@
 """
 import time
 
-from video_shot_breakdown.hengline.tools.langchain_memory_tool import LangChainMemoryTool
+from hengshot.hengline.tools.langchain_memory_tool import LangChainMemoryTool
 
 
 def test_langchain_memory():

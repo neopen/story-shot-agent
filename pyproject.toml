@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = {attr = "video_shot_breakdown.__version__"}
+version = {attr = "hengshot.__version__"}
 
 [project]
 name = "hengshot"
@@ -42,17 +42,17 @@ dependencies = [
     # 核心AI/LLM
     "langchain==0.3.27",
     "langchain-community==0.3.31",
-    "langchain-deepseek>=0.1.0",
     "langchain-ollama>=0.1.0",
-    "dashscope==1.23.9",
+#    "langchain-deepseek>=0.1.0",
+#    "dashscope==1.23.9",
     "langgraph==0.6.11",
 
     # RAG/向量存储
-    "llama-index-core==0.14.4",
-    "llama-index-embeddings-openai>=0.1.0",
-    "llama-index-embeddings-huggingface>=0.1.0",
-    "llama-index-embeddings-ollama>=0.1.0",
-    "chromadb>=0.4.22",
+#    "llama-index-core==0.14.4",
+#    "llama-index-embeddings-openai>=0.1.0",
+#    "llama-index-embeddings-huggingface>=0.1.0",
+#    "llama-index-embeddings-ollama>=0.1.0",
+#    "chromadb>=0.4.22",
 
     # 配置与数据验证
     "pydantic>=2.11.10",
@@ -61,7 +61,7 @@ dependencies = [
 
     # 数据处理
     "numpy>=1.24.0",
-    "jieba>=0.42.1",
+#    "jieba>=0.42.1",
 
     # 工具库
     "requests>=2.31.0",
@@ -115,22 +115,38 @@ Documentation = "https://HengLine.github.io/video-shot-agent"
 "Issue Tracker" = "https://github.com/HengLine/video-shot-agent/issues"
 "Changelog" = "https://github.com/HengLine/video-shot-agent/releases"
 
-# 注意：这里引用的是内部的Python包名 video_shot_breakdown
+# 注意：这里引用的是内部的Python包名 hengshot
 [project.scripts]
-video-shot-agent = "video_shot_breakdown.cli:main"
-vs-agent = "video_shot_breakdown.cli:main"  # 简写别名
+video-shot-agent = "hengshot.cli:main"
+vs-agent = "hengshot.cli:main"  # 简写别名
 
 # 如果使用FastAPI，可以添加一个serve命令
 [project.entry-points."console_scripts"]
-video-shot-agent-serve = "video_shot_breakdown.cli:serve"
+video-shot-agent-serve = "hengshot.cli:serve"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["video_shot_breakdown*"]
+include = ["hengshot*"]
 exclude = ["tests*", "tests.*"]
+
+# 包含包内数据文件
+[tool.setuptools.package-data]
+hengshot = [
+    "*.yaml",
+    "*.yml",
+    "*.json",
+    "*.txt",
+    "*.md",
+    "templates/*",
+    "templates/*/*",
+    "config/*.yaml",
+    "config/**/*.yaml",
+    "hengline/prompts/**/*.yaml",
+    ".env.example"
+]
 
 [tool.black]
 line-length = 88
@@ -142,7 +158,7 @@ line_length = 88
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -151,7 +167,7 @@ disallow_untyped_defs = true
 module = [
     "langchain.*",
     "langchain_community.*",
-    "llama_index.*",
+#    "llama_index.*",
 ]
 ignore_missing_imports = true
 

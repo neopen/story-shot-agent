@@ -8,12 +8,12 @@
 
 from typing import Dict
 
-from video_shot_breakdown.hengline.agent.script_parser2.script_parser_models import UnifiedScript
-from video_shot_breakdown.hengline.agent.temporal_planner.splitter.five_second_splitter import FiveSecondSplitter
-from video_shot_breakdown.hengline.agent.temporal_planner.splitter.splitter_config import SplitterConfig
-from video_shot_breakdown.hengline.agent.video_assembler.splitter.splitter_validator import SplitterExporter, SegmentValidator, SegmentVisualizer
-from video_shot_breakdown.hengline.agent.temporal_planner.temporal_planner_model import DurationEstimation, ElementType
-from video_shot_breakdown.utils.obj_utils import dict_to_dataclass
+from hengshot.hengline.agent.script_parser2.script_parser_models import UnifiedScript
+from hengshot.hengline.agent.temporal_planner.splitter.five_second_splitter import FiveSecondSplitter
+from hengshot.hengline.agent.temporal_planner.splitter.splitter_config import SplitterConfig
+from hengshot.hengline.agent.video_assembler.splitter.splitter_validator import SplitterExporter, SegmentValidator, SegmentVisualizer
+from hengshot.hengline.agent.temporal_planner.temporal_planner_model import DurationEstimation, ElementType
+from hengshot.utils.obj_utils import dict_to_dataclass
 
 
 def create_sample_estimations() -> Dict[str, DurationEstimation]:

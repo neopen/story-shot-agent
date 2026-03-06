@@ -5,12 +5,12 @@
 @Github: https://github.com/HengLine/video-shot-agent
 @Time: 2026/1/13 16:12
 """
-from video_shot_breakdown.hengline.agent.script_parser2.script_parser_models import Scene
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.rule_base_estimator import EstimationContext
-from video_shot_breakdown.hengline.agent.shot_generator_bak.estimator.rule_scene_estimator import RuleSceneDurationEstimator
-from video_shot_breakdown.hengline.config.keyword_config import get_keyword_config
-from video_shot_breakdown.hengline.config.temporal_planner_config import get_planner_config
-from video_shot_breakdown.utils.obj_utils import dict_to_obj
+from hengshot.hengline.agent.script_parser2.script_parser_models import Scene
+from hengshot.hengline.agent.shot_generator_bak.estimator.rule_base_estimator import EstimationContext
+from hengshot.hengline.agent.shot_generator_bak.estimator.rule_scene_estimator import RuleSceneDurationEstimator
+from hengshot.hengline.config.keyword_config import get_keyword_config
+from hengshot.hengline.config.temporal_planner_config import get_planner_config
+from hengshot.utils.obj_utils import dict_to_obj
 
 
 def demonstrate_yaml_config():

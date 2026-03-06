@@ -1,0 +1,35 @@
+# MANIFEST.in
+# 确保所有非 Python 文件被打包
+
+# 配置文件
+include src/hengshot/*.yaml
+include src/hengshot/*.yml
+include src/hengshot/*.json
+include src/hengshot/*.txt
+# 包含配置文件
+include src/hengshot/**/*.yaml
+include src/hengshot/**/*.yml
+# 包含示例文件
+include .env.example
+
+# 排除敏感文件
+global-exclude .env
+global-exclude .env.local
+global-exclude .env.*.local
+
+# 数据文件
+recursive-include example *
+recursive-include src/hengshot/templates *
+
+# 排除测试文件
+prune tests
+prune .github
+
+# 排除敏感文件
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .env
+global-exclude .env.*
+global-exclude *.so
+global-exclude *.dll
+global-exclude .gitignore
