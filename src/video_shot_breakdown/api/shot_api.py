@@ -63,6 +63,7 @@ def generate_storyboard_api(request: ProcessRequest, background_tasks: Backgroun
 
         # 立即返回任务ID
         return ProcessResult(
+            success=True,
             task_id=task_id,
             status="pending",
             created_at=datetime.now()
@@ -187,10 +188,10 @@ async def get_task_result(task_id: str):
 
     return ProcessResult(
         task_id=task_id,
+        success=task["status"] == "completed",
         status="success" if task["status"] == "completed" else "failed",
-        data=task.get("result"),
-        error_message=task.get("error"),
-        warnings=task.get("result", {}).get("warnings", []) if task.get("result") else None,
+        data=task.get("result", {}).get("data"),
+        message=task.get("error"),
         processing_time_ms=processing_time,
         created_at=task["created_at"],
         completed_at=task.get("completed_at")

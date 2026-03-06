@@ -50,9 +50,9 @@ class ProcessResult(BaseModel):
     """处理结果响应模型"""
     task_id: str
     status: str  # success, failed
+    success: bool
     data: Optional[Dict[str, Any]] = None  # 处理结果数据
-    error_message: Optional[str] = None
-    warnings: Optional[List[str]] = None
+    message: Optional[str] = None
     processing_time_ms: Optional[int] = None  # 处理耗时（毫秒）
     created_at: datetime
     completed_at: Optional[datetime] = None

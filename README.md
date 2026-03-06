@@ -163,22 +163,70 @@ curl --location --request GET 'http://localhost:8000/api/v1/status/hengline20260
   "fragments": [
     {
       "fragment_id": "frag_001",
-      "prompt": "Cinematic wide shot of a rainy-night city apartment living room: rain-streaked window blurs vibrant neon signs outside into soft, glowing color smudges; interior lit solely by a single warm yellow floor lamp casting gentle light on a dusty vintage record player, faded movie posters on the walls, and stacked leather-bound notebooks; shallow depth of field, moody chiaroscuro lighting, film grain texture, 35mm cinematic color grading, atmospheric haze, hyper-detailed realism, slow ambient camera drift",
-      "negative_prompt": "bright lighting, daylight, people, text, logos, modern furniture, clean surfaces, sharp focus everywhere, cartoonish style, low resolution, motion blur artifacts, lens flare, overexposure, cluttered composition",
-      "duration": 4.0,
+      "prompt": "Cinematic wide shot: midnight 11 PM in a compact urban apartment living room — rain lashes violently against the window, blurring distant neon signs (pink, cyan, magenta) into soft streaks; dim ambient light from a silent black-and-white vintage film playing on an old CRT TV casts faint flickering glow; medium-gray fabric sofa, weathered oak coffee table, analog wall clock frozen at 11:00, half-drawn beige curtains; woman (Lin Ran) curled on sofa under a thick, off-white hand-knitted wool blanket — coarse texture, yellowed edges, visible pilling and wear; she wears a loose, muted gray cotton long-sleeve top with subtle collar folds; her face is tired but alert, eyes slightly red, jaw gently tensed; shallow depth of field, film grain, naturalistic color grading, moody chiaroscuro lighting, 35mm cinematic realism\n\n全景镜头：深夜11点的城市公寓客厅，窗外大雨滂沱，雨幕模糊映出远处霓虹灯（粉、青、洋红）的光斑；室内微光来自静音播放的黑白老电影CRT电视，泛出轻微闪烁荧光；米灰布艺沙发、原木茶几、指针停在11点的老式挂钟、半掩的米色窗帘；林然蜷坐于沙发，裹着厚实米白旧羊毛毯——粗纺质感、边缘泛黄起球、生活磨损明显；身穿中性灰素色棉质长袖上衣，宽松剪裁、领口微褶；神情疲惫而警觉，眼眶微红，下颌线轻绷；浅景深，胶片颗粒感，自然影调，明暗对比克制的电影级写实风格",
+      "negative_prompt": "cartoon, anime, 3D render, photorealistic stock photo, bright lighting, smiling face, modern fashion, high saturation, text, logo, watermark, sharp focus everywhere, clean unused objects, glossy surfaces, daylight, people walking, dialogue subtitles",
+      "duration": 4.2,
       "model": "runway_gen2",
-      "style": "cinematic noir ambiance with nostalgic analog warmth",
-      "requires_special_attention": false
+      "style": "cinematic 35mm film, moody realism, shallow depth of field, natural lighting, muted palette, subtle motion blur on rain streaks",
+      "requires_special_attention": false,
+      "audio_prompt": {
+        "audio_id": "audio_001",
+        "prompt": "Low-frequency rain ambience (intensity 0.95), distant muffled TV static hiss (black-and-white film tone), near-silence punctuated by faint breath and fabric rustle — no speech, no music, no sudden transients; highly restrained dynamic range, immersive spatial audio, slight reverb suggesting small enclosed apartment space\n\n低频雨声基底（强度0.95），远处模糊的老式黑白电视底噪（嘶嘶白噪音），近乎寂静中夹杂极轻微呼吸声与羊毛毯摩擦声——无人声台词、无音乐、无突兀瞬态；高度克制的动态范围，沉浸式空间音频，轻微混响体现小户型密闭空间感",
+        "negative_prompt": "speech, dialogue, footsteps, door creak, music, birdsong, wind howl, thunderclap, laughter, applause, narration",
+        "model_type": "AudioLDM_3",
+        "voice_type": "narration",
+        "audio_style": "cinematic",
+        "voice_character": null,
+        "voice_description": "ambient sound design only, no voice, pure atmospheric field recording style",
+        "speed": 1.0,
+        "pitch_shift": 0.0,
+        "emotion": "neutral",
+        "stability": 0.7,
+        "duration_seconds": 4.2,
+        "sound_attributes": {
+          "intensity": 0.8,
+          "reverb": 0.3
+        },
+        "format": "wav",
+        "sample_rate": 24000,
+        "seed": 8742,
+        "scene_context": "A quiet, emotionally charged apartment interior at night during heavy rain — Lin Ran sits alone, exhausted but vigilant, surrounded by memory-laden domestic objects",
+        "previous_audio_id": "audio_014"
+      }
     },
     {
       "fragment_id": "frag_002",
-      "prompt": "Cinematic medium shot: Lin Ran curled up on a light gray fabric sofa, bare feet resting on a textured wool rug, knees covered by a faded indigo blanket with worn edges; she wears a creamy white cotton robe, hair slightly damp at the ends, her profile softly illuminated by warm floor lamp light revealing tired, serene contours; outside the window, a faint lightning flash briefly illuminates her still, delicate eyelashes — shallow depth of field, soft cinematic lighting, film grain texture, 35mm anamorphic lens aesthetic, natural skin tones, ultra-detailed fabric and textile realism, subtle ambient occlusion, moody yet intimate atmosphere.",
-      "negative_prompt": "blurry, deformed hands, extra limbs, text, logos, cartoonish style, low resolution, oversaturated colors, harsh shadows, noisy grain, CGI look, anime style, smiling, motion blur, talking, open eyes blinking, daylight, cluttered background",
+      "prompt": "medium shot, cinematic lighting, Lin Ran curled up on a light gray fabric sofa, wrapped in a creamy off-white vintage wool blanket — thick, coarse-knit, slightly yellowed and pilled at edges, showing visible wear; she wears a neutral-toned (light gray/mushroom beige) soft cotton long-sleeve top, loose fit, subtle collar pleats, no jewelry or decoration; her expression is exhausted yet alert, eyes slightly red-rimmed, quiet emotional tension; background: modern small-city apartment living room — light gray fabric sofa, warm-toned wooden coffee table, vintage wall clock frozen at 11:00, half-drawn curtains revealing blurred neon lights and rain-streaked window; muted black-and-white old film playing silently on TV screen; ambient low-frequency rain, faint TV static hum, restrained vocal dynamic range\n\n中景，电影感布光：林然蜷坐于米灰布艺沙发中，裹着米白色旧羊毛毯——厚实粗纺、局部泛黄起球、边缘磨损，具明显生活使用痕迹；身穿中性灰/米白色素色棉质长袖上衣，宽松剪裁，领口微褶，无装饰；神情疲惫而警觉，眼眶微红，情绪张力内敛；背景为现代都市小户型客厅：米灰布艺沙发、暖调原木茶几、静止于11点的老式挂钟、半掩窗帘映出窗外模糊霓虹与雨痕；电视静音播放黑白老电影；环境音为低频雨声基底 + 微弱电视底噪 + 高度克制的人声动态范围",
+      "negative_prompt": "modern fashion clothing, bright colors, glossy textures, sharp focus on face only, text overlays, logos, cartoon style, anime, photorealistic skin imperfections, motion blur, shaky cam, high saturation, studio lighting, smiling, energetic pose, multiple people, clean unused objects",
       "duration": 3.0,
       "model": "runway_gen2",
-      "style": "Cinematic, moody, intimate, photorealistic, 35mm film aesthetic",
-      "requires_special_attention": false
-    }
+      "style": "cinematic, realistic, muted color palette, shallow depth of field, Kodak Portra 400 film grain, emotionally restrained tone",
+      "requires_special_attention": false,
+      "audio_prompt": {
+        "audio_id": "audio_002",
+        "prompt": "ambient low-frequency rainfall (intensity 0.9), distant faint television white noise (black-and-white film static), near-silence with subtle breath and micro-movement cues, highly compressed vocal dynamic range, no dialogue, immersive domestic stillness\n\n低频雨声（强度0.9）、远处微弱电视底噪（黑白电影静电声）、近乎寂静中夹杂细微呼吸与身体微动声、人声动态范围高度压缩、无台词、沉浸式居家静默氛围",
+        "negative_prompt": "dialogue, music, footsteps, door sounds, phone ring, laughter, wind, thunder, abrupt transients, high-frequency hiss, stereo panning effects",
+        "model_type": "AudioLDM_3",
+        "voice_type": "narration",
+        "audio_style": "cinematic",
+        "voice_character": null,
+        "voice_description": "no voice, pure environmental atmosphere with ultra-low dynamic range and tactile silence",
+        "speed": 1.0,
+        "pitch_shift": 0.0,
+        "emotion": "neutral",
+        "stability": 0.7,
+        "duration_seconds": 3.0,
+        "sound_attributes": {
+          "intensity": 0.8,
+          "reverb": 0.3
+        },
+        "format": "wav",
+        "sample_rate": 24000,
+        "seed": 42719,
+        "scene_context": "urban apartment living room at night during heavy rain, character sitting still under wool blanket, silent TV glowing faintly, emotional stillness",
+        "previous_audio_id": "audio_001"
+      }
+    },
     ......
   ]
 }

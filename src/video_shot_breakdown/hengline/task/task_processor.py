@@ -45,7 +45,7 @@ class AsyncTaskProcessor:
             self.task_manager.update_task_progress(task_id, "finalizing", 90)
 
             # 完成任务
-            self.task_manager.complete_task(task_id, result, None)
+            self.task_manager.complete_task(task_id, result)
 
             info(f"任务完成: {task_id}")
 

@@ -12,6 +12,7 @@ from langgraph.graph import StateGraph, END
 
 from video_shot_breakdown.hengline.agent.script_parser_agent import ScriptParserAgent
 from video_shot_breakdown.logger import debug, error, info, warning
+from video_shot_breakdown.utils.log_utils import print_log_exception
 from .workflow_decision import PipelineDecision
 from .workflow_models import AgentStage, PipelineNode, PipelineState
 from .workflow_nodes import WorkflowNodes
@@ -351,27 +352,13 @@ class MultiAgentPipeline:
             # 处理返回结果
             success = final_result.get("success", False)
             data = final_result.get("data")
-            errors = final_result.get("errors", [])
-
-            # 获取处理统计信息
-            processing_stats = final_result.get("processing_stats", {})
-
-            result = {
-                "success": success,
-                "data": data,
-                "errors": errors,
-                "processing_stats": processing_stats,
-                "task_id": self.task_id,
-                "workflow_status": "completed" if success else "failed"
-            }
-
             info(f"工作流执行结果: success={success}, has_data={data is not None}")
 
             # 如果需要，可以添加额外的验证
             if success and data:
                 self._validate_final_output(data)
 
-            return result
+            return final_result
 
         except Exception as e:
             error(f"执行工作流时出错: {str(e)}")
@@ -551,14 +538,14 @@ class MultiAgentPipeline:
                 warning(f"data字段不是字典: {type(data)}")
                 return False
 
-            # 检查是否有fragment_sequence
-            fragment_sequence = data.get("fragment_sequence")
-            if not fragment_sequence:
-                warning("结果中没有fragment_sequence")
+            # 检查是否有 instructions
+            instructions = data.get("instructions")
+            if not instructions:
+                warning("结果中没有 instructions")
                 return False
 
             # 检查片段数量
-            fragments = fragment_sequence.get("fragments", [])
+            fragments = instructions.fragments
             if not isinstance(fragments, list):
                 warning(f"fragments不是列表: {type(fragments)}")
                 return False
@@ -569,21 +556,32 @@ class MultiAgentPipeline:
                 return False
 
             # 检查元数据
-            metadata = fragment_sequence.get("metadata", {})
+            metadata = instructions.metadata
             if metadata.get("fixed_by_output_fixer"):
                 debug("结果已被修复器修复")
 
             # 检查片段ID是否唯一
-            fragment_ids = [f.get("id") for f in fragments if isinstance(f, dict) and "id" in f]
+            fragment_ids = [f.fragment_id for f in fragments]
             unique_ids = set(fragment_ids)
             if len(fragment_ids) != len(unique_ids):
                 warning(f"片段ID不唯一: {len(fragment_ids)}个片段, {len(unique_ids)}个唯一ID")
+
+            # 检查片段是否有提示词
+            fragments_with_prompts = [f for f in fragments if f.prompt]
+            if len(fragments_with_prompts) < len(fragments) * 0.8:  # 至少80%的片段应该有提示词
+                warning(f"片段中提示词缺失较多: {len(fragments_with_prompts)}/{len(fragments)}个片段有提示词")
+
+            # 检查音频提示词是否存在
+            fragments_with_audio_prompts = [f for f in fragments if f.audio_prompt]
+            if len(fragments_with_audio_prompts) < len(fragments) * 0.5:  # 至少50%的片段应该有音频提示词
+                warning(f"片段中音频提示词缺失较多: {len(fragments_with_audio_prompts)}/{len(fragments)}个片段有音频提示词")
 
             info(f"验证通过: {len(fragments)}个片段")
             return True
 
         except Exception as e:
             error(f"验证结果时出错: {str(e)}")
+            print_log_exception()
             return False
 
     def _validate_final_output(self, data: Dict[str, Any]):

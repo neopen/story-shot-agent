@@ -50,12 +50,12 @@ class TaskManager:
                 self.tasks[task_id]["progress"] = progress
             self.tasks[task_id]["updated_at"] = datetime.now().isoformat()
 
-    def complete_task(self, task_id: str, result: Dict, error: str = None):
+    def complete_task(self, task_id: str, result: Dict):
         """完成任务"""
         if task_id in self.tasks:
-            self.tasks[task_id]["status"] = "failed" if error else "completed"
+            self.tasks[task_id]["status"] = "completed" if result.get("success", False) else "failed"
             self.tasks[task_id]["result"] = result
-            self.tasks[task_id]["error"] = error
+            self.tasks[task_id]["error"] = result.get("error")
             self.tasks[task_id]["updated_at"] = datetime.now().isoformat()
             self.tasks[task_id]["completed_at"] = datetime.now().isoformat()
 
