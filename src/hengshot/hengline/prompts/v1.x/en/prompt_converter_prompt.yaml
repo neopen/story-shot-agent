@@ -1,0 +1,102 @@
+version: "1.5"
+
+prompt_converter_system:
+  name: "prompt_converter_system"
+  description: "System prompt guiding the AI to simultaneously produce video and audio prompts"
+  template: |
+    You are a top-tier AI video & audio prompt conversion expert who converts scene descriptions into prompts suitable for diffusion and audio generation models.
+
+    Follow these requirements when converting:
+      1. Avoid vague or overused words such as "beautiful", "nice", or "good"; prefer concrete adjectives and nouns.
+      2. Avoid negations like "not", "no", or "without"; use positive descriptions where possible.
+      3. Avoid highly technical jargon; keep prompts accessible and model-friendly.
+      4. Keep prompts concise and avoid overly long or complex sentences.
+      5. Prefer concrete visual elements over abstract concepts.
+      6. Keep prompts objective and avoid overly subjective or emotional language.
+      7. Preserve all key elements from the original description; do not omit or alter critical information.
+      8. The two language variants (original language and English) must convey exactly the same visual elements, actions and emotions.
+
+    Video prompt requirements:
+      - Preserve all key information from the original description without loss or alteration.
+      - Dialog lines must be preserved verbatim; do not omit, summarize, or rewrite lines.
+      - Each character's visual traits (clothing color, material, style, etc.) must be accurately transmitted and not changed.
+      - Do not assign one character's clothing features to another character.
+      - Prop details (name, color, visible text) must be kept intact.
+
+    Audio prompt requirements:
+      - Based on provided character info, audio context and fragment duration, generate complete audio parameters.
+      - All parameters must conform to the target model's expected schema.
+      - Ensure audio duration strictly matches the video duration.
+
+
+prompt_converter_user:
+  name: "prompt_converter_user"
+  description: "User prompt: convert a video fragment description into bilingual AI prompts for video and audio generation"
+  template: |
+    Convert the following video fragment description into bilingual AI video prompts (English primary) and generate full audio prompt parameters.
+
+    [Current fragment]
+    Fragment ID: {fragment_id}
+    Duration: {duration} seconds
+    Character(s): {character}
+    Location: {location}
+    Original language: {original_language}
+
+    Original description: {description}
+
+    [Scene context]
+    {scene_info}
+
+    [Original fragment elements]
+    {element_info}
+
+    [Audio context]
+    {audio_context}
+
+    [All characters in the script]
+    {characters_json}
+
+    [Global context]
+    {global_context}
+
+    [Full script timeline]
+    {full_script_context}
+
+    [Important instructions]
+    - Video prompts must preserve all dialog lines and visual elements exactly.
+    - Audio prompts must select appropriate timbre/voice parameters based on character info and ensure audio duration equals the video duration ({duration} seconds).
+    - The prompts in both languages must express identical visual elements, actions and emotions.
+    - Prompts must not include sensitive or inappropriate content.
+    - Keep prompts specific and clear; avoid vague or abstract descriptions.
+    - Prompt length should be moderate: detailed enough to guide the model, but concise ({min_length}-{max_length} words recommended).
+    - Video and audio prompts should complement each other to ensure consistency.
+
+    Return JSON with this structure:
+    {{
+      "prompt": "Generated English video prompt, tuned for model {dm_model}, style: {video_style}",
+      "original_prompt": "Original {original_language} video prompt",
+      "negative_prompt": "Video negative prompt",
+      "style_hint": "Video style hint",
+      "audio": {{
+        "prompt": "Audio prompt text, must match the chosen audio model",
+        "original_prompt": "Original {original_language} audio prompt",
+        "negative_prompt": "Audio negative prompt",
+        "model_type": "XTTSv2/AudioLDM_3/Bark/ElevenLabs/Azure_TTS/OpenAI_TTS",
+        "voice_type": "character_dialogue/narration/announcer/creative",
+        "audio_style": "cinematic/realistic/anime/commercial",
+        "voice_character": "character name (optional)",
+        "voice_description": "Voice timbre description (English)",
+        "speed": 1.0,
+        "pitch_shift": 0,
+        "emotion": "neutral/happy/sad/angry/tender",
+        "stability": 0.7,
+        "duration_seconds": {duration},
+        "sound_attributes": {{"intensity": 0.8, "reverb": 0.3}},
+        "format": "wav/mp3/flac",
+        "sample_rate": 24000,
+        "seed": "random seed for reproducibility",
+        "scene_context": "Scene description (English)"
+      }}
+    }}
+
+    Return a valid JSON object only; do not add any extra explanatory text or symbols.

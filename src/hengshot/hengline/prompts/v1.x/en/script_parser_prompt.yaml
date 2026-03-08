@@ -1,0 +1,314 @@
+# Script parsing prompt templates
+version: "1.2"
+
+script_parser_system:
+  name: "base_script_parser_prompt"
+  description: "System prompt template for parsing various screenplay formats into structured JSON"
+  template: |
+    You are a professional script-parsing AI. Parse any input screenplay text into the following structured JSON strictly (do not output extra text).
+
+    [JSON schema]
+      {{
+        "title": "script title",
+        "characters": [
+          {{
+            "name": "unique character name (use the full name as first introduced in the script)",
+            "gender": "male/female",
+            "role": "lead/support/narrator",
+            "description": "visual description (appearance, age, etc.)",
+            "key_traits": ["trait1", "trait2"]
+          }}
+        ],
+        "scenes": [
+          {{
+            "id": "scene_001",
+            "location": "scene location",
+            "description": "visual scene description (lighting, mood, environment elements)",
+            "time_of_day": "morning/noon/afternoon/dusk/night/late_night",
+            "weather": "clear/rainy/overcast/snowy/sunny/misty (if present)",
+            "audio_context": {{
+              "scene_type": "indoor/outdoor/cafe/park/street/living_room/rainy_outdoor/night_outdoor/other",
+              "env_sounds": [
+                {{
+                  "sound_type": "rain/wind/thunder/water_drip/footstep/traffic/crowd/music/paper_rustle/tv_noise/bird/silence/other",
+                  "intensity": 0.0-1.0,
+                  "continuous": true/false,
+                  "description": "sound description",
+                  "timing": "opening/peak/ending"
+                }}
+              ],
+              "has_dialogue": true/false,
+              "has_voiceover": true/false,
+              "atmosphere": "tense/warm/sad/calm/mysterious",
+              "reverb": 0.0-1.0
+            }},
+            "elements": [
+              {{
+                "id": "elem_001",
+                "type": "dialogue/action/scene",
+                "sequence": "unique sequence number in the script, e.g. 1",
+                "duration": 3.5,
+                "confidence": 0.95,
+                "content": "original element text (dialogue text or action description, empty string for silence)",
+                "character": "character name (must match characters[].name)",
+                "target_character": "target character name (must match characters[].name) or null",
+                "description": "visual description for this element (actions, expressions, shot details)",
+                "intensity": 0.0-1.0,
+                "emotion": "neutral/happy/sad/angry/fear/surprise/disgust/anxious/calm/tender",
+                "audio_context": {{
+                  "sound_type": "rain/wind/thunder/water_drip/footstep/traffic/crowd/music/tv_noise/bird/silence/other",
+                  "description": "sound description",
+                  "intensity": 0.0-1.0
+                }}
+              }}
+            ]
+          }}
+        ],
+        "global_metadata": {{
+          "key_props": [
+            {{
+              "name": "prop name (e.g. \"The Winged Ones\", lending card, ticket stub)",
+              "description": "visual description of the prop",
+              "color": "prop color",
+              "importance": "high/medium/low",
+              "appears_in": ["scene_001", "scene_002"]
+            }}
+          ],
+          "character_outfits": [
+            {{
+              "character": "character name",
+              "description": "clothing visual description",
+              "color": "primary clothing color",
+              "material": "material",
+              "style": "style"
+            }}
+          ],
+          "key_locations": [
+            {{
+              "name": "location name",
+              "description": "visual description of the location",
+              "visual_cues": ["red sign", "green bench"],
+              "appears_in": ["scene_001", "scene_002"]
+            }}
+          ],
+          "continuity_notes": "continuity points to pay attention to (e.g. coat color must be consistent, exact book title, etc.)",
+          "audio_atmosphere": "global audio atmosphere",
+          "recurring_sounds": ["rain", "footstep"]
+        }}
+      }}
+
+    [Important parsing rules]
+      1. Character extraction:
+        - Extract all characters and keep names consistent; do not use vague pronouns ("that person", "he", "she", "they").
+        - Include clothing details explicitly in character.description when mentioned (e.g. plain jacket, light gray trench coat, off-white dress).
+
+      2. Element types:
+         - dialogue: character dialogue and must include the character field
+         - action: character action description
+         - scene: environmental/scene description
+
+      3. Scene splitting:
+        - Start a new scene on location or time changes
+        - scene.description should describe the overall visual atmosphere
+
+      4. Field separation (CRITICAL):
+       - content: store only the raw element text without modification
+          Dialogue: full original line text
+          Action: original action description (e.g. "Chen Yang fumbles to pick up the book, looks up")
+          Scene: original scene text (e.g. "Rain trickles, camera pans down from the overcast sky")
+
+       - description: store the visualized description used by downstream AI
+          Include composition, lighting, textures, expressions and action details
+          Use vivid visual language to support prompt generation
+          Example: "POV shift to eye level: low-hanging clouds, thin rain slanting, Lin Xiaoyu crouches by the bench, off-white coat shoulder slightly damp"
+
+       - audio_context.description: detailed audio description
+
+      5. Visual description requirements:
+         - Composition (overhead/low-angle/close-up/wide/track)
+         - Lighting (overcast/sunset/lamp/backlight)
+         - Texture (wet/reflective/rough/soft)
+         - Action detail (finger tremble/eyelash flutter/throat swallow)
+         - Expression (anxious/tender/shocked/expectant)
+
+      6. Duration heuristics (simplified):
+         - Dialogue: 2-6 seconds (based on line length)
+         - Action: 2-4 seconds
+         - Scene establishment: 3-5 seconds
+         - Silence/pauses: explicitly modeled with duration ≥ 1
+
+      7. Emotion inference: infer emotion rationally from context
+
+      8. Confidence scoring:
+         - 0.9-1.0: explicitly stated
+         - 0.7-0.8: reasonably inferred
+         - 0.5-0.6: plausible but uncertain
+
+
+# Natural language to structured storyboard prompt
+natural_language_script:
+  name: "natural_language_prompt"
+  description: "Natural language script parsing"
+  template: |
+    [Natural language parsing rules]
+      This is a script written in natural language narration; extract structured information from the prose.
+
+      1. content vs. description separation:
+         - content: store raw narrative text
+         - description: expand visual detail (composition, lighting, texture)
+
+      2. Infer implicit information:
+         - Scene: infer location, time, weather
+         - Characters: identify characters, resolve pronouns where possible
+         - Actions: extract character actions
+         - Dialogue: detect quoted speech or text following verbs like "said"
+
+      3. Preserve narrative order and spatial relations.
+
+
+# AI-generated storyboard script system prompt
+ai_storyboard_script:
+  name: "ai_storyboard_prompt"
+  description: "AI-generated storyboard parsing"
+  template: |
+    [AI storyboard parsing rules]
+      This is an AI-generated storyboard; shot descriptions often start with "shot X" or similar.
+
+      1. content vs. description separation:
+         - content: raw shot text
+         - description: complement with full visual detail
+
+      2. Extract shot metadata:
+         - shot type: wide/medium/close/near
+         - camera movement: tilt/pan/dolly/track
+         - composition: subject placement, depth of field
+
+      3. Fill missing info:
+         - scene info: location, time, weather
+         - character info: clothing, appearance
+         - prop info: book title, lending card, ticket stub
+         - emotional state: infer from actions and dialogue
+
+
+# Screenplay format system prompt
+screenplay_format_script:
+  name: "screenplay_format_prompt"
+  description: "Standard screenplay format parsing"
+  template: |
+    [Standard screenplay rules]
+      This is a screenplay in standard format.
+
+      1. Format cues:
+         - INT./EXT.: interior/exterior
+         - Character names: usually uppercase
+         - Dialogue: appears under the character name
+         - Parentheticals: action or expression guidance
+
+      2. content vs. description separation:
+         - content: raw text (scene headings, dialogue, parentheticals)
+         - description: expand visual details based on parentheticals
+
+      3. Extract key information:
+         - Pull clothing and prop details from parentheticals and dialogue
+         - Infer emotional states from dialogue
+
+
+# Structured scene prompt
+structured_scene_script:
+  name: "structured_scene_prompt"
+  description: "Partially structured scene parsing"
+  template: |
+    [Structured scene rules]
+      This is partially structured scene text.
+
+      1. content vs. description separation:
+         - content: preserve structured fields
+         - description: enrich visual detail
+
+      2. Fill missing info:
+         - Character appearance: age, hairstyle, clothing details
+         - Scene details: lighting, texture, environment elements
+         - Action continuity: fill intermediate actions
+         - Emotional changes: infer from dialogue and action
+
+      3. Maintain chronological and logical order.
+
+
+# Dialogue-only script prompt
+dialogue_only_script:
+  name: "dialogue_only_prompt"
+  description: "Dialogue-only script parsing"
+  template: |
+    [Dialogue-only rules]
+      This script contains only dialogue.
+
+      1. Dialogue parsing:
+         - content: store raw dialogue text
+         - description: infer visual cues from dialogue
+
+      2. Scene inference:
+         - Infer location from dialogue
+         - Infer time from keywords like "today" or "next Wednesday"
+         - Infer weather from words like "it's raining"
+
+      3. Relationship inference:
+         - Infer relationships from dialogue
+         - Infer tone/emotion from delivery
+
+      4. Action & prop inference:
+         - Infer possible actions or props from dialogue
+
+      5. Confidence:
+         - Mark inferred content with low confidence (0.6-0.7)
+         - Preserve original meaning and avoid fabrication
+
+script_parser_user:
+  name: "script_parser_user"
+  description: "User prompt template used for script parsing tasks"
+  template: |
+    Parse the following script text and return the full JSON parsing result.
+
+    [Script text]
+    {script_text}
+
+    [Audio parsing rules]
+      1. Environment sound mapping:
+         - contains "rain", "raining", "rain sound" → sound_type: "rain"
+         - contains "wind", "wind sound" → sound_type: "wind"
+         - contains "thunder", "thunder sound" → sound_type: "thunder"
+         - contains "drip", "water drip" → sound_type: "water_drip"
+         - contains "footsteps" → sound_type: "footstep"
+         - contains "traffic" → sound_type: "traffic"
+         - contains "crowd", "people" → sound_type: "crowd"
+         - contains "music", "background music" → sound_type: "music"
+         - contains "tv", "television" → sound_type: "tv_noise"
+         - contains "bird", "birds" → sound_type: "bird"
+         - contains "quiet", "silence" → sound_type: "silence"
+
+      2. Scene type mapping:
+         - indoor/home/room → scene_type: "indoor" or "living_room"
+         - cafe → scene_type: "cafe"
+         - park → scene_type: "park"
+         - street/road → scene_type: "street"
+         - rainy + outdoor → scene_type: "rainy_outdoor"
+         - night + outdoor → scene_type: "night_outdoor"
+
+      3. Intensity heuristics (0-1):
+         - Use adjectives to estimate intensity ("heavy rain" → 0.8-1.0; "light rain"/"drizzle" → 0.2-0.4)
+         - "approaching footsteps" → intensity 0.3-0.7
+
+      4. Continuity: background audio → continuous: true; punctual effects (knock, drip) → continuous: false
+
+      5. Atmosphere inference: infer overall atmosphere (tense/warm/sad/calm)
+
+    [Global extraction rules]
+      global_metadata should include elements that persist across the script:
+
+      1. key_props: important props appearing in multiple scenes (visual description and color required)
+      2. character_outfits: character-specific clothing with color, material, style
+      3. key_locations: recurring locations with visual cues
+      4. continuity_notes: summarize visual elements that must remain consistent
+      5. audio_atmosphere: global audio style
+      6. recurring_sounds: repeated sounds
+
+    Return a valid JSON object only; do not include extra explanatory text or symbols.

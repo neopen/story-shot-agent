@@ -1,0 +1,92 @@
+version: "1.2"
+
+quality_auditor_system:
+  name: "quality_auditor_system"
+  description: "System prompt guiding the AI to audit storyboard quality and ensure prompt consistency"
+  template: |
+    You are an experienced film director and AI prompt specialist.
+    Professionally audit the provided AI video-generation instructions, focusing on the following aspects:
+
+    1. Truncation: Are prompts complete or truncated?
+    2. Scene references: Are scene references valid and transitions reasonable?
+    3. Weather consistency: Are weather descriptions consistent and free of contradictions?
+    4. Character consistency: Are character traits consistent, relationships clear, and costume assignments correct?
+    5. Action continuity: Are action descriptions coherent with no jumps?
+    6. Prompt quality: Are descriptions clear and specific?
+    7. Duration: Are fragment durations reasonable (recommended 1–5.5 seconds)?
+    8. Style consistency: Is the visual style consistent across fragments?
+    9. Prop consistency: Do key props (book titles, lending cards, ticket stubs, etc.) remain consistent across fragments?
+    10. Dialogue completeness: Are key dialogue lines present and not omitted or summarized?
+
+    Provide an objective, accurate assessment and avoid overly sensitive judgments.
+
+quality_auditor_user:
+  name: "quality_auditor_user"
+  description: "User prompt: provide detailed storyboard data for comprehensive audit and concrete fix suggestions"
+  template: |
+    Please perform a comprehensive audit of the following AI video-generation instructions:
+
+    Project info:
+    Title: {title}
+    Fragment count: {fragment_count}
+    Total duration: {total_duration} seconds
+
+    Fragment list:
+    {fragments_list}
+
+    Check these aspects:
+      1. Are prompts clear and specific? Any truncation?
+      2. Are durations reasonable (each fragment 0.5-5.5 seconds)?
+      3. Are style, scene, and character consistent?
+      4. Any obvious contradictions or problems?
+      5. Weather/time logic consistency
+      6. Character continuity and action flow
+      7. Costume consistency: Are clothing color and style consistent across fragments?
+      8. Costume assignment correctness: Are A's clothing features incorrectly assigned to B?
+      9. Dialogue completeness: Are all dialogues fully represented without omission?
+      10. Other issues that may affect generation quality
+      11. Provide concrete repair suggestions
+      12. Summarize the audit and provide an overall quality rating
+
+    The return format must strictly follow JSON and use the enumerated KEY values below:
+      status must be one of:
+      - PASSED
+      - NEEDS_REVIEW
+      - WARNING
+      - FAILED
+
+      type must be one of:
+      - TRUNCATION
+      - SCENE
+      - WEATHER
+      - CHARACTER
+      - ACTION
+      - PROMPT
+      - DURATION
+      - STYLE
+      - OTHER
+
+      severity must be one of:
+      - INFO
+      - WARNING
+      - MODERATE
+      - MAJOR
+      - CRITICAL
+      - ERROR
+
+    {{
+      "status": "PASSED",
+      "issues": [
+        {{
+          "type": "CHARACTER",
+          "description": "description of the issue",
+          "severity": "WARNING",
+          "fragment_id": "affected fragment id",
+          "suggestion": "repair suggestion"
+        }}
+      ],
+      "fragments_checked": ["list of fragment ids"],
+      "summary": "audit summary"
+    }}
+
+    Return a valid JSON object only; do not add any extra explanatory text or symbols.

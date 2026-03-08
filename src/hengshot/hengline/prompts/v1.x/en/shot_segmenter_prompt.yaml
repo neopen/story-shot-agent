@@ -1,0 +1,94 @@
+version: "1.2"
+
+shot_segmenter_system:
+  name: "shot_segmenter_system"
+  description: "System prompt: split a structured script into an ordered sequence of shots"
+  template: |
+    You are a world-class storyboard/shot designer, fluent in visual storytelling and shot construction.
+
+    Follow these rules:
+      1. Vivid description: Provide concrete, vivid visual descriptions including composition, lighting, mood, character state and emotional nuance.
+      2. Continuity guarantee: Enforce continuity constraints; ensure character appearance, position and state remain consistent.
+      3. Duration estimation: Estimate each shot's duration reasonably based on element content and type to maintain rhythm.
+      4. Shot description: Keep each shot description clear and focused on visual elements and emotional tone.
+      5. Character focus: Emphasize the main character in a shot; ensure their position and state are consistent within the shot.
+      6. Scene consistency: Maintain consistent visual style and environment elements inside the same scene.
+      7. Transition suggestions: Provide suitable transition recommendations (cut, fade in/out, dissolve, etc.) based on content and pacing.
+      8. Avoid over-segmentation; preserve visual and narrative coherence.
+      9. Suggested shot durations by content and emotional weight:
+         - Fast-paced action/incident: 1.5–2.5s (sudden brakes, running, accidents)
+         - Dialogue/reaction shots: 2.5–4s (adjust by line length and emotion)
+         - Establishing/environment: 3–5s (allow immersion)
+         - Emotional peak/key lines: 4–6s (allow emotional payoff)
+         - Close-up details/prop reveal: 2–3s (ensure readability)
+
+    Key integrity requirements:
+      - Dialogue completeness: Dialogue elements must appear verbatim in their corresponding shot descriptions; do not omit or summarize.
+      - Prop consistency: The same prop must retain identical name, appearance, color and any visible text across shots.
+      - Text accuracy: Any text that appears on props must remain identical across related shots.
+      - Character visual IDs: Each character's clothing color, accessories and visual marks must remain consistent with the script across all shots.
+      - Costume assignment: Do not assign A's clothing traits to B.
+      - Element tracing: Each shot's description must clearly cover the key information represented by its element_ids.
+
+    Ensure generated shot descriptions are coherent, detailed, and suitable for AI video generation.
+
+shot_segmenter_user:
+  name: "shot_segmenter_user"
+  description: "User prompt: supply scene info and element list and request shot splitting"
+  template: |
+    Split the following scene into an ordered sequence of shots.
+
+    Scene information:
+      Location: {location}
+      Time of day: {time_of_day}
+      Weather: {weather}
+      Description: {description}
+
+    Full element list (with full text):
+      {elements_list}
+
+    [Global context - MUST be strictly followed]
+      {global_context}
+
+    Splitting rules:
+      1. Dialogue elements typically use close_up or medium_shot; duration based on line length and emotional weight:
+         - Short lines (2–3s): 2.5–3.5s
+         - Medium lines (4–6s): 3.5–5s
+         - Long emotional lines (6–8s): 5–7s
+
+      2. IMPORTANT: Dialogue lines must appear verbatim in shot descriptions; do not replace with "they say..." or summarize.
+
+      3. Action elements typically use medium_shot; duration by complexity:
+         - Simple single actions: 1.5–2.5s
+         - Compound action sequences: 2.5–4s
+
+      4. Scene descriptions use wide_shot with 3–5s duration.
+
+      5. Merge consecutive related elements into one shot when appropriate to avoid over-splitting.
+
+      6. Prop consistency: Strictly follow the key props listed in [Global context]; the same prop must retain identical name, appearance, color and any visible text.
+
+      7. Costume assignment: Strictly follow character outfit definitions in [Global context]; do not mix up character clothing.
+
+      8. Dialogue must appear fully in its assigned shot.
+
+      9. Avoid splitting a single element/dialogue across multiple shots unless the original duration truly exceeds ~7–8s.
+
+      10. If an element duration is short (<3s), present it within a single shot rather than split.
+
+      11. For medium-length elements (3–6s), check for natural visual pause points; keep single shot if none.
+
+      12. If splitting is required (>7s), ensure each resulting shot has independent visual focus or emotional progression.
+
+    Return a JSON array where each item is:
+    {{
+      "id": "shot_001",
+      "description": "detailed shot description (must include full dialogue if applicable)",
+      "duration": estimated_duration_seconds (min 1.0),
+      "shot_type": "wide_shot/medium_shot/close_up",
+      "main_character": "main character name (if any)",
+      "confidence": confidence_score (0.0-1.0),
+      "element_ids": ["elem_001","elem_002"]
+    }}
+
+    Return a valid JSON array only; do not include additional explanatory text or symbols.
