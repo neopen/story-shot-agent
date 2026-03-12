@@ -55,7 +55,7 @@ script_parser_system:
                 "target_character": "目标角色名，必须与 characters[].name 的值保持一致，若没有则为 null",
                 "description": "元素的视觉描述（动作、表情、画面细节）",
                 "intensity": 0.0-1.0,
-                "emotion": "neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/other，必须为其中之一，其中other为无法归类的情绪",
+                "emotion": "值必须为其中之一，无法归类时使用other：neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/other",
                 "audio_context": {{
                   "sound_type": "rain/wind/thunder/water_drip/footstep/traffic/crowd/music/tv_noise/bird/silence/other",
                   "description": "声音描述",

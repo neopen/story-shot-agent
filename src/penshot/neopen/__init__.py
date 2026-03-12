@@ -1,6 +1,6 @@
 """
 @FileName: __init__.py
-@Description: HengLine 包初始化文件
+@Description: penshot 包初始化文件
 @Author: Haeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10 - 2025/11

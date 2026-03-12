@@ -22,12 +22,12 @@ class BaseConfig:
         """初始化基础配置"""
         # 处理语言参数
         self._language = get_language()
-        self._initialize_config()
 
         # 配置文件路径
         self._set_config_path()
         self._config_data = {}
         # 加载配置
+        self._initialize_config()
         self.load_configuration()
 
     def _set_config_path(self):

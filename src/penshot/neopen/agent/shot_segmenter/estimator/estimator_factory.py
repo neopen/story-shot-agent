@@ -14,6 +14,7 @@ from penshot.neopen.agent.shot_segmenter.estimator.dialogue_estimator import Dia
 from penshot.neopen.agent.shot_segmenter.estimator.scene_estimator import SceneDurationEstimator
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotInfo, ShotType, ShotSequence
 from penshot.logger import debug, info, error
+from penshot.utils.log_utils import print_log_exception
 
 
 class DurationEstimatorFactory:
@@ -69,7 +70,8 @@ class DurationEstimatorFactory:
 
             except Exception as e:
                 error(f"估算镜头 {shot.id} 失败: {e}")
-                shot.duration = 3.0  # 默认时长
+                print_log_exception()
+                # shot.duration = 3.0  # 默认时长
 
         # 更新时间戳和统计数据
         current_time = 0.0

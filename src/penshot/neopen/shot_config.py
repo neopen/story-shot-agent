@@ -14,7 +14,7 @@ from penshot.neopen.client.client_config import AIConfig
 class ShotConfig(AIConfig):
     """用户请求的参数"""
     prev_continuity_state = None        # 前一个分镜的连续性状态，用于保持连续性
-    enable_llm: bool = True    # 开启 LLM 解析，否则使用规则解析
+    enable_llm: bool = True             # 开启 LLM 解析，否则使用规则解析
     enable_continuity_check: bool = False   # 开启连续性检查
     # 流程控制
     max_total_loops: int = 20  # 最大总循环次数
@@ -30,6 +30,7 @@ class ShotConfig(AIConfig):
     default_shot_duration: float = 3.0
     llm_confidence: float = 0.6  # LLM 输出的置信度阈值，低于该值将触发规则修正
     always_enhance: bool = True  # 是否始终进行时长增强（即使LLM置信度较高）
+    enable_enhance: bool = True  # 是否启用时长增强器进行修正
 
     # ======================视频分割
     duration_split_threshold: float = 5.5  # 超过5秒触发分割

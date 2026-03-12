@@ -9,7 +9,7 @@ import re
 from abc import abstractmethod
 from typing import Dict, List, Optional
 
-from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, CharacterType, EmotionType
+from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, CharacterType
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotInfo, ShotSequence, ShotType
 
 
@@ -99,7 +99,6 @@ class BaseDurationEstimator:
                 stats["medium_shot_count"] += 1
 
         return stats
-
 
     def _get_scene_location(self, shot: ShotInfo, script: ParsedScript) -> str:
         """获取场景地点"""

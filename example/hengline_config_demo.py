@@ -93,17 +93,6 @@ async def neopen_config_examples():
         timeout=45,
     )
 
-    # ==================== 示例6: 从环境变量加载配置 ====================
-    print("\n=== 示例6: 从环境变量加载配置 ===")
-    import os
-    # 设置环境变量
-    os.environ["HENGLINE_MODEL_NAME"] = "gpt-4"
-    os.environ["HENGLINE_API_KEY"] = "your-api-key-from-env"
-    os.environ["HENGLINE_MAX_TOKENS"] = "2500"
-
-    # 使用默认构造函数，会自动读取环境变量
-    config6 = ShotConfig()  # 从环境变量加载配置
-
     # ==================== 示例7: 自定义提示词模板 ====================
     print("\n=== 示例7: 自定义配置（如果有相关参数） ===")
     config7 = ShotConfig(

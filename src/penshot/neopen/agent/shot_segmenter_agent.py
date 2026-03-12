@@ -21,7 +21,7 @@ from penshot.utils.log_utils import print_log_exception
 class ShotSegmenterAgent:
     """分镜生成智能体"""
 
-    def __init__(self, llm, config: Optional[ShotConfig] = None):
+    def __init__(self, llm, config: ShotConfig):
         """
         初始化分镜生成智能体
         
@@ -37,7 +37,7 @@ class ShotSegmenterAgent:
             self.segmenter = ShotSegmenterFactory.create_segmenter(AgentMode.RULE, self.config)
 
         # 时长增强器
-        self.enhancer = DurationEnhancer() if self.config.get("enable_enhance", True) else None
+        self.enhancer = DurationEnhancer() if self.config.enable_enhance else None
 
         # 配置
         self.llm_confidence = config.llm_confidence or 0.7
@@ -69,7 +69,7 @@ class ShotSegmenterAgent:
             shot_sequence = estimator_factory.estimate_sequence(shot_sequence, structured_script)
 
             # 3. 如果启用增强，进行后处理优化
-            if self.enhancer and (self.always_enhance or self.config.get("enable_llm", False)):
+            if self.enhancer and (self.always_enhance or self.config.enable_llm):
                 debug("应用时长增强优化")
                 enhanced_sequence, corrections = self.enhancer.enhance(
                     shot_sequence,
