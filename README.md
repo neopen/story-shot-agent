@@ -18,7 +18,7 @@
 
 **注意**：本智能体不参与剧本创作，不会调用模型生成视频，亦不会合成视频，以上流程中标注处就是本智能体任务（未来版本会支持qita）。
 
-详细设计参照文档：[**剧本分镜智能体的架构设计与实现细节**](https://pengline.github.io/2025/10/0194020a663c408fb500dd7532349519/)
+详细设计参照文档：[**剧本分镜智能体的架构设计与实现细节**](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
 
 
 
@@ -289,7 +289,7 @@ async def generate_storyboard_endpoint(script_text: str):
 
 可以将剧本分镜智能体作为 LangGraph 工作流中的一个节点。
 
-使用方式：[剧本分镜智能体架构设计与实现 | 集成到 LangGraph 节点](https://pengline.github.io/2025/10/0194020a663c408fb500dd7532349519/)
+使用方式：[剧本分镜智能体架构设计与实现 | 集成到 LangGraph 节点](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
 
 
 
@@ -299,7 +299,7 @@ async def generate_storyboard_endpoint(script_text: str):
 
 如：上游是剧本创作智能体，下游是 文生视频+剪辑 智能。
 
-使用方式：[剧本分镜智能体架构设计与实现 | 集成到 A2A 系统](https://pengline.github.io/2025/10/0194020a663c408fb500dd7532349519/)
+使用方式：[剧本分镜智能体架构设计与实现 | 集成到 A2A 系统](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
 
 
 

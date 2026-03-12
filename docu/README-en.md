@@ -4,22 +4,13 @@ English | [中文](../README.md)
 
 A multi-agent collaborative storyboard generation system that splits scripts in various formats into short AI-generatable video script units, outputs high-quality shot fragment descriptions, and preserves narrative continuity. It supports multiple AI providers, is highly extensible and easy to use. The system can be integrated as a Python library, a Web API, a LangGraph node, or into A2A (agent-to-agent) systems.
 
-> - Requirement: Given a script of approximately two minutes, generate corresponding short video segments using AI models.
 >
-> - Technical constraint: Current text-to-video systems typically produce 5–10 seconds per generation. To produce a two-minute video you must stitch multiple ~5-second clips together.
+> Video creation pipeline: Client → LLM script authoring → <u>Storyboard parsing (splitting)</u> → DM video synthesis (text-to-video) → video assembly & rendering (FFmpeg)
 >
-> - Task & challenges: To stitch generated clips, the first step is to split the original script into segments that match the target 5–10 second duration (depending on the target model). Each clip must remain narratively coherent; otherwise stitched clips will result in mismatched scenes, actions, or character continuity.
+> Note: This agent does not author scripts, does not generate video, nor does it perform final composition in the current version (future releases may add these). The highlighted step above is the agent's responsibility.
 >
->   Actions, speech rate and other factors affect duration — e.g., an elderly person moves slower, angry shouting speeds up delivery, running is faster than walking — so the splitter must consider many scenarios.
+> For a detailed architecture and implementation discussion, see: [Storyboard Agent — Architecture and Implementation Details](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
 >
->   This agent performs that task: the user supplies a script, the system splits it according to configurable rules and model constraints, and returns segmented script fragments that the user can feed to video generation models (Runway, Pika, Sora, Wan, Stable Video, etc.). Final composition can be done using standard tools like FFmpeg (or future automated steps).
-
-
-Video creation pipeline: Client → LLM script authoring → <u>Storyboard parsing (splitting)</u> → DM video synthesis (text-to-video) → video assembly & rendering (FFmpeg)
-
-Note: This agent does not author scripts, does not generate video, nor does it perform final composition in the current version (future releases may add these). The highlighted step above is the agent's responsibility.
-
-For a detailed architecture and implementation discussion, see: [Storyboard Agent — Architecture and Implementation Details](https://pengline.github.io/2025/10/0194020a663c408fb500dd7532349519/)
 
 
 
@@ -200,9 +191,9 @@ Example (abbreviated) JSON output structure:
 Notes on packaging and installation:
 
 ```sh
-# Choose a release wheel from: https://github.com/HengLine/video-shot-agent/releases
+# Choose a release wheel from: https://github.com/neopen/video-shot-agent/releases
 # Example:
-wget https://github.com/HengLine/video-shot-agent/releases/download/v0.1.4/penshot-0.1.4-py3-none-any.whl
+wget https://github.com/neopen/video-shot-agent/releases/download/v0.1.4/penshot-0.1.4-py3-none-any.whl
 pip install penshot-0.1.1-py3-none-any.whl
 # The package defaults to using Ollama; install provider-specific LLM clients as required:
 # pip install langchain-openai  # for OpenAI/DeepSeek
@@ -222,7 +213,7 @@ Configuration notes:
 >    LLM__DEFAULT__MODEL_NAME=gpt-4-turbo-preview
 >    LLM__DEFAULT__TIMEOUT=30
 >    LLM__DEFAULT__MAX_TOKENS=4000
->    
+>       
 >    # ================= LLM备用配置 =================
 >    LLM__FALLBACK__BASE_URL=http://localhost:11434
 >    LLM__FALLBACK__MODEL_NAME=qwen3:4b
@@ -237,7 +228,7 @@ Configuration notes:
 ### 1. Use as a Python library
 
 ```python
-from penshot.hengline import generate_storyboard
+from penshot.neopen import generate_storyboard
 
 async def basic_usage():
     """Basic usage example"""
@@ -265,7 +256,7 @@ async def basic_usage():
 You can expose a simple HTTP API endpoint to call the storyboard generator:
 
 ```python
-from penshot.hengline import generate_storyboard
+from penshot.neopen import generate_storyboard
 
 @app.post("/api/generate-storyboard")
 async def generate_storyboard_endpoint(script_text: str):
