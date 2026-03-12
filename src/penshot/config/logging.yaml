@@ -18,7 +18,7 @@ file:
   level: INFO
   class: logging.handlers.RotatingFileHandler
   formatter: formatter
-  filename: "logs/hengline_%Y-%m-%d.log"  # 添加日期格式
+  filename: "logs/penshot_%Y-%m-%d.log"  # 添加日期格式
   maxBytes: 10485760
   backupCount: 5
   encoding: utf8
