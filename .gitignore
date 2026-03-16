@@ -11,6 +11,7 @@ temp/
 .git/
 .svn/
 .env
+.pypirc
 bin/
 .settings/
 __pycache__/
