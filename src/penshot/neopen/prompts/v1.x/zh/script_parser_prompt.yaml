@@ -25,7 +25,7 @@ script_parser_system:
             "id": "scene_001",
             "location": "场景地点",
             "description": "场景视觉描述（光影、氛围、环境元素）",
-            "time_of_day": "早晨/中午/下午/傍晚/夜晚/凌晨",
+            "time_of_day": "早晨/上午/中午/下午/傍晚/夜晚/深夜/凌晨",
             "weather": "晴天/雨天/阴天/雪天/暖阳/灰蒙蒙等（如有）",
             "audio_context": {{
               "scene_type": "indoor/outdoor/cafe/park/street/living_room/rainy_outdoor/night_outdoor/other",
@@ -40,7 +40,7 @@ script_parser_system:
               ],
               "has_dialogue": true/false,
               "has_voiceover": true/false,
-              "atmosphere": "紧张/温馨/忧伤/平静/神秘",
+              "atmosphere": "neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/heavy/other",
               "reverb": 0.0-1.0
             }},
             "elements": [
@@ -55,7 +55,7 @@ script_parser_system:
                 "target_character": "目标角色名，必须与 characters[].name 的值保持一致，若没有则为 null",
                 "description": "元素的视觉描述（动作、表情、画面细节）",
                 "intensity": 0.0-1.0,
-                "emotion": "值必须为其中之一，无法归类时使用other：neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/other",
+                "emotion": "neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/heavy/other",
                 "audio_context": {{
                   "sound_type": "rain/wind/thunder/water_drip/footstep/traffic/crowd/music/tv_noise/bird/silence/other",
                   "description": "声音描述",

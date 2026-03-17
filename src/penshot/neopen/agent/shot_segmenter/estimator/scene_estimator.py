@@ -6,7 +6,7 @@
 @Time: 2026/1/19
 """
 
-from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
+from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, EmotionType
 from penshot.neopen.agent.shot_segmenter.estimator.base_estimator import BaseDurationEstimator
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotInfo, ShotType
 from penshot.logger import debug
@@ -90,11 +90,11 @@ class SceneDurationEstimator(BaseDurationEstimator):
 
         # 4. 情绪调整
         scene_mood = self._get_scene_mood(shot, script)
-        if scene_mood in ["壮丽", "宏伟"]:
+        if scene_mood in ["magnificent", "imposing", "majestic", "grandiose", "palatial", "majestical"]:
             base_duration *= 1.3
-        elif scene_mood in ["压抑", "沉重"]:
+        elif scene_mood in [EmotionType.REPRESSION.value, EmotionType.HEAVY.value]:
             base_duration *= 1.2
-        elif scene_mood in ["紧张"]:
+        elif scene_mood in [EmotionType.TENSE.value]:
             base_duration *= 0.9
 
         # 5. 视觉复杂度调整

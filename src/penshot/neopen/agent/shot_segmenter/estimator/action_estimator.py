@@ -88,9 +88,9 @@ class ActionDurationEstimator(BaseDurationEstimator):
 
         # 4. 场景情绪调整
         scene_mood = shot.emotion
-        if scene_mood in [EmotionType.TENSE, EmotionType.ANXIOUS]:
+        if scene_mood in [EmotionType.TENSE.value, EmotionType.ANXIOUS.value]:
             base_duration *= 0.9  # 紧张场景节奏快
-        elif scene_mood in [EmotionType.SAD, EmotionType.CHOKING]:
+        elif scene_mood in [EmotionType.SAD.value, EmotionType.CHOKING.value]:
             base_duration *= 1.2  # 悲伤场景节奏慢
 
         # 5. 角色特征调整

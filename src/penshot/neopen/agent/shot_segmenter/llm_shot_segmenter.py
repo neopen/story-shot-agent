@@ -8,13 +8,13 @@
 import json
 from typing import Optional, List
 
+from penshot.logger import info, error
 from penshot.neopen.agent.base_agent import BaseAgent
-from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, SceneInfo, GlobalMetadata, EmotionType
+from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, SceneInfo, GlobalMetadata
 from penshot.neopen.agent.shot_segmenter.base_shot_segmenter import BaseShotSegmenter
 from penshot.neopen.agent.shot_segmenter.rule_shot_segmenter import RuleShotSegmenter
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence, ShotInfo, ShotType
 from penshot.neopen.shot_config import ShotConfig
-from penshot.logger import info, error
 
 
 class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
@@ -63,7 +63,6 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
 
         # 后处理
         return self._post_process(shot_sequence)
-
 
     def _split_scene_with_llm(self, scene: SceneInfo, start_time: float, shot_offset: int, global_metadata: GlobalMetadata) -> List[ShotInfo]:
         """使用LLM拆分单个场景"""
@@ -114,7 +113,7 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
                 description=shot_data.get("description", ""),
                 start_time=round(current_time, 2),
                 duration=shot_data.get("duration", 3.0),
-                emotion=EmotionType(shot_data.get("emotion", "neutral")),
+                emotion=shot_data.get("emotion", "neutral"),
                 shot_type=ShotType(shot_data.get("shot_type", "medium_shot")),
                 main_character=shot_data.get("main_character"),
                 element_ids=shot_data.get("element_ids", []),

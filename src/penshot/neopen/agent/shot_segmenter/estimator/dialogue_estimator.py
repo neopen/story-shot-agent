@@ -105,7 +105,7 @@ class DialogueDurationEstimator(BaseDurationEstimator):
         base_duration += pause_time
 
         # 6. 情感镜头调整("悲伤", "激动")
-        if shot.emotion in [EmotionType.SAD, EmotionType.EMOTIONAL] and shot.shot_type == ShotType.CLOSE_UP:
+        if shot.emotion in [EmotionType.SAD.value, EmotionType.EMOTIONAL.value] and shot.shot_type == ShotType.CLOSE_UP:
             base_duration *= 1.3
 
         # 7. 角色特征调整

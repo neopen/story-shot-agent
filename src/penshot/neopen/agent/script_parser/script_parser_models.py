@@ -63,6 +63,7 @@ class EmotionType(str, Enum):
     EMOTIONAL = "emotional" # 激动的情绪，适用于情绪波动较大的场景
     WHISPER = "whisper"     # 低语的情绪，适用于秘密、亲密等场景
     CHOKING = "choking"     # 哽咽的情绪，适用于极度悲伤、痛苦的场景
+    HEAVY = "heavy"         # 沉重的心情
     REPRESSION = "repression"   # 压抑的情绪，适用于内心挣扎、无法表达的情感状态
     SHOCK = "shock"             # 震惊的情绪，适用于突发事件、重大转折等场景
     RESIGNED = "resigned"       # 无奈的情绪，适用于角色接受不幸、放弃抵抗等场景
@@ -120,7 +121,7 @@ class BaseElement(BaseModel):
         description="动作或语气等的强度等级，0-1之间"
     )
     emotion: str = Field(
-        default=EmotionType.NEUTRAL,
+        default=EmotionType.NEUTRAL.value,
         description="伴随情绪：neutral/happy/angry/sad/fear"
     )
     # 元素音频上下文

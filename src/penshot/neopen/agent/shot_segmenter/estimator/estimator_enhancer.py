@@ -8,7 +8,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
+from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, EmotionType
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_models import CorrectionRecord, CorrectionReason, CorrectionLevel
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence, ShotInfo, ShotType
 from penshot.logger import debug, info
@@ -104,7 +104,7 @@ class DurationEnhancer:
 
         # 2. 情感镜头调整
         scene_mood = self._get_scene_mood(shot, script)
-        if scene_mood in ["悲伤", "激动", "紧张"] and shot.shot_type == ShotType.CLOSE_UP:
+        if scene_mood in [EmotionType.SAD.value, EmotionType.EMOTIONAL.value, EmotionType.TENSE.value] and shot.shot_type == ShotType.CLOSE_UP:
             if new_duration < 3.0:
                 new_duration = 3.0
                 reasons.append(CorrectionReason.EMOTIONAL)
