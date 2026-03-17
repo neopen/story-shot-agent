@@ -1,7 +1,7 @@
 """
 @FileName: direct_usage.py
 @Description: 作为Python库直接使用
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/10 19:46
 """

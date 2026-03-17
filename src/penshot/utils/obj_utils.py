@@ -1,7 +1,7 @@
 """
 @FileName: dict_utils.py
 @Description: 
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/11 23:39
 """

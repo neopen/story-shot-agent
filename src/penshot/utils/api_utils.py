@@ -1,7 +1,7 @@
 """
 @FileName: api_utils.py
 @Description: 
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/3 12:45
 """

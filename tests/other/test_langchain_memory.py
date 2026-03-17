@@ -1,7 +1,7 @@
 """
 @FileName: langchain_memory_test.py
 @Description: 测试LangChainMemoryTool的功能
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/11
 """

@@ -1,7 +1,7 @@
 """
 @FileName: workflow_models.py
 @Description: 工作流模型定义文件，包含工作流状态和条件的枚举类
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/27 19:12
 """

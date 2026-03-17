@@ -1,7 +1,7 @@
 """
 @FileName: result_storage_tool.py
 @Description: 结果存储工具模块，提供智能体结果的保存、加载和管理功能
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/12/18
 """

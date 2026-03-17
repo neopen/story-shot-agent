@@ -1,7 +1,7 @@
 """
 @FileName: llm_shot_generator.py
 @Description: 基于LLM的镜头生成器
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/26 17:35
 """

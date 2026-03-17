@@ -1,7 +1,7 @@
 """
 @FileName: web_app.py
 @Description: 集成到Web应用（FastAPI示例）
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/10 19:44
 """

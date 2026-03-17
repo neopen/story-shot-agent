@@ -1,7 +1,7 @@
 """
 @FileName: langgraph_integration.py
 @Description: 集成到 LangGraph 工作流节点
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/10 19:43
 """

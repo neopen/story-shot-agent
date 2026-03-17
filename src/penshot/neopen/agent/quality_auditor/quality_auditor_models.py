@@ -1,7 +1,7 @@
 """
 @FileName: quality_auditor_models.py
 @Description: 质量审核模型
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/19 22:58
 """

@@ -1,7 +1,7 @@
 """
 @FileName: script_parser_agent.py
 @Description: LLM 剧本解析基类，包含复杂度评估和路由决策逻辑
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10 - 2025/11
 """

@@ -1,7 +1,7 @@
 """
 @FileName: prompt_converter_models.py
 @Description: 模型
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/18 14:25
 """

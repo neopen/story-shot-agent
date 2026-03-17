@@ -1,7 +1,7 @@
 """
 @FileName: workflow_nodes.py
 @Description: LangGraph工作流节点实现，包含所有工作流执行功能
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10 - 2025/11
 """

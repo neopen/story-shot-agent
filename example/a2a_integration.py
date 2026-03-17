@@ -1,7 +1,7 @@
 """
 @FileName: a2a_integration.py
 @Description: 集成到A2A系统（代理到代理）
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/10 19:45
 """

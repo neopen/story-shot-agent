@@ -1,7 +1,7 @@
 """
 @FileName: language_manage.py
 @Description: 语言管理模块
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/12/18 14:10
 """

@@ -1,7 +1,7 @@
 """
 @FileName: human_decision_models.py
 @Description: 人工决策模型定义
-@Author: Haeng
+@Author: HiPeng
 @Time: 2026/2/5 16:58
 """
 from enum import Enum

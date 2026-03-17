@@ -1,7 +1,7 @@
 """
 @FileName: task_models.py
 @Description: API-friendly request/response models for task processing
-@Author: Haeng (adapted)
+@Author: HiPeng (adapted)
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/03/17
 """

@@ -1,7 +1,7 @@
 """
 @FileName: script_parser_config.py
 @Description: 剧本转换智能体配置
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10/27 17:22
 """

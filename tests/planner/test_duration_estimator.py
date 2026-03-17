@@ -1,7 +1,7 @@
 """
 @FileName: ai_estimator.py
 @Description: 
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/12 21:03
 """

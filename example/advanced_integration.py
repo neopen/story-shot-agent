@@ -1,7 +1,7 @@
 """
 @FileName: advanced_integration.py
 @Description: 高级集成示例（结合其他功能）
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/10 19:47
 """

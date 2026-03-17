@@ -5,7 +5,7 @@ from penshot.utils.redis_utils import RedisClient
 """
 @FileName: task_manager.py
 @Description: 
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/26 16:42
 """

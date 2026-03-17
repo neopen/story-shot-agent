@@ -1,7 +1,7 @@
 """
 @FileName: neopen_config_demo.py
 @Description: 包含完整详细配置示例
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/10 19:52
 """

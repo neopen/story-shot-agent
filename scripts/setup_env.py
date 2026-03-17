@@ -10,7 +10,7 @@
         4. 安装项目依赖
         5. 启动应用
     步骤严格按顺序执行，只有上一步成功才执行下一步
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/08 - 2025/11
 """

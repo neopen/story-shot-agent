@@ -1,7 +1,7 @@
 """
 @FileName: test_hybrid_estimator.py
 @Description: 
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/15 19:10
 """

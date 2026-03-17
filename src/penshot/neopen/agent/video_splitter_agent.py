@@ -1,7 +1,7 @@
 """
 @FileName: video_assembler_agent.py
 @Description: 视频片段分割器
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/22 22:00
 """

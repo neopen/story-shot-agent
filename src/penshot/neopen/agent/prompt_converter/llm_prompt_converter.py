@@ -1,7 +1,7 @@
 """
 @FileName: llm_prompt_converter.py
 @Description: 基于LLM的提示词转换器 - 音频参数由LLM直接从CharacterInfo解析
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/26 23:36
 """

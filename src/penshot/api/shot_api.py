@@ -1,7 +1,7 @@
 """
 @FileName: a2a_api.py
 @Description:  分镜生成API，通过A2A协议调用分镜生成功能
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10/23 11:19
 """

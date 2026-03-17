@@ -1,7 +1,7 @@
 """
 @FileName: human_enhanced_converter.py
 @Description: 增强版人工决策转换器
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/2/5 17:47
 """

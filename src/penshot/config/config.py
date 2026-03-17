@@ -1,7 +1,7 @@
 """
 @FileName: config.py
 @Description: 配置管理模块 - 严格遵循 env > yaml > default 优先级
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/01
 """

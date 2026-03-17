@@ -1,7 +1,7 @@
 """
 @FileName: test_temporal_scene_planner.py
 @Description: 规则基础时序规划器演示
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/13 16:12
 """

@@ -1,7 +1,7 @@
 """
 @FileName: prompt_utils.py
 @Description: 提示词处理工具
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/5 23:46
 """

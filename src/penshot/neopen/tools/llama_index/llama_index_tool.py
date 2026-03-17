@@ -1,7 +1,7 @@
 """
 @FileName: llama_index_tool.py
 @Description: LlamaIndex 工具函数模块
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/12/18
 """

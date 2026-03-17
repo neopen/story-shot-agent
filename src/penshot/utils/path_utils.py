@@ -1,7 +1,7 @@
 """
 @FileName: path_utils.py.py
 @Description: 最可靠的路径获取方案
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/30 17:05
 """

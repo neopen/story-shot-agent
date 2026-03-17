@@ -1,7 +1,7 @@
 """
 @FileName: generate_agent.py
 @Description: 
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10/23 15:51
 """

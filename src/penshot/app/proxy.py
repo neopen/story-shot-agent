@@ -2,7 +2,7 @@
 """
 @FileName: proxy.py
 @Description: 代理服务模块 - 处理API请求的代理和转发
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2025/10/6
 """

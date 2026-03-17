@@ -1,7 +1,7 @@
 """
 @FileName: workflow_decision.py
 @Description: 决策函数类 - 控制工作流分支逻辑
-@Author: Haeng
+@Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/26 16:12
 """
