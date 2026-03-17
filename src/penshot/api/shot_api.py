@@ -6,13 +6,14 @@
 @Time: 2025/10/23 11:19
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi import HTTPException
 
-from penshot.neopen.context_var import task_id_ctx
 from penshot.logger import error, log_with_context
+from penshot.neopen.context_var import task_id_ctx
+from penshot.neopen.language_manage import set_language
 from penshot.neopen.task.task_manager import TaskManager
 from penshot.neopen.task.task_models import ProcessRequest, ProcessResult, ProcessingStatus, BatchProcessResult, BatchProcessRequest
 from penshot.neopen.task.task_processor import AsyncTaskProcessor
@@ -35,7 +36,6 @@ def generate_storyboard_api(request: ProcessRequest, background_tasks: Backgroun
         StoryboardResponse: 分镜生成结果
     """
     try:
-        # 记录请求日志
         log_with_context(
             "INFO",
             "接收到分镜生成请求",
@@ -47,6 +47,8 @@ def generate_storyboard_api(request: ProcessRequest, background_tasks: Backgroun
 
         if request.task_id:
             task_id_ctx.set(request.task_id)
+
+        set_language(request.language)
 
         # 创建任务
         task_id = task_manager.create_task(
@@ -66,7 +68,7 @@ def generate_storyboard_api(request: ProcessRequest, background_tasks: Backgroun
             success=True,
             task_id=task_id,
             status="pending",
-            created_at=datetime.now()
+            created_at=datetime.now(timezone.utc)
         )
 
     except ValueError as e:
@@ -93,6 +95,7 @@ async def batch_process_scripts(
     """
     try:
         batch_id = request.batch_id or str(uuid.uuid4())
+        set_language(request.language)
 
         # 在后台异步处理批量任务
         background_tasks.add_task(
@@ -108,7 +111,7 @@ async def batch_process_scripts(
             completed_tasks=0,
             failed_tasks=0,
             pending_tasks=len(request.scripts),
-            created_at=datetime.now()
+            created_at=datetime.now(timezone.utc)
         )
 
     except Exception as e:
@@ -132,21 +135,33 @@ def get_task_status(task_id: str):
             detail=f"任务不存在: {task_id}"
         )
 
-    # 计算预估剩余时间（基于进度）
+    # 计算预估剩余时间（基于进度），并把存储的 ISO 字符串解析为 datetime
+    try:
+        created_at_dt = datetime.fromisoformat(task["created_at"]) if isinstance(task["created_at"], str) else task["created_at"]
+    except Exception:
+        created_at_dt = datetime.now(timezone.utc)
+
+    try:
+        updated_at_dt = datetime.fromisoformat(task["updated_at"]) if isinstance(task["updated_at"], str) else task["updated_at"]
+    except Exception:
+        updated_at_dt = datetime.now(timezone.utc)
+
     estimated_time = None
-    if task["status"] == "processing" and task["progress"] > 0:
-        # 简单线性估计
-        elapsed = (datetime.now() - task["created_at"]).total_seconds()
-        estimated_time = int((elapsed / task["progress"]) * (100 - task["progress"]))
+    if task["status"] == "processing" and task.get("progress") and task["progress"] > 0:
+        try:
+            elapsed = (datetime.now(timezone.utc) - created_at_dt).total_seconds()
+            estimated_time = int((elapsed / task["progress"]) * (100 - task["progress"]))
+        except Exception:
+            estimated_time = None
 
     return ProcessingStatus(
         task_id=task_id,
         status=task["status"],
         stage=task["stage"],
-        progress=task["progress"],
+        progress=task.get("progress"),
         estimated_time_remaining=estimated_time,
-        created_at=task["created_at"],
-        updated_at=task["updated_at"],
+        created_at=created_at_dt,
+        updated_at=updated_at_dt,
         error_message=task.get("error")
     )
 
@@ -177,14 +192,19 @@ async def get_task_result(task_id: str):
             detail="任务正在处理中"
         )
 
-    # 计算处理时间
+    # 解析时间字符串并计算处理时间（毫秒）
     processing_time = None
-    if task.get("completed_at"):
-        completed_at = datetime.strptime(task["completed_at"], "%Y-%m-%dT%H:%M:%S.%f")
-        created_at = datetime.strptime(task["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
-        processing_time = int(
-            (completed_at - created_at).total_seconds() * 1000
-        )
+    try:
+        if task.get("completed_at"):
+            completed_at_dt = datetime.fromisoformat(task["completed_at"]) if isinstance(task["completed_at"], str) else task["completed_at"]
+            created_at_dt = datetime.fromisoformat(task["created_at"]) if isinstance(task["created_at"], str) else task["created_at"]
+            processing_time = int((completed_at_dt - created_at_dt).total_seconds() * 1000)
+        else:
+            completed_at_dt = None
+            created_at_dt = datetime.fromisoformat(task["created_at"]) if isinstance(task["created_at"], str) else task["created_at"]
+    except Exception:
+        completed_at_dt = task.get("completed_at")
+        created_at_dt = task.get("created_at")
 
     return ProcessResult(
         task_id=task_id,
@@ -193,8 +213,8 @@ async def get_task_result(task_id: str):
         data=task.get("result", {}).get("data"),
         message=task.get("error"),
         processing_time_ms=processing_time,
-        created_at=task["created_at"],
-        completed_at=task.get("completed_at")
+        created_at=created_at_dt,
+        completed_at=completed_at_dt
     )
 
 

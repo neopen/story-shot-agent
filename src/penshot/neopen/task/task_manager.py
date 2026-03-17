@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from penshot.utils.redis_utils import RedisClient
+
 """
 @FileName: task_manager.py
 @Description: 
@@ -5,77 +9,559 @@
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/26 16:42
 """
-import uuid
-from datetime import datetime
-from typing import Optional, Dict
+"""
+TaskManager with optional Redis backend.
+- If redis_url or redis_client is provided, tasks are persisted in Redis (JSON per task, and an ID set).
+- Otherwise tasks are stored in-process memory (protected by RLock).
+- Workflow cache and pipeline instances remain in-memory.
+"""
 
-from penshot.neopen.agent import MultiAgentPipeline
-from penshot.neopen.shot_config import ShotConfig
+import copy
+import json
+import uuid
+from dataclasses import is_dataclass
+from datetime import datetime, timezone
+from threading import RLock
+from collections import OrderedDict
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
+
 from penshot.logger import info
+
+if TYPE_CHECKING:
+    from penshot.neopen.agent import MultiAgentPipeline
+from penshot.neopen.shot_config import ShotConfig
 
 
 class TaskManager:
-    """任务状态管理器"""
+    """任务状态管理器，支持内存或 Redis 后端（可选）。"""
 
-    def __init__(self):
-        self.tasks: Dict[str, Dict] = {}
-        self.workflow_cache: Dict[str, MultiAgentPipeline] = {}
+    def __init__(self, max_workflow_cache_size: int = 64):
+        # in-memory task store (used when Redis not configured)
+        self._local_tasks: Dict[str, Dict[str, Any]] = {}
+        # raw config objects for internal use when local
+        self._local_raw_configs: Dict[str, Any] = {}
 
+        # workflow cache (in-memory) and pipeline factory
+        self.workflow_cache: "OrderedDict[str, Any]" = OrderedDict()
+        self.max_workflow_cache_size = max_workflow_cache_size
+        self.pipeline_factory = None
+
+        # concurrency
+        self._lock = RLock()
+
+        # metrics (local if no redis; if redis configured, metrics stored in redis keys)
+        self._metrics = {"created": 0, "completed": 0, "failed": 0}
+
+        # redis client (lazy init) or None
+        self.use_redis = False
+        self.redis_client = RedisClient()
+        try:
+            self.redis = self.redis_client.get_client()
+            self.use_redis = True
+        except Exception:
+            # redis not available
+            self.redis = None
+            self.use_redis = False
+
+    # ---------------------- serialization helpers ----------------------
+    def _safe_serialize(self, value: Any) -> Any:
+        from enum import Enum
+
+        if value is None:
+            return None
+        if isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, datetime):
+            try:
+                return value.isoformat()
+            except Exception:
+                return str(value)
+        if is_dataclass(value):
+            try:
+                return {k: self._safe_serialize(v) for k, v in vars(value).items()}
+            except Exception:
+                return str(value)
+        if isinstance(value, dict):
+            res = {}
+            for k, v in value.items():
+                try:
+                    key = str(k)
+                except Exception:
+                    key = json.dumps(k, default=str)
+                res[key] = self._safe_serialize(v)
+            return res
+        if isinstance(value, (list, tuple, set)):
+            return [self._safe_serialize(v) for v in value]
+        if isinstance(value, Enum):
+            return getattr(value, "value", getattr(value, "name", str(value)))
+        try:
+            return json.loads(json.dumps(value))
+        except Exception:
+            return str(value)
+
+    def _serialize_config(self, config: Any) -> Dict[str, Any]:
+        try:
+            if config is None:
+                return {}
+            return self._safe_serialize(config) or {}
+        except Exception:
+            return {"raw": str(config)}
+
+    def _config_key(self, config: Any) -> str:
+        """Generate a stable key for a config (sha256 of JSON)"""
+        try:
+            payload = json.dumps(self._serialize_config(config), sort_keys=True, ensure_ascii=False)
+        except Exception:
+            payload = str(config)
+        try:
+            import hashlib
+
+            return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        except Exception:
+            # fallback to uuid5-based key
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, payload))
+
+    # ---------------------- redis helpers ----------------------
+    def _redis_key(self, task_id: str) -> str:
+        return f"task:{task_id}"
+
+    def _redis_tasks_set_key(self) -> str:
+        return "tasks:ids"
+
+    def _redis_metrics_key(self, name: str) -> str:
+        return f"tasks:metrics:{name}"
+
+    # ---------------------- core operations ----------------------
     def create_task(self, script: str, config: Optional[ShotConfig] = None, task_id: str = None) -> str:
-        """创建新任务"""
+        if not isinstance(script, str) or not script.strip():
+            raise ValueError("script must be a non-empty string")
         task_id = task_id or str(uuid.uuid4())
 
-        self.tasks[task_id] = {
+        record = {
             "task_id": task_id,
             "script": script,
-            "config": config or {},
+            "config": config,
             "status": "pending",
             "stage": "initialized",
             "progress": 0,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "result": None,
             "error": None,
-            "callbacks": []
+            "callbacks": [],
         }
+
+        if self.use_redis and self.redis is not None:
+            key = self._redis_key(task_id)
+            # store JSON and add to set
+            try:
+                self.redis.set(key, json.dumps(record, ensure_ascii=False))
+                self.redis.sadd(self._redis_tasks_set_key(), task_id)
+                # increment metrics in redis
+                try:
+                    self.redis.incr(self._redis_metrics_key("created"))
+                except Exception:
+                    pass
+            except Exception:
+                # fallback to local
+                with self._lock:
+                    self._local_tasks[task_id] = record
+                    self._local_raw_configs[task_id] = config
+                    self._metrics["created"] += 1
+        else:
+            with self._lock:
+                if task_id in self._local_tasks:
+                    raise ValueError(f"task_id already exists: {task_id}")
+                self._local_tasks[task_id] = record
+                self._local_raw_configs[task_id] = config
+                self._metrics["created"] += 1
 
         info(f"创建任务: {task_id}")
         return task_id
 
-    def update_task_progress(self, task_id: str, stage: str, progress: float = None):
-        """更新任务进度"""
-        if task_id in self.tasks:
-            self.tasks[task_id]["stage"] = stage
-            if progress is not None:
-                self.tasks[task_id]["progress"] = progress
-            self.tasks[task_id]["updated_at"] = datetime.now().isoformat()
+    def _read_record_local(self, task_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            rec = self._local_tasks.get(task_id)
+            return copy.deepcopy(rec) if rec is not None else None
 
-    def complete_task(self, task_id: str, result: Dict):
-        """完成任务"""
-        if task_id in self.tasks:
-            self.tasks[task_id]["status"] = "completed" if result.get("success", False) else "failed"
-            self.tasks[task_id]["result"] = result
-            self.tasks[task_id]["error"] = result.get("error")
-            self.tasks[task_id]["updated_at"] = datetime.now().isoformat()
-            self.tasks[task_id]["completed_at"] = datetime.now().isoformat()
+    def _read_record_redis(self, task_id: str) -> Optional[Dict[str, Any]]:
+        if not self.redis:
+            return None
+        key = self._redis_key(task_id)
+        raw = self.redis.get(key)
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except Exception:
+            return None
+
+    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        if self.use_redis and self.redis:
+            return self._read_record_redis(task_id)
+        return self._read_record_local(task_id)
+
+    def update_task_progress(self, task_id: str, stage: str, progress: float = None):
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            # simple read-modify-write
+            raw = self.redis.get(key)
+            if not raw:
+                return
+            try:
+                rec = json.loads(raw)
+            except Exception:
+                return
+            rec["stage"] = stage
+            if progress is not None:
+                try:
+                    p = float(progress)
+                    rec["progress"] = max(0.0, min(100.0, p))
+                except Exception:
+                    pass
+            rec["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self.redis.set(key, json.dumps(rec, ensure_ascii=False))
+        else:
+            with self._lock:
+                if task_id not in self._local_tasks:
+                    return
+                if stage is not None:
+                    self._local_tasks[task_id]["stage"] = stage
+                if progress is not None:
+                    try:
+                        p = float(progress)
+                        self._local_tasks[task_id]["progress"] = max(0.0, min(100.0, p))
+                    except Exception:
+                        pass
+                self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    def update_task_result(self, task_id: str, partial_result: Dict[str, Any]) -> bool:
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            # optimistic retry using WATCH
+            tries = 3
+            for _ in range(tries):
+                pipe = None
+                try:
+                    pipe = self.redis.pipeline()
+                    pipe.watch(key)
+                    raw = self.redis.get(key)
+                    if not raw:
+                        try:
+                            if pipe is not None:
+                                pipe.unwatch()
+                        except Exception:
+                            pass
+                        return False
+                    rec = json.loads(raw)
+                    cur = rec.get("result") or {}
+                    if not isinstance(cur, dict):
+                        cur = {}
+                    try:
+                        cur.update(partial_result)
+                    except Exception:
+                        cur = partial_result
+                    rec["result"] = cur
+                    rec["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    pipe.multi()
+                    pipe.set(key, json.dumps(rec, ensure_ascii=False))
+                    pipe.execute()
+                    return True
+                except Exception:
+                    try:
+                        if pipe is not None:
+                            pipe.reset()
+                    except Exception:
+                        pass
+                    continue
+            return False
+        else:
+            with self._lock:
+                if task_id not in self._local_tasks:
+                    return False
+                cur = self._local_tasks[task_id].get("result") or {}
+                try:
+                    cur.update(partial_result)
+                except Exception:
+                    cur = partial_result
+                self._local_tasks[task_id]["result"] = cur
+                self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                return True
+
+    def complete_task(self, task_id: str, result: Dict[str, Any]):
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            raw = self.redis.get(key)
+            if not raw:
+                return
+            try:
+                rec = json.loads(raw)
+            except Exception:
+                return
+            rec["status"] = "completed" if result.get("success", False) else "failed"
+            rec["result"] = result
+            rec["error"] = result.get("error")
+            rec["updated_at"] = datetime.now(timezone.utc).isoformat()
+            rec["completed_at"] = datetime.now(timezone.utc).isoformat()
+            self.redis.set(key, json.dumps(rec, ensure_ascii=False))
+            try:
+                if result.get("success", False):
+                    self.redis.incr(self._redis_metrics_key("completed"))
+                else:
+                    self.redis.incr(self._redis_metrics_key("failed"))
+            except Exception:
+                pass
+        else:
+            with self._lock:
+                if task_id in self._local_tasks:
+                    self._local_tasks[task_id]["status"] = "completed" if result.get("success", False) else "failed"
+                    self._local_tasks[task_id]["result"] = result
+                    self._local_tasks[task_id]["error"] = result.get("error")
+                    self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    self._local_tasks[task_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    try:
+                        if result.get("success", False):
+                            self._metrics["completed"] += 1
+                        else:
+                            self._metrics["failed"] += 1
+                    except Exception:
+                        pass
 
     def fail_task(self, task_id: str, error_message: str):
-        """标记任务失败"""
-        if task_id in self.tasks:
-            self.tasks[task_id]["status"] = "failed"
-            self.tasks[task_id]["error"] = error_message
-            self.tasks[task_id]["updated_at"] = datetime.now().isoformat()
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            raw = self.redis.get(key)
+            if not raw:
+                return
+            try:
+                rec = json.loads(raw)
+            except Exception:
+                return
+            rec["status"] = "failed"
+            rec["error"] = error_message
+            rec["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self.redis.set(key, json.dumps(rec, ensure_ascii=False))
+            try:
+                self.redis.incr(self._redis_metrics_key("failed"))
+            except Exception:
+                pass
+        else:
+            with self._lock:
+                if task_id in self._local_tasks:
+                    self._local_tasks[task_id]["status"] = "failed"
+                    self._local_tasks[task_id]["error"] = error_message
+                    self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    try:
+                        self._metrics["failed"] += 1
+                    except Exception:
+                        pass
 
-    def get_task(self, task_id: str) -> Optional[Dict]:
-        """获取任务信息"""
-        return self.tasks.get(task_id)
+    def list_tasks(self) -> List[str]:
+        if self.use_redis and self.redis:
+            try:
+                return list(self.redis.smembers(self._redis_tasks_set_key()))
+            except Exception:
+                return []
+        with self._lock:
+            return list(self._local_tasks.keys())
 
-    def get_workflow(self, task_id, config: Optional[ShotConfig] = None) -> MultiAgentPipeline:
-        """获取或创建工作流实例"""
-        # config_key = str(config) if config else "default"
-        config_key = task_id if task_id else "default"
+    def delete_task(self, task_id: str, cleanup_workflow: bool = True) -> bool:
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            try:
+                self.redis.delete(key)
+                self.redis.srem(self._redis_tasks_set_key(), task_id)
+            except Exception:
+                return False
+        else:
+            with self._lock:
+                if task_id not in self._local_tasks:
+                    return False
+                self._local_tasks.pop(task_id, None)
+                self._local_raw_configs.pop(task_id, None)
 
-        if config_key not in self.workflow_cache:
-            self.workflow_cache[config_key] = MultiAgentPipeline(task_id, config)
+        if cleanup_workflow:
+            # remove workflow cache if no other tasks use same config
+            try:
+                cfg = None
+                if self.use_redis and self.redis:
+                    # best-effort: try to read raw config is not stored in redis in raw form, skip
+                    cfg = None
+                else:
+                    cfg = self._local_raw_configs.get(task_id)
+                if cfg is not None:
+                    key = self._config_key(cfg) if hasattr(self, "_config_key") else None
+                    if key and key in self.workflow_cache:
+                        # check if any other local task uses same config
+                        still_used = False
+                        for other_id, other_cfg in self._local_raw_configs.items():
+                            if other_id == task_id:
+                                continue
+                            if hasattr(self, "_config_key") and self._config_key(other_cfg) == key:
+                                still_used = True
+                                break
+                        if not still_used:
+                            self.workflow_cache.pop(key, None)
+            except Exception:
+                pass
 
-        return self.workflow_cache[config_key]
+        return True
+
+    # keep get_workflow behavior similar to previous (in-memory pipeline cache)
+    def get_workflow(self, task_id: Optional[str] = None, config: Optional[Any] = None) -> "Any":
+        # prefer local raw config when available
+        if task_id is not None and (config is None or isinstance(config, dict)):
+            with self._lock:
+                raw = self._local_raw_configs.get(task_id)
+            if raw is not None:
+                config = raw
+
+        # compute cache key (use serialized config JSON as key)
+        try:
+            payload = json.dumps(self._serialize_config(config), sort_keys=True, ensure_ascii=False)
+        except Exception:
+            payload = str(config)
+        key = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload))
+
+        with self._lock:
+            pipeline = self.workflow_cache.get(key)
+            if pipeline is not None:
+                try:
+                    self.workflow_cache.move_to_end(key)
+                except Exception:
+                    pass
+                return pipeline
+
+        # create pipeline (use factory if provided)
+        if getattr(self, "pipeline_factory", None) is not None:
+            pipeline = self.pipeline_factory(task_id, config)
+        else:
+            from penshot.neopen.agent import MultiAgentPipeline  # type: ignore
+
+            pipeline = MultiAgentPipeline(task_id, config)
+
+        # insert into LRU cache
+        with self._lock:
+            if self.max_workflow_cache_size > 0 and len(self.workflow_cache) >= self.max_workflow_cache_size:
+                try:
+                    oldest_key, _ = self.workflow_cache.popitem(last=False)
+                    info(f"Evicted oldest workflow cache key: {oldest_key}")
+                except Exception:
+                    pass
+            self.workflow_cache[key] = pipeline
+
+        return pipeline
+
+    # ---------------------- utility methods ----------------------
+    def clear_workflow_cache(self):
+        with self._lock:
+            self.workflow_cache.clear()
+
+    def get_cached_workflow_keys(self) -> List[str]:
+        with self._lock:
+            return list(self.workflow_cache.keys())
+
+    def get_metrics(self) -> Dict[str, int]:
+        if self.use_redis and self.redis:
+            try:
+                return {
+                    "created": int(self.redis.get(self._redis_metrics_key("created")) or 0),
+                    "completed": int(self.redis.get(self._redis_metrics_key("completed")) or 0),
+                    "failed": int(self.redis.get(self._redis_metrics_key("failed")) or 0),
+                }
+            except Exception:
+                return dict(self._metrics)
+        with self._lock:
+            return dict(self._metrics)
+
+    def set_max_workflow_cache_size(self, size: int):
+        if not isinstance(size, int) or size < 0:
+            raise ValueError("max_workflow_cache_size must be a non-negative integer")
+        with self._lock:
+            self.max_workflow_cache_size = size
+            try:
+                while self.max_workflow_cache_size > 0 and len(self.workflow_cache) > self.max_workflow_cache_size:
+                    self.workflow_cache.popitem(last=False)
+            except Exception:
+                pass
+
+    def export_task_snapshot(self, task_id: str) -> Optional[Dict[str, Any]]:
+        if self.use_redis and self.redis:
+            return self._read_record_redis(task_id)
+        return self._read_record_local(task_id)
+
+    def import_task_snapshot(self, snapshot: Dict[str, Any]) -> str:
+        task_id = snapshot.get("task_id") or str(uuid.uuid4())
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            try:
+                self.redis.set(key, json.dumps(snapshot, ensure_ascii=False))
+                self.redis.sadd(self._redis_tasks_set_key(), task_id)
+            except Exception:
+                # fallback to local
+                with self._lock:
+                    self._local_tasks[task_id] = snapshot
+                    self._local_raw_configs[task_id] = None
+        else:
+            with self._lock:
+                self._local_tasks[task_id] = snapshot
+                self._local_raw_configs[task_id] = None
+        return task_id
+
+    def shutdown(self, close_pipelines: bool = True):
+        # attempt to call common cleanup methods on pipelines
+        with self._lock:
+            keys = list(self.workflow_cache.keys())
+        for k in keys:
+            with self._lock:
+                pipeline = self.workflow_cache.get(k)
+            if not pipeline:
+                continue
+            if close_pipelines:
+                for method_name in ("close", "shutdown", "stop", "terminate"):
+                    meth = getattr(pipeline, method_name, None)
+                    if callable(meth):
+                        try:
+                            meth()
+                        except Exception:
+                            pass
+                        break
+        with self._lock:
+            self.workflow_cache.clear()
+
+    def set_task_callback(self, task_id: str, callback_url: str) -> bool:
+        """Set or update the callback URL associated with a task.
+
+        For Redis: perform a read-modify-write.
+        For local: update the in-memory record.
+        """
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            raw = self.redis.get(key)
+            if not raw:
+                return False
+            try:
+                rec = json.loads(raw)
+            except Exception:
+                return False
+            rec.setdefault("callbacks", [])
+            # replace callbacks with single callback
+            rec["callbacks"] = [callback_url]
+            rec["callback_url"] = callback_url
+            rec["updated_at"] = datetime.now(timezone.utc).isoformat()
+            try:
+                self.redis.set(key, json.dumps(rec, ensure_ascii=False))
+                return True
+            except Exception:
+                return False
+        else:
+            with self._lock:
+                if task_id not in self._local_tasks:
+                    return False
+                self._local_tasks[task_id].setdefault("callbacks", [])
+                self._local_tasks[task_id]["callbacks"] = [callback_url]
+                self._local_tasks[task_id]["callback_url"] = callback_url
+                self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                return True
+
+# end of TaskManager

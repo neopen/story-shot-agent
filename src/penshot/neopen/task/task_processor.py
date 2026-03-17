@@ -6,7 +6,7 @@
 @Time: 2026/1/26 16:40
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict
 
 from penshot.neopen.shot_config import ShotConfig
@@ -14,6 +14,7 @@ from penshot.logger import error, info
 from penshot.neopen.task.task_handler import CallbackHandler
 from penshot.neopen.task.task_manager import TaskManager
 from penshot.utils.log_utils import print_log_exception
+from penshot.neopen.task.task_models import CallbackPayload
 
 
 class AsyncTaskProcessor:
@@ -39,7 +40,8 @@ class AsyncTaskProcessor:
 
             # 执行处理
             self.task_manager.update_task_progress(task_id, "parsing_script", 20)
-            result = await workflow.run_process(task["script"], task["config"])
+            # workflow.run_process should return a dict-like result with keys: success, data, error
+            result = await workflow.run_process(task["script"], task["config"])  # type: ignore
 
             # 更新进度
             self.task_manager.update_task_progress(task_id, "finalizing", 90)
@@ -64,15 +66,21 @@ class AsyncTaskProcessor:
         if not task:
             return
 
-        callback_data = {
-            "task_id": task_id,
-            "status": "success" if result.get("success") else "failed",
-            "data": result.get("data"),
-            "error_message": result.get("error"),
-            "completed_at": datetime.now().isoformat()
-        }
-
-        await self.callback_handler.notify_callback(task["callback_url"], callback_data)
+        # standardize callback payload using CallbackPayload model
+        try:
+            payload = CallbackPayload(
+                task_id=task_id,
+                status="success" if result.get("success") else "failed",
+                data=result.get("data"),
+                error_message=result.get("error"),
+                completed_at=datetime.now(timezone.utc)
+            )
+            # use pydantic model_dump to get a dict representation (compatible with pydantic v2)
+            await self.callback_handler.notify_callback(task["callback_url"], payload.model_dump())
+        except Exception as e:
+            error(f"回调构建/发送失败 for task {task_id}: {e}")
+            # don't change task state here; just log the callback failure
+            return
 
     async def process_batch(self, batch_id: str, scripts: List[str], config: ShotConfig = None):
         """批量处理任务"""

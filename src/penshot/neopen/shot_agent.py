@@ -9,6 +9,7 @@ import uuid
 from typing import Dict, Optional
 
 from penshot.neopen.agent import MultiAgentPipeline
+from penshot.neopen.language_manage import Language, set_language
 from penshot.neopen.shot_config import ShotConfig
 
 
@@ -16,6 +17,7 @@ from penshot.neopen.shot_config import ShotConfig
 async def generate_storyboard(
         script_text: str,
         task_id: Optional[str] = str(uuid.uuid4().hex),
+        language: Language = Language.ZH,
         config: Optional[ShotConfig] = ShotConfig()
 ) -> Dict:
     """
@@ -30,8 +32,9 @@ async def generate_storyboard(
         包含分镜列表的完整结果
     """
     # 创建并运行多智能体管道
+    set_language(language.value)
     workflow = MultiAgentPipeline(config=config, task_id=task_id)
     return await  workflow.run_process(
         raw_script=script_text,
-        config=ShotConfig()
+        config=config
     )
