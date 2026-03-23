@@ -133,6 +133,10 @@ class AIAudioPrompt(BaseModel):
         description="前一段音频ID。用于保持音色/风格连贯性"
     )
 
+    def to_dict(self) -> dict:
+        """转换为字典表示"""
+        return self.model_dump()
+
     # === 验证器 ===
     @validator('negative_prompt', pre=True, always=True)
     def set_default_negative_prompt(cls, v, values):
@@ -275,6 +279,10 @@ class AIVideoPrompt(BaseModel):
         default=None,
         description="关联的音频提示词（如果有）"
     )
+
+    def to_dict(self) -> dict:
+        """转换为字典表示"""
+        return self.model_dump()
 
 
 class AIVideoInstructions(BaseModel):

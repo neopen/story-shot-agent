@@ -47,7 +47,7 @@ def detect_ai_provider_by_url(base_url: str) -> ClientType:
         str | None: 厂商名称（小写）或 None（无法识别）
     """
     if not base_url or not isinstance(base_url, str):
-        return ClientType.OLLAMA
+        raise ModuleNotFoundError("未找到默认 LLM 配置")
 
     # 统一转为小写便于匹配
     url_lower = base_url.lower()

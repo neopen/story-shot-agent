@@ -289,7 +289,7 @@ script_parser_user:
     请解析以下剧本内容，返回完整的JSON解析结果。
     
     【问题类型】
-    {', '.join(issue_types)}
+    {issue_types}
     
     【修复建议】
     {suggestions}

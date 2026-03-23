@@ -129,28 +129,28 @@ video_splitter_user:
         【关键道具】《飞鸟集》：钴蓝色，水渍清晰
       
       输出：
-        {
+        {{
           "needs_split": true,
           "reason": "6.0秒超阈值，台词有自然停顿点（省略号）",
           "segments": [
-            {
+            {{
               "duration": 3.2,
               "description": "陈阳刚直起身，右手拎空防水袋，左手轻触《飞鸟集》封面，目光未完全转向，语气温和：'我跑了两条街找防水袋……'",
               "key_frames": ["直起身瞬间", "左手将触未触书脊"],
               "continuity_hints": ["反光条闪光角度", "水渍轮廓初显"]
-            },
-            {
+            }},
+            {{
               "duration": 2.8,
               "description": "陈阳左手托起《飞鸟集》，钴蓝封皮水渍清晰，借阅卡完好，凝视林小雨，语气笃定：'诗里说"雨是云的眼泪"，可我不想让你哭。'",
               "key_frames": ["掌心托书", "借阅卡特写"],
               "continuity_hints": ["借阅卡文字清晰", "眼神方向一致"]
-            }
+            }}
           ],
           "continuity_plan": {
             "character_consistency": "明黄雨衣颜色一致，眼神方向连贯",
             "scene_consistency": "水渍范围自然衔接",
             "transition_suggestions": ["0.3秒光学模糊转场", "声音留白0.2秒"]
-          }
-        }
+          }}
+        }}
     
     请直接返回合法的JSON，不要添加其他任何解释性文字和特殊符号。

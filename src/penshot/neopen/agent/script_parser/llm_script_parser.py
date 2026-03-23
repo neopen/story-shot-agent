@@ -63,9 +63,9 @@ class LLMScriptParser(BaseScriptParser, BaseAgent):
         if repair_params:
             issue_types = repair_params.get('issue_types', [])
             suggestions = repair_params.get('suggestions', {})
-            user_prompt = prompt_template.format(script_text=script_text, issue_types=issue_types, suggestions=suggestions)
+            user_prompt = prompt_template.format(script_text=script_text, issue_types=', '.join(issue_types), suggestions=suggestions)
         else:
-            user_prompt = prompt_template.format(script_text=script_text)
+            user_prompt = prompt_template.format(script_text=script_text, issue_types="", suggestions="")
 
         debug(f"AI系统提示词（摘要）: {system_prompt[:150]}...")
         debug(f"AI用户提示词（摘要）: {user_prompt[:150]}...")

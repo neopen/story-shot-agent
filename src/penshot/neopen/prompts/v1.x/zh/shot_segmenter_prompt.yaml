@@ -136,7 +136,7 @@ shot_segmenter_user:
       
       输出：
         [
-          {
+          {{
             "id": "shot_001",
             "description": "全景镜头：灰蒙蒙天空下，雨丝斜织，青砖地面泛光，绿色铁艺长椅静置红底白字招牌下；林小雨蹲在长椅右侧，米白长裙下摆微湿，浅灰开衫肩头洇水，双手捧着钴蓝色《飞鸟集》，神情焦虑。",
             "duration": 4.0,
@@ -145,8 +145,8 @@ shot_segmenter_user:
             "emotion": "anxious",
             "confidence": 8.8,
             "element_ids": ["elem_001"]
-          },
-          {
+          }},
+          {{
             "id": "shot_002",
             "description": "特写镜头：林小雨侧脸微抬，雨水沿发梢滑落，睫毛轻颤，声音轻颤：'明明说好今天还书的……这雨下得，他会不会不来了？'",
             "duration": 3.5,
@@ -155,7 +155,7 @@ shot_segmenter_user:
             "emotion": "sad",
             "confidence": 8.5,
             "element_ids": ["elem_002"]
-          }
+          }}
         ]
     
     直接返回合法的JSON结构，不要添加其他任何解释性文字和特殊符号。
