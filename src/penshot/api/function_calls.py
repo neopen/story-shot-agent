@@ -7,16 +7,15 @@
 
 import asyncio
 import threading
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Optional, List, Any, Callable
 
-from penshot.logger import log_with_context
+from penshot.logger import log_with_context, info, error
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_language import Language, set_language
-from penshot.neopen.task.task_manager import TaskManager
-from penshot.neopen.task.task_processor import AsyncTaskProcessor
+from penshot.neopen.task.task_factory import create_task_factory, TaskFactory, TaskResponse, TaskPriority
+from penshot.neopen.task.task_models import TaskStatus
 
 
 @dataclass
@@ -24,24 +23,36 @@ class PenshotResult:
     """Penshot 执行结果"""
     task_id: str
     success: bool
-    status: str
+    status: TaskStatus  # pending, processing, completed, failed, timeout, not_found
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     processing_time_ms: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            "task_id": self.task_id,
+            "success": self.success,
+            "status": self.status,
+            "data": self.data,
+            "error": self.error,
+            "processing_time_ms": self.processing_time_ms
+        }
 
 
 class PenshotFunction:
     """
     Penshot 智能体功能调用接口
 
-    复用现有的 TaskManager 进行任务管理
+    使用 TaskFactory 统一管理任务队列、并发控制和任务生命周期
     """
 
     def __init__(
             self,
             config: Optional[ShotConfig] = None,
             language: Language = Language.ZH,
-            task_manager: Optional[TaskManager] = None
+            max_concurrent: int = 10,
+            queue_size: int = 1000
     ):
         """
         初始化 Penshot 功能接口
@@ -49,14 +60,22 @@ class PenshotFunction:
         Args:
             config: 系统配置
             language: 输出语言
-            task_manager: 任务管理器（可选）
+            max_concurrent: 最大并发数（默认10）
+            queue_size: 队列大小（默认1000）
         """
         self.config = config or ShotConfig()
         self.language = language
 
-        # 复用任务管理器
-        self.task_manager = task_manager or TaskManager()
-        self.task_processor = AsyncTaskProcessor(self.task_manager)
+        # 使用 TaskFactory 替代原始的 TaskManager + TaskProcessor
+        self.task_factory: TaskFactory = create_task_factory(
+            max_concurrent=max_concurrent,
+            queue_size=queue_size,
+            default_config=config,
+            default_language=language
+        )
+
+        # 保持兼容性
+        self.task_manager = self.task_factory.task_manager
 
         # 回调存储
         self._callbacks: Dict[str, Callable] = {}
@@ -65,6 +84,8 @@ class PenshotFunction:
         self._background_loop: Optional[asyncio.AbstractEventLoop] = None
         self._background_thread: Optional[threading.Thread] = None
         self._start_background_loop()
+
+        info(f"PenshotFunction 初始化完成，最大并发: {max_concurrent}")
 
     def _start_background_loop(self):
         """启动后台事件循环"""
@@ -82,60 +103,39 @@ class PenshotFunction:
             pass
 
     def _run_async_in_background(self, coro):
-        """
-        在后台事件循环中运行协程
-
-        使用 run_coroutine_threadsafe 是正确的方式
-        """
+        """在后台事件循环中运行协程"""
         if self._background_loop is None:
             raise RuntimeError("后台事件循环未启动")
+        return asyncio.run_coroutine_threadsafe(coro, self._background_loop)
 
-        future = asyncio.run_coroutine_threadsafe(coro, self._background_loop)
-        return future
-
-    def _call_soon_in_background(self, func, *args):
-        """
-        在后台事件循环中同步执行函数
-
-        正确使用 call_soon_threadsafe，需要传递函数和参数
-
-        Args:
-            func: 要执行的函数
-            *args: 函数参数
-        """
-        if self._background_loop is None:
-            raise RuntimeError("后台事件循环未启动")
-
-        self._background_loop.call_soon_threadsafe(func, *args)
-
-    def _call_soon_with_context(self, func, *args, context=None):
-        """
-        在后台事件循环中执行函数（带上下文）
-
-        Args:
-            func: 要执行的函数
-            *args: 函数参数
-            context: 上下文对象
-        """
-        if self._background_loop is None:
-            raise RuntimeError("后台事件循环未启动")
-
-        if context is not None:
-            self._background_loop.call_soon_threadsafe(func, *args, context=context)
-        else:
-            self._background_loop.call_soon_threadsafe(func, *args)
-
+    # ==================== 核心方法 ====================
     def breakdown_script(
             self,
             script_text: str,
             task_id: Optional[str] = None,
             language: Optional[Language] = None,
-            wait_timeout: float = 300.0
+            wait_timeout: float = 300.0,
+            priority: TaskPriority = TaskPriority.NORMAL
     ) -> PenshotResult:
         """
         同步执行剧本分镜拆分（等待完成）
+
+        Args:
+            script_text: 剧本文本
+            task_id: 任务ID（可选）
+            language: 输出语言
+            wait_timeout: 等待超时时间（秒）
+            priority: 任务优先级
+
+        Returns:
+            PenshotResult: 执行结果
         """
-        task_id = self.breakdown_script_async(script_text, task_id, language)
+        task_id = self.breakdown_script_async(
+            script_text=script_text,
+            task_id=task_id,
+            language=language,
+            priority=priority
+        )
         return self.wait_for_result(task_id, timeout=wait_timeout)
 
     def breakdown_script_async(
@@ -143,62 +143,115 @@ class PenshotFunction:
             script_text: str,
             task_id: Optional[str] = None,
             language: Optional[Language] = None,
-            callback: Optional[Callable] = None
+            callback: Optional[Callable] = None,
+            priority: TaskPriority = TaskPriority.NORMAL
     ) -> str:
         """
         异步执行剧本分镜拆分（立即返回 task_id）
+
+        Args:
+            script_text: 剧本文本
+            task_id: 任务ID（可选）
+            language: 输出语言
+            callback: 任务完成回调函数
+            priority: 任务优先级
+
+        Returns:
+            str: 任务ID
         """
-        task_id = task_id or uuid.uuid4().hex
+        # 生成任务ID
+        task_id = task_id or self._generate_task_id()
         lang = language or self.language
 
+        # 保存回调
         if callback:
             self._callbacks[task_id] = callback
 
+        # 设置语言
         set_language(lang)
 
-        # 创建任务
-        self.task_manager.create_task(
+        # 使用 TaskFactory 提交任务
+        self.task_factory.submit(
             script=script_text,
+            task_id=task_id,
             config=self.config,
-            task_id=task_id
+            language=lang,
+            priority=priority,
+            callback=lambda r: self._on_task_complete(task_id, r)
         )
 
-        # 在后台事件循环中处理任务
-        self._run_async_in_background(
-            self._process_and_callback(task_id)
-        )
-
+        log_with_context("INFO", f"任务已提交: {task_id}", {"priority": priority.name})
         return task_id
 
-    async def _process_and_callback(self, task_id: str):
-        """处理任务并触发回调"""
-        try:
-            await self.task_processor.process_script_task(task_id)
+    def _on_task_complete(self, task_id: str, task_response: TaskResponse):
+        """任务完成回调"""
+        # 转换为 PenshotResult
+        result = PenshotResult(
+            task_id=task_response.task_id,
+            success=task_response.success,
+            status=task_response.status,
+            data=task_response.data,
+            error=task_response.error,
+            processing_time_ms=task_response.processing_time_ms
+        )
 
-            result = self.get_task_result(task_id)
-
-            if task_id in self._callbacks:
-                callback = self._callbacks[task_id]
-                if asyncio.iscoroutinefunction(callback):
-                    await callback(result)
-                else:
-                    loop = asyncio.get_event_loop()
-                    await loop.run_in_executor(None, callback, result)
+        # 触发用户回调
+        if task_id in self._callbacks:
+            callback = self._callbacks[task_id]
+            try:
+                callback(result)
+            except Exception as e:
+                error(f"回调执行失败: {task_id}, 错误: {str(e)}")
+            finally:
                 del self._callbacks[task_id]
 
-        except Exception as e:
-            log_with_context("ERROR", f"任务处理失败: {str(e)}", {"task_id": task_id})
+    # ==================== 状态查询方法 ====================
 
     def get_task_status(self, task_id: str) -> Optional[Dict]:
-        """获取任务状态"""
-        return self.task_manager.get_task(task_id)
+        """
+        获取任务状态
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            Dict: 任务状态信息
+        """
+        status = self.task_factory.get_status(task_id)
+        if status:
+            return {
+                "task_id": status.task_id,
+                "status": status.status,
+                "stage": status.stage,
+                "progress": status.progress,
+                "created_at": status.created_at,
+                "updated_at": status.updated_at,
+                "error": status.error_message
+            }
+        return None
 
     def get_task_result(self, task_id: str) -> Optional[PenshotResult]:
-        """获取任务结果"""
-        task = self.task_manager.get_task(task_id)
-        if not task:
+        """
+        获取任务结果
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            PenshotResult: 任务结果
+        """
+        result = self.task_factory.get_result(task_id)
+        if not result:
             return None
-        return self._task_to_result(task_id, task)
+
+        return PenshotResult(
+            task_id=result.task_id,
+            success=result.success,
+            status=result.status,
+            data=result.data,
+            error=result.error,
+            processing_time_ms=result.processing_time_ms
+        )
 
     def wait_for_result(
             self,
@@ -206,42 +259,30 @@ class PenshotFunction:
             timeout: float = 300.0,
             poll_interval: float = 0.5
     ) -> PenshotResult:
-        """等待任务完成"""
-        import time
+        """
+        同步等待任务完成
 
-        start_time = time.time()
+        Args:
+            task_id: 任务ID
+            timeout: 超时时间（秒）
+            poll_interval: 轮询间隔（秒）
 
-        while time.time() - start_time < timeout:
-            task = self.task_manager.get_task(task_id)
-
-            if not task:
-                return PenshotResult(
-                    task_id=task_id,
-                    success=False,
-                    status="not_found",
-                    error=f"任务不存在: {task_id}"
-                )
-
-            status = task.get("status")
-
-            if status == "completed":
-                return self._task_to_result(task_id, task)
-
-            if status == "failed":
-                return PenshotResult(
-                    task_id=task_id,
-                    success=False,
-                    status="failed",
-                    error=task.get("error", "未知错误")
-                )
-
-            time.sleep(poll_interval)
+        Returns:
+            PenshotResult: 任务结果
+        """
+        result = self.task_factory.wait_for_result(
+            task_id=task_id,
+            timeout=timeout,
+            poll_interval=poll_interval
+        )
 
         return PenshotResult(
-            task_id=task_id,
-            success=False,
-            status="timeout",
-            error=f"等待超时 ({timeout}秒)"
+            task_id=result.task_id,
+            success=result.success,
+            status=result.status,
+            data=result.data,
+            error=result.error,
+            processing_time_ms=result.processing_time_ms
         )
 
     async def wait_for_result_async(
@@ -250,137 +291,213 @@ class PenshotFunction:
             timeout: float = 300.0,
             poll_interval: float = 0.5
     ) -> PenshotResult:
-        """异步等待任务完成"""
-        import asyncio
+        """
+        异步等待任务完成
 
-        start_time = asyncio.get_event_loop().time()
+        Args:
+            task_id: 任务ID
+            timeout: 超时时间（秒）
+            poll_interval: 轮询间隔（秒）
 
-        while True:
-            task = self.task_manager.get_task(task_id)
+        Returns:
+            PenshotResult: 任务结果
+        """
+        result = await self.task_factory.wait_for_result_async(
+            task_id=task_id,
+            timeout=timeout,
+            poll_interval=poll_interval
+        )
 
-            if not task:
-                return PenshotResult(
-                    task_id=task_id,
-                    success=False,
-                    status="not_found",
-                    error=f"任务不存在: {task_id}"
-                )
+        return PenshotResult(
+            task_id=result.task_id,
+            success=result.success,
+            status=result.status,
+            data=result.data,
+            error=result.error,
+            processing_time_ms=result.processing_time_ms
+        )
 
-            status = task.get("status")
-
-            if status == "completed":
-                return self._task_to_result(task_id, task)
-
-            if status == "failed":
-                return PenshotResult(
-                    task_id=task_id,
-                    success=False,
-                    status="failed",
-                    error=task.get("error", "未知错误")
-                )
-
-            if asyncio.get_event_loop().time() - start_time > timeout:
-                return PenshotResult(
-                    task_id=task_id,
-                    success=False,
-                    status="timeout",
-                    error=f"等待超时 ({timeout}秒)"
-                )
-
-            await asyncio.sleep(poll_interval)
+    # ==================== 任务管理方法 ====================
 
     def cancel_task(self, task_id: str) -> bool:
-        """取消任务"""
-        task = self.task_manager.get_task(task_id)
-        if not task:
-            return False
+        """
+        取消任务
 
-        if task.get("status") in ["completed", "failed", "cancelled"]:
-            return False
+        Args:
+            task_id: 任务ID
 
-        self.task_manager.fail_task(task_id, "任务被用户取消")
-        return True
+        Returns:
+            bool: 是否成功取消
+        """
+        return self.task_factory.cancel(task_id)
 
     def batch_breakdown(
             self,
             scripts: List[str],
             language: Optional[Language] = None,
-            wait_timeout: float = 600.0
+            wait_timeout: float = 600.0,
+            priority: TaskPriority = TaskPriority.NORMAL
     ) -> List[PenshotResult]:
-        """批量处理多个剧本"""
-        task_ids = []
+        """
+        批量处理多个剧本（同步，等待全部完成）
 
-        for script in scripts:
-            task_id = self.breakdown_script_async(script, language=language)
-            task_ids.append(task_id)
+        Args:
+            scripts: 剧本列表
+            language: 输出语言
+            wait_timeout: 单个任务超时时间
+            priority: 任务优先级
 
-        results = []
-        for task_id in task_ids:
-            result = self.wait_for_result(task_id, timeout=wait_timeout)
-            results.append(result)
+        Returns:
+            List[PenshotResult]: 结果列表
+        """
+        # 使用 TaskFactory 的批量处理方法
+        results = self.task_factory.batch(
+            scripts=scripts,
+            config=self.config,
+            language=language.value if language else self.language.value,
+            priority=priority,
+            timeout=wait_timeout
+        )
 
-        return results
+        # 转换为 PenshotResult
+        return [
+            PenshotResult(
+                task_id=r.task_id,
+                success=r.success,
+                status=r.status,
+                data=r.data,
+                error=r.error,
+                processing_time_ms=r.processing_time_ms
+            )
+            for r in results
+        ]
 
     async def batch_breakdown_async(
             self,
             scripts: List[str],
             language: Optional[Language] = None,
-            max_concurrent: int = 3
+            max_concurrent: int = 3,
+            priority: TaskPriority = TaskPriority.NORMAL
     ) -> List[PenshotResult]:
-        """异步批量处理多个剧本"""
-        semaphore = asyncio.Semaphore(max_concurrent)
+        """
+        批量处理多个剧本（异步，支持并发控制）
 
-        async def process_one(script: str) -> PenshotResult:
-            async with semaphore:
-                task_id = self.breakdown_script_async(script, language=language)
-                return await self.wait_for_result_async(task_id)
+        Args:
+            scripts: 剧本列表
+            language: 输出语言
+            max_concurrent: 最大并发数
+            priority: 任务优先级
 
-        tasks = [process_one(script) for script in scripts]
-        return await asyncio.gather(*tasks)
-
-    def _task_to_result(self, task_id: str, task: Dict) -> PenshotResult:
-        """将任务字典转换为 PenshotResult"""
-        status = task.get("status")
-        is_success = status == "completed"
-
-        processing_time_ms = None
-        try:
-            if task.get("completed_at") and task.get("created_at"):
-                completed_at = datetime.fromisoformat(task["completed_at"]) if isinstance(task["completed_at"], str) else task["completed_at"]
-                created_at = datetime.fromisoformat(task["created_at"]) if isinstance(task["created_at"], str) else task["created_at"]
-                processing_time_ms = int((completed_at - created_at).total_seconds() * 1000)
-        except Exception:
-            pass
-
-        data = None
-        if task.get("result") and isinstance(task["result"], dict):
-            data = task["result"].get("data")
-
-        return PenshotResult(
-            task_id=task_id,
-            success=is_success,
-            status=status,
-            data=data,
-            error=task.get("error"),
-            processing_time_ms=processing_time_ms
+        Returns:
+            List[PenshotResult]: 结果列表
+        """
+        results = await self.task_factory.batch_async(
+            scripts=scripts,
+            config=self.config,
+            language=language.value if language else self.language.value,
+            priority=priority,
+            max_concurrent=max_concurrent
         )
 
+        return [
+            PenshotResult(
+                task_id=r.task_id,
+                success=r.success,
+                status=r.status,
+                data=r.data,
+                error=r.error,
+                processing_time_ms=r.processing_time_ms
+            )
+            for r in results
+        ]
+
+    # ==================== 队列监控方法 ====================
+
+    def get_queue_status(self) -> Dict[str, Any]:
+        """
+        获取队列状态
+
+        Returns:
+            Dict: 队列状态信息
+        """
+        return self.task_factory.get_queue_status()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        获取统计信息
+
+        Returns:
+            Dict: 统计信息
+        """
+        return self.task_factory.get_stats()
+
+    def set_max_concurrent(self, max_concurrent: int):
+        """
+        动态设置最大并发数
+
+        Args:
+            max_concurrent: 最大并发数
+        """
+        self.task_factory.set_max_concurrent(max_concurrent)
+        info(f"最大并发数已调整为: {max_concurrent}")
+
+    # ==================== 生命周期管理 ====================
+
     def shutdown(self):
-        """关闭后台事件循环"""
+        """
+        关闭 Penshot 功能接口
+
+        等待所有任务完成后关闭
+        """
+        info("正在关闭 PenshotFunction...")
+        # 使用异步方式关闭
+        future = self._run_async_in_background(
+            self.task_factory.shutdown(wait_for_completion=True, timeout=30)
+        )
+        try:
+            future.result(timeout=35)
+        except Exception as e:
+            error(f"关闭时发生错误: {str(e)}")
+
+        # 停止后台事件循环
         if self._background_loop:
             self._background_loop.call_soon_threadsafe(self._background_loop.stop)
         if self._background_thread:
             self._background_thread.join(timeout=5)
 
+        info("PenshotFunction 已关闭")
 
-if __name__ == '__main__':
+    # ==================== 辅助方法 ====================
 
-    # 使用示例
-    def create_penshot_agent(
-            config: Optional[ShotConfig] = None,
-            language: Language = Language.ZH
-    ) -> PenshotFunction:
-        """创建 Penshot 智能体实例"""
-        return PenshotFunction(config=config, language=language)
+    def _generate_task_id(self) -> str:
+        """生成任务ID"""
+        import random
+        return "TSK" + datetime.now().strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9999))
 
-    print(create_penshot_agent())
+
+# ==================== 便捷函数 ====================
+
+def create_penshot_agent(
+        config: Optional[ShotConfig] = None,
+        language: Language = Language.ZH,
+        max_concurrent: int = 10,
+        queue_size: int = 1000
+) -> PenshotFunction:
+    """
+    创建 Penshot 智能体实例
+
+    Args:
+        config: 系统配置
+        language: 输出语言
+        max_concurrent: 最大并发数
+        queue_size: 队列大小
+
+    Returns:
+        PenshotFunction: 智能体实例
+    """
+    return PenshotFunction(
+        config=config,
+        language=language,
+        max_concurrent=max_concurrent,
+        queue_size=queue_size
+    )

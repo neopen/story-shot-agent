@@ -9,13 +9,9 @@ Package exports for penshot.neopen.task
 Expose API-friendly models and core classes for easier imports.
 """
 from .task_models import (
-    ProcessRequest,
     ProcessingStatus,
-    ProcessResult,
-    BatchProcessRequest,
-    BatchProcessResult,
     CallbackPayload,
-    APIResponse,
+    APIResponse, BatchTaskResponse, TaskResponse,
 )
 
 from .task_manager import TaskManager
@@ -24,11 +20,9 @@ from .task_handler import CallbackHandler
 
 __all__ = [
     # models
-    "ProcessRequest",
     "ProcessingStatus",
-    "ProcessResult",
-    "BatchProcessRequest",
-    "BatchProcessResult",
+    "TaskResponse",
+    "BatchTaskResponse",
     "CallbackPayload",
     "APIResponse",
     # runtime classes

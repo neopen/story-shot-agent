@@ -1,21 +1,19 @@
 from __future__ import annotations
 
+from penshot.neopen.task.task_models import TaskStatus
 from penshot.utils.log_utils import print_log_exception
 from penshot.utils.obj_utils import obj_to_dict
 from penshot.utils.redis_utils import RedisClient
 
 """
 @FileName: task_manager.py
-@Description: 
+@Description: TaskManager with optional Redis backend.
+    - If redis_url or redis_client is provided, tasks are persisted in Redis (JSON per task, and an ID set).
+    - Otherwise tasks are stored in-process memory (protected by RLock).
+    - Workflow cache and pipeline instances remain in-memory.
 @Author: HiPeng
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/26 16:42
-"""
-"""
-TaskManager with optional Redis backend.
-- If redis_url or redis_client is provided, tasks are persisted in Redis (JSON per task, and an ID set).
-- Otherwise tasks are stored in-process memory (protected by RLock).
-- Workflow cache and pipeline instances remain in-memory.
 """
 
 import copy
@@ -143,7 +141,7 @@ class TaskManager:
             "task_id": task_id,
             "script": script,
             "config": config,
-            "status": "pending",
+            "status": TaskStatus.PENDING,
             "stage": "initialized",
             "progress": 0,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -302,7 +300,7 @@ class TaskManager:
                 rec = json.loads(raw)
             except Exception:
                 return
-            rec["status"] = "completed" if result.get("success", False) else "failed"
+            rec["status"] = TaskStatus.SUCCESS if result.get("success", False) else TaskStatus.FAILED
             rec["result"] = result
             rec["error"] = result.get("error")
             rec["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -318,7 +316,7 @@ class TaskManager:
         else:
             with self._lock:
                 if task_id in self._local_tasks:
-                    self._local_tasks[task_id]["status"] = "completed" if result.get("success", False) else "failed"
+                    self._local_tasks[task_id]["status"] = TaskStatus.SUCCESS if result.get("success", False) else TaskStatus.FAILED
                     self._local_tasks[task_id]["result"] = result
                     self._local_tasks[task_id]["error"] = result.get("error")
                     self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -341,7 +339,7 @@ class TaskManager:
                 rec = json.loads(raw)
             except Exception:
                 return
-            rec["status"] = "failed"
+            rec["status"] = TaskStatus.FAILED
             rec["error"] = error_message
             rec["updated_at"] = datetime.now(timezone.utc).isoformat()
             self.redis.set(key, json.dumps(obj_to_dict(rec), ensure_ascii=False))
@@ -352,7 +350,7 @@ class TaskManager:
         else:
             with self._lock:
                 if task_id in self._local_tasks:
-                    self._local_tasks[task_id]["status"] = "failed"
+                    self._local_tasks[task_id]["status"] = TaskStatus.FAILED
                     self._local_tasks[task_id]["error"] = error_message
                     self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
                     try:

@@ -7,96 +7,48 @@
 """
 from __future__ import annotations
 
-import random
+from dataclasses import field, dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, Field, field_validator
-
-from penshot.neopen.shot_language import Language
-from penshot.neopen.shot_config import ShotConfig
+from pydantic import BaseModel, Field
 
 
-def _generate_task_id() -> str:
-    return "HL" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9999))
+class TaskStatus(str, Enum):
+    """ task流程状态 """
+    PENDING = "pending"
+    PROCESSING = "processing"
+    # COMPLETED = "completed"
+    SUCCESS = "success"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    NOT_FOUND = "not_found"
+    TIMEOUT = "timeout"
+    UNKNOWN = "unknown"
+
+    def is_completed(self) -> bool:
+        return self in (TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.CANCELLED)
 
 
-class ProcessRequest(BaseModel):
-    """处理请求数据模型（用于 API 输入）
-
-    Notes:
-    - `config` 使用通用字典以保证可序列化并与内部 dataclass 互操作。
-    - `task_id` 使用生成器作为默认值。
-    """
-    script: str = Field(..., min_length=1, description="原始剧本文本")
-    config: Optional[ShotConfig] = Field(default_factory=ShotConfig, description="处理配置（序列化形式）")
-    callback_url: Optional[str] = Field(default=None, description="回调URL，处理完成后通知（可选）")
-    task_id: str = Field(default_factory=_generate_task_id, description="外部请求ID（可选）")
-    language: Language = Field(default=Language.ZH, description='剧本语言，例如 "zh" 或 "en"')
-
-    @field_validator("language")
-    def validate_language(cls, v):
-        if v not in {Language.ZH, Language.EN}:
-            raise ValueError("language must be one of: 'zh', 'en'")
-        return v
+class TaskPriority(int, Enum):
+    """任务优先级"""
+    LOW = 1
+    NORMAL = 2
+    HIGH = 3
+    CRITICAL = 4
 
 
 class ProcessingStatus(BaseModel):
     """处理状态响应模型（用于轮询/状态接口）"""
     task_id: str
-    status: str = Field(..., description="任务状态: pending | processing | completed | failed")
+    status: TaskStatus = Field(..., description="任务状态: pending | processing | completed | failed")
     stage: Optional[str] = Field(default=None, description="当前处理阶段")
     progress: Optional[float] = Field(default=None, ge=0, le=100, description="进度百分比")
     estimated_time_remaining: Optional[int] = Field(default=None, description="预估剩余时间（秒）")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error_message: Optional[str] = None
-
-
-class ProcessResult(BaseModel):
-    """处理结果响应模型（用于回调和最终响应）"""
-    task_id: str
-    status: str = Field(..., description="success | failed")
-    success: bool
-    data: Optional[Dict[str, Any]] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
-    processing_time_ms: Optional[int] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
-
-
-class BatchProcessRequest(BaseModel):
-    """批量处理请求模型（API 输入）"""
-    scripts: List[str] = Field(..., description="剧本列表")
-    config: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    batch_id: Optional[str] = None
-    language: Language = Field(default=Language.ZH, description='剧本语言，例如 "zh" 或 "en"')
-
-    @field_validator("language")
-    def validate_language(cls, v):
-        if v not in {Language.ZH, Language.EN}:
-            raise ValueError("language must be one of: 'zh', 'en'")
-        return v
-
-    @field_validator("scripts")
-    def validate_scripts_length(cls, v):
-        if not v or len(v) < 1:
-            raise ValueError("scripts must contain at least 1 item")
-        if len(v) > 50:
-            raise ValueError("scripts contains too many items (max 50)")
-        return v
-
-
-class BatchProcessResult(BaseModel):
-    """批量处理结果模型（API 输出）"""
-    batch_id: str
-    total_tasks: int
-    completed_tasks: int
-    failed_tasks: int
-    pending_tasks: int
-    results: List[Dict[str, Any]] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CallbackPayload(BaseModel):
@@ -116,13 +68,57 @@ class APIResponse(BaseModel):
     data: Optional[Any] = None
 
 
+@dataclass
+class TaskResponse:
+    """任务响应数据类"""
+    task_id: str
+    success: bool
+    status: TaskStatus
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    processing_time_ms: Optional[int] = None
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "success": self.success,
+            "status": self.status.value if hasattr(self.status, 'value') else self.status,
+            "data": self.data,
+            "error": self.error,
+            "processing_time_ms": self.processing_time_ms,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None
+        }
+
+
+@dataclass
+class BatchTaskResponse:
+    """批量任务响应数据类"""
+    batch_id: str
+    total_tasks: int
+    task_ids: List[str]
+    status: TaskStatus
+    results: List[TaskResponse] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "batch_id": self.batch_id,
+            "total_tasks": self.total_tasks,
+            "task_ids": self.task_ids,
+            "status": self.status.value if hasattr(self.status, 'value') else self.status,
+            "results": [r.to_dict() for r in self.results],
+            "created_at": self.created_at.isoformat()
+        }
+
+
 # 兼容导出名（保持原文件中常用符号）
 __all__ = [
-    "ProcessRequest",
     "ProcessingStatus",
-    "ProcessResult",
-    "BatchProcessRequest",
-    "BatchProcessResult",
+    "BatchTaskResponse",
+    "TaskResponse",
     "CallbackPayload",
     "APIResponse",
 ]
