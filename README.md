@@ -196,17 +196,15 @@ curl --location --request GET 'http://localhost:8000/api/v1/result/HL20260306193
 
 
 ## 智能体集成示例
-**注意**：以下`generate_storyboard()`是同步函数，实际集成时需要根据具体应用场景进行适当调整和扩展。
-
 ### 环境准备
 
 **安装依赖**：
 
 ```sh
 # 选择最新版本，下载 whl 包（https://github.com/neopen/video-shot-agent/releases）
-wget https://github.com/neopen/video-shot-agent/releases/download/v0.1.4/penshot-0.1.4-py3-none-any.whl
+wget https://github.com/neopen/video-shot-agent/releases/download/v1.0.0/penshot-1.0.0-py3-none-any.whl
 # 安装包
-pip install penshot-0.1.1-py3-none-any.whl
+pip install penshot-1.0.0-py3-none-any.whl
 # 内部默认安装使用 ollama，如果要使用其他平台，需要安装对应的LLM包
 # pip install langchain-openai	使用 openai 或 deepseek
 # pip install dashscope			使用千问
@@ -240,10 +238,18 @@ pip install penshot-0.1.1-py3-none-any.whl
 ### 1. 作为Python库使用
 
 ```python
-from penshot.neopen import generate_storyboard
+
+from penshot.api import PenshotFunction
+from penshot.neopen.shot_language import Language
+
 
 async def basic_usage():
     """基础用法示例"""
+    print("=== 基础用法示例 ===")
+
+    # 创建智能体实例（可配置并发数）
+    agent = PenshotFunction(language=Language.ZH, max_concurrent=5)
+
     script = """
     场景：现代办公室
     时间：下午3点
@@ -251,13 +257,23 @@ async def basic_usage():
     动作：小李正在写代码，突然接到电话，表情惊讶
     """
 
-    # 简单调用
-    result = await generate_storyboard(
-        script_text=script
-    )
-    print(f"生成完成，任务ID: {result.get('task_id')}")
-    print(f"生成结果: {result.get('success', False)}")
-    print(f"分镜片段: {result.get('data', {})}")
+    # 同步调用（等待完成）
+    result = agent.breakdown_script(script)
+
+    print(f"任务ID: {result.task_id}")
+    print(f"成功: {result.success}")
+    print(f"状态: {result.status}")
+
+    if result.success:
+        data = result.data or {}
+        shots = data.get("shots", [])
+        stats = data.get("stats", {})
+        print(f"镜头数量: {stats.get('shot_count', len(shots))}")
+        print(f"总时长: {stats.get('total_duration', 0):.1f}秒")
+
+        # 显示前3个镜头
+        for i, shot in enumerate(shots[:3], 1):
+            print(f"  镜头{i}: {shot.get('description', '')[:50]}...")
 
     return result
 ```
@@ -267,20 +283,116 @@ async def basic_usage():
 可以通过 HTTP API 将剧本分镜智能体集成到各种 Web 应用中：
 
 ```python
-from penshot.neopen import generate_storyboard
+from penshot.api import PenshotFunction
+from penshot.neopen import ShotConfig
+from penshot.neopen.shot_language import Language
+from penshot.neopen.task.task_models import TaskStatus
 
-@app.post("/api/generate-storyboard")
-async def generate_storyboard_endpoint(script_text: str):
+def create_web_app(
+        config: Optional[ShotConfig] = None,
+        enable_cors: bool = True
+) -> FastAPI:
     """
-    生成视频分镜的Web API端点
+    创建 Web 应用
+
+    Args:
+        config: 全局配置
+        enable_cors: 是否启用 CORS
+
+    Returns:
+        FastAPI 应用实例
     """
-    
-    try:
-        return await generate_storyboard(
-            script_text=script_text
+
+    app = FastAPI(
+        title="Penshot 分镜生成 API",
+        description="智能分镜视频生成服务",
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc"
+    )
+
+    # 初始化服务
+    config = config or ShotConfig()
+    penshot = PenshotFunction(config=config)
+
+    # 启用 CORS
+    if enable_cors:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+
+    @app.post("/api/generate", response_model=TaskResponse, tags=["Storyboard"])
+    async def generate_storyboard(
+            request: ScriptRequest
+    ):
+        """
+        生成视频分镜（异步）
+
+        提交剧本进行分镜生成，立即返回 task_id
+        """
+        try:
+            language = Language.ZH if request.language == "zh" else Language.EN
+
+            # 确定任务ID
+            task_id = request.task_id
+
+            if request.wait:
+                # 同步模式
+                result = penshot.breakdown_script(
+                    script_text=request.script_text,
+                    task_id=task_id,
+                    language=language,
+                    wait_timeout=request.timeout
+                )
+
+                return TaskResponse(
+                    task_id=result.task_id,
+                    status=result.status,
+                    message="同步处理完成" if result.success else f"处理失败: {result.error}",
+                    created_at=datetime.now(timezone.utc)
+                )
+            else:
+                # 异步模式
+                task_id = penshot.breakdown_script_async(
+                    script_text=request.script_text,
+                    task_id=task_id,
+                    language=language
+                )
+
+                return TaskResponse(
+                    task_id=task_id,
+                    status=TaskStatus.PENDING,
+                    message="任务已提交，请使用 /api/status/{task_id} 查询状态",
+                    created_at=datetime.now(timezone.utc)
+                )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+            
+    @app.get("/api/result/{task_id}", response_model=TaskResultResponse, tags=["Task"])
+    async def get_task_result(task_id: str):
+        """
+        获取任务结果
+
+        - **task_id**: 任务ID
+        """
+        result = penshot.get_task_result(task_id)
+
+        if not result:
+            raise HTTPException(status_code=404, detail=f"任务不存在或未完成: {task_id}")
+
+        return TaskResultResponse(
+            task_id=result.task_id,
+            success=result.success,
+            status=result.status,
+            data=result.data,
+            error=result.error,
+            processing_time_ms=result.processing_time_ms
+        )
 ```
 
 
@@ -289,7 +401,7 @@ async def generate_storyboard_endpoint(script_text: str):
 
 可以将剧本分镜智能体作为 LangGraph 工作流中的一个节点。
 
-使用方式：[剧本分镜智能体架构设计与实现 | 集成到 LangGraph 节点](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
+使用方式：[剧本分镜智能体架构设计与实现 | 集成到 LangGraph 节点](https://pengline.github.io/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
 
 
 
@@ -299,7 +411,7 @@ async def generate_storyboard_endpoint(script_text: str):
 
 如：上游是剧本创作智能体，下游是 文生视频+剪辑 智能。
 
-使用方式：[剧本分镜智能体架构设计与实现 | 集成到 A2A 系统](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
+使用方式：[剧本分镜智能体架构设计与实现 | 集成到 A2A 系统](https://pengline.github.io/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
 
 
 
