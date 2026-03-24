@@ -47,6 +47,8 @@ class TaskFactory:
         self._task_futures: Dict[str, Future] = {}
         self._task_results: Dict[str, TaskResponse] = {}
 
+        self._batch_tasks: Dict[str, List[str]] = {}  # batch_id -> list of task_ids
+
         # 启动后台任务处理线程
         self._background_thread: Optional[threading.Thread] = None
         self._start_background_processor()
@@ -465,7 +467,9 @@ class TaskFactory:
             priority: TaskPriority = TaskPriority.NORMAL,
             callback_url: Optional[str] = None
     ) -> BatchTaskResponse:
-        """批量提交（不等待完成）"""
+        """
+        批量提交（不等待完成）
+        """
         batch_id = self._generate_batch_id()
         task_ids = []
 
@@ -479,6 +483,16 @@ class TaskFactory:
             )
             task_ids.append(task_id)
 
+            # 保存批次信息到任务中
+            task = self.task_manager.get_task(task_id)
+            if task:
+                # 更新任务的批次信息
+                task["batch_id"] = batch_id
+                self.task_manager.update_task_result(task_id, {"batch_id": batch_id})
+
+        # 保存批次映射
+        self._batch_tasks[batch_id] = task_ids
+
         return BatchTaskResponse(
             batch_id=batch_id,
             total_tasks=len(task_ids),
@@ -486,17 +500,79 @@ class TaskFactory:
             status=TaskStatus.PENDING
         )
 
-    def batch_get_results(
-            self,
-            task_ids: List[str]
-    ) -> List[TaskResponse]:
-        """批量获取任务结果"""
+    def batch_get_status(self, batch_id: str) -> List[ProcessingStatus]:
+        """
+        获取批量任务状态
+
+        Args:
+            batch_id: 批量任务ID
+
+        Returns:
+            List[ProcessingStatus]: 批次中所有任务的状态列表
+        """
+        # 获取批次下所有任务ID
+        # 注意：这里需要从 TaskManager 获取批次信息
+        # 由于当前 TaskManager 没有直接存储批次信息，我们需要通过其他方式获取
+
+        # 方式1：通过 task_manager 的元数据获取（如果存储了批次信息）
+        task_ids = self._get_task_ids_by_batch(batch_id)
+
+        if not task_ids:
+            # 方式2：如果没有存储批次信息，尝试从所有任务中查找
+            all_task_ids = self.task_manager.list_tasks()
+            task_ids = []
+            for tid in all_task_ids:
+                task = self.task_manager.get_task(tid)
+                if task and task.get("batch_id") == batch_id:
+                    task_ids.append(tid)
+
+        # 获取每个任务的状态
+        statuses = []
+        for task_id in task_ids:
+            status = self.get_status(task_id)
+            if status:
+                statuses.append(status)
+
+        return statuses
+
+    def batch_get_results(self, batch_id: str) -> List[TaskResponse]:
+        """
+        获取批量任务结果
+
+        Args:
+            batch_id: 批量任务ID
+
+        Returns:
+            List[TaskResponse]: 批次中所有任务的结果列表
+        """
+        task_ids = self._get_task_ids_by_batch(batch_id)
+
         results = []
         for task_id in task_ids:
             result = self.get_result(task_id)
-            if result is not None:
+            if result:
                 results.append(result)
+
         return results
+
+    def _get_task_ids_by_batch(self, batch_id: str) -> List[str]:
+        """
+        根据批次ID获取任务ID列表
+        """
+        task_ids = []
+
+        # 方式1：从 batch_submit 时保存的映射中获取
+        if hasattr(self, '_batch_tasks'):
+            return self._batch_tasks.get(batch_id, [])
+
+        # 方式2：遍历所有任务查找
+        all_task_ids = self.task_manager.list_tasks()
+        for tid in all_task_ids:
+            task = self.task_manager.get_task(tid)
+            if task and task.get("batch_id") == batch_id:
+                task_ids.append(tid)
+
+        return task_ids
 
     # ==================== 任务管理方法 ====================
 

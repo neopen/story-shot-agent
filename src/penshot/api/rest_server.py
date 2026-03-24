@@ -98,6 +98,7 @@ class BatchProcessResult(BaseModel):
     success_tasks: int
     failed_tasks: int
     pending_tasks: int
+    processing_tasks: int
     results: List[ProcessingStatus] = Field(default_factory=list, )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -272,11 +273,6 @@ def batch_process_scripts(
 ) -> BatchProcessResult:
     """
     批量处理多个剧本（异步）
-
-    - **scripts**: 剧本列表（最多50个）
-    - **batch_id**: 可选，自定义批量ID
-    - **config**: 统一配置（可选）
-    - **language**: 输出语言
     """
     try:
         batch_id = request.batch_id or str(uuid.uuid4())
@@ -306,12 +302,25 @@ def batch_process_scripts(
             language=request.language
         )
 
+        # 返回批次状态，包含已创建的任务信息
         return BatchProcessResult(
             batch_id=batch_response.batch_id,
             total_tasks=batch_response.total_tasks,
             success_tasks=0,
             failed_tasks=0,
+            processing_tasks=0,
             pending_tasks=batch_response.total_tasks,
+            results=[
+                ProcessingStatus(
+                    task_id=tid,
+                    status=TaskStatus.PENDING,
+                    stage="submitted",
+                    progress=0,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
+                )
+                for tid in batch_response.task_ids
+            ],
             created_at=batch_response.created_at
         )
 
@@ -395,30 +404,109 @@ async def batch_process_scripts_sync(
 
 
 @router.get("/batch/status/{batch_id}", response_model=BatchProcessResult)
-def get_batch_status(batch_id):
+def get_batch_status(batch_id: str):
     """
     获取批量任务状态
 
-    - **batch_id**: 批量任务ID，逗号隔开
+    - **batch_id**: 批量任务ID
     """
     factory = get_task_factory()
 
-    batch_status = factory.batch_get_status(batch_id)
-    if not batch_status or batch_status == []:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"任务不存在: {batch_id}"
-        )
+    # 获取批次下所有任务的状态
+    batch_statuses = factory.batch_get_status(batch_id)
+
+    if not batch_statuses:
+        # 尝试从任务中查找
+        tasks = factory.task_manager.get_tasks_by_batch(batch_id)
+        if not tasks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"批次不存在: {batch_id}"
+            )
+
+        # 转换为状态列表
+        batch_statuses = []
+        for task in tasks:
+            batch_statuses.append(
+                ProcessingStatus(
+                    task_id=task.get("task_id"),
+                    status=task.get("status", TaskStatus.UNKNOWN),
+                    stage=task.get("stage"),
+                    progress=task.get("progress"),
+                    created_at=task.get("created_at"),
+                    updated_at=task.get("updated_at"),
+                    error_message=task.get("error")
+                )
+            )
+
+    # 统计状态
+    total = len(batch_statuses)
+    success = sum(1 for s in batch_statuses if s.status == TaskStatus.SUCCESS)
+    failed = sum(1 for s in batch_statuses if s.status == TaskStatus.FAILED)
+    processing = sum(1 for s in batch_statuses if s.status == TaskStatus.PROCESSING)
+    pending = sum(1 for s in batch_statuses if s.status == TaskStatus.PENDING)
 
     return BatchProcessResult(
         batch_id=batch_id,
-        total_tasks=len(batch_status),
-        success_tasks=len([x for x in batch_status if x and x.status == TaskStatus.SUCCESS]),
-        failed_tasks=len([x for x in batch_status if x and x.status == TaskStatus.FAILED]),
-        pending_tasks=len([x for x in batch_status if x and x.status == TaskStatus.PENDING]),
-        results=batch_status,
+        total_tasks=total,
+        success_tasks=success,
+        failed_tasks=failed,
+        pending_tasks=pending,
+        processing_tasks=processing,
+        results=batch_statuses,
         created_at=datetime.now(timezone.utc)
     )
+
+
+@router.get("/batch/result/{batch_id}")
+def get_batch_result(batch_id: str):
+    """
+    获取批量任务结果
+
+    - **batch_id**: 批量任务ID
+    """
+    factory = get_task_factory()
+
+    results = factory.batch_get_results(batch_id)
+
+    if not results:
+        # 尝试从任务中获取
+        tasks = factory.task_manager.get_tasks_by_batch(batch_id)
+        if not tasks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"批次不存在: {batch_id}"
+            )
+
+        # 转换为结果列表
+        for task in tasks:
+            results.append(
+                TaskResponse(
+                    task_id=task.get("task_id"),
+                    success=task.get("status") == TaskStatus.SUCCESS,
+                    status=task.get("status", TaskStatus.UNKNOWN),
+                    data=task.get("result", {}).get("data"),
+                    error=task.get("error"),
+                    processing_time_ms=None,
+                    created_at=task.get("created_at"),
+                    completed_at=task.get("completed_at")
+                )
+            )
+
+    # 统计信息
+    total = len(results)
+    completed = sum(1 for r in results if r.success)
+    failed = sum(1 for r in results if not r.success and r.status != TaskStatus.PENDING)
+    pending = sum(1 for r in results if r.status == TaskStatus.PENDING)
+
+    return {
+        "batch_id": batch_id,
+        "total_tasks": total,
+        "completed_tasks": completed,
+        "failed_tasks": failed,
+        "pending_tasks": pending,
+        "results": [r.to_dict() for r in results]
+    }
 
 
 # ============================================================================

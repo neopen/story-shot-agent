@@ -38,12 +38,7 @@ async def startup_event():
     factory = get_task_factory()
 
     # 恢复未完成的任务（只恢复两小时内的）
-    recovered_count = factory.recover_pending_tasks(max_age_hours=2)
-
-    if recovered_count > 0:
-        info(f"已恢复 {recovered_count} 个未完成的任务（两小时内）")
-    else:
-        info("没有需要恢复的任务（两小时内）")
+    factory.recover_pending_tasks(max_age_hours=2)
 
     # 显示当前队列状态
     queue_status = factory.get_queue_status()
@@ -70,7 +65,7 @@ async def startup_with_recovery():
             info(f"  任务: {task.get('task_id')}, 状态: {task.get('status')}, 阶段: {task.get('stage')}")
 
         # 4. 恢复任务
-        recovered = factory.recover_pending_tasks(max_age_hours=2)
+        factory.recover_pending_tasks(max_age_hours=2)
 
     info("服务启动完成，队列状态:")
     info(f"  队列长度: {factory.get_queue_status()['queue_length']}")

@@ -290,6 +290,67 @@ class TaskManager:
                 self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
                 return True
 
+    def update_task_batch(self, task_id: str, batch_id: str) -> bool:
+        """
+        更新任务的批次ID
+
+        Args:
+            task_id: 任务ID
+            batch_id: 批次ID
+
+        Returns:
+            bool: 是否成功
+        """
+        if self.use_redis and self.redis:
+            key = self._redis_key(task_id)
+            raw = self.redis.get(key)
+            if not raw:
+                return False
+            try:
+                rec = json.loads(raw)
+                rec["batch_id"] = batch_id
+                rec["updated_at"] = datetime.now(timezone.utc).isoformat()
+                self.redis.set(key, json.dumps(obj_to_dict(rec), ensure_ascii=False))
+                return True
+            except Exception:
+                return False
+        else:
+            with self._lock:
+                if task_id in self._local_tasks:
+                    self._local_tasks[task_id]["batch_id"] = batch_id
+                    self._local_tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    return True
+            return False
+
+    def get_tasks_by_batch(self, batch_id: str) -> List[Dict[str, Any]]:
+        """
+        根据批次ID获取所有任务
+
+        Args:
+            batch_id: 批次ID
+
+        Returns:
+            List[Dict]: 任务列表
+        """
+        tasks = []
+
+        if self.use_redis and self.redis:
+            try:
+                task_ids = self.list_tasks()
+                for task_id in task_ids:
+                    task = self.get_task(task_id)
+                    if task and task.get("batch_id") == batch_id:
+                        tasks.append(task)
+            except Exception as e:
+                error(f"从 Redis 获取批次任务失败: {e}")
+        else:
+            with self._lock:
+                for task_id, task in self._local_tasks.items():
+                    if task.get("batch_id") == batch_id:
+                        tasks.append(copy.deepcopy(task))
+
+        return tasks
+
     def complete_task(self, task_id: str, result: Dict[str, Any]):
         if self.use_redis and self.redis:
             key = self._redis_key(task_id)
