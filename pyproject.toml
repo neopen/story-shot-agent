@@ -10,7 +10,7 @@ name = "penshot"
 #penvoice     # 未来：语音合成
 #penvision    # 未来：图像处理
 #penstudio    # 未来：创意工作室
-version = "1.0.0"
+version = "1.0.1"
 description = "长剧本分镜智能体：支持将任意自然语言剧本，转换为结构化分镜数据，支持视频生成与编辑。"
 #description="Peng's intelligent shot breakdown and video generation pipeline"
 readme = "README.md"
