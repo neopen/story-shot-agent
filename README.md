@@ -205,6 +205,8 @@ curl --location --request GET 'http://localhost:8000/api/v1/result/HL20260306193
 wget https://github.com/neopen/video-shot-agent/releases/download/v1.0.0/penshot-1.0.0-py3-none-any.whl
 # 安装包
 pip install penshot-1.0.0-py3-none-any.whl
+# 或者直接安装
+pip install penshot
 # 内部默认安装使用 ollama，如果要使用其他平台，需要安装对应的LLM包
 # pip install langchain-openai	使用 openai 或 deepseek
 # pip install dashscope			使用千问
