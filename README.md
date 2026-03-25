@@ -1,6 +1,6 @@
 # 剧本分镜智能体
 
-中文 | [English](docu/README-en.md)
+中文 | [English](docs/README-en.md)
 
 一个基于多智能体协作的剧本分镜系统，能够将多种格式的剧本拆分为AI可生成的短视频脚本单元，输出高质量分镜片段描述，并保证叙事连续性。支持多种AI提供商，具有强大的可扩展性和易用性。可以通过Python库、Web API、LangGraph节点或A2A系统集成使用。
 
@@ -201,12 +201,11 @@ curl --location --request GET 'http://localhost:8000/api/v1/result/HL20260306193
 **安装依赖**：
 
 ```sh
-# 选择最新版本，下载 whl 包（https://github.com/neopen/video-shot-agent/releases）
-wget https://github.com/neopen/video-shot-agent/releases/download/v1.0.0/penshot-1.0.0-py3-none-any.whl
-# 安装包
-pip install penshot-1.0.0-py3-none-any.whl
-# 或者直接安装
-pip install penshot
+# 直接安装
+pip install neoshot
+# 或者下载 whl：wget https://github.com/neopen/video-shot-agent/releases/download/v0.1.0/neoshot-0.1.0-py3-none-any.whl
+# 安装包：pip install neoshot-0.1.0-py3-none-any.whl
+
 # 内部默认安装使用 ollama，如果要使用其他平台，需要安装对应的LLM包
 # pip install langchain-openai	使用 openai 或 deepseek
 # pip install dashscope			使用千问
@@ -240,17 +239,14 @@ pip install penshot
 ### 1. 作为Python库使用
 
 ```python
-
 from penshot.api import PenshotFunction
-from penshot.neopen.shot_language import Language
-
 
 async def basic_usage():
     """基础用法示例"""
     print("=== 基础用法示例 ===")
 
     # 创建智能体实例（可配置并发数）
-    agent = PenshotFunction(language=Language.ZH, max_concurrent=5)
+    agent = PenshotFunction(max_concurrent=5)
 
     script = """
     场景：现代办公室
@@ -437,7 +433,7 @@ def create_web_app(
 1. **简单规则**：使用固定规则，无法处理复杂剧本结构
 2. **无状态记忆能力**：只支持一次拆解，不支持超长文本的多次拆分
 3. **无学习能力**：不会从用户反馈中学习优化
-4. **简单切割**：视频分割简单，会有一致性、连续性、时长压缩等问题
+4. **简单切割**：视频分割简单，会有一致性、连续性等问题
 5. **有限的自定义**：配置选项较少
 6. **错误处理简单**：遇到异常可能直接失败
 
