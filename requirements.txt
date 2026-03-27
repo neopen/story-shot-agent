@@ -19,6 +19,8 @@ redis
 python-dotenv
 pydantic
 pydantic-settings
+pyyaml
+colorama
 #
 numpy
 requests

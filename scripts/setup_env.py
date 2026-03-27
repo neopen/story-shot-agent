@@ -157,9 +157,9 @@ class AppBaseEnv:
             return None, None
 
         # 检查虚拟环境pip是否可执行
-        if not os.access(pip_exe, os.X_OK):
-            error(f"[错误] 虚拟环境pip不可执行: {pip_exe}")
-            return None, None
+        # if not os.access(pip_exe, os.X_OK):
+        #     error(f"[错误] 虚拟环境pip不可执行: {pip_exe}")
+        #     return None, None
 
         debug(f"[成功] 虚拟环境验证通过，将使用以下路径：Python: {python_exe}")
 
