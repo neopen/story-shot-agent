@@ -2,7 +2,11 @@
 
 中文 | [English](docs/README-en.md)
 
-一个基于多智能体协作的剧本分镜系统，能够将多种格式的剧本拆分为AI可生成的短视频脚本单元，输出高质量分镜片段描述，并保证叙事连续性。支持多种AI提供商，具有强大的可扩展性和易用性。可以通过Python库、Web API、LangGraph节点或A2A系统集成使用。
+一个基于多智能体协作的剧本分镜系统，能够将多种格式的剧本拆分为AI可生成的短视频脚本单元，输出高质量分镜片段描述，并保证叙事连续性。支持多种AI提供商，具有强大的可扩展性和易用性。
+
+以 LangChain + LangGraph 实现通过 LLM 把任意格式剧本，解析转换为符合模型的 “Text to Video” 脚本片段提示词（5-20秒），且会保持片段间角色剧情的连贯性和一致性，可直接应用于Sora、Veo、Runway、Pika、Kling、通义万相、Stable Video Diffusion等模型。 支持 MCP、REST API 协议和 Function Call，可通过 A2A、LangGraph、API、Python 库等方式集成使用。
+
+**==自然语言处理（NLP）应用场景的典型项目==**
 
 > - **需求描述**：假如我有一段预估两分钟左右的剧本，想通过AI模型生成对应的短视频。
 >
@@ -18,7 +22,9 @@
 
 **注意**：本智能体不参与剧本创作，不会调用模型生成视频，亦不会合成视频，以上流程中标注处就是本智能体任务（未来版本会支持qita）。
 
-详细设计参照文档：[**剧本分镜智能体的架构设计与实现细节**](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
+
+
+详细设计参照文档：[剧本分镜智能体架构设计与实现（v1.x） | 余一叶知秋尽](https://pengline.github.io/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
 
 
 
@@ -202,9 +208,8 @@ curl --location --request GET 'http://localhost:8000/api/v1/result/HL20260306193
 
 ```sh
 # 直接安装
-pip install neoshot
-# 或者下载 whl：wget https://github.com/neopen/video-shot-agent/releases/download/v0.1.0/neoshot-0.1.0-py3-none-any.whl
-# 安装包：pip install neoshot-0.1.0-py3-none-any.whl
+pip install penshot
+# 或者 pip install https://github.com/neopen/video-shot-agent/releases/download/v0.2.1/penshot-0.2.1-py3-none-any.whl
 
 # 内部默认安装使用 ollama，如果要使用其他平台，需要安装对应的LLM包
 # pip install langchain-openai	使用 openai 或 deepseek
@@ -240,13 +245,15 @@ pip install neoshot
 
 ```python
 from penshot.api import PenshotFunction
+from penshot.neopen import ShotConfig
+from penshot.neopen.shot_language import Language
 
 async def basic_usage():
     """基础用法示例"""
     print("=== 基础用法示例 ===")
 
     # 创建智能体实例（可配置并发数）
-    agent = PenshotFunction(max_concurrent=5)
+    agent = PenshotFunction(language=Language.ZH, max_concurrent=5)
 
     script = """
     场景：现代办公室
@@ -272,6 +279,35 @@ async def basic_usage():
         # 显示前3个镜头
         for i, shot in enumerate(shots[:3], 1):
             print(f"  镜头{i}: {shot.get('description', '')[:50]}...")
+
+    return result
+
+async def async_usage():
+    """异步用法示例"""
+    print("\n=== 异步用法示例 ===")
+
+    agent = PenshotFunction(language=Language.ZH, max_concurrent=5)
+
+    script = """
+    早晨，一个女孩在咖啡馆读书，阳光透过窗户...
+    """
+
+    # 异步提交任务
+    task_id = agent.breakdown_script_async(
+        script,
+        callback=lambda r: print(f"回调: 任务 {r.task_id} 完成")
+    )
+
+    print(f"任务已提交: {task_id}")
+
+    # 查询状态
+    status = agent.get_task_status(task_id)
+    print(f"初始状态: {status.get('status')}")
+
+    # 等待结果
+    result = await agent.wait_for_result_async(task_id)
+
+    print(f"最终结果: 成功={result.success}, 状态={result.status}")
 
     return result
 ```

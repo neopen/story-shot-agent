@@ -2,14 +2,14 @@
 
 English | [中文](../README.md)
 
-A multi-agent collaborative storyboard generation system that splits scripts in various formats into short AI-generatable video script units, outputs high-quality shot fragment descriptions, and preserves narrative continuity. It supports multiple AI providers, is highly extensible and easy to use. The system can be integrated as a Python library, a Web API, a LangGraph node, or into A2A (agent-to-agent) systems.
+A multi-agent collaborative storyboard generation system that splits scripts in various formats into short AI-generatable video script units, outputs high-quality shot fragment descriptions, and preserves narrative continuity. It supports multiple AI providers, is highly extensible and easy to use. 
+
+Using LangChain + LangGraph, any format script can be parsed and converted into "Text to Video" script prompt words that conform to the model (5-20 seconds), while maintaining the continuity and consistency of the character story between the segments. It can be directly applied to models such as Sora, Veo, Runway, Pika, Kling, Tongyi Wanxiang, Stable Video Diffusion, etc. It supports MCP, REST API protocols and Function Call, and can be integrated and used through methods such as A2A, LangGraph, API, and Python libraries.
 
 >
 > Video creation pipeline: Client → LLM script authoring → <u>Storyboard parsing (splitting)</u> → DM video synthesis (text-to-video) → video assembly & rendering (FFmpeg)
 >
 > Note: This agent does not author scripts, does not generate video, nor does it perform final composition in the current version (future releases may add these). The highlighted step above is the agent's responsibility.
->
-> For a detailed architecture and implementation discussion, see: [Storyboard Agent — Architecture and Implementation Details](https://penhex.github.io/2025/10/0194020a663c408fb500dd7532349519/)
 >
 
 
@@ -191,10 +191,9 @@ Example (abbreviated) JSON output structure:
 Notes on packaging and installation:
 
 ```sh
-# Choose a release wheel from: https://github.com/neopen/video-shot-agent/releases
-# Example:
-wget https://github.com/neopen/video-shot-agent/releases/download/v0.1.4/penshot-0.1.4-py3-none-any.whl
-pip install penshot-0.1.1-py3-none-any.whl
+pip install penshot
+# pip install https://github.com/neopen/video-shot-agent/releases/download/v0.2.1/penshot-0.2.1-py3-none-any.whl
+
 # The package defaults to using Ollama; install provider-specific LLM clients as required:
 # pip install langchain-openai  # for OpenAI/DeepSeek
 # pip install dashscope        # for Qwen
@@ -207,14 +206,14 @@ Configuration notes:
 > 2. Edit `.env` and fill in real values (API keys, base URLs, model names)
 >
 >    ```python
->    # ================= LLM默认配置 =================
+>    # ================= LLM default config =================
 >    LLM__DEFAULT__BASE_URL=https://api.openai.com/v1
 >    LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 >    LLM__DEFAULT__MODEL_NAME=gpt-4-turbo-preview
 >    LLM__DEFAULT__TIMEOUT=30
 >    LLM__DEFAULT__MAX_TOKENS=4000
->       
->    # ================= LLM备用配置 =================
+>          
+>    # ================= LLM Backup config =================
 >    LLM__FALLBACK__BASE_URL=http://localhost:11434
 >    LLM__FALLBACK__MODEL_NAME=qwen3:4b
 >    LLM__FALLBACK__TIMEOUT=300
@@ -228,24 +227,34 @@ Configuration notes:
 ### 1. Use as a Python library
 
 ```python
-from penshot.neopen import generate_storyboard
+from penshot.api import PenshotFunction
+from penshot.neopen import ShotConfig
+from penshot.neopen.shot_language import Language
 
-async def basic_usage():
-    """Basic usage example"""
+async def async_usage():
+    """异步用法示例"""
+
+    agent = PenshotFunction(language=Language.ZH, max_concurrent=5)
+
     script = """
-    Scene: modern office
-    Time: 3 PM
-    Character: Xiaoli (programmer)
-    Action: Xiaoli is coding when he receives a phone call and looks surprised
+    早晨，一个女孩在咖啡馆读书，阳光透过窗户...
     """
-
-    # Simple call
-    result = await generate_storyboard(
-        script_text=script
+    
+    task_id = agent.breakdown_script_async(
+        script,
+        callback=lambda r: print(f"回调: 任务 {r.task_id} 完成")
     )
-    print(f"Task completed, task_id: {result.get('task_id')}")
-    print(f"Success: {result.get('success', False)}")
-    print(f"Fragments: {result.get('data', {})}")
+
+    print(f"任务已提交: {task_id}")
+
+    # 查询状态
+    status = agent.get_task_status(task_id)
+    print(f"初始状态: {status.get('status')}")
+
+    # 等待结果
+    result = await agent.wait_for_result_async(task_id)
+
+    print(f"最终结果: 成功={result.success}, 状态={result.status}")
 
     return result
 ```
@@ -256,14 +265,116 @@ async def basic_usage():
 You can expose a simple HTTP API endpoint to call the storyboard generator:
 
 ```python
-from penshot.neopen import generate_storyboard
+from penshot.api import PenshotFunction
+from penshot.neopen import ShotConfig
+from penshot.neopen.shot_language import Language
+from penshot.neopen.task.task_models import TaskStatus
 
-@app.post("/api/generate-storyboard")
-async def generate_storyboard_endpoint(script_text: str):
-    try:
-        return await generate_storyboard(script_text=script_text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+def create_web_app(
+        config: Optional[ShotConfig] = None,
+        enable_cors: bool = True
+) -> FastAPI:
+    """
+    创建 Web 应用
+
+    Args:
+        config: 全局配置
+        enable_cors: 是否启用 CORS
+
+    Returns:
+        FastAPI 应用实例
+    """
+
+    app = FastAPI(
+        title="Penshot 分镜生成 API",
+        description="智能分镜视频生成服务",
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc"
+    )
+
+    # 初始化服务
+    config = config or ShotConfig()
+    penshot = PenshotFunction(config=config)
+
+    # 启用 CORS
+    if enable_cors:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    @app.post("/api/generate", response_model=TaskResponse, tags=["Storyboard"])
+    async def generate_storyboard(
+            request: ScriptRequest
+    ):
+        """
+        生成视频分镜（异步）
+
+        提交剧本进行分镜生成，立即返回 task_id
+        """
+        try:
+            language = Language.ZH if request.language == "zh" else Language.EN
+
+            # 确定任务ID
+            task_id = request.task_id
+
+            if request.wait:
+                # 同步模式
+                result = penshot.breakdown_script(
+                    script_text=request.script_text,
+                    task_id=task_id,
+                    language=language,
+                    wait_timeout=request.timeout
+                )
+
+                return TaskResponse(
+                    task_id=result.task_id,
+                    status=result.status,
+                    message="同步处理完成" if result.success else f"处理失败: {result.error}",
+                    created_at=datetime.now(timezone.utc)
+                )
+            else:
+                # 异步模式
+                task_id = penshot.breakdown_script_async(
+                    script_text=request.script_text,
+                    task_id=task_id,
+                    language=language
+                )
+
+                return TaskResponse(
+                    task_id=task_id,
+                    status=TaskStatus.PENDING,
+                    message="任务已提交，请使用 /api/status/{task_id} 查询状态",
+                    created_at=datetime.now(timezone.utc)
+                )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+            
+    @app.get("/api/result/{task_id}", response_model=TaskResultResponse, tags=["Task"])
+    async def get_task_result(task_id: str):
+        """
+        获取任务结果
+
+        - **task_id**: 任务ID
+        """
+        result = penshot.get_task_result(task_id)
+
+        if not result:
+            raise HTTPException(status_code=404, detail=f"任务不存在或未完成: {task_id}")
+
+        return TaskResultResponse(
+            task_id=result.task_id,
+            success=result.success,
+            status=result.status,
+            data=result.data,
+            error=result.error,
+            processing_time_ms=result.processing_time_ms
+        )
 ```
 
 
