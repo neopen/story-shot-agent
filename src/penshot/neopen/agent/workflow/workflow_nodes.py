@@ -639,7 +639,7 @@ class WorkflowNodes:
             # 5. 分析问题来源
             issues_by_stage = self._analyze_continuity_issues(continuity_issues, continuity_context)
 
-            info(f"发现 {len(continuity_issues)} 个连续性问题，分布在: {list(issues_by_stage.keys())}")
+            warning(f"发现 {len(continuity_issues)} 个连续性问题，分布在: {[s.name for s in issues_by_stage.keys()]}")
 
             # 6. 检查重试限制
             if self._can_retry_continuity(state):
@@ -652,7 +652,7 @@ class WorkflowNodes:
                 # 标记需要重试
                 state.continuity_retry_count = getattr(state, 'continuity_retry_count', 0) + 1
                 state.needs_continuity_repair = True
-                state.error_source = PipelineNode.CONTINUITY_GUARDIAN
+                state.error_source = PipelineNode.CONTINUITY_CHECK
 
                 # 返回到需要修复的阶段
                 return self._route_to_fix_stage(state, issues_by_stage)
@@ -667,8 +667,17 @@ class WorkflowNodes:
 
         except Exception as e:
             error(f"连续性守护节点异常: {e}")
-            state.error_messages.append(f"连续性检查失败: {str(e)}")
+            print_log_exception()
+            error_msg = f"连续性检查失败: {str(e)}"
+            error(error_msg)
+            state.error = error_msg
+            state.error_messages.append(error_msg)
+
+            state.current_node = PipelineNode.CONTINUITY_CHECK
             state.current_stage = AgentStage.ERROR_HANDLER
+            state.error_source = PipelineNode.CONTINUITY_CHECK
+
+            state.audit_report = self._create_fallback_audit_report(state)
 
         return state
 
