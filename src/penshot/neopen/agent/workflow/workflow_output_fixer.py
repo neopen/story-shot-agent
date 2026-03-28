@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence
 from penshot.neopen.agent.workflow.workflow_states import WorkflowState
 from penshot.logger import info, warning, error, debug
+from penshot.utils.log_utils import print_log_exception
 
 
 class WorkflowOutputFixer:
@@ -56,8 +57,7 @@ class WorkflowOutputFixer:
 
         except Exception as e:
             error(f"增强workflow调用失败: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            print_log_exception()
 
             # 返回错误结果
             return {

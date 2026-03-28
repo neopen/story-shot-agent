@@ -10,12 +10,15 @@ import traceback
 from datetime import datetime
 from typing import Dict, Any, List
 
+from penshot.logger import error, debug, info, warning
+from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import ContinuityGuardianChecker
+from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import ContinuityCheckResult, ContinuityIssueType, ContinuityIssue
+from penshot.neopen.agent.continuity_guardian.continuity_repair_generator import ContinuityRepairGenerator
 from penshot.neopen.agent.human_decision.human_decision_intervention import HumanIntervention
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import AuditStatus, QualityAuditReport, SeverityLevel
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import AuditStatus, QualityAuditReport, SeverityLevel, QualityRepairParams
 from penshot.neopen.agent.workflow.workflow_models import AgentStage, PipelineNode
 from penshot.neopen.agent.workflow.workflow_states import WorkflowState
 from penshot.neopen.tools.result_storage_tool import create_result_storage
-from penshot.logger import error, debug, info, warning
 from penshot.utils.log_utils import print_log_exception
 
 
@@ -46,6 +49,10 @@ class WorkflowNodes:
         self.human_intervention = HumanIntervention(timeout_seconds=180)
         self.storage = create_result_storage()
 
+        # 连续性守护
+        self.generator = ContinuityRepairGenerator()
+        self.checker = ContinuityGuardianChecker()
+
     def parse_script_node(self, state: WorkflowState) -> WorkflowState:
         """
         剧本解析节点（增强版）
@@ -61,7 +68,7 @@ class WorkflowNodes:
             repair_params = state.repair_params.get(PipelineNode.PARSE_SCRIPT, None)
 
             if repair_params:
-                self.shot_segmenter.apply_repair_params(repair_params)
+                self.script_parser.apply_repair_params(repair_params)
                 info(f"剧本解析节点收到修复参数，问题类型: {repair_params.issue_types}")
                 if repair_params.suggestions:
                     info(f"修复建议: {repair_params.suggestions}")
@@ -76,7 +83,8 @@ class WorkflowNodes:
 
             # 执行剧本解析（传入修复参数）
             parsed_script = self.script_parser.process(
-                state.raw_script
+                state.raw_script,
+                repair_params=repair_params
             )
 
             debug(f"剧本解析完成，场景数: {len(parsed_script.scenes)}，角色数: {len(parsed_script.characters)}")
@@ -159,7 +167,8 @@ class WorkflowNodes:
 
             # 执行分镜生成（传入修复参数）
             shot_sequence = self.shot_segmenter.process(
-                state.parsed_script
+                state.parsed_script,
+                repair_params=repair_params
             )
 
             if not shot_sequence:
@@ -230,7 +239,7 @@ class WorkflowNodes:
             repair_params = state.repair_params.get(PipelineNode.SPLIT_VIDEO, None)
 
             if repair_params:
-                self.shot_segmenter.apply_repair_params(repair_params)
+                self.video_splitter.apply_repair_params(repair_params)
                 info(f"视频分割节点收到修复参数，问题类型: {repair_params.issue_types}")
                 if repair_params.suggestions:
                     info(f"修复建议: {repair_params.suggestions}")
@@ -249,7 +258,8 @@ class WorkflowNodes:
             # 执行视频分割（传入修复参数）
             fragment_sequence = self.video_splitter.process(
                 state.shot_sequence,
-                state.parsed_script
+                parsed_script=state.parsed_script,
+                repair_params=repair_params
             )
 
             if not fragment_sequence:
@@ -326,7 +336,7 @@ class WorkflowNodes:
             repair_params = state.repair_params.get(PipelineNode.CONVERT_PROMPT, None)
 
             if repair_params:
-                self.shot_segmenter.apply_repair_params(repair_params)
+                self.prompt_converter.apply_repair_params(repair_params)
                 info(f"提示词转换节点收到修复参数，问题类型: {repair_params.issue_types}")
                 if repair_params.suggestions:
                     info(f"修复建议: {repair_params.suggestions}")
@@ -345,7 +355,8 @@ class WorkflowNodes:
             # 执行提示词转换（传入修复参数）
             instructions = self.prompt_converter.process(
                 state.fragment_sequence,
-                state.parsed_script
+                parsed_script=state.parsed_script,
+                repair_params=repair_params
             )
 
             if not instructions:
@@ -594,18 +605,70 @@ class WorkflowNodes:
 
     def continuity_check_node(self, state: WorkflowState) -> WorkflowState:
         """
-        连续性检查节点
-        功能：检查跨片段的视觉连续性
-        输入：ai_instructions, fragments
-        输出：continuity_issues (连续性问题列表)
+        连续性守护节点
+
+        职责：
+        1. 检查所有阶段的连续性（视觉、角色、场景、动作）
+        2. 识别连续性问题的来源阶段
+        3. 生成修复方案并触发重试
         """
-        # TODO: 实现连续性检查逻辑
-        # 1. 跟踪角色服装、道具状态
-        # 2. 检查场景一致性
-        # 3. 验证位置和动作连续性
-        # 4. 标记不连续点
-        state.continuity_issues = []
-        state.current_stage = AgentStage.CONTINUITY
+        info("进入连续性守护节点")
+
+        try:
+            # 1. 收集所有阶段的输出
+            continuity_context = {
+                "parsed_script": state.parsed_script,
+                "shot_sequence": state.shot_sequence,
+                "fragment_sequence": state.fragment_sequence,
+                "instructions": state.instructions,
+            }
+
+            # 2. 执行连续性检查（返回 ContinuityCheckResult）
+            check_result = self._check_continuity(continuity_context)
+
+            # 3. 如果没有问题，通过检查
+            if check_result.passed and check_result.total_issues == 0:
+                info("连续性检查通过")
+                state.continuity_passed = True
+                state.current_stage = AgentStage.CONTINUITY
+                return state
+
+            # 4. 获取问题列表
+            continuity_issues = check_result.issues
+
+            # 5. 分析问题来源
+            issues_by_stage = self._analyze_continuity_issues(continuity_issues, continuity_context)
+
+            info(f"发现 {len(continuity_issues)} 个连续性问题，分布在: {list(issues_by_stage.keys())}")
+
+            # 6. 检查重试限制
+            if self._can_retry_continuity(state):
+                # 7. 生成修复参数并触发重试
+                for stage, issues in issues_by_stage.items():
+                    repair_params = self._create_continuity_repair_params(issues, stage)
+                    state.repair_params[stage] = repair_params
+                    info(f"为阶段 {stage.value} 生成连续性修复参数，共{len(issues)}个问题")
+
+                # 标记需要重试
+                state.continuity_retry_count = getattr(state, 'continuity_retry_count', 0) + 1
+                state.needs_continuity_repair = True
+                state.error_source = PipelineNode.CONTINUITY_GUARDIAN
+
+                # 返回到需要修复的阶段
+                return self._route_to_fix_stage(state, issues_by_stage)
+            else:
+                # 重试次数超限，需要人工干预
+                error(f"连续性修复重试次数超限: {state.continuity_retry_count}")
+                state.needs_human_review = True
+                state.error_source = PipelineNode.CONTINUITY_GUARDIAN
+
+            state.continuity_issues = continuity_issues
+            state.current_stage = AgentStage.CONTINUITY
+
+        except Exception as e:
+            error(f"连续性守护节点异常: {e}")
+            state.error_messages.append(f"连续性检查失败: {str(e)}")
+            state.current_stage = AgentStage.ERROR_HANDLER
 
         return state
 
@@ -1040,3 +1103,139 @@ class WorkflowNodes:
             # 未知行动，默认重试
             warning(f"未知恢复行动: {action}，使用默认重试")
             state.error_messages = state.error_messages[-3:]
+
+    #     ======================== 连续性节点 ========================
+    def _check_continuity(self, context: Dict[str, Any]) -> ContinuityCheckResult:
+        """
+        执行连续性检查
+
+        Args:
+            context: 包含各阶段输出的上下文
+                - parsed_script: 解析后的剧本
+                - shot_sequence: 镜头序列
+                - fragment_sequence: 片段序列
+                - instructions: AI指令
+
+        Returns:
+            ContinuityCheckResult: 连续性检查结果对象
+        """
+        info("开始执行连续性检查...")
+
+        # 执行连续性检查
+        result = self.checker.check_all_continuity(context)
+
+        # 记录检查结果摘要
+        summary = result.get_summary()
+        info(f"连续性检查完成: 通过={summary['passed']}, "
+             f"问题总数={summary['total_issues']}, "
+             f"严重={summary['critical']}, "
+             f"主要={summary['major']}, "
+             f"中度={summary['moderate']}, "
+             f"轻微={summary['minor']}")
+
+        # 记录每个问题的详细信息
+        for issue in result.issues:
+            warning(f"连续性问题 [{issue.severity.value}]: {issue.type.value} - {issue.description}")
+            if issue.suggestion:
+                debug(f"  修复建议: {issue.suggestion}")
+
+        return result
+
+    def _analyze_continuity_issues(self, issues: List[ContinuityIssue],
+                                   context: Dict) -> Dict[PipelineNode, List[ContinuityIssue]]:
+        """
+        分析连续性问题的来源阶段
+
+        Args:
+            issues: ContinuityIssue 列表
+            context: 上下文信息
+
+        Returns:
+            按阶段分组的问题字典
+        """
+        issues_by_stage = {
+            PipelineNode.PARSE_SCRIPT: [],
+            PipelineNode.SEGMENT_SHOT: [],
+            PipelineNode.SPLIT_VIDEO: [],
+            PipelineNode.CONVERT_PROMPT: [],
+        }
+
+        for issue in issues:
+            # 使用 issue 自带的 source_stage
+            if issue.source_stage:
+                # source_stage 可能是字符串，需要转换为 PipelineNode
+                try:
+                    stage = PipelineNode(issue.source_stage)
+                    if stage in issues_by_stage:
+                        issues_by_stage[stage].append(issue)
+                        continue
+                except ValueError:
+                    pass
+
+            # 根据问题类型推断来源
+            source = self._infer_issue_source(issue.type)
+            issues_by_stage[source].append(issue)
+
+        # 返回非空的阶段
+        return {k: v for k, v in issues_by_stage.items() if v}
+
+    def _infer_issue_source(self, issue_type: ContinuityIssueType) -> PipelineNode:
+        """根据问题类型推断来源阶段"""
+        source_mapping = {
+            ContinuityIssueType.CHARACTER_MISSING: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE: PipelineNode.CONVERT_PROMPT,
+            ContinuityIssueType.SCENE_JUMP: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.SCENE_TOO_FREQUENT: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.ACTION_BREAK: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.STYLE_INCONSISTENT: PipelineNode.CONVERT_PROMPT,
+            ContinuityIssueType.STYLE_SUDDEN_CHANGE: PipelineNode.CONVERT_PROMPT,
+            ContinuityIssueType.TIME_GAP: PipelineNode.SPLIT_VIDEO,
+            ContinuityIssueType.TIME_OVERLAP: PipelineNode.SPLIT_VIDEO,
+            ContinuityIssueType.PROP_CHANGE: PipelineNode.PARSE_SCRIPT,
+            ContinuityIssueType.PROP_DISAPPEAR: PipelineNode.PARSE_SCRIPT,
+            ContinuityIssueType.PROP_APPEAR: PipelineNode.PARSE_SCRIPT,
+            ContinuityIssueType.LIGHTING_CHANGE: PipelineNode.CONVERT_PROMPT,
+            ContinuityIssueType.COLOR_INCONSISTENT: PipelineNode.CONVERT_PROMPT,
+        }
+        return source_mapping.get(issue_type, PipelineNode.CONVERT_PROMPT)
+
+    def _create_continuity_repair_params(self, issues: List, stage: PipelineNode) -> QualityRepairParams:
+        """创建连续性修复参数"""
+
+        return self.generator.generate_repair_params(issues, stage)
+
+    def _can_retry_continuity(self, state: WorkflowState) -> bool:
+        """检查连续性修复是否可重试"""
+        max_retries = getattr(state, 'max_continuity_retries', 3)
+        current_retries = getattr(state, 'continuity_retry_count', 0)
+        return current_retries < max_retries
+
+    def _route_to_fix_stage(self, state: WorkflowState, issues_by_stage: Dict) -> WorkflowState:
+        """路由到需要修复的阶段"""
+        # 选择最早的问题阶段进行修复
+        stage_priority = [
+            PipelineNode.PARSE_SCRIPT,
+            PipelineNode.SEGMENT_SHOT,
+            PipelineNode.SPLIT_VIDEO,
+            PipelineNode.CONVERT_PROMPT,
+        ]
+
+        for stage in stage_priority:
+            if stage in issues_by_stage:
+                info(f"路由到阶段 {stage.value} 进行连续性修复")
+                state.current_node = stage
+
+                # 设置对应的 AgentStage
+                stage_mapping = {
+                    PipelineNode.PARSE_SCRIPT: AgentStage.PARSER,
+                    PipelineNode.SEGMENT_SHOT: AgentStage.SEGMENTER,
+                    PipelineNode.SPLIT_VIDEO: AgentStage.SPLITTER,
+                    PipelineNode.CONVERT_PROMPT: AgentStage.CONVERTER,
+                }
+                state.current_stage = stage_mapping.get(stage, AgentStage.CONVERTER)
+                return state
+
+        # 默认回到提示词生成
+        state.current_node = PipelineNode.CONVERT_PROMPT
+        state.current_stage = AgentStage.CONVERTER
+        return state

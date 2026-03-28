@@ -134,8 +134,12 @@ class WorkflowState(InputState, ScriptParsingState, ShotGeneratorState, NodeLoop
 
     # === 连续性管理 ===
     continuity_state: Optional[Dict] = {}  # 当前连续性状态
-    continuity_issues: Optional[List[Dict]] = []  # 连续性问题列表
+    continuity_issues: Optional[List] = field(default_factory=list)  # 连续性问题列表
     continuity_anchors: Optional[Dict] = {}  # 连续性锚点映射
+    continuity_passed: bool = False
+    continuity_retry_count: int = 0
+    max_continuity_retries: int = 3
+    needs_continuity_repair: bool = False
 
     # === 镜头拆分配置 ===
     max_shot_duration: float = 30.0  # 镜头允许的时长范围
