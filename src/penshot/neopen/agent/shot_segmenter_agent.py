@@ -10,17 +10,19 @@ from typing import Optional, List
 
 from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode
+from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType, QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_enhancer import DurationEnhancer
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_factory import estimator_factory
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_factory import ShotSegmenterFactory
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence, ShotInfo, ShotType
+from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
 
 
-class ShotSegmenterAgent:
+class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
     """分镜生成智能体"""
 
     def __init__(self, llm, config: ShotConfig):
@@ -31,6 +33,7 @@ class ShotSegmenterAgent:
             llm: 语言模型实例
             config: 配置
         """
+        super().__init__()
         self.llm = llm
         self.config = config or {}
 
@@ -49,6 +52,48 @@ class ShotSegmenterAgent:
         # 历史记录
         self.segment_history = []
         self.last_shot_sequence = None
+
+        # 用于存储修复参数影响的配置
+        self._increase_shot_count = False
+        self._prefer_shorter_shots = False
+
+    def process(self, structured_script: ParsedScript) -> Optional[ShotSequence]:
+        # 使用当前修复参数影响生成策略
+        # if self._increase_shot_count:
+        #     # 调整分镜生成器的配置
+        #     self.config.set_min_shots_per_scene(3)  # 增加每个场景的镜头数
+        #
+        # if self._prefer_shorter_shots:
+        #     # 调整时长阈值
+        #     self.segmenter.set_max_shot_duration(4.0)  # 限制最长4秒
+
+        return self.shot_process(structured_script, self.current_repair_params)
+
+    def repair_result(self, shot_sequence: ShotSequence, issues: List[BasicViolation],
+                      structured_script: ParsedScript) -> ShotSequence:
+        return self.repair_shots(shot_sequence, issues, structured_script)
+
+    def detect_issues(self, shot_sequence: ShotSequence, structured_script: ParsedScript) -> List[BasicViolation]:
+        return self.detect_shot_issues(shot_sequence, structured_script)
+
+    def _on_repair_params_applied(self) -> None:
+        """根据修复参数调整内部配置"""
+        if not self.current_repair_params:
+            return
+
+        # 重置标志
+        self._increase_shot_count = False
+        self._prefer_shorter_shots = False
+
+        # 根据问题类型设置标志
+        if RuleType.SHOT_INSUFFICIENT.code in self.current_repair_params.issue_types:
+            self._increase_shot_count = True
+            debug("修复参数：将增加镜头数量")
+
+        if RuleType.SHOT_DURATION_TOO_LONG.code in self.current_repair_params.issue_types:
+            self._prefer_shorter_shots = True
+            debug("修复参数：将缩短镜头时长")
+
 
     def shot_process(self, structured_script: ParsedScript, repair_params: Optional[QualityRepairParams]) -> Optional[ShotSequence]:
         """
@@ -115,7 +160,7 @@ class ShotSegmenterAgent:
             error(f"镜头拆分异常: {e}")
             return None
 
-    def detect_issues(self, shot_sequence: ShotSequence, structured_script: ParsedScript) -> List[BasicViolation]:
+    def detect_shot_issues(self, shot_sequence: ShotSequence, structured_script: ParsedScript) -> List[BasicViolation]:
         """
         检测分镜生成中的问题 - 供质量审查节点调用
 
@@ -133,6 +178,7 @@ class ShotSegmenterAgent:
                 rule_code=RuleType.SHOT_MISSING.code,
                 rule_name=RuleType.SHOT_MISSING.description,
                 issue_type=IssueType.FRAGMENT,
+                source_node=PipelineNode.SEGMENT_SHOT,
                 description="未能生成任何镜头",
                 severity=SeverityLevel.ERROR,
                 fragment_id=None,
@@ -149,6 +195,7 @@ class ShotSegmenterAgent:
                 rule_code=RuleType.SHOT_INSUFFICIENT.code,
                 rule_name=RuleType.SHOT_INSUFFICIENT.description,
                 issue_type=IssueType.FRAGMENT,
+                source_node=PipelineNode.SEGMENT_SHOT,
                 description=f"镜头数量不足: {len(shots)}个，预期至少{expected_min_shots}个",
                 severity=SeverityLevel.MODERATE,
                 fragment_id=None,
@@ -163,6 +210,7 @@ class ShotSegmenterAgent:
                     rule_code=RuleType.SHOT_DURATION_TOO_SHORT.code,
                     rule_name=RuleType.SHOT_DURATION_TOO_SHORT.description,
                     issue_type=IssueType.DURATION,
+                    source_node=PipelineNode.SEGMENT_SHOT,
                     description=f"镜头{shot.id}时长过短: {shot.duration}秒",
                     severity=SeverityLevel.MAJOR,
                     fragment_id=shot.id,
@@ -174,6 +222,7 @@ class ShotSegmenterAgent:
                     rule_code=RuleType.SHOT_DURATION_TOO_LONG.code,
                     rule_name=RuleType.SHOT_DURATION_TOO_LONG.description,
                     issue_type=IssueType.DURATION,
+                    source_node=PipelineNode.SEGMENT_SHOT,
                     description=f"镜头{shot.id}时长过长: {shot.duration}秒",
                     severity=SeverityLevel.WARNING,
                     fragment_id=shot.id,
@@ -187,6 +236,7 @@ class ShotSegmenterAgent:
                     rule_code=RuleType.SHOT_DESCRIPTION_MISSING.code,
                     rule_name=RuleType.SHOT_DESCRIPTION_MISSING.description,
                     issue_type=IssueType.PROMPT,
+                    source_node=PipelineNode.SEGMENT_SHOT,
                     description=f"镜头{shot.id}描述过短或缺失",
                     severity=SeverityLevel.MODERATE,
                     fragment_id=shot.id,
@@ -200,6 +250,7 @@ class ShotSegmenterAgent:
                 rule_code=RuleType.SHOT_TYPE_UNIFORM.code,
                 rule_name=RuleType.SHOT_TYPE_UNIFORM.description,
                 issue_type=IssueType.STYLE,
+                source_node=PipelineNode.SEGMENT_SHOT,
                 description=f"镜头类型过于单一: 只有{shot_types[0] if shot_types else '无'}",
                 severity=SeverityLevel.WARNING,
                 fragment_id=None,
@@ -221,6 +272,7 @@ class ShotSegmenterAgent:
                     rule_code=RuleType.SHOT_REPETITIVE.code,
                     rule_name=RuleType.SHOT_REPETITIVE.description,
                     issue_type=IssueType.CONTINUITY,
+                    source_node=PipelineNode.SEGMENT_SHOT,
                     description=f"镜头{curr_shot.id}和{next_shot.id}类型相同且连续",
                     severity=SeverityLevel.WARNING,
                     fragment_id=curr_shot.id,
@@ -241,6 +293,7 @@ class ShotSegmenterAgent:
                     rule_code=RuleType.CHARACTER_NOT_IN_SHOTS.code,
                     rule_name=RuleType.CHARACTER_NOT_IN_SHOTS.description,
                     issue_type=IssueType.CHARACTER,
+                    source_node=PipelineNode.SEGMENT_SHOT,
                     description=f"角色未在镜头中出现: {', '.join(missing_chars)}",
                     severity=SeverityLevel.MODERATE,
                     fragment_id=None,

@@ -8,7 +8,8 @@
 import json
 from typing import Optional, Dict, Any
 
-from penshot.neopen.agent.base_agent import BaseAgent
+from penshot.logger import info, error
+from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.prompt_converter.base_prompt_converter import BasePromptConverter
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
@@ -25,10 +26,10 @@ from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence, VideoFragment
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_language import get_language
-from penshot.logger import info, error
 from penshot.utils.log_utils import print_log_exception
 
-class LLMPromptConverter(BasePromptConverter, BaseAgent):
+
+class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
     """基于LLM的提示词转换器 - 音频参数由LLM直接从CharacterInfo解析"""
 
     def __init__(self, llm_client, config: Optional[ShotConfig]):
@@ -47,7 +48,6 @@ class LLMPromptConverter(BasePromptConverter, BaseAgent):
         """初始化提示词模板"""
         self.system_prompt = self._get_prompt_template("prompt_converter_system")
         self.user_prompt_template = self._get_prompt_template("prompt_converter_user")
-
 
     def convert(self, fragment_sequence: FragmentSequence, parsed_script: ParsedScript,
                 repair_params: Optional[QualityRepairParams]) -> AIVideoInstructions:
@@ -371,7 +371,6 @@ class LLMPromptConverter(BasePromptConverter, BaseAgent):
         }
 
         return context
-
 
     def _build_audio_prompt_from_llm_result(self, result: Dict[str, Any], fragment: VideoFragment) -> Optional[AIAudioPrompt]:
         """从LLM返回的数据构建AIAudioPrompt对象"""

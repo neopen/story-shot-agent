@@ -41,10 +41,11 @@ class AuditStatus(str, Enum):
     WARNING = "warning"  # 有警告
 
 
-class IssueType(Enum):
+class IssueType(str, Enum):
     """问题类型枚举"""
     SCENE = "scene"                 # 场景问题
     CHARACTER = "character"         # 角色问题
+    WEATHER = "weather"             # 气候问题
     DIALOGUE = "dialogue"           # 对话问题
     ACTION = "action"               # 动作问题
     DURATION = "duration"           # 时长问题
@@ -68,7 +69,7 @@ class Rule:
     issue_type: 'IssueType'
 
 
-class RuleType(Enum):
+class RuleType(str, Enum):
     """规则类型枚举 - 统一管理所有审查规则"""
 
     # ==================== LLM审查规则 ====================
@@ -251,6 +252,7 @@ class BasicViolation(BaseModel):
     rule_name: str = Field(..., description="规则名称")
     description: str = Field(..., description="违规描述")
     issue_type: IssueType = Field(..., description="问题类型")
+    source_node: PipelineNode = Field(..., description="原节点")
     severity: Literal[SeverityLevel.INFO, SeverityLevel.WARNING, SeverityLevel.ERROR,
     SeverityLevel.MAJOR, SeverityLevel.MODERATE, SeverityLevel.CRITICAL] = Field(
         default=SeverityLevel.WARNING,
@@ -282,6 +284,11 @@ class QualityRepairParams(BaseModel):
         description="修复类型"
     )
 
+    issues: List[BasicViolation] = Field(
+        default_factory=list,
+        description="完整问题列表"
+    )
+
     fragments: List[str] = Field(
         default_factory=list,
         description="对应的片段ID集合"
@@ -296,6 +303,7 @@ class QualityRepairParams(BaseModel):
         default=None,
         description="严重程度摘要"
     )
+
 
 
 class QualityAuditReport(BaseModel):

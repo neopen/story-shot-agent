@@ -11,7 +11,7 @@ import time
 from typing import Dict, Any, Optional, List
 
 from penshot.logger import info, error, debug
-from penshot.neopen.agent.base_agent import BaseAgent
+from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions, AIVideoPrompt
 from penshot.neopen.agent.quality_auditor.base_quality_auditor import BaseQualityAuditor
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
@@ -21,7 +21,7 @@ from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
 
 
-class LLMQualityAuditor(BaseQualityAuditor, BaseAgent):
+class LLMQualityAuditor(BaseQualityAuditor, BaseLLMAgent):
     """LLM深度审查器 - 只负责LLM审查，不合并结果"""
 
     def __init__(self, llm_client, config: Optional[ShotConfig]):

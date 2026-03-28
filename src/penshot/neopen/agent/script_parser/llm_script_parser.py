@@ -8,17 +8,17 @@
 import json
 from typing import Any, Dict, Optional
 
-from penshot.neopen.agent.base_agent import BaseAgent
+from penshot.logger import info, warning, error, debug
+from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.base_models import ScriptType
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
 from penshot.neopen.agent.script_parser.base_script_parser import BaseScriptParser
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.client.client_config import AIConfig
-from penshot.logger import info, warning, error, debug
 from penshot.neopen.tools.json_parser_tool import parse_json_response
 
 
-class LLMScriptParser(BaseScriptParser, BaseAgent):
+class LLMScriptParser(BaseScriptParser, BaseLLMAgent):
 
     def __init__(self, llm, config: AIConfig = None):
         """
@@ -98,7 +98,6 @@ class LLMScriptParser(BaseScriptParser, BaseAgent):
             warning("剧本解析结果可能存在问题")
 
         return parsed_script
-
 
     def _get_default_prompt(self) -> str:
         """获取默认系统提示词"""

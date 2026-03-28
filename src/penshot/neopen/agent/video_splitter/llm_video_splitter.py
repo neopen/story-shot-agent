@@ -9,7 +9,8 @@ import json
 import time
 from typing import List, Optional, Dict, Any
 
-from penshot.neopen.agent.base_agent import BaseAgent
+from penshot.logger import info, error, warning, debug
+from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
@@ -18,11 +19,10 @@ from penshot.neopen.agent.video_splitter.base_video_splitter import BaseVideoSpl
 from penshot.neopen.agent.video_splitter.rule_video_splitter import RuleVideoSplitter
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence, VideoFragment
 from penshot.neopen.shot_config import ShotConfig
-from penshot.logger import info, error, warning, debug
 from penshot.utils.log_utils import print_log_exception
 
 
-class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
+class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
     """基于LLM的视频智能分割器 - 从ParsedScript获取全局信息"""
 
     def __init__(self, llm_client, config: Optional[ShotConfig]):
@@ -49,7 +49,6 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
         """初始化提示词模板"""
         self.system_prompt = self._get_prompt_template("video_splitter_system")
         self.user_prompt_template = self._get_prompt_template("video_splitter_user")
-
 
     def cut(self, shot_sequence: ShotSequence, parsed_script: ParsedScript,
             repair_params: Optional[QualityRepairParams]) -> FragmentSequence:
@@ -253,9 +252,9 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
             fragment.continuity_notes["fixed_at"] = time.time()
 
             if i > 0:
-                fragment.continuity_notes["prev_fragment"] = fragments[i-1].id
+                fragment.continuity_notes["prev_fragment"] = fragments[i - 1].id
             if i < len(fragments) - 1:
-                fragment.continuity_notes["next_fragment"] = fragments[i+1].id
+                fragment.continuity_notes["next_fragment"] = fragments[i + 1].id
 
         info("修复连续性注释")
         return fragments
@@ -308,7 +307,6 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseAgent):
             global_context=global_context,
             repair_hint=repair_hint
         )
-
 
     def _should_use_llm_split(self, shot: ShotInfo) -> bool:
         """判断是否应该使用AI分割"""

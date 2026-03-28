@@ -12,13 +12,15 @@ from typing import Dict, Tuple, List, Optional
 from penshot.logger import debug, info, warning
 from penshot.neopen.agent.script_parser.llm_script_parser import LLMScriptParser
 from .base_models import AgentMode, ScriptType, ElementType
+from .base_repairable_agent import BaseRepairableAgent
 from .quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType, QualityRepairParams
 from .script_parser.rule_script_parser import RuleScriptParser
 from .script_parser.script_parser_models import ParsedScript, SceneInfo, CharacterInfo, CharacterType
+from .workflow.workflow_models import PipelineNode
 from ..shot_config import ShotConfig
 
 
-class ScriptParserAgent:
+class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
     """优化版剧本解析智能体 - 支持工作流联动和修复"""
 
     def __init__(self, llm, config: Optional[ShotConfig]):
@@ -29,6 +31,7 @@ class ScriptParserAgent:
             llm: 语言模型实例（推荐GPT-4o）
             config: 配置
         """
+        super().__init__()
         self.config = config or {}
         self.use_local_rules = self.config.use_local_rules  # 是否启用本地规则校验和补全
 
@@ -40,6 +43,16 @@ class ScriptParserAgent:
         # 解析历史记录（用于修复）
         self.parsing_history = []
         self.last_parsed_script = None
+
+    def process(self, script_text: str) -> Optional[ParsedScript]:
+        return self.parser_process(script_text, self.current_repair_params)
+
+    def repair_result(self, parsed_script: ParsedScript, issues: List[BasicViolation],
+                      original_text: str = None) -> ParsedScript:
+        return self.repair_script(parsed_script, issues, original_text)
+
+    def detect_issues(self, parsed_script: ParsedScript, original_text: str) -> List[BasicViolation]:
+        return self.detect_parse_issues(parsed_script, original_text)
 
     def parser_process(self, script_text: str, repair_params: Optional[QualityRepairParams]) -> Optional[ParsedScript]:
         """
@@ -98,7 +111,7 @@ class ScriptParserAgent:
 
         return parsed_script
 
-    def detect_issues(self, parsed_script: ParsedScript, original_text: str) -> List[BasicViolation]:
+    def detect_parse_issues(self, parsed_script: ParsedScript, original_text: str) -> List[BasicViolation]:
         """
         检测解析问题 - 供质量审查节点调用
 
@@ -117,6 +130,7 @@ class ScriptParserAgent:
                 rule_code=RuleType.SCENE_MISSING.code,
                 rule_name=RuleType.SCENE_MISSING.description,
                 issue_type=IssueType.SCENE,
+                source_node=PipelineNode.PARSE_SCRIPT,
                 description="未能识别到任何场景",
                 severity=SeverityLevel.ERROR,
                 fragment_id=None,
@@ -127,6 +141,7 @@ class ScriptParserAgent:
                 rule_code=RuleType.SCENE_INSUFFICIENT.code,
                 rule_name=RuleType.SCENE_INSUFFICIENT.description,
                 issue_type=IssueType.SCENE,
+                source_node=PipelineNode.PARSE_SCRIPT,
                 description=f"只识别到{len(parsed_script.scenes)}个场景",
                 severity=SeverityLevel.WARNING,
                 fragment_id=None,
@@ -139,6 +154,7 @@ class ScriptParserAgent:
                 rule_code=RuleType.CHARACTER_MISSING.code,
                 rule_name=RuleType.CHARACTER_MISSING.description,
                 issue_type=IssueType.CHARACTER,
+                source_node=PipelineNode.PARSE_SCRIPT,
                 description="未能识别到任何角色",
                 severity=SeverityLevel.ERROR,
                 fragment_id=None,
@@ -155,6 +171,7 @@ class ScriptParserAgent:
                 rule_code=RuleType.DIALOGUE_MISSING.code,
                 rule_name=RuleType.DIALOGUE_MISSING.description,
                 issue_type=IssueType.DIALOGUE,
+                source_node=PipelineNode.PARSE_SCRIPT,
                 description="原始文本包含对话但未被提取",
                 severity=SeverityLevel.MAJOR,
                 fragment_id=None,
@@ -171,6 +188,7 @@ class ScriptParserAgent:
                 rule_code=RuleType.ACTION_INSUFFICIENT.code,
                 rule_name=RuleType.ACTION_INSUFFICIENT.description,
                 issue_type=IssueType.ACTION,
+                source_node=PipelineNode.PARSE_SCRIPT,
                 description=f"检测到{verb_count}个动作词，但只提取了{len(actions)}个动作",
                 severity=SeverityLevel.MODERATE,
                 fragment_id=None,
@@ -186,6 +204,7 @@ class ScriptParserAgent:
                         rule_code=RuleType.CHARACTER_INCONSISTENT.code,
                         rule_name=RuleType.CHARACTER_INCONSISTENT.description,
                         issue_type=IssueType.CHARACTER,
+                        source_node=PipelineNode.PARSE_SCRIPT,
                         description=f"元素{elem.id}引用未定义角色'{elem.character}'",
                         severity=SeverityLevel.MAJOR,
                         fragment_id=None,
@@ -202,6 +221,7 @@ class ScriptParserAgent:
                         rule_code=RuleType.ELEMENT_DURATION_TOO_SHORT.code,
                         rule_name=RuleType.ELEMENT_DURATION_TOO_SHORT.description,
                         issue_type=IssueType.DURATION,
+                        source_node=PipelineNode.PARSE_SCRIPT,
                         description=f"发现{len(short_elements)}个元素时长过短",
                         severity=SeverityLevel.WARNING,
                         fragment_id=None,
@@ -216,6 +236,7 @@ class ScriptParserAgent:
                         rule_code=RuleType.ELEMENT_SEQUENCE_WRONG.code,
                         rule_name=RuleType.ELEMENT_SEQUENCE_WRONG.description,
                         issue_type=IssueType.SCENE,
+                        source_node=PipelineNode.PARSE_SCRIPT,
                         description=f"场景{scene.id}的元素顺序不正确",
                         severity=SeverityLevel.MODERATE,
                         fragment_id=None,
@@ -232,6 +253,7 @@ class ScriptParserAgent:
                                 rule_code=RuleType.EMOTION_MISMATCH.code,
                                 rule_name=RuleType.EMOTION_MISMATCH.description,
                                 issue_type=IssueType.CHARACTER,
+                                source_node=PipelineNode.PARSE_SCRIPT,
                                 description=f"对话{elem.id}可能包含情感但标注为中性",
                                 severity=SeverityLevel.INFO,
                                 fragment_id=None,
@@ -245,6 +267,7 @@ class ScriptParserAgent:
                         rule_code=RuleType.CHARACTER_DESC_MISSING.code,
                         rule_name=RuleType.CHARACTER_DESC_MISSING.description,
                         issue_type=IssueType.CHARACTER,
+                        source_node=PipelineNode.PARSE_SCRIPT,
                         description=f"角色'{char.name}'缺少描述信息",
                         severity=SeverityLevel.WARNING,
                         fragment_id=None,
@@ -637,6 +660,7 @@ class ScriptParserAgent:
             rule_code=rule_code,
             rule_name=rule_name,
             issue_type=issue_type,
+            source_node=PipelineNode.PARSE_SCRIPT,
             description=description,
             severity=severity,
             fragment_id=None,

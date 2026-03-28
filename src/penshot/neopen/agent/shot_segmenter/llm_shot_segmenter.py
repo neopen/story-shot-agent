@@ -10,7 +10,7 @@ import re
 from typing import Optional, List, Dict
 
 from penshot.logger import info, error, debug, warning
-from penshot.neopen.agent.base_agent import BaseAgent
+from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, SceneInfo, GlobalMetadata
 from penshot.neopen.agent.shot_segmenter.base_shot_segmenter import BaseShotSegmenter
@@ -20,7 +20,7 @@ from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
 
 
-class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
+class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
     """基于LLM的分镜拆分器"""
 
     def __init__(self, llm_client, config: Optional[ShotConfig]):
@@ -39,11 +39,8 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseAgent):
         # 用户提示词模板
         self.user_prompt_template = self._get_prompt_template("shot_segmenter_user")
 
-    def set_repair_params(self, repair_params: QualityRepairParams):
-        """设置修复参数"""
-        self.current_repair_params = repair_params
 
-    def split(self, parsed_script: ParsedScript, repair_params: Optional[QualityRepairParams] = None) -> ShotSequence:
+    def split(self, parsed_script: ParsedScript, repair_params: Optional[QualityRepairParams]) -> ShotSequence:
         """使用LLM拆分剧本"""
         info(f"使用LLM拆分分镜，剧本: {parsed_script.title}")
 

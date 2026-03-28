@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any, List
 
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, BasicViolation, SeverityLevel, AuditStatus, RuleType, IssueType
+from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.logger import info
 
@@ -374,12 +375,14 @@ class BaseQualityAuditor(ABC):
 
     def _add_violation(self, report: QualityAuditReport, rule_type: RuleType, issue_type: IssueType,
                        description: str, severity: SeverityLevel = SeverityLevel.WARNING,
-                       fragment_id: Optional[str] = None, suggestion: Optional[str] = None) -> None:
+                       fragment_id: Optional[str] = None, suggestion: Optional[str] = None,
+                       source_node: PipelineNode = PipelineNode.AUDIT_QUALITY) -> None:
         """添加违规记录"""
         violation = BasicViolation(
             rule_code=rule_type.code,
             rule_name=rule_type.description,
             issue_type=issue_type,
+            source_node=source_node,
             description=description,
             severity=severity,
             fragment_id=fragment_id,

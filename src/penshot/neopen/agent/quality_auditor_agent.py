@@ -11,7 +11,7 @@ from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
 from penshot.neopen.agent.quality_auditor.quality_auditor_factory import QualityAuditorFactory
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, AuditStatus, SeverityLevel, IssueType, QualityRepairParams
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, AuditStatus, SeverityLevel, IssueType, QualityRepairParams, BasicViolation
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
@@ -39,18 +39,32 @@ class QualityAuditorAgent:
             self.rule_auditor = QualityAuditorFactory.create_auditor(AgentMode.RULE, config)
             self.llm_auditor = None
 
-        # 问题类型到来源节点的映射
+        # 问题类型到来源节点的映射（扩展）
         self.issue_source_mapping = {
+            # 剧本解析阶段
             IssueType.SCENE: PipelineNode.PARSE_SCRIPT,
             IssueType.CHARACTER: PipelineNode.PARSE_SCRIPT,
-            IssueType.WEATHER: PipelineNode.SEGMENT_SHOT,
-            IssueType.ACTION: PipelineNode.SEGMENT_SHOT,
-            IssueType.FRAGMENT: PipelineNode.SPLIT_VIDEO,
+            IssueType.DIALOGUE: PipelineNode.PARSE_SCRIPT,
+            IssueType.ACTION: PipelineNode.PARSE_SCRIPT,
+
+            # 分镜生成阶段
+            IssueType.FRAGMENT: PipelineNode.SEGMENT_SHOT,
+            IssueType.CONTINUITY: PipelineNode.SEGMENT_SHOT,
+
+            # 视频分割阶段
             IssueType.DURATION: PipelineNode.SPLIT_VIDEO,
+
+            # 提示词转换阶段
             IssueType.TRUNCATION: PipelineNode.CONVERT_PROMPT,
             IssueType.PROMPT: PipelineNode.CONVERT_PROMPT,
             IssueType.STYLE: PipelineNode.CONVERT_PROMPT,
             IssueType.MODEL: PipelineNode.CONVERT_PROMPT,
+            IssueType.AUDIO: PipelineNode.CONVERT_PROMPT,
+
+            # 其他
+            IssueType.WEATHER: PipelineNode.PARSE_SCRIPT,
+            IssueType.FORMAT: PipelineNode.PARSE_SCRIPT,
+            IssueType.COMPLETENESS: PipelineNode.PARSE_SCRIPT,
         }
 
         # 严重程度权重
@@ -63,9 +77,23 @@ class QualityAuditorAgent:
             SeverityLevel.ERROR: 50,
         }
 
-    def qa_process(self, instructions: AIVideoInstructions) -> Optional[QualityAuditReport]:
-        """执行质量审查 - 合并基本规则和LLM结果"""
+    def qa_process(self, instructions: AIVideoInstructions,
+                   stage_issues: Optional[Dict[PipelineNode, List[BasicViolation]]]) -> Optional[QualityAuditReport]:
+        """
+        执行质量审查 - 合并基本规则、LLM结果和各阶段问题
+
+        Args:
+            instructions: AI视频指令
+            stage_issues: 各阶段检测到的问题（来自各个智能体的detect_issues方法）
+
+        Returns:
+            质量审查报告
+        """
         debug("开始质量审查")
+
+        # 初始化阶段问题
+        if stage_issues is None:
+            stage_issues = {}
 
         try:
             # 1. 执行基本规则审查
@@ -78,11 +106,11 @@ class QualityAuditorAgent:
                 llm_report = self.llm_auditor.audit(instructions)
                 info(f"LLM审查完成，发现{len(llm_report.violations) if llm_report else 0}个问题")
 
-            # 3. 合并报告
-            merged_report = self._merge_reports(rule_report, llm_report, instructions)
+            # 3. 合并报告（包含各阶段问题）
+            merged_report = self._merge_reports(rule_report, llm_report, instructions, stage_issues)
 
             # 4. 增强报告：添加问题分类和修复参数
-            enhanced_report = self._enhance_report(merged_report, instructions)
+            enhanced_report = self._enhance_report(merged_report, instructions, stage_issues)
 
             # 5. 后处理（计算分数、状态等）
             final_report = self._post_process_report(enhanced_report)
@@ -97,8 +125,9 @@ class QualityAuditorAgent:
 
     def _merge_reports(self, rule_report: QualityAuditReport,
                        llm_report: Optional[QualityAuditReport],
-                       instructions: AIVideoInstructions) -> QualityAuditReport:
-        """合并基本规则和LLM审查报告"""
+                       instructions: AIVideoInstructions,
+                       stage_issues: Dict[PipelineNode, List[BasicViolation]]) -> QualityAuditReport:
+        """合并基本规则、LLM审查报告和各阶段问题"""
 
         # 创建合并报告（基于规则报告）
         merged = QualityAuditReport(
@@ -108,21 +137,47 @@ class QualityAuditorAgent:
             stats=rule_report.stats.copy()
         )
 
-        # 合并LLM报告的问题
+        # 1. 合并LLM报告的问题
         if llm_report:
             for violation in llm_report.violations:
                 merged.violations.append(violation)
 
-            # 合并检查项
             for check in llm_report.checks:
                 merged.checks.append(check)
 
-            # 更新分数（取平均）
-            merged.score = (rule_report.score + llm_report.score) / 2
+        # 2. 合并各阶段检测到的问题
+        total_stage_issues = 0
+        for node, issues in stage_issues.items():
+            if issues:
+                total_stage_issues += len(issues)
+                for issue in issues:
+                    # 设置问题来源节点
+                    if not hasattr(issue, 'source_node') or not issue.source_node:
+                        issue.source_node = node
+                    merged.violations.append(issue)
+
+                info(f"合并阶段 {node.value} 的问题: {len(issues)}个")
+
+        if total_stage_issues > 0:
+            info(f"总共合并各阶段问题: {total_stage_issues}个")
+
+        # 3. 更新分数（如果合并了问题，需要重新计算）
+        if total_stage_issues > 0:
+            merged.score = self._calculate_weighted_score(merged.violations)
 
         return merged
 
-    def _enhance_report(self, report: QualityAuditReport, instructions: AIVideoInstructions) -> QualityAuditReport:
+    def _calculate_weighted_score(self, violations: List[BasicViolation]) -> float:
+        """根据问题计算加权分数"""
+        base_score = 100.0
+        for violation in violations:
+            penalty = self.severity_weights.get(violation.severity, 5)
+            base_score -= penalty
+        return max(0.0, min(100.0, base_score))
+
+    def _enhance_report(self, report: QualityAuditReport,
+                        instructions: AIVideoInstructions,
+                        stage_issues: Dict[PipelineNode, List[BasicViolation]]) -> QualityAuditReport:
         """增强报告：添加问题分类和修复参数"""
 
         # 初始化分类
@@ -143,29 +198,52 @@ class QualityAuditorAgent:
             SeverityLevel.ERROR: [],
         }
 
-        # 分类每个问题
+        # 分类报告中的每个问题
         for violation in report.violations:
-            issues_by_type[violation.issue_type].append(violation)
+            # 按类型分类
+            if violation.issue_type in issues_by_type:
+                issues_by_type[violation.issue_type].append(violation)
+            else:
+                issues_by_type[IssueType.OTHER].append(violation)
 
+            # 按严重程度分类
             severity = violation.severity
             if severity in issues_by_severity:
                 issues_by_severity[severity].append(violation)
 
-            source = self.issue_source_mapping.get(violation.issue_type, PipelineNode.CONVERT_PROMPT)
-            issues_by_source[source].append(violation)
+            # 按来源分类（优先使用问题自带的source_node）
+            source = getattr(violation, 'source_node', None)
+            if not source:
+                source = self.issue_source_mapping.get(violation.issue_type, PipelineNode.CONVERT_PROMPT)
 
-        # 生成修复参数
+            if source in issues_by_source:
+                issues_by_source[source].append(violation)
+            else:
+                issues_by_source[PipelineNode.CONVERT_PROMPT].append(violation)
+
+        # 生成修复参数（包含各阶段问题）
         repair_params_by_source = {}
         for source, issues in issues_by_source.items():
             if issues:
                 repair_params_by_source[source] = QualityRepairParams(
                     fix_needed=True,
-                    issue_count= len(issues),
-                    issue_types=list(set([i.issue_type.value for i in issues])),
-                    fragments=[i.fragment_id for i in issues if i.fragment_id],
+                    issue_count=len(issues),
+                    issue_types=list(set([i.issue_type.value for i in issues if i.issue_type])),
+                    fragments=list(set([i.fragment_id for i in issues if i.fragment_id])),
                     suggestions=self._collect_suggestions(issues),
-                    severity_summary=self._get_severity_summary(issues)
+                    severity_summary=self._get_severity_summary(issues),
+                    issues=issues  # 保存完整问题列表供修复使用
                 )
+
+        # 记录各阶段问题统计
+        stage_issue_stats = {}
+        for node, issues in stage_issues.items():
+            if issues:
+                stage_issue_stats[node.value] = {
+                    "count": len(issues),
+                    "by_severity": self._get_severity_summary(issues),
+                    "by_type": self._get_type_summary(issues)
+                }
 
         # 添加到报告
         report.detailed_analysis = {
@@ -182,8 +260,9 @@ class QualityAuditorAgent:
                 for severity, issues in issues_by_severity.items() if issues
             },
             "repair_params_by_source": {
-                source.value: params for source, params in repair_params_by_source.items()
-            }
+                source.value: params.model_dump() for source, params in repair_params_by_source.items()
+            },
+            "stage_issue_stats": stage_issue_stats
         }
 
         # 保存到报告属性
@@ -191,6 +270,14 @@ class QualityAuditorAgent:
         report.repair_params = repair_params_by_source
 
         return report
+
+    def _get_type_summary(self, issues: List[BasicViolation]) -> Dict[str, int]:
+        """获取问题类型摘要"""
+        summary = {}
+        for issue in issues:
+            type_str = issue.issue_type.value if issue.issue_type else "unknown"
+            summary[type_str] = summary.get(type_str, 0) + 1
+        return summary
 
     def _collect_suggestions(self, issues: List) -> Dict[str, List[str]]:
         """收集修复建议"""
@@ -200,6 +287,11 @@ class QualityAuditorAgent:
                 if issue.fragment_id not in suggestions:
                     suggestions[issue.fragment_id] = []
                 suggestions[issue.fragment_id].append(issue.suggestion)
+            elif issue.suggestion:
+                # 全局建议
+                if "global" not in suggestions:
+                    suggestions["global"] = []
+                suggestions["global"].append(issue.suggestion)
         return suggestions
 
     def _get_severity_summary(self, issues: List) -> Dict[str, int]:

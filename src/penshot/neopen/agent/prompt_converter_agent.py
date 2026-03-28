@@ -10,16 +10,18 @@ from typing import Optional, List
 
 from penshot.logger import debug, error, info
 from penshot.neopen.agent.base_models import AgentMode
+from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.prompt_converter.prompt_converter_factory import PromptConverterFactory
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions, AIVideoPrompt
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType, QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence
+from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
 
 
-class PromptConverterAgent:
+class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequence]):
     """提示指令转换器"""
 
     def __init__(self, llm, config: Optional[ShotConfig]):
@@ -30,6 +32,7 @@ class PromptConverterAgent:
             llm: 语言模型实例
             config: 配置
         """
+        super().__init__()
         self.llm = llm
         self.config = config or {}
         if self.config.enable_llm:
@@ -41,8 +44,22 @@ class PromptConverterAgent:
         self.convert_history = []
         self.last_instructions = None
 
+    def process(self, fragment_sequence: FragmentSequence, parsed_script: ParsedScript) -> Optional[AIVideoInstructions]:
+
+        return self.prompt_process(fragment_sequence, parsed_script, self.current_repair_params)
+
+    def repair_result(self, instructions: AIVideoInstructions, issues: List[BasicViolation],
+                      fragment_sequence: FragmentSequence) -> AIVideoInstructions:
+        """实现基类的修复方法"""
+        return self.repair_prompts(instructions, issues, fragment_sequence)
+
+    def detect_issues(self, instructions: AIVideoInstructions,
+                      fragment_sequence: FragmentSequence) -> List[BasicViolation]:
+        return self.detect_prompt_issues(instructions, fragment_sequence)
+
+
     def prompt_process(self, fragment_sequence: FragmentSequence, parsed_script: ParsedScript,
-                       repair_params: Optional[QualityRepairParams] = None) -> Optional[AIVideoInstructions]:
+                       repair_params: Optional[QualityRepairParams]) -> Optional[AIVideoInstructions]:
         """视频片段转换提示词"""
         debug("开始视频转换提示词")
 
@@ -90,8 +107,8 @@ class PromptConverterAgent:
             error(f"视频转换提示词异常: {e}")
             return None
 
-    def detect_issues(self, instructions: AIVideoInstructions,
-                      fragment_sequence: FragmentSequence) -> List[BasicViolation]:
+    def detect_prompt_issues(self, instructions: AIVideoInstructions,
+                             fragment_sequence: FragmentSequence) -> List[BasicViolation]:
         """
         检测提示词转换中的问题 - 供质量审查节点调用
 
@@ -109,6 +126,7 @@ class PromptConverterAgent:
                 rule_code=RuleType.PROMPT_MISSING.code,
                 rule_name=RuleType.PROMPT_MISSING.description,
                 issue_type=IssueType.PROMPT,
+                source_node=PipelineNode.CONVERT_PROMPT,
                 description="未能生成任何提示词",
                 severity=SeverityLevel.ERROR,
                 fragment_id=None,
@@ -125,6 +143,7 @@ class PromptConverterAgent:
                     rule_code=RuleType.PROMPT_EMPTY.code,
                     rule_name=RuleType.PROMPT_EMPTY.description,
                     issue_type=IssueType.PROMPT,
+                    source_node=PipelineNode.CONVERT_PROMPT,
                     description=f"片段{prompt.fragment_id}的提示词为空",
                     severity=SeverityLevel.ERROR,
                     fragment_id=prompt.fragment_id,
@@ -140,6 +159,7 @@ class PromptConverterAgent:
                     rule_code=RuleType.PROMPT_TOO_LONG.code,
                     rule_name=RuleType.PROMPT_TOO_LONG.description,
                     issue_type=IssueType.PROMPT,
+                    source_node=PipelineNode.CONVERT_PROMPT,
                     description=f"片段{prompt.fragment_id}提示词过长: {prompt_length}字符",
                     severity=SeverityLevel.WARNING,
                     fragment_id=prompt.fragment_id,
@@ -150,6 +170,7 @@ class PromptConverterAgent:
                     rule_code=RuleType.PROMPT_TOO_SHORT.code,
                     rule_name=RuleType.PROMPT_TOO_SHORT.description,
                     issue_type=IssueType.PROMPT,
+                    source_node=PipelineNode.CONVERT_PROMPT,
                     description=f"片段{prompt.fragment_id}提示词过短: {prompt_length}字符",
                     severity=SeverityLevel.WARNING,
                     fragment_id=prompt.fragment_id,
@@ -163,6 +184,7 @@ class PromptConverterAgent:
                     rule_code=RuleType.PROMPT_TRUNCATED.code,
                     rule_name=RuleType.PROMPT_TRUNCATED.description,
                     issue_type=IssueType.TRUNCATION,
+                    source_node=PipelineNode.CONVERT_PROMPT,
                     description=f"片段{prompt.fragment_id}提示词可能被截断",
                     severity=SeverityLevel.MAJOR,
                     fragment_id=prompt.fragment_id,
@@ -179,6 +201,7 @@ class PromptConverterAgent:
                 rule_code=RuleType.STYLE_INCONSISTENT.code,
                 rule_name=RuleType.STYLE_INCONSISTENT.description,
                 issue_type=IssueType.STYLE,
+                source_node=PipelineNode.CONVERT_PROMPT,
                 description=f"检测到{len(styles)}种不同风格，可能导致视觉不连贯",
                 severity=SeverityLevel.MODERATE,
                 fragment_id=None,
@@ -192,6 +215,7 @@ class PromptConverterAgent:
                     rule_code=RuleType.NEGATIVE_PROMPT_MISSING.code,
                     rule_name=RuleType.NEGATIVE_PROMPT_MISSING.description,
                     issue_type=IssueType.PROMPT,
+                    source_node=PipelineNode.CONVERT_PROMPT,
                     description=f"片段{prompt.fragment_id}缺少负面提示词",
                     severity=SeverityLevel.INFO,
                     fragment_id=prompt.fragment_id,
@@ -208,6 +232,7 @@ class PromptConverterAgent:
                         rule_code=RuleType.AUDIO_PROMPT_TOO_SHORT.code,
                         rule_name=RuleType.AUDIO_PROMPT_TOO_SHORT.description,
                         issue_type=IssueType.AUDIO,
+                        source_node=PipelineNode.CONVERT_PROMPT,
                         description=f"片段{prompt.fragment_id}音频提示词过短",
                         severity=SeverityLevel.WARNING,
                         fragment_id=prompt.fragment_id,
@@ -219,6 +244,7 @@ class PromptConverterAgent:
                         rule_code=RuleType.AUDIO_DURATION_MISMATCH.code,
                         rule_name=RuleType.AUDIO_DURATION_MISMATCH.description,
                         issue_type=IssueType.DURATION,
+                        source_node=PipelineNode.CONVERT_PROMPT,
                         description=f"片段{prompt.fragment_id}音频时长({audio.duration_seconds}s)与视频时长({prompt.duration}s)不匹配",
                         severity=SeverityLevel.MAJOR,
                         fragment_id=prompt.fragment_id,
@@ -231,6 +257,7 @@ class PromptConverterAgent:
                         rule_code=RuleType.AUDIO_PROMPT_MISSING.code,
                         rule_name=RuleType.AUDIO_PROMPT_MISSING.description,
                         issue_type=IssueType.AUDIO,
+                        source_node=PipelineNode.CONVERT_PROMPT,
                         description=f"片段{prompt.fragment_id}应有音频但未生成",
                         severity=SeverityLevel.MODERATE,
                         fragment_id=prompt.fragment_id,
@@ -239,11 +266,12 @@ class PromptConverterAgent:
 
         # 7. 检查模型支持
         for prompt in prompts:
-            if prompt.model not in self.config.supported_models:
+            if prompt.model != self.config.video_model:
                 issues.append(BasicViolation(
                     rule_code=RuleType.MODEL_UNSUPPORTED.code,
                     rule_name=RuleType.MODEL_UNSUPPORTED.description,
                     issue_type=IssueType.MODEL,
+                    source_node=PipelineNode.CONVERT_PROMPT,
                     description=f"片段{prompt.fragment_id}使用不支持的模型: {prompt.model}",
                     severity=SeverityLevel.WARNING,
                     fragment_id=prompt.fragment_id,

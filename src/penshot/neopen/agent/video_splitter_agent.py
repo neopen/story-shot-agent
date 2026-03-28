@@ -10,16 +10,18 @@ from typing import Optional, List
 
 from penshot.logger import debug, error, info
 from penshot.neopen.agent.base_models import AgentMode
+from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType, QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence
 from penshot.neopen.agent.video_splitter.video_splitter_factory import VideoSplitterFactory
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence, VideoFragment
+from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
 
 
-class VideoSplitterAgent:
+class VideoSplitterAgent(BaseRepairableAgent[FragmentSequence, ShotSequence]):
     """视频片段分割器"""
 
     def __init__(self, llm, config: Optional[ShotConfig]):
@@ -30,6 +32,7 @@ class VideoSplitterAgent:
             llm: 语言模型实例
             config: 配置
         """
+        super().__init__()
         self.llm = llm
         self.config = config or {}
         if self.config.enable_llm:
@@ -40,6 +43,18 @@ class VideoSplitterAgent:
         # 历史记录
         self.split_history = []
         self.last_fragment_sequence = None
+
+    def process(self, shot_sequence: ShotSequence, parsed_script: ParsedScript) -> Optional[FragmentSequence]:
+        return self.video_process(shot_sequence, parsed_script, self.current_repair_params)
+
+    def repair_result(self, fragment_sequence: FragmentSequence, issues: List[BasicViolation],
+                      shot_sequence: ShotSequence) -> FragmentSequence:
+        """实现基类的修复方法"""
+        return self.repair_fragments(fragment_sequence, issues, shot_sequence)
+
+    def detect_issues(self, fragment_sequence: FragmentSequence,
+                      shot_sequence: ShotSequence) -> List[BasicViolation]:
+        return self.detect_video_issues(fragment_sequence, shot_sequence)
 
     def video_process(self, shot_sequence: ShotSequence, parsed_script: ParsedScript,
                       repair_params: Optional[QualityRepairParams] = None) -> Optional[FragmentSequence]:
@@ -87,7 +102,7 @@ class VideoSplitterAgent:
             error(f"视频片段切割异常: {e}")
             return None
 
-    def detect_issues(self, fragment_sequence: FragmentSequence,
+    def detect_video_issues(self, fragment_sequence: FragmentSequence,
                       shot_sequence: ShotSequence) -> List[BasicViolation]:
         """
         检测视频分割中的问题 - 供质量审查节点调用
@@ -106,6 +121,7 @@ class VideoSplitterAgent:
                 rule_code=RuleType.FRAGMENT_MISSING.code,
                 rule_name=RuleType.FRAGMENT_MISSING.description,
                 issue_type=IssueType.FRAGMENT,
+                source_node=PipelineNode.SPLIT_VIDEO,
                 description="未能生成任何视频片段",
                 severity=SeverityLevel.ERROR,
                 fragment_id=None,
@@ -122,6 +138,7 @@ class VideoSplitterAgent:
                 rule_code=RuleType.FRAGMENT_INSUFFICIENT.code,
                 rule_name=RuleType.FRAGMENT_INSUFFICIENT.description,
                 issue_type=IssueType.FRAGMENT,
+                source_node=PipelineNode.SPLIT_VIDEO,
                 description=f"片段数量不足: {len(fragments)}个，预期至少{expected_min_fragments}个",
                 severity=SeverityLevel.MODERATE,
                 fragment_id=None,
@@ -136,6 +153,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_DURATION_TOO_SHORT.code,
                     rule_name=RuleType.FRAGMENT_DURATION_TOO_SHORT.description,
                     issue_type=IssueType.DURATION,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{fragment.id}时长过短: {fragment.duration}秒",
                     severity=SeverityLevel.MAJOR,
                     fragment_id=fragment.id,
@@ -147,6 +165,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_DURATION_TOO_LONG.code,
                     rule_name=RuleType.FRAGMENT_DURATION_TOO_LONG.description,
                     issue_type=IssueType.DURATION,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{fragment.id}时长过长: {fragment.duration}秒",
                     severity=SeverityLevel.WARNING,
                     fragment_id=fragment.id,
@@ -160,6 +179,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_DESCRIPTION_MISSING.code,
                     rule_name=RuleType.FRAGMENT_DESCRIPTION_MISSING.description,
                     issue_type=IssueType.PROMPT,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{fragment.id}描述过短或缺失",
                     severity=SeverityLevel.MODERATE,
                     fragment_id=fragment.id,
@@ -178,6 +198,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_TIME_GAP.code,
                     rule_name=RuleType.FRAGMENT_TIME_GAP.description,
                     issue_type=IssueType.CONTINUITY,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{curr.id}和{next_frag.id}之间存在时间间隔: "
                                 f"预期{expected_next_start}s，实际{next_frag.start_time}s",
                     severity=SeverityLevel.MAJOR,
@@ -197,6 +218,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_OVERLAP.code,
                     rule_name=RuleType.FRAGMENT_OVERLAP.description,
                     issue_type=IssueType.CONTINUITY,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{curr.id}和{next_frag.id}存在重叠: {overlap:.2f}秒",
                     severity=SeverityLevel.ERROR,
                     fragment_id=curr.id,
@@ -210,6 +232,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_NO_ELEMENTS.code,
                     rule_name=RuleType.FRAGMENT_NO_ELEMENTS.description,
                     issue_type=IssueType.FRAGMENT,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{fragment.id}没有关联任何剧本元素",
                     severity=SeverityLevel.WARNING,
                     fragment_id=fragment.id,
@@ -224,6 +247,7 @@ class VideoSplitterAgent:
                     rule_code=RuleType.FRAGMENT_NO_CONTINUITY.code,
                     rule_name=RuleType.FRAGMENT_NO_CONTINUITY.description,
                     issue_type=IssueType.CONTINUITY,
+                    source_node=PipelineNode.SPLIT_VIDEO,
                     description=f"片段{fragment.id}缺少连续性注释",
                     severity=SeverityLevel.WARNING,
                     fragment_id=fragment.id,
