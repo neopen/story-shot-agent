@@ -268,6 +268,7 @@ class AsyncTaskProcessor:
                             queued_task.callback(task_id, result)
                     except Exception as e:
                         error(f"任务回调执行失败: {task_id}, 错误: {str(e)}")
+                        print_log_exception()
 
         except asyncio.CancelledError:
             self._stats["total_cancelled"] += 1

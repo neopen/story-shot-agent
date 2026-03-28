@@ -19,6 +19,8 @@ from penshot.neopen.shot_language import Language
 from penshot.neopen.task.task_manager import TaskManager
 from penshot.neopen.task.task_models import ProcessingStatus, TaskStatus, TaskResponse, BatchTaskResponse
 from penshot.neopen.task.task_processor import AsyncTaskProcessor, TaskPriority
+from penshot.utils.log_utils import print_log_exception
+
 
 class TaskFactory:
     """任务工厂 - 封装任务提交和执行"""
@@ -133,6 +135,7 @@ class TaskFactory:
                     self._callbacks[task_id](result)
                 except Exception as e:
                     error(f"回调执行失败: {task_id}, 错误: {e}")
+                    print_log_exception()
                 finally:
                     del self._callbacks[task_id]
 
@@ -319,7 +322,14 @@ class TaskFactory:
         try:
             # 使用 Future.result() 等待，这会释放 GIL，允许其他线程运行
             result = future.result(timeout=timeout)
-            return result
+
+            return TaskResponse(
+                task_id=task_id,
+                success=True,
+                status=TaskStatus.SUCCESS,
+                data=result,
+            )
+
         except TimeoutError:
             return TaskResponse(
                 task_id=task_id,

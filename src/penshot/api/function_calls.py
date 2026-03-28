@@ -16,6 +16,7 @@ from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_language import Language, set_language
 from penshot.neopen.task.task_factory import create_task_factory, TaskFactory, TaskResponse, TaskPriority
 from penshot.neopen.task.task_models import TaskStatus
+from penshot.utils.log_utils import print_log_exception
 
 
 @dataclass
@@ -201,7 +202,8 @@ class PenshotFunction:
             try:
                 callback(result)
             except Exception as e:
-                error(f"回调执行失败: {task_id}, 错误: {str(e)}")
+                error(f"回调失败: {task_id}, 错误: {str(e)}")
+                print_log_exception()
             finally:
                 del self._callbacks[task_id]
 
@@ -256,16 +258,14 @@ class PenshotFunction:
     def wait_for_result(
             self,
             task_id: str,
-            timeout: float = 300.0,
-            poll_interval: float = 0.5
-    ) -> PenshotResult:
+            timeout: float = 300.0
+    ) -> Optional[PenshotResult]:
         """
         同步等待任务完成
 
         Args:
             task_id: 任务ID
             timeout: 超时时间（秒）
-            poll_interval: 轮询间隔（秒）
 
         Returns:
             PenshotResult: 任务结果
@@ -273,8 +273,10 @@ class PenshotFunction:
         result = self.task_factory.wait_for_result(
             task_id=task_id,
             timeout=timeout,
-            poll_interval=poll_interval
         )
+
+        if not result:
+            return None
 
         return PenshotResult(
             task_id=result.task_id,
