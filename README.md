@@ -271,17 +271,15 @@ async def basic_usage():
     if result.success:
         data = result.data or {}
         instructions = data.get("instructions", {})
-        shots = instructions.fragments
-        project_info = instructions.project_info
+        shots = instructions.get("fragments", [])
+        project_info = instructions.get("project_info", {})
 
         print(f"镜头数量: {project_info.get('total_fragments', len(shots))}")
         print(f"总时长: {project_info.get('total_duration', 0):.1f}秒")
 
         # 显示前3个镜头
         for i, shot in enumerate(shots[:3], 1):
-            print(f" 片段提示词 {i}: {shot.prompt[:50]}...")
-
-    return result
+            print(f" 片段提示词 {i}: {shot.get('prompt')[:50]}...")
 
 
 async def async_usage():
@@ -310,8 +308,6 @@ async def async_usage():
     result = await agent.wait_for_result_async(task_id)
 
     print(f"最终结果: 成功={result.success}, 状态={result.status}")
-
-    return result
 ```
 
 ### 2. 集成到Web应用（API）
