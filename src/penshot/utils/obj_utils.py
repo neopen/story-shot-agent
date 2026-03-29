@@ -5,8 +5,14 @@
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/11 23:39
 """
-from dataclasses import is_dataclass, asdict, fields
-from typing import Any, get_type_hints, get_origin, get_args, Dict, List, Union
+from copy import deepcopy
+from dataclasses import fields
+from typing import Optional
+from typing import get_type_hints, get_origin, get_args
+from enum import Enum
+from dataclasses import is_dataclass, asdict
+from typing import Any, Dict, List, Union
+from collections import deque
 
 
 class JSONObject:
@@ -23,10 +29,20 @@ class JSONObject:
         return str(self.__dict__)
 
 
-def obj_to_dict(obj: Any) -> Union[Dict, List, str, int, float, bool, None]:
+# ================================== obj 转 dict ==================================
+
+def obj_to_dict(
+        obj: Any,
+        enum_mode: str = 'value',  # 'value' | 'name' | 'str'
+        max_depth: int = 10,  # 防止无限递归
+        current_depth: int = 0
+) -> Union[Dict, List, str, int, float, bool, None]:
     """
-    安全地将任意对象转换为原生 Python 数据结构（dict/list/str/int...），
-    适用于序列化、日志记录、JSON 输出等场景。
+        安全地将任意对象转换为原生 Python 数据结构（dict/list/str/int...），
+        适用于序列化、日志记录、JSON 输出等场景。
+            支持任意嵌套层级的 Enum 转换
+            处理字典的 Key 和 Value
+            支持多种容器类型
 
     支持：
       - dataclass
@@ -42,51 +58,250 @@ def obj_to_dict(obj: Any) -> Union[Dict, List, str, int, float, bool, None]:
     Returns:
         可 JSON 序列化的原生数据结构
     """
-    # None 或基本类型（str, int, float, bool）
+    # 防止无限递归
+    if current_depth > max_depth:
+        return str(obj)
+
+    # None 或基本类型
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
 
-    # 字典：递归处理 value
+    # Enum 类型处理（优先级高）
+    if isinstance(obj, Enum):
+        if enum_mode == 'value':
+            return obj.value
+        elif enum_mode == 'name':
+            return obj.name
+        elif enum_mode == 'str':
+            return str(obj)
+        return obj.value
+
+    # 字典：同时处理 key 和 value
     if isinstance(obj, dict):
-        return {k: obj_to_dict(v) for k, v in obj.items()}
+        return {
+            obj_to_dict(k, enum_mode, max_depth, current_depth + 1):
+                obj_to_dict(v, enum_mode, max_depth, current_depth + 1)
+            for k, v in obj.items()
+        }
 
-    # 列表/元组：递归处理元素
-    if isinstance(obj, (list, tuple)):
-        return [obj_to_dict(item) for item in obj]
+    # 列表/元组/集合/队列：递归处理元素
+    if isinstance(obj, (list, tuple, set, frozenset, deque)):
+        return [
+            obj_to_dict(item, enum_mode, max_depth, current_depth + 1)
+            for item in obj
+        ]
 
-    # Pydantic v2 (LangChain 0.2+ 默认)
+    # Pydantic v2
     if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
         try:
-            dumped = obj.model_dump()
-            return obj_to_dict(dumped)  # 递归确保嵌套安全
-        except Exception:
-            pass  # fallback
+            dumped = obj.model_dump(mode='python')  # mode='python' 确保不序列化 Enum
+            return obj_to_dict(dumped, enum_mode, max_depth, current_depth + 1)
+        except Exception as e:
+            pass
 
     # Pydantic v1
     if hasattr(obj, "dict") and callable(getattr(obj, "dict")):
         try:
             dumped = obj.dict()
-            return obj_to_dict(dumped)
-        except Exception:
-            pass  # fallback
+            return obj_to_dict(dumped, enum_mode, max_depth, current_depth + 1)
+        except Exception as e:
+            pass
 
     # dataclass
     if is_dataclass(obj) and not isinstance(obj, type):
         try:
-            return obj_to_dict(asdict(obj))
-        except Exception:
-            pass  # fallback
+            return obj_to_dict(asdict(obj), enum_mode, max_depth, current_depth + 1)
+        except Exception as e:
+            pass
 
     # 普通对象（有 __dict__）
     if hasattr(obj, "__dict__"):
         try:
-            return obj_to_dict(vars(obj))
-        except Exception:
+            return obj_to_dict(vars(obj), enum_mode, max_depth, current_depth + 1)
+        except Exception as e:
             pass
 
-    # 最后手段：转为字符串（避免崩溃）
+    # 处理 __slots__ 对象
+    if hasattr(obj, "__slots__"):
+        try:
+            slot_dict = {slot: getattr(obj, slot) for slot in obj.__slots__ if hasattr(obj, slot)}
+            return obj_to_dict(slot_dict, enum_mode, max_depth, current_depth + 1)
+        except Exception as e:
+            pass
+
+    # 最后手段：转为字符串
     return str(obj)
 
+
+def convert_data_dict(data: Dict[str, Any], enum_mode: str = 'value') -> Dict[str, Any]:
+    """
+    专门处理字典结构，遍历所有 key 对应的模型并转换
+
+    Args:
+        data: 字典，value 可能是模型对象
+        enum_mode: 枚举转换模式 ('value' | 'name' | 'str')
+
+    Returns:
+        转换后的完整字典
+    """
+    if not isinstance(data, dict):
+        raise TypeError("data 必须是字典类型")
+
+    return obj_to_dict(data, enum_mode=enum_mode)
+
+
+# =========================== obj 转 dict（安全版本） ===========================
+def _is_enum_subclass(obj: Any) -> bool:
+    """
+    检查是否是 Enum 子类（包括自定义 Enum 基类）
+    """
+    try:
+        # 检查类型继承链
+        for base in type(obj).__mro__:
+            if base.__name__ == 'Enum' and 'enum' in str(base.__module__):
+                return True
+        return False
+    except Exception:
+        return False
+
+def obj_to_dict_safe(
+        obj: Any,
+        enum_mode: str = 'value',
+        max_depth: int = 10,
+        current_depth: int = 0,
+        _seen: Optional[set] = None
+) -> Union[Dict, List, str, int, float, bool, None]:
+    """
+    安全版本：完全深拷贝，无引用问题
+    防止循环引用
+    所有可变对象都创建新副本
+    """
+    if current_depth > max_depth:
+        return str(obj)
+
+        # 防止循环引用
+    if _seen is None:
+        _seen = set()
+    obj_id = id(obj)
+    if obj_id in _seen:
+        return str(obj)
+
+    # None
+    if obj is None:
+        return None
+
+    # Enum 检查（最高优先级，在所有容器之前）
+    # 使用 type(obj).__bases__ 检查是否是 Enum 子类
+    if isinstance(obj, Enum) or _is_enum_subclass(obj):
+        if enum_mode == 'value':
+            return obj.value
+        elif enum_mode == 'name':
+            return obj.name
+        elif enum_mode == 'str':
+            return str(obj)
+        return obj.value
+
+    # 基本类型（不可变，安全）
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+
+    # 字典（创建新字典）
+    if isinstance(obj, dict):
+        _seen.add(obj_id)
+        result = {
+            obj_to_dict_safe(k, enum_mode, max_depth, current_depth + 1, _seen):
+                obj_to_dict_safe(v, enum_mode, max_depth, current_depth + 1, _seen)
+            for k, v in obj.items()
+        }
+        _seen.discard(obj_id)
+        return result
+
+    # 列表/元组/集合（创建新列表）
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        _seen.add(obj_id)
+        result = [
+            obj_to_dict_safe(item, enum_mode, max_depth, current_depth + 1, _seen)
+            for item in obj
+        ]
+        _seen.discard(obj_id)
+        return result
+
+    # Pydantic v2（关键：使用 mode='python' 并递归处理结果）
+    if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
+        try:
+            _seen.add(obj_id)
+            # mode='python' 返回 Python 对象，mode='json' 会直接序列化
+            dumped = obj.model_dump(mode='python', exclude_none=False)
+            result = obj_to_dict_safe(dumped, enum_mode, max_depth, current_depth + 1, _seen)
+            _seen.discard(obj_id)
+            return result
+        except Exception as e:
+            print(f"Pydantic v2 model_dump 失败：{e}")
+            pass
+
+    # Pydantic v1
+    if hasattr(obj, "dict") and callable(getattr(obj, "dict")):
+        try:
+            _seen.add(obj_id)
+            dumped = obj.dict()
+            result = obj_to_dict_safe(dumped, enum_mode, max_depth, current_depth + 1, _seen)
+            _seen.discard(obj_id)
+            return result
+        except Exception as e:
+            print(f"Pydantic v1 dict 失败：{e}")
+            pass
+
+    # dataclass
+    if is_dataclass(obj) and not isinstance(obj, type):
+        try:
+            _seen.add(obj_id)
+            result = obj_to_dict_safe(asdict(obj), enum_mode, max_depth, current_depth + 1, _seen)
+            _seen.discard(obj_id)
+            return result
+        except Exception as e:
+            print(f"dataclass asdict 失败：{e}")
+            pass
+
+    # 普通对象（deepcopy 避免引用）
+    if hasattr(obj, "__dict__"):
+        try:
+            _seen.add(obj_id)
+            obj_dict = deepcopy(vars(obj))
+            result = obj_to_dict_safe(obj_dict, enum_mode, max_depth, current_depth + 1, _seen)
+            _seen.discard(obj_id)
+            return result
+        except Exception as e:
+            print(f"__dict__ 处理失败：{e}")
+            pass
+
+    # __slots__ 对象
+    if hasattr(obj, "__slots__"):
+        try:
+            _seen.add(obj_id)
+            slot_dict = deepcopy({
+                slot: getattr(obj, slot)
+                for slot in obj.__slots__
+                if hasattr(obj, slot)
+            })
+            result = obj_to_dict_safe(slot_dict, enum_mode, max_depth, current_depth + 1, _seen)
+            _seen.discard(obj_id)
+            return result
+        except Exception as e:
+            print(f"__slots__ 处理失败：{e}")
+            pass
+
+    # 最后手段
+    return str(obj)
+
+
+def convert_data_dict_safe(data: Dict[str, Any], enum_mode: str = 'value') -> Dict[str, Any]:
+    """安全转换字典中的所有模型"""
+    if not isinstance(data, dict):
+        raise TypeError("data 必须是字典类型")
+    return obj_to_dict_safe(data, enum_mode=enum_mode)
+
+
+# ============================ dict 转 dataclass ============================
 
 def batch_dict_to_dataclass(datas: List[Any], cls) -> [Any]:
     """ 将字典列表转换为指定的 dataclass 对象列表。"""
