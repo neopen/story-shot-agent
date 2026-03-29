@@ -27,6 +27,7 @@ from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSe
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_language import get_language
 from penshot.utils.log_utils import print_log_exception
+from penshot.utils.str_count_utils import only_count_en
 
 
 class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
@@ -151,18 +152,18 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
     def _fix_length_issues(self, instructions: AIVideoInstructions) -> AIVideoInstructions:
         """修复长度问题"""
         for prompt in instructions.fragments:
-            prompt_length = len(prompt.prompt)
+            prompt_length = only_count_en(prompt.prompt)
 
-            if prompt_length > self.config.max_prompt_length:
+            if prompt_length > self.config.prompt_length_max_threshold:
                 # 截断
-                prompt.prompt = prompt.prompt[:self.config.max_prompt_length - 20] + "..."
-                info(f"截断过长提示词: {prompt.fragment_id} {prompt_length} -> {self.config.max_prompt_length}")
+                prompt.prompt = prompt.prompt[:self.config.prompt_length_max_threshold - 20] + "..."
+                info(f"截断过长提示词: {prompt.fragment_id} {prompt_length} -> {self.config.prompt_length_max_threshold}")
 
-            elif prompt_length < self.config.min_prompt_length:
+            elif prompt_length < self.config.prompt_length_min_threshold:
                 # 扩展
                 extension = "，高清画质，电影级质感"
                 prompt.prompt = prompt.prompt + extension
-                info(f"扩展过短提示词: {prompt.fragment_id} {prompt_length} -> {len(prompt.prompt)}")
+                info(f"扩展过短提示词: {prompt.fragment_id} {prompt_length} -> {only_count_en(prompt.prompt)}")
 
         return instructions
 

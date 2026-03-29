@@ -14,6 +14,7 @@ from penshot.neopen.agent.quality_auditor.base_quality_auditor import BaseQualit
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, RuleType, SeverityLevel, IssueType
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
+from penshot.utils.str_count_utils import only_count_en
 
 
 class RuleQualityAuditor(BaseQualityAuditor):
@@ -121,31 +122,30 @@ class RuleQualityAuditor(BaseQualityAuditor):
         check_name = "提示词长度检查"
         too_long_count = 0
         too_short_count = 0
-        max_prompt_length = self.config.max_prompt_length * 10
 
         for fragment in instructions.fragments:
-            prompt_length = len(fragment.prompt)
+            prompt_length = only_count_en(fragment.prompt)
 
-            if prompt_length > max_prompt_length:
+            if prompt_length > self.config.prompt_length_max_threshold:
                 self._add_violation(
                     report=report,
                     rule_type=RuleType.PROMPT_TOO_LONG,
                     source_node=PipelineNode.CONVERT_PROMPT,
                     issue_type=IssueType.PROMPT,
-                    description=f"片段 {fragment.fragment_id} 提示词过长: {prompt_length}字符 (限制长度: {max_prompt_length})",
+                    description=f"片段 {fragment.fragment_id} 提示词过长: {prompt_length} 单词 (限制长度: {self.config.max_prompt_length} 个单词)",
                     severity=SeverityLevel.WARNING,
                     fragment_id=fragment.fragment_id,
-                    suggestion=f"将提示词缩短到{max_prompt_length}字符以内"
+                    suggestion=f"将提示词缩短到{self.config.max_prompt_length} 个单词以内"
                 )
                 too_long_count += 1
 
-            if prompt_length < self.config.min_prompt_length:
+            if prompt_length < self.config.prompt_length_min_threshold:
                 self._add_violation(
                     report=report,
                     rule_type=RuleType.PROMPT_TOO_SHORT,
                     source_node=PipelineNode.CONVERT_PROMPT,
                     issue_type=IssueType.PROMPT,
-                    description=f"片段 {fragment.fragment_id} 提示词过短: {prompt_length}字符 (建议: ≥{self.config.min_prompt_length})",
+                    description=f"片段 {fragment.fragment_id} 提示词过短: {prompt_length} 单词 (建议: ≥{self.config.min_prompt_length} 个单词)",
                     severity=SeverityLevel.WARNING,
                     fragment_id=fragment.fragment_id,
                     suggestion="添加更多描述性内容到提示词"

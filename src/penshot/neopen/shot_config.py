@@ -44,7 +44,17 @@ class ShotConfig(AIConfig):
     audio_model: str = AudioModelType.XTTSv2.value
     default_negative_prompt: str = "blurry, distorted, low quality, cartoonish, bad anatomy"
     default_style: str = VideoStyle.CINEMATIC.value
-    max_prompt_length: int = 200    # 提示词最大长度（单词数）
-    min_prompt_length: int = 10
+    max_prompt_length: int = 100    # 提示词最大长度（单词数）
+    min_prompt_length: int = 20
+
+    # ======================质量审查
+    # enable_quality_audit: bool = True  # 是否启用质量审查
+    # quality_audit_threshold: float = 0.5  # 质量审查的分数阈值，低于该值视为不合格
+    prompt_length_max_threshold: int = max_prompt_length + 20   # 提示词长度警告阈值，超过该值将发出警告
+    prompt_length_min_threshold: int = min_prompt_length - 10  # 提示词长度警告阈值，超过该值将发出警告
+
+    # ======================其他
+    # enable_caching: bool = True  # 是否启用缓存机制，避免重复计算
+    # cache_expiry_seconds: int = 3600  # 缓存过期时间
 
 

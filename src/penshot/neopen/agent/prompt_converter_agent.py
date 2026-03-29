@@ -19,6 +19,7 @@ from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSe
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
+from penshot.utils.str_count_utils import count_words_full, only_count_en
 
 
 class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequence]):
@@ -58,7 +59,6 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
     def detect_issues(self, instructions: AIVideoInstructions,
                       fragment_sequence: FragmentSequence) -> List[BasicViolation]:
         return self.detect_prompt_issues(instructions, fragment_sequence)
-
 
     def prompt_process(self, fragment_sequence: FragmentSequence, parsed_script: ParsedScript,
                        repair_params: Optional[QualityRepairParams]) -> Optional[AIVideoInstructions]:
@@ -154,29 +154,29 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
 
         # 2. 检查提示词长度
         for prompt in prompts:
-            prompt_length = len(prompt.prompt)
+            prompt_length = only_count_en(prompt.prompt)
 
-            if prompt_length > self.config.max_prompt_length:
+            if prompt_length > self.config.prompt_length_max_threshold:
                 issues.append(BasicViolation(
                     rule_code=RuleType.PROMPT_TOO_LONG.code,
                     rule_name=RuleType.PROMPT_TOO_LONG.description,
                     issue_type=IssueType.PROMPT,
                     source_node=PipelineNode.CONVERT_PROMPT,
-                    description=f"片段{prompt.fragment_id}提示词过长: {prompt_length}字符",
+                    description=f"片段{prompt.fragment_id}提示词过长: {prompt_length}个单词",
                     severity=SeverityLevel.WARNING,
                     fragment_id=prompt.fragment_id,
-                    suggestion=f"将提示词缩短到{self.config.max_prompt_length}字符以内"
+                    suggestion=f"将提示词缩短到{self.config.max_prompt_length}单词以内"
                 ))
-            elif prompt_length < self.config.min_prompt_length:
+            elif prompt_length < self.config.prompt_length_min_threshold:
                 issues.append(BasicViolation(
                     rule_code=RuleType.PROMPT_TOO_SHORT.code,
                     rule_name=RuleType.PROMPT_TOO_SHORT.description,
                     issue_type=IssueType.PROMPT,
                     source_node=PipelineNode.CONVERT_PROMPT,
-                    description=f"片段{prompt.fragment_id}提示词过短: {prompt_length}字符",
+                    description=f"片段{prompt.fragment_id}提示词过短: {prompt_length}个单词",
                     severity=SeverityLevel.WARNING,
                     fragment_id=prompt.fragment_id,
-                    suggestion=f"添加更多描述性内容，至少{self.config.min_prompt_length}字符"
+                    suggestion=f"添加更多描述性内容，至少{self.config.min_prompt_length}个单词"
                 ))
 
         # 3. 检查提示词截断
@@ -362,18 +362,19 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                 if not prompt:
                     continue
 
-                prompt_length = len(prompt.prompt)
-                if '过长' in issue.description and prompt_length > self.config.max_prompt_length:
+                prompt_length = only_count_en(prompt.prompt)
+                if '过长' in issue.description and prompt_length > self.config.prompt_length_max_threshold:
                     # 截断提示词
-                    prompt.prompt = prompt.prompt[:self.config.max_prompt_length - 20] + "..."
-                    repair_actions.append(f"截断过长提示词: {fragment_id} {prompt_length} -> {self.config.max_prompt_length}")
-                elif '过短' in issue.description and prompt_length < self.config.min_prompt_length:
+                    prompt.prompt = prompt.prompt[:self.config.prompt_length_max_threshold] + "..."
+                    repair_actions.append(f"截断过长提示词: {fragment_id} {prompt_length} -> {self.config.prompt_length_max_threshold} 个单词")
+
+                elif '过短' in issue.description and prompt_length < self.config.prompt_length_min_threshold:
                     # 扩展提示词
                     if fragment_id in fragment_map:
                         fragment = fragment_map[fragment_id]
                         extension = f"，{fragment.description}" if fragment.description else "，高清画质"
                         prompt.prompt = prompt.prompt + extension
-                        repair_actions.append(f"扩展过短提示词: {fragment_id} {prompt_length} -> {len(prompt.prompt)}")
+                        repair_actions.append(f"扩展过短提示词: {fragment_id} {prompt_length} -> {only_count_en(prompt.prompt)} 个单词")
 
         # ========== 3. 修复截断问题 ==========
         if truncated_issues:
