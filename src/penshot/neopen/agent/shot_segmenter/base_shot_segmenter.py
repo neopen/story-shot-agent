@@ -6,7 +6,7 @@
 @Time: 2026/1/17 22:03
 """
 from abc import abstractmethod, ABC
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
@@ -28,7 +28,7 @@ class BaseShotSegmenter(ABC):
         info(f"初始化分镜拆分器: {self.__class__.__name__}")
 
     @abstractmethod
-    def split(self, parsed_script: ParsedScript, repair_params: Optional[QualityRepairParams]) -> ShotSequence:
+    def split(self, parsed_script: ParsedScript, repair_params: Optional[QualityRepairParams], historical_context: Optional[Dict[str, Any]]) -> ShotSequence:
         """拆分剧本为镜头序列（抽象方法）"""
         pass
 

@@ -7,7 +7,7 @@
 """
 import json
 import re
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from penshot.logger import info, error, debug, warning
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
@@ -27,6 +27,7 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
         super().__init__(config)
         self.llm_client = llm_client
         self.current_repair_params = None
+        self.current_historical_context  = None
 
         # 初始化提示词
         self._init_prompts()
@@ -39,10 +40,15 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
         # 用户提示词模板
         self.user_prompt_template = self._get_prompt_template("shot_segmenter_user")
 
+    # llm_shot_segmenter.py - 修改 split 方法
 
-    def split(self, parsed_script: ParsedScript, repair_params: Optional[QualityRepairParams]) -> ShotSequence:
+    def split(self, parsed_script: ParsedScript, repair_params: Optional[QualityRepairParams],
+              historical_context: Optional[Dict[str, Any]]) -> ShotSequence:
         """使用LLM拆分剧本"""
         info(f"使用LLM拆分分镜，剧本: {parsed_script.title}")
+
+        # 保存历史上下文
+        self.current_historical_context = historical_context
 
         # 如果有修复参数，保存到实例
         if repair_params:
@@ -63,61 +69,60 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
             try:
                 scene_shots = self._split_scene_with_llm(
                     scene, current_time, len(all_shots),
-                    parsed_script.global_metadata
+                    parsed_script.global_metadata,
+                    historical_context  # 传递历史上下文
                 )
                 all_shots.extend(scene_shots)
 
-                # 更新当前时间
                 if scene_shots:
                     current_time = scene_shots[-1].start_time + scene_shots[-1].duration
 
             except Exception as e:
                 error(f"场景{scene.id}分镜失败: {str(e)}")
                 print_log_exception()
-                # 降级到规则拆分
                 rule_splitter = RuleShotSegmenter(self.config)
                 fallback_shots = rule_splitter.split_scene(scene, current_time, len(all_shots))
                 all_shots.extend(fallback_shots)
 
-        # 构建序列
         shot_sequence = ShotSequence(
             script_reference=script_ref,
             shots=all_shots
         )
 
-        # 后处理
         shot_sequence = self._post_process(shot_sequence)
 
-        # 如果有修复参数，应用修复
         if self.current_repair_params and self.current_repair_params.fix_needed:
             shot_sequence = self._apply_repair_params(shot_sequence, parsed_script)
 
         return shot_sequence
 
+
     def _split_scene_with_llm(self, scene: SceneInfo, start_time: float,
-                              shot_offset: int, global_metadata: GlobalMetadata) -> List[ShotInfo]:
+                              shot_offset: int, global_metadata: GlobalMetadata,
+                              historical_context: Optional[Dict[str, Any]] = None) -> List[ShotInfo]:
         """使用LLM拆分单个场景"""
 
-        # 使用详细格式
         global_context = self._format_global_metadata(global_metadata, scene_id=scene.id, format_type="shot")
 
-        # 准备元素列表文本
         elements_list = "\n".join([
             f"  {i + 1}. [{elem.type.value}] {elem.character or '场景'}, {elem.emotion}: {elem.content} (预估时长: {elem.duration}秒)"
             for i, elem in enumerate(scene.elements)
         ])
 
-        # 构建修复提示（如果有）
+        # 构建修复提示
         repair_hint = ""
         if self.current_repair_params and self.current_repair_params.fix_needed and self.current_repair_params.issue_types:
             repair_hint = f"""
                 【重要：修复要求】
-                    之前的分镜存在以下问题：
-                    - 问题类型: {', '.join(self.current_repair_params.issue_types)}
-                    - 修复建议: {json.dumps(self.current_repair_params.suggestions, ensure_ascii=False) if self.current_repair_params.suggestions else '无'}
-                    
-                    请根据上述建议调整分镜生成策略，避免再次出现相同问题。
-                """
+                之前的分镜存在以下问题：
+                - 问题类型: {', '.join(self.current_repair_params.issue_types)}
+                - 修复建议: {json.dumps(self.current_repair_params.suggestions, ensure_ascii=False) if self.current_repair_params.suggestions else '无'}
+            
+                请根据上述建议调整分镜生成策略，避免再次出现相同问题。
+            """
+
+        # 构建历史上下文提示
+        history_hint = self._build_history_hint(historical_context)
 
         # 准备用户提示词
         user_prompt = self.user_prompt_template.format(
@@ -129,18 +134,83 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
             elements_count=len(scene.elements),
             elements_list=elements_list,
             global_context=global_context,
-            repair_hint=repair_hint
+            repair_hint=repair_hint,
+            history_hint=history_hint
         )
 
         debug(f"场景{scene.id}分镜提示词长度: {len(user_prompt)}字符")
 
-        # 调用LLM
         response = self._call_llm_chat_with_retry(self.llm_client, self.system_prompt, user_prompt)
-
-        # 解析响应
         shots_data = self._parse_ai_response(response, scene.id, start_time, shot_offset)
 
         return shots_data
+
+
+    def _build_history_hint(self, historical_context: Optional[Dict[str, Any]]) -> str:
+        """构建历史上下文提示"""
+        if not historical_context:
+            return ""
+
+        hints = []
+
+        # 1. 常见问题模式
+        common_issues = historical_context.get("common_issues")
+        if common_issues and isinstance(common_issues, list):
+            issue_counts = {}
+            for issue in common_issues[-30:]:
+                if isinstance(issue, dict):
+                    issue_type = issue.get("issue_type", {}).get("value", "unknown")
+                else:
+                    issue_type = getattr(issue, "issue_type", "unknown")
+                    if hasattr(issue_type, "value"):
+                        issue_type = issue_type.value
+                issue_counts[issue_type] = issue_counts.get(issue_type, 0) + 1
+
+            sorted_issues = sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)
+            top_issues = [f"{t}({c}次)" for t, c in sorted_issues[:3]]
+
+            if top_issues:
+                hints.append(f"常见分镜问题类型: {', '.join(top_issues)}，请特别注意避免这些问题。")
+
+        # 2. 历史统计信息
+        historical_stats = historical_context.get("historical_stats")
+        if historical_stats and isinstance(historical_stats, dict):
+            avg_shot_count = historical_stats.get("shot_count", 0)
+            avg_duration = historical_stats.get("avg_duration", 0)
+
+            if avg_shot_count > 0:
+                hints.append(f"历史分镜统计: 平均镜头数={avg_shot_count:.0f}, 平均时长={avg_duration:.1f}秒")
+
+            if avg_shot_count < 5:
+                hints.append("历史数据表明镜头数量偏少，建议增加镜头数量丰富画面。")
+            if avg_duration > 4.0:
+                hints.append("历史数据表明镜头时长偏长，建议控制每个镜头在3-5秒。")
+
+        # 3. 历史问题模式
+        historical_issues = historical_context.get("historical_issues")
+        if historical_issues and isinstance(historical_issues, list):
+            issue_types = {}
+            for issue in historical_issues[-20:]:
+                if isinstance(issue, dict):
+                    issue_type = issue.get("issue_type", {}).get("value", "unknown")
+                else:
+                    issue_type = getattr(issue, "issue_type", "unknown")
+                issue_types[issue_type] = issue_types.get(issue_type, 0) + 1
+
+            if issue_types:
+                common = ", ".join([f"{t}({c}次)" for t, c in list(issue_types.items())[:3]])
+                hints.append(f"历史分镜问题: {common}，请参考避免。")
+
+        if not hints:
+            return ""
+
+        return "\n".join([
+            "",
+            "【历史分镜参考信息】",
+            *[f"  - {hint}" for hint in hints],
+            ""
+        ])
+
 
     def _parse_ai_response(self, response: str, scene_id: str, start_time: float, shot_offset: int) -> List[ShotInfo]:
         """解析LLM响应并构建镜头列表"""

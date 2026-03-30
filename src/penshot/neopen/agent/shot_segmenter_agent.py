@@ -6,12 +6,12 @@
 @Time: 2025/10 - 2025/11
 """
 import time
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType, QualityRepairParams
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_enhancer import DurationEnhancer
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_factory import estimator_factory
@@ -57,10 +57,14 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         self._increase_shot_count = False
         self._prefer_shorter_shots = False
 
-    def process(self, structured_script: ParsedScript, repair_params: Optional[QualityRepairParams]) -> Optional[ShotSequence]:
-        if repair_params:
-            self.current_repair_params = repair_params
+        # 历史上下文相关变量
+        self._common_issue_patterns: Dict[str, int] = {}
+        self._focus_on_scene_continuity: bool = False
+        self._focus_on_character_consistency: bool = False
+        self._focus_on_shot_variety: bool = False
+        self._need_extra_validation: bool = False
 
+    def process(self, structured_script: ParsedScript) -> Optional[ShotSequence]:
         # 使用当前修复参数影响生成策略
         # if self._increase_shot_count:
         #     # 调整分镜生成器的配置
@@ -70,7 +74,21 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         #     # 调整时长阈值
         #     self.segmenter.set_max_shot_duration(4.0)  # 限制最长4秒
 
-        return self.shot_process(structured_script, repair_params)
+        # 使用历史上下文优化策略
+        if self.current_historical_context:
+            # 历史上下文已在 apply_historical_context 中处理
+            # 这里可以记录使用情况
+            debug("使用历史上下文优化分镜生成")
+
+            # 根据历史问题调整生成策略
+            if self._focus_on_shot_variety:
+                debug("启用镜头多样性增强模式")
+            if self._focus_on_character_consistency:
+                debug("启用角色一致性增强模式")
+            if self._prefer_shorter_shots:
+                debug("启用短镜头优先模式")
+
+        return self.shot_process(structured_script)
 
     def repair_result(self, shot_sequence: ShotSequence, issues: List[BasicViolation],
                       structured_script: ParsedScript) -> ShotSequence:
@@ -97,27 +115,85 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
             self._prefer_shorter_shots = True
             debug("修复参数：将缩短镜头时长")
 
+    # shot_segmenter_agent.py - 添加历史上下文回调
 
-    def shot_process(self, structured_script: ParsedScript, repair_params: Optional[QualityRepairParams]) -> Optional[ShotSequence]:
+    def _on_historical_context_applied(self) -> None:
+        """历史上下文应用后的自定义处理"""
+        if not self.current_historical_context:
+            return
+
+        insights = self.get_historical_insights()
+
+        # 1. 根据高频问题调整策略
+        high_freq_issues = insights.get("high_freq_issues", {})
+
+        if "shot_insufficient" in high_freq_issues:
+            info("根据历史经验，镜头数量不足问题频繁，将增加每个场景的镜头数")
+            self._focus_on_shot_variety = True
+            self._increase_shot_count = True
+
+        if "shot_duration_too_long" in high_freq_issues:
+            info("根据历史经验，镜头时长过长问题频繁，将缩短镜头时长")
+            self._prefer_shorter_shots = True
+
+        if "shot_type_uniform" in high_freq_issues:
+            info("根据历史经验，镜头类型单一问题频繁，将增加镜头类型多样性")
+            self._focus_on_shot_variety = True
+
+        if "character_not_in_shots" in high_freq_issues:
+            info("根据历史经验，角色缺失问题频繁，将加强角色识别")
+            self._focus_on_character_consistency = True
+
+        # 2. 根据质量等级调整
+        if self.should_use_enhanced_validation():
+            info("启用增强验证模式，将更严格检查镜头质量")
+            self._need_extra_validation = True
+
+        # 3. 应用历史统计信息
+        historical_stats = self.current_historical_context.get("historical_stats")
+        if historical_stats:
+            avg_shot_count = historical_stats.get("shot_count", 0)
+            avg_duration = historical_stats.get("avg_duration", 0)
+            debug(f"历史分镜统计: 平均镜头数={avg_shot_count}, 平均时长={avg_duration}")
+
+            if avg_shot_count < 5:
+                self._focus_on_shot_variety = True
+                debug("历史平均镜头数较少，将增加镜头数量")
+
+        # 4. 应用历史问题模式
+        historical_issues = self.current_historical_context.get("historical_issues")
+        if historical_issues:
+            debug(f"历史问题数量: {len(historical_issues)}条，将参考避免这些问题")
+
+    # shot_segmenter_agent.py - 修改 shot_process 方法
+
+    def shot_process(self, structured_script: ParsedScript) -> Optional[ShotSequence]:
         """
         规划剧本的时序分段并估算时长
 
         Args:
             structured_script: 结构化的剧本
-            repair_params: 修复参数（来自工作流）
 
         Returns:
             带时长估算的镜头序列
         """
         debug("开始拆分镜头并估算时长")
 
+        # 记录历史上下文信息
+        if self.current_historical_context:
+            debug(f"历史上下文已加载: 常见问题模式={len(self.get_historical_insights().get('common_issues', {}))}种")
+
         # 记录分割尝试
         attempt = len(self.segment_history) + 1
         self.segment_history.append({"attempt": attempt, "timestamp": time.time()})
 
         try:
-            # 1. 先生成分镜（LLM或规则）
-            shot_sequence = self.segmenter.split(structured_script, repair_params)
+            # 1. 先生成分镜（LLM或规则）- 传递历史上下文
+            shot_sequence = self.segmenter.split(
+                structured_script,
+                self.current_repair_params,
+                self.current_historical_context
+            )
 
             if not shot_sequence:
                 error("分镜生成失败")
@@ -139,11 +215,12 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
 
                 if corrections:
                     info(f"时长增强: 修正{len(corrections)}个镜头")
-                    for corr in corrections[:5]:  # 只显示前5个
+                    for corr in corrections[:5]:
                         debug(f"  {corr.shot_id}: {corr.original_duration}s -> {corr.corrected_duration}s ({corr.reasons})")
                 shot_sequence = enhanced_sequence
 
             # 4. 记录修复历史
+            repair_params = self.current_repair_params
             if repair_params and repair_params.fix_needed:
                 if "repair_history" not in shot_sequence.metadata:
                     shot_sequence.metadata["repair_history"] = []

@@ -2,6 +2,7 @@ version: "1.3"
 changelog: |
   - 2026-03-18: 规范化提示词，添加错误处理、镜头类型、完整示例和相关规则
   - 2026-03-27: 添加修复参数，通过修复建议和问题修复问题
+  - 2026-03-30: 添加 history_hint 参数，支持记忆功能的 历史上下文提示
 
 
 shot_segmenter_system:
@@ -110,6 +111,8 @@ shot_segmenter_user:
       {global_context}
     
     {repair_hint}
+    
+    {history_hint}
     
     【置信度评估】
       - 0.9-1.0: 明确对应元素，拆分决策清晰
