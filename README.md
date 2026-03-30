@@ -234,18 +234,18 @@ pip install penshot
 ### 1. 作为Python库使用
 
 ```python
-from penshot.api import PenshotFunction
+from penshot.api.function_calls import create_penshot_agent
 
 async def async_usage():
     """异步用法示例"""
-    agent = PenshotFunction(max_concurrent=5)
+    penshot = create_penshot_agent(max_concurrent=5)
 
     script = """
     早晨，一个女孩在咖啡馆读书，阳光透过窗户...
     """
 
     # 异步提交任务
-    task_id = agent.breakdown_script_async(
+    task_id = penshot.breakdown_script_async(
         script,
         callback=lambda r: print(f"回调: 任务 {r.task_id} 完成")
     )
@@ -253,11 +253,11 @@ async def async_usage():
     print(f"任务已提交: {task_id}")
 
     # 查询状态
-    status = agent.get_task_status(task_id)
+    status = penshot.get_task_status(task_id)
     print(f"初始状态: {status.get('status')}")
 
     # 等待结果
-    result = await agent.wait_for_result_async(task_id)
+    result = await penshot.wait_for_result_async(task_id)
 
     print(f"最终结果: 成功={result.success}, 状态={result.status}")
 ```
@@ -271,13 +271,10 @@ async def async_usage():
 可以通过 HTTP API 将剧本分镜智能体集成到各种 Web 应用中：
 
 ```python
-from penshot.api import PenshotFunction
+from penshot.api.function_calls import create_penshot_agent
 from penshot.neopen.task.task_models import TaskStatus
 
 def create_web_app() -> FastAPI:
-    """
-    创建 Web 应用
-    """
     app = FastAPI(
         title="Penshot 分镜生成 API",
         description="智能分镜视频生成服务",
@@ -285,7 +282,7 @@ def create_web_app() -> FastAPI:
     )
 
     # 初始化服务
-    penshot = PenshotFunction()
+    penshot = create_penshot_agent(max_concurrent=5)
 
     # 启用 CORS
     app.add_middleware(
@@ -360,9 +357,9 @@ def create_web_app() -> FastAPI:
 
 ```python
 # 使用 Python 模块方式启动 MCP Server
-python -m penshot.api.mcp_server
+python -m penshot.mcp_server
 # 或指定参数启动 MCP Server
-python -m penshot.api.mcp_server --max-concurrent 5 --queue-size 500
+python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
 客户端示例
@@ -371,7 +368,7 @@ python -m penshot.api.mcp_server --max-concurrent 5 --queue-size 500
 class MCPClient:
     """MCP 客户端 - 同步版本，Windows 兼容"""
 
-    def __init__(self, server_module: str = "penshot.api.mcp_server"):
+    def __init__(self, server_module: str = "penshot.mcp_server"):
         self.server_module = server_module
         self.process: Optional[subprocess.Popen] = None
         self._request_id = 0
@@ -456,19 +453,16 @@ class MCPClient:
 
         return response
 
-    def breakdown_script(self, script: str, language: str = "zh", wait: bool = False, timeout: int = 300) -> dict:
+    def breakdown_script(self, script: str, wait: bool = False, timeout: int = 300) -> dict:
         """拆分剧本"""
         result = self._call("tools/call", {
             "name": "breakdown_script",
             "arguments": {
                 "script": script.strip(),
-                "language": language,
                 "wait": wait,
                 "timeout": timeout
             }
         })
-
-        print(f"   [DEBUG] 原始响应: {result}")
 
         if "error" in result:
             raise Exception(result["error"]["message"])
@@ -478,7 +472,6 @@ class MCPClient:
             text_content = content[0]["text"]
             try:
                 parsed = json.loads(text_content)
-                print(f"   [DEBUG] 解析后: {parsed}")
                 return parsed
             except json.JSONDecodeError:
                 print(f"   [DEBUG] JSON解析失败，原始文本: {text_content}")

@@ -204,7 +204,7 @@ Configuration notes:
 >    LLM__DEFAULT__MODEL_NAME=gpt-4-turbo-preview
 >    LLM__DEFAULT__TIMEOUT=30
 >    LLM__DEFAULT__MAX_TOKENS=4000
->                
+>                      
 >    # ================= LLM Backup config =================
 >    LLM__FALLBACK__BASE_URL=http://localhost:11434
 >    LLM__FALLBACK__MODEL_NAME=qwen3:4b
@@ -219,11 +219,10 @@ Configuration notes:
 ### 1. Use as a Python library
 
 ```python
-from penshot.api import PenshotFunction
-from penshot.neopen.shot_language import Language
+from penshot.api.function_calls import create_penshot_agent
 
 async def async_usage():
-    agent = PenshotFunction(language=Language.EN, max_concurrent=5)
+    agent = create_penshot_agent(language=Language.EN, max_concurrent=5)
 
     script = """
 	In the morning, a girl was reading in a coffee shop, with sunlight streaming through the window....
@@ -249,7 +248,7 @@ async def async_usage():
 You can expose a simple HTTP API endpoint to call the storyboard generator:
 
 ```python
-from penshot.api import PenshotFunction
+from penshot.api.function_calls import create_penshot_agent
 from penshot.neopen.shot_language import Language
 from penshot.neopen.task.task_models import TaskStatus
 
@@ -261,7 +260,7 @@ def create_web_app() -> FastAPI:
         redoc_url="/redoc"
     )
 
-    penshot = PenshotFunction()
+    penshot = create_penshot_agent(language=Language.EN, max_concurrent=5)
 
     # CORS
     app.add_middleware(
@@ -276,8 +275,7 @@ def create_web_app() -> FastAPI:
     async def generate_storyboard(request: ScriptRequest):
         try:
             task_id = penshot.breakdown_script_async(
-                script_text=request.script_text,
-                language=Language.EN
+                script_text=request.script_text
             )
 
             return TaskResponse(
@@ -332,16 +330,16 @@ Sample code: [video-shot-agent/example/mcp_client.py at main · neopen/video-sho
 
 ```python
 # start MCP Server
-python -m penshot.api.mcp_server
+python -m penshot.mcp_server
 # or
-python -m penshot.api.mcp_server --max-concurrent 5 --queue-size 500
+python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
 MCPClient
 
 ```python
 class MCPClient:
-    def __init__(self, server_module: str = "penshot.api.mcp_server"):
+    def __init__(self, server_module: str = "penshot.mcp_server"):
         self.server_module = server_module
         self.process: Optional[subprocess.Popen] = None
         self._request_id = 0
