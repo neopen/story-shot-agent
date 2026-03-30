@@ -51,13 +51,17 @@ class ResultStorage:
         # 返回完整的结果文件路径
         return os.path.join(uuid_dir, result_filename)
 
-    def save_obj_result(self, uuid: str, result_data: Any,
-                        result_filename: str):
+    def save_obj(self, uuid: str, result_data: Any):
+            # 转换为字典
+        return self.save_json_result(uuid, obj_to_dict(result_data), f"{uuid}.json")
+
+    def save_obj_result(self, uuid: str, result_data: Any, result_filename: str):
+            # 转换为字典
+        return self.save_json_result(uuid, obj_to_dict(result_data), result_filename)
+
+    def save_json_result(self, uuid: str, data_dict: Dict[str, Any], result_filename: str):
         """保存json"""
         try:
-            # 转换为字典
-            data_dict = obj_to_dict(result_data)
-
             # 递归检查并处理可能被截断的字符串
             self._ensure_string_integrity(data_dict)
 
