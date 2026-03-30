@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
 
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, BasicViolation, QualityRepairParams
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence
@@ -33,8 +33,6 @@ class ScriptParsingState(BaseModel):
     parsed_script: ParsedScript = None  # 结构化剧本
     parse_errors: List[str] = []  # 解析错误信息
     parse_warnings: List[str] = []  # 解析警告信息
-    parse_stats: Dict[str, Any] = field(default_factory=dict)  # 解析统计信息
-    parse_issues: List[BasicViolation] = field(default_factory=list)  # 解析过程中的问题
 
 
 class ShotGeneratorState(BaseModel):
@@ -42,24 +40,18 @@ class ShotGeneratorState(BaseModel):
     shot_sequence: ShotSequence = None  # 镜头序列
     current_shot_index: int = None  # 当前处理的镜头索引
     shot_errors: Dict[str, List] = None  # 按镜头存储的错误
-    segment_stats: Dict[str, Any] = field(default_factory=dict)  # 分镜统计信息
-    segment_issues: List[BasicViolation] = field(default_factory=list)  # 分镜过程中的问题
 
 
 class VideoSegmenterState(BaseModel):
     """视频拆分相关状态"""
     fragment_sequence: FragmentSequence = None  # AI视频片段序列
     fragment_quality_scores: Dict[str, float] = None  # 片段质量评分
-    split_stats: Dict[str, Any] = field(default_factory=dict)  # 分割统计信息
-    split_issues: List[BasicViolation] = field(default_factory=list)  # 分割过程中的问题
 
 
 class PromptConverterState(BaseModel):
     """指令转换相关状态"""
     instructions: AIVideoInstructions = None  # AI生成指令
     prompt_templates_used: List[str] = None  # 使用的Prompt模板
-    convert_stats: Dict[str, Any] = field(default_factory=dict)  # 转换统计信息
-    convert_issues: List[BasicViolation] = field(default_factory=list)  # 转换过程中的问题
 
 
 class QualityAuditorState(BaseModel):
@@ -134,7 +126,6 @@ class WorkflowState(InputState, ScriptParsingState, ShotGeneratorState, NodeLoop
 
     # === 连续性管理 ===
     continuity_state: Optional[Dict] = {}  # 当前连续性状态
-    continuity_issues: Optional[List] = field(default_factory=list)  # 连续性问题列表
     continuity_anchors: Optional[Dict] = {}  # 连续性锚点映射
     continuity_passed: bool = False
     continuity_retry_count: int = 0
@@ -155,14 +146,12 @@ class WorkflowState(InputState, ScriptParsingState, ShotGeneratorState, NodeLoop
 
     # 审查
     audit_history: List[Dict[str, Any]] = []  # 质量审查历史记录
-    audit_executed: bool = False            #
+    audit_executed: bool = False  #
     audit_timestamp: Optional[str] = None
-    last_audit_result: Optional[Dict] = None  # 上一次质量审查结果
 
     # 修复
     fix_summary: Optional[Dict[str, Any]] = {}
-    repair_params: Dict[PipelineNode, QualityRepairParams] = {} # 按来源的修复参数
-    repair_history: List[Dict[str, Any]] = [] # 修复记录
+    repair_params: Dict[PipelineNode, QualityRepairParams] = {}  # 按来源的修复参数
 
     # 节点执行历史
     node_execution_history: Optional[List[Dict]] = []
