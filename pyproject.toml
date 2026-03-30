@@ -7,7 +7,7 @@ version = {attr = "penshot.__version__"}
 
 [project]
 name = "penshot"
-version = "0.2.1"
+version = "0.2.2"
 description = "长剧本分镜智能体：支持将任意自然语言剧本，转换为结构化分镜数据，支持视频生成与编辑。"
 readme = "README.md"
 authors = [
