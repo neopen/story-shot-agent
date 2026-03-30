@@ -39,7 +39,8 @@ class LLMScriptParser(BaseScriptParser, BaseLLMAgent):
             "default": self._get_default_prompt()
         }
 
-    def parser(self, script_text: Any, script_format: ScriptType, repair_params: Optional[QualityRepairParams]) -> Optional[ParsedScript]:
+    def parser(self, script_text: Any, script_format: ScriptType,
+               repair_params: Optional[QualityRepairParams], historical_context: Optional[Dict[str, Any]]) -> Optional[ParsedScript]:
 
         """
         优化版剧本解析函数
@@ -48,6 +49,8 @@ class LLMScriptParser(BaseScriptParser, BaseLLMAgent):
         Args:
             script_text: 原始剧本文本
             script_format: 原始剧本类型
+            repair_params: 修复参数
+            historical_context: 历史上下文（来自记忆模块）
 
         Returns:
             结构化的剧本动作序列
@@ -70,14 +73,19 @@ class LLMScriptParser(BaseScriptParser, BaseLLMAgent):
                     请根据上述建议调整解析策略，避免再次出现相同问题。
                 """
 
+        # 构建历史上下文提示
+        history_hint = ""
+        if historical_context:
+            history_hint = self._build_history_hint(historical_context)
+
         # 构建用户提示词
         prompt_template = self._build_user_prompt(script_text, script_format)
 
-        # if repair_params and repair_params.fix_needed and repair_params.issue_types:
-        #     user_prompt = prompt_template.format(script_text=script_text
-        #                                          , issue_types=', '.join(repair_params.issue_types), suggestions=repair_params.suggestions)
-
-        user_prompt = prompt_template.format(script_text=script_text, repair_hint=repair_hint)
+        user_prompt = prompt_template.format(
+            script_text=script_text,
+            repair_hint=repair_hint,
+            history_hint=history_hint
+        )
 
         debug(f"AI系统提示词（摘要）: {system_prompt[:150]}...")
         debug(f"AI用户提示词（摘要）: {user_prompt[:150]}...")
@@ -98,6 +106,59 @@ class LLMScriptParser(BaseScriptParser, BaseLLMAgent):
             warning("剧本解析结果可能存在问题")
 
         return parsed_script
+
+    def _build_history_hint(self, historical_context: Dict[str, Any]) -> str:
+        """构建历史上下文提示"""
+        if not historical_context:
+            return ""
+
+        hints = []
+
+        # 1. 常见问题模式
+        common_issues = historical_context.get("common_issues")
+        if common_issues and isinstance(common_issues, list):
+            issue_counts = {}
+            for issue in common_issues[-30:]:
+                if isinstance(issue, dict):
+                    issue_type = issue.get("issue_type", {}).get("value", "unknown")
+                else:
+                    issue_type = getattr(issue, "issue_type", "unknown")
+                    if hasattr(issue_type, "value"):
+                        issue_type = issue_type.value
+                issue_counts[issue_type] = issue_counts.get(issue_type, 0) + 1
+
+            sorted_issues = sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)
+            top_issues = [f"{t}({c}次)" for t, c in sorted_issues[:3]]
+
+            if top_issues:
+                hints.append(f"常见问题类型: {', '.join(top_issues)}，请特别注意避免这些问题。")
+
+        # 2. 历史统计信息
+        historical_stats = historical_context.get("historical_stats")
+        if historical_stats and isinstance(historical_stats, dict):
+            avg_completeness = historical_stats.get("completeness_score", 0)
+            if avg_completeness < 0.6:
+                hints.append(f"历史解析平均完整度较低({avg_completeness:.0%})，请提高解析质量。")
+            elif avg_completeness < 0.8:
+                hints.append(f"历史解析平均完整度为{avg_completeness:.0%}，请关注关键字段识别。")
+
+        # 3. 最近策略建议
+        recent_strategy = historical_context.get("recent_strategy")
+        if recent_strategy and isinstance(recent_strategy, dict):
+            strategy_hint = recent_strategy.get("suggestion") or recent_strategy.get("strategy")
+            if strategy_hint:
+                hints.append(f"参考最近成功策略: {strategy_hint}")
+
+        if not hints:
+            return ""
+
+        return "\n".join([
+            "",
+            "【历史参考信息】",
+            *[f"  - {hint}" for hint in hints],
+            ""
+        ])
+
 
     def _get_default_prompt(self) -> str:
         """获取默认系统提示词"""

@@ -13,7 +13,7 @@ from penshot.logger import debug, info, warning
 from penshot.neopen.agent.script_parser.llm_script_parser import LLMScriptParser
 from .base_models import AgentMode, ScriptType, ElementType
 from .base_repairable_agent import BaseRepairableAgent
-from .quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType, QualityRepairParams
+from .quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType
 from .script_parser.rule_script_parser import RuleScriptParser
 from .script_parser.script_parser_models import ParsedScript, SceneInfo, CharacterInfo, CharacterType
 from .workflow.workflow_models import PipelineNode
@@ -44,11 +44,16 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         self.parsing_history = []
         self.last_parsed_script = None
 
-    def process(self, script_text: str, repair_params: Optional[QualityRepairParams]) -> Optional[ParsedScript]:
-        if repair_params:
-            self.current_repair_params = repair_params
+    def process(self, script_text: str) -> Optional[ParsedScript]:
+        """
+            处理剧本解析
 
-        return self.parser_process(script_text, repair_params)
+            Args:
+                script_text: 原始剧本文本
+
+            """
+
+        return self.parser_process(script_text)
 
     def repair_result(self, parsed_script: ParsedScript, issues: List[BasicViolation],
                       original_text: str = None) -> ParsedScript:
@@ -57,14 +62,46 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
     def detect_issues(self, parsed_script: ParsedScript, original_text: str) -> List[BasicViolation]:
         return self.detect_parse_issues(parsed_script, original_text)
 
-    def parser_process(self, script_text: str, repair_params: Optional[QualityRepairParams]) -> Optional[ParsedScript]:
+    def _on_historical_context_applied(self) -> None:
+        """历史上下文应用后的自定义处理"""
+        insights = self.get_historical_insights()
+
+        # 根据高频问题调整策略
+        high_freq_issues = insights.get("high_freq_issues", {})
+        if "scene_insufficient" in high_freq_issues:
+            info("根据历史经验，将加强场景识别")
+            # 可以设置内部标志或调整提示词
+
+        if "character_missing" in high_freq_issues:
+            info("根据历史经验，将加强角色识别")
+
+        if "dialogue_missing" in high_freq_issues:
+            info("根据历史经验，将加强对话识别")
+
+        # 根据质量等级调整
+        if self.should_use_enhanced_validation():
+            info("启用增强验证模式")
+
+    def _on_repair_params_applied(self) -> None:
+        """修复参数应用后的回调方法"""
+        if not self.current_repair_params:
+            return
+
+        info(f"应用修复参数: {self.current_repair_params.issue_types}")
+
+        # 可根据修复参数调整解析策略
+        if "scene_insufficient" in self.current_repair_params.issue_types:
+            self._focus_on_scene_detection = True
+        if "character_missing" in self.current_repair_params.issue_types:
+            self._focus_on_character_detection = True
+
+    def parser_process(self, script_text: str) -> Optional[ParsedScript]:
         """
         优化版剧本解析函数
         将整段中文剧本转换为结构化动作序列
 
         Args:
             script_text: 原始剧本文本
-            repair_params: 修复参数（来自工作流）
 
         Returns:
             结构化的剧本动作序列
@@ -81,7 +118,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
 
         # 步骤2：AI深度解析（如果提供了修复参数，传递给LLM）
         debug(" 调用AI进行深度解析...")
-        parsed_script = self.script_parser.get(AgentMode.LLM).parser(script_text, format_type, repair_params)
+        parsed_script = self.script_parser.get(AgentMode.LLM).parser(
+            script_text, format_type, self.current_repair_params, self.current_historical_context
+        )
 
         # 步骤3：规则校验和补全
         if self.use_local_rules:

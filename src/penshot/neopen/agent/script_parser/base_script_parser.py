@@ -27,7 +27,8 @@ class BaseScriptParser(ABC):
         self.complexity_assessor = ComplexityAssessor()
 
     @abstractmethod
-    def parser(self, script_text: Any, script_format: ScriptType, repair_params: Optional[QualityRepairParams]) -> ParsedScript:
+    def parser(self, script_text: Any, script_format: ScriptType
+               , repair_params: Optional[QualityRepairParams], historical_context: Optional[Dict[str, Any]]) -> ParsedScript:
         """处理输入数据（子类实现）"""
         raise NotImplementedError("子类必须实现process方法")
 

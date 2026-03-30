@@ -291,10 +291,10 @@ script_parser_user:
 
     {repair_hint}
     
+    {history_hint}
     
     【剧本内容】
     {script_text}
-    
     
     【音频解析规则】
       1. 环境音识别：
