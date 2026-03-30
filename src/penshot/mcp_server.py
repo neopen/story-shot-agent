@@ -10,17 +10,18 @@ import json
 import logging
 import sys
 
-# 重定向所有日志到 stderr
-logging.basicConfig(
-    stream=sys.stderr,
-    level=logging.WARNING,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+def setLog():
+    # 重定向所有日志到 stderr
+    logging.basicConfig(
+        stream=sys.stderr,
+        level=logging.WARNING,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
-# 禁用其他模块的日志输出
-logging.getLogger("PenShot").setLevel(logging.WARNING)
-logging.getLogger("langchain").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.WARNING)
+    # 禁用其他模块的日志输出
+    logging.getLogger("PenShot").setLevel(logging.WARNING)
+    logging.getLogger("langchain").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class PenshotMCPServer:
@@ -30,6 +31,8 @@ class PenshotMCPServer:
         # 延迟导入
         from penshot.api.function_calls import create_penshot_agent
         from penshot.neopen.shot_language import Language
+
+        setLog()
 
         # 所有初始化日志输出到 stderr
         sys.stderr.write(f"Penshot MCP Server initializing...\n")

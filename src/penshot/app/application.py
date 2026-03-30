@@ -18,7 +18,7 @@ import traceback
 #
 # 导入模型API路由器
 from penshot.api.index_api import router as index_router
-from penshot.api.rest_server import router as rest_router
+from penshot.api.rest_api import router as rest_router
 from penshot.config.config import settings
 from penshot.logger import error
 from penshot.neopen.shot_context import RequestContextMiddleware

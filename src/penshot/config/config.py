@@ -359,7 +359,7 @@ class Settings(BaseSettings):
 
     def get_embedding_config(self, provider: str = "default") -> EmbeddingProviderConfig:
         """获取嵌入模型配置"""
-        return self.embedding.fallback if provider == "fallback" else self.embedding.default
+        return self.embed.fallback if provider == "fallback" else self.embed.default
 
     def get_config_summary(self) -> Dict[str, Any]:
         """获取当前配置摘要（用于日志/调试）"""
@@ -376,8 +376,8 @@ class Settings(BaseSettings):
                 "fallback_model": self.llm.fallback.model_name if self.llm.fallback else None,
             },
             "embedding": {
-                "default_model": self.embedding.default.model_name,
-                "fallback_model": self.embedding.fallback.model_name if self.embedding.fallback else None,
+                "default_model": self.embed.default.model_name,
+                "fallback_model": self.embed.fallback.model_name if self.embed.fallback else None,
             },
             "storyboard": {
                 "max_shots": self.storyboard.structure.max_shots,

@@ -6,16 +6,16 @@
 @Time: 2026/1/9 21:23
 """
 import time
+from abc import ABC
 from typing import Any, Dict, Optional
 
-from penshot.neopen.agent.base_agent import BaseAgent
 from penshot.neopen.agent.script_parser.script_parser_models import GlobalMetadata, ParsedScript
 from penshot.neopen.client.client_factory import llm_chat_complete
 from penshot.neopen.prompts.prompts_manager import prompt_manager
 from penshot.neopen.tools.json_parser_tool import parse_json_response
 
 
-class BaseLLMAgent(BaseAgent):
+class BaseLLMAgent(ABC):
 
     def _get_prompt_template(self, key_name) -> str:
         """创建LLM提示词模板"""
