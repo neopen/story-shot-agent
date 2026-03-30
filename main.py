@@ -18,7 +18,7 @@ import signal
 import sys
 from pathlib import Path
 
-from scripts.setup_env import AppBaseEnv
+from penshot.app.setup_env import AppBaseEnv
 from penshot.app import app
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, get_logging_manager

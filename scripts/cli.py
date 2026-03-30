@@ -420,7 +420,7 @@ def cmd_serve(args):
     print_info("启动中... (按 Ctrl+C 停止)")
 
     try:
-        from penshot.api.mcp_server import run_mcp_server
+        from penshot.mcp_server import run_mcp_server
         run_mcp_server()
     except KeyboardInterrupt:
         print("\n")
