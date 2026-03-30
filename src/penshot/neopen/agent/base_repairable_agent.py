@@ -25,7 +25,14 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
     def __init__(self):
         """初始化"""
         self.repair_history: List[Dict[str, Any]] = []
+        # repair_params: 修复参数（来自工作流）
         self.current_repair_params: Optional[QualityRepairParams] = None
+        """
+            historical_context: 历史上下文（来自记忆模块）
+                - recent_strategy: 最近解析策略
+                - historical_stats: 历史解析统计
+                - common_issues: 常见问题模式
+        """
         self.current_historical_context: Optional[Dict[str, Any]] = None
 
         # 历史上下文分析结果（子类可使用）
@@ -213,10 +220,12 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
         ])
 
     def clear_historical_context(self) -> None:
-        """清空历史上下文"""
+        """清空历史上下文（节点成功完成后调用）"""
         self.current_historical_context = None
         self._historical_insights = {}
         self._context_applied = False
+        debug("历史上下文已清空")
+
 
     def apply_repair_params(self, node: PipelineNode, repair_params: QualityRepairParams) -> None:
         """
@@ -279,3 +288,10 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
     def clear_repair_history(self):
         """清空修复历史"""
         self.repair_history = []
+
+    def clear_all_state(self) -> None:
+        """清空所有临时状态（任务完成时调用）"""
+        self.clear_repair_params()
+        self.clear_historical_context()
+        self.repair_history.clear()
+

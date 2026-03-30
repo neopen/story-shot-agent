@@ -72,100 +72,66 @@ class WorkflowNodes:
         """
         剧本解析节点（增强版）
         功能：将原始剧本解析为结构化元素序列，支持修复参数
-
-        新增功能：
-        - 支持修复参数传递（来自质量审查的修复建议）
-        - 记录解析过程中的问题
-        - 更新修复历史
         """
         try:
-            # 回忆历史解析经验
+            # ========== 1. 加载历史上下文 ==========
             recent_strategy = self.memory.recall("parsing_strategy_recent", memory_type=MemoryType.SHORT)
             historical_stats = self.memory.recall("stats_parse_script", memory_type=MemoryType.MEDIUM)
             common_issues = self.memory.recall("common_parse_issues", memory_type=MemoryType.LONG)
 
-            # 构建历史上下文
             historical_context = {
                 "recent_strategy": recent_strategy,
                 "historical_stats": historical_stats,
                 "common_issues": common_issues
             }
 
-            self.script_parser.apply_historical_context(historical_context)
+            # 只有存在有效内容时才应用历史上下文
+            if historical_context and any(historical_context.values()):
+                self.script_parser.apply_historical_context(historical_context)
 
-            # 检查是否有修复参数需要传递
+            # ========== 2. 加载修复参数 ==========
             repair_params = state.repair_params.get(PipelineNode.PARSE_SCRIPT, None)
-
             if repair_params:
                 self.script_parser.apply_repair_params(PipelineNode.PARSE_SCRIPT, repair_params)
-                # 记忆模块替代 repair_history
-                self.memory.remember(
-                    f"repair_{PipelineNode.PARSE_SCRIPT.value}",
-                    {
-                        "timestamp": datetime.now().isoformat(),
-                        "issue_types": repair_params.issue_types,
-                        "suggestions": repair_params.suggestions,
-                        "success": True
-                    },
-                    memory_type=MemoryType.MEDIUM
-                )
 
+                info(f"剧本解析节点收到修复参数，问题类型: {repair_params.issue_types}")
+                if repair_params.suggestions:
+                    info(f"修复建议: {repair_params.suggestions}")
             else:
                 debug("剧本解析节点执行（无修复参数）")
 
-            # 执行剧本解析（传入修复参数）
-            parsed_script = self.script_parser.process(
-                state.raw_script
-            )
+            # ========== 3. 执行解析 ==========
+            parsed_script = self.script_parser.process(state.raw_script)
 
             debug(f"剧本解析完成，场景数: {len(parsed_script.scenes)}，角色数: {len(parsed_script.characters)}")
             debug(f"完整性评分: {parsed_script.stats.get('completeness_score', 0)}")
 
-            # 保存剧本解析结果
+            # ========== 4. 保存结果 ==========
             self.storage.save_obj_result(state.task_id, parsed_script, "script_parser_result.json")
 
-            # 检测解析过程中发现的问题（用于后续质量审查）
+            # ========== 5. 问题检测与记忆存储 ==========
             parse_issues = self.script_parser.detect_issues(parsed_script, state.raw_script)
             if parse_issues:
-                debug(f"解析过程发现问题: {len(parse_issues)}个")
-                # 用记忆模块替代 parse_issues 存储
+                # 短期记忆：当前任务的问题
                 self.memory.remember(
                     f"issues_{PipelineNode.PARSE_SCRIPT.value}",
                     [issue.dict() for issue in parse_issues],
                     memory_type=MemoryType.SHORT
                 )
 
-                existing_common = self.memory.recall("common_parse_issues", memory_type=MemoryType.LONG)
-                if existing_common:
-                    # 合并并去重
-                    all_issues = existing_common + [issue.dict() for issue in parse_issues]
-                    # 只保留最近100条
-                    if len(all_issues) > 100:
-                        all_issues = all_issues[-100:]
-                    self.memory.remember("common_parse_issues", all_issues, memory_type=MemoryType.LONG)
-                else:
-                    self.memory.remember(
-                        "common_parse_issues",
-                        [issue.dict() for issue in parse_issues],
-                        memory_type=MemoryType.LONG
-                    )
+                # 长期记忆：更新常见问题模式
+                existing_common = self.memory.recall("common_parse_issues", memory_type=MemoryType.LONG) or []
+                all_issues = existing_common + [issue.dict() for issue in parse_issues]
+                if len(all_issues) > 100:
+                    all_issues = all_issues[-100:]
+                self.memory.remember("common_parse_issues", all_issues, memory_type=MemoryType.LONG)
 
+            # ========== 6. 更新状态 ==========
             state.parsed_script = parsed_script
             state.current_stage = AgentStage.PARSER
             state.current_node = PipelineNode.PARSE_SCRIPT
 
-            # 存储本次解析经验
-            self.memory.remember(
-                f"repair_{PipelineNode.PARSE_SCRIPT.value}",
-                {
-                    "timestamp": datetime.now().isoformat(),
-                    "repair_params": repair_params.model_dump() if repair_params else None,
-                    "success": True
-                },
-                memory_type=MemoryType.MEDIUM
-            )
-
-            # 更新解析统计
+            # ========== 7. 存储解析统计（中期记忆） ==========
             current_stats = {
                 "timestamp": datetime.now().isoformat(),
                 "parse_attempts": parsed_script.stats.get("parse_attempts", 1),
@@ -181,60 +147,74 @@ class WorkflowNodes:
                 memory_type=MemoryType.MEDIUM
             )
 
-            # 改为从记忆模块获取统计信息
+            # ========== 8. 存储修复历史（中期记忆） ==========
+            self.memory.remember(
+                f"repair_{PipelineNode.PARSE_SCRIPT.value}",
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "repair_params": repair_params.model_dump() if repair_params else None,
+                    "success": True,
+                    "stats": current_stats
+                },
+                memory_type=MemoryType.MEDIUM
+            )
+
+            # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.PARSE_SCRIPT.value}", memory_type=MemoryType.MEDIUM)
             confidence = stats.get("parsing_confidence", {}).get("overall", 0) if stats else 0
             info(f"剧本解析节点完成，置信度: {confidence}")
 
+            # ========== 10. 节点成功完成，清理临时状态 ==========
+            self.script_parser.clear_repair_params()
+            self.script_parser.clear_historical_context()
+
         except Exception as e:
             print_log_exception()
-            # 捕获异常，记录错误
             error_msg = f"剧本解析失败: {str(e)}"
             error(error_msg)
             state.error = error_msg
-            # 添加到错误信息
             state.error_messages.append(error_msg)
-
-            # 记录堆栈跟踪（开发环境）
             debug(f"解析异常堆栈: {traceback.format_exc()}")
 
-            # 设置错误状态
             state.current_node = PipelineNode.PARSE_SCRIPT
             state.current_stage = AgentStage.ERROR_HANDLER
             state.error_source = PipelineNode.PARSE_SCRIPT
 
         return state
 
+
     def split_shots_node(self, state: WorkflowState) -> WorkflowState:
         """
         镜头拆分节点（增强版）
         功能：将结构化剧本拆分为视觉镜头，支持修复参数
-
-        新增功能：
-        - 支持修复参数传递（来自质量审查的修复建议）
-        - 记录分镜过程中的问题
-        - 更新修复历史
         """
         try:
-            # 回忆历史镜头拆分经验
+            # ========== 1. 加载历史上下文 ==========
             historical_shot_stats = self.memory.recall(f"stats_{PipelineNode.SEGMENT_SHOT.value}", memory_type=MemoryType.MEDIUM)
             historical_shot_issues = self.memory.recall(f"issues_{PipelineNode.SEGMENT_SHOT.value}", memory_type=MemoryType.SHORT)
             common_shot_patterns = self.memory.recall("common_shot_patterns", memory_type=MemoryType.LONG)
 
-            # 构建历史上下文
             historical_context = {
                 "historical_stats": historical_shot_stats,
                 "historical_issues": historical_shot_issues,
                 "common_patterns": common_shot_patterns
             }
-            self.shot_segmenter.apply_historical_context(historical_context)
 
-            # 检查是否有修复参数需要传递
+            # 只有存在有效内容时才应用历史上下文
+            if historical_context and any(historical_context.values()):
+                self.shot_segmenter.apply_historical_context(historical_context)
+
+            # ========== 2. 加载修复参数 ==========
             repair_params = state.repair_params.get(PipelineNode.SEGMENT_SHOT, None)
 
             if repair_params:
                 self.shot_segmenter.apply_repair_params(PipelineNode.SEGMENT_SHOT, repair_params)
-                # 记录修复来源
+
+                info(f"分镜生成节点收到修复参数，问题类型: {repair_params.issue_types}")
+                if repair_params.suggestions:
+                    info(f"修复建议: {repair_params.suggestions}")
+
+                # 记录修复来源到记忆
                 self.memory.remember(
                     f"repair_{PipelineNode.SEGMENT_SHOT.value}",
                     {
@@ -248,10 +228,8 @@ class WorkflowNodes:
             else:
                 debug("分镜生成节点执行（无修复参数）")
 
-            # 执行分镜生成（传入修复参数）
-            shot_sequence = self.shot_segmenter.process(
-                state.parsed_script
-            )
+            # ========== 3. 执行分镜生成 ==========
+            shot_sequence = self.shot_segmenter.process(state.parsed_script)
 
             if not shot_sequence:
                 raise Exception("分镜生成返回空结果")
@@ -265,25 +243,25 @@ class WorkflowNodes:
                 shot_types[shot.shot_type.value] = shot_types.get(shot.shot_type.value, 0) + 1
             debug(f"镜头类型分布: {shot_types}")
 
-            # 保存分镜结果
+            # ========== 4. 保存结果 ==========
             self.storage.save_obj_result(state.task_id, shot_sequence, "shot_segmenter_result.json")
 
-            # 检测分镜过程中发现的问题（用于后续质量审查）
+            # ========== 5. 问题检测与记忆存储 ==========
             segment_issues = self.shot_segmenter.detect_issues(shot_sequence, state.parsed_script)
             if segment_issues:
                 debug(f"分镜过程发现问题: {len(segment_issues)}个")
-                # state.segment_issues.extend(segment_issues)
                 self.memory.remember(
                     f"issues_{PipelineNode.SEGMENT_SHOT.value}",
                     [issue.dict() for issue in segment_issues],
                     memory_type=MemoryType.SHORT
                 )
 
+            # ========== 6. 更新状态 ==========
             state.shot_sequence = shot_sequence
             state.current_stage = AgentStage.SEGMENTER
             state.current_node = PipelineNode.SEGMENT_SHOT
 
-            # 更新分镜统计
+            # ========== 7. 存储分镜统计（中期记忆） ==========
             current_stats = {
                 "timestamp": datetime.now().isoformat(),
                 "shot_count": len(shot_sequence.shots),
@@ -300,20 +278,34 @@ class WorkflowNodes:
                 memory_type=MemoryType.MEDIUM
             )
 
+            # ========== 8. 存储修复历史 ==========
+            self.memory.remember(
+                f"repair_{PipelineNode.SEGMENT_SHOT.value}",
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "repair_params": repair_params.model_dump() if repair_params else None,
+                    "success": True,
+                    "stats": current_stats
+                },
+                memory_type=MemoryType.MEDIUM
+            )
+
+            # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.SEGMENT_SHOT.value}", memory_type=MemoryType.MEDIUM)
             shot_count = stats.get("shot_count", 0) if stats else 0
             info(f"分镜生成节点完成，镜头数: {shot_count}")
 
+            # ========== 10. 节点成功完成，清理临时状态 ==========
+            self.shot_segmenter.clear_repair_params()
+            self.shot_segmenter.clear_historical_context()
+
         except Exception as e:
             print_log_exception()
-            # 捕获异常，记录错误
             error_msg = f"分镜解析节点异常: {str(e)}"
             error(error_msg)
             state.error = error_msg
-            # 添加到错误信息
             state.error_messages.append(error_msg)
 
-            # 设置错误状态
             state.current_node = PipelineNode.SEGMENT_SHOT
             state.current_stage = AgentStage.ERROR_HANDLER
             state.error_source = PipelineNode.SEGMENT_SHOT
@@ -324,32 +316,33 @@ class WorkflowNodes:
         """
         AI分段节点（增强版）
         功能：将镜头按限制切分为AI可处理的片段，支持修复参数
-
-        新增功能：
-        - 支持修复参数传递（来自质量审查的修复建议）
-        - 记录分割过程中的问题
-        - 更新修复历史
         """
         try:
-            # 回忆历史分割经验
+            # ========== 1. 加载历史上下文 ==========
             historical_split_stats = self.memory.recall(f"stats_{PipelineNode.SPLIT_VIDEO.value}", memory_type=MemoryType.MEDIUM)
             historical_split_issues = self.memory.recall(f"issues_{PipelineNode.SPLIT_VIDEO.value}", memory_type=MemoryType.SHORT)
             common_split_patterns = self.memory.recall("common_split_patterns", memory_type=MemoryType.LONG)
 
-            # 构建历史上下文
             historical_context = {
                 "historical_stats": historical_split_stats,
                 "historical_issues": historical_split_issues,
                 "common_patterns": common_split_patterns
             }
-            self.video_splitter.apply_historical_context(historical_context)
 
-            # 检查是否有修复参数需要传递
+            # 只有存在有效内容时才应用历史上下文
+            if historical_context and any(historical_context.values()):
+                self.video_splitter.apply_historical_context(historical_context)
+
+            # ========== 2. 加载修复参数 ==========
             repair_params = state.repair_params.get(PipelineNode.SPLIT_VIDEO, None)
 
             if repair_params:
                 self.video_splitter.apply_repair_params(PipelineNode.SPLIT_VIDEO, repair_params)
-                # 记录修复来源
+
+                info(f"视频分割节点收到修复参数，问题类型: {repair_params.issue_types}")
+                if repair_params.suggestions:
+                    info(f"修复建议: {repair_params.suggestions}")
+
                 self.memory.remember(
                     f"repair_{PipelineNode.SPLIT_VIDEO.value}",
                     {
@@ -363,7 +356,7 @@ class WorkflowNodes:
             else:
                 debug("视频分割节点执行（无修复参数）")
 
-            # 执行视频分割（传入修复参数）
+            # ========== 3. 执行视频分割 ==========
             fragment_sequence = self.video_splitter.process(
                 state.shot_sequence,
                 parsed_script=state.parsed_script,
@@ -380,28 +373,28 @@ class WorkflowNodes:
             durations = [f.duration for f in fragment_sequence.fragments]
             debug(f"时长分布: 最小={min(durations):.1f}s, 最大={max(durations):.1f}s, 平均={sum(durations) / len(durations):.1f}s")
 
-            # 保存分割结果
+            # ========== 4. 保存结果 ==========
             self.storage.save_obj_result(state.task_id, fragment_sequence, "video_splitter_result.json")
 
-            # 检测分割过程中发现的问题（用于后续质量审查）
+            # ========== 5. 问题检测与记忆存储 ==========
             split_issues = self.video_splitter.detect_issues(fragment_sequence, state.shot_sequence)
             if split_issues:
                 debug(f"分割过程发现问题: {len(split_issues)}个")
-                # state.split_issues.extend(split_issues)
                 self.memory.remember(
                     f"issues_{PipelineNode.SPLIT_VIDEO.value}",
                     [issue.dict() for issue in split_issues],
                     memory_type=MemoryType.SHORT
                 )
 
+            # ========== 6. 更新状态 ==========
             state.fragment_sequence = fragment_sequence
             state.current_stage = AgentStage.SPLITTER
             state.current_node = PipelineNode.SPLIT_VIDEO
 
-            # 如果有metadata，记录分割方法统计
+            # 获取metadata
             metadata = getattr(fragment_sequence, 'metadata', {})
 
-            # 更新分割统计
+            # ========== 7. 存储分割统计（中期记忆） ==========
             current_stats = {
                 "timestamp": datetime.now().isoformat(),
                 "fragment_count": len(fragment_sequence.fragments),
@@ -421,20 +414,34 @@ class WorkflowNodes:
                 memory_type=MemoryType.MEDIUM
             )
 
+            # ========== 8. 存储修复历史 ==========
+            self.memory.remember(
+                f"repair_{PipelineNode.SPLIT_VIDEO.value}",
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "repair_params": repair_params.model_dump() if repair_params else None,
+                    "success": True,
+                    "stats": current_stats
+                },
+                memory_type=MemoryType.MEDIUM
+            )
+
+            # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.SPLIT_VIDEO.value}", memory_type=MemoryType.MEDIUM)
             fragment_count = stats.get("fragment_count", 0) if stats else 0
             info(f"视频分割节点完成，片段数: {fragment_count}")
 
+            # ========== 10. 节点成功完成，清理临时状态 ==========
+            self.video_splitter.clear_repair_params()
+            self.video_splitter.clear_historical_context()
+
         except Exception as e:
             print_log_exception()
-            # 捕获异常，记录错误
             error_msg = f"视频分段异常: {str(e)}"
             error(error_msg)
             state.error = error_msg
-            # 添加到错误信息
             state.error_messages.append(error_msg)
 
-            # 设置错误状态
             state.current_node = PipelineNode.SPLIT_VIDEO
             state.current_stage = AgentStage.ERROR_HANDLER
             state.error_source = PipelineNode.SPLIT_VIDEO
@@ -445,32 +452,33 @@ class WorkflowNodes:
         """
         Prompt生成节点（增强版）
         功能：为每个片段生成AI视频生成提示词，支持修复参数
-
-        新增功能：
-        - 支持修复参数传递（来自质量审查的修复建议）
-        - 记录转换过程中的问题
-        - 更新修复历史
         """
         try:
-            # 回忆历史转换经验
+            # ========== 1. 加载历史上下文 ==========
             historical_convert_stats = self.memory.recall(f"stats_{PipelineNode.CONVERT_PROMPT.value}", memory_type=MemoryType.MEDIUM)
             historical_convert_issues = self.memory.recall(f"issues_{PipelineNode.CONVERT_PROMPT.value}", memory_type=MemoryType.SHORT)
             successful_prompts = self.memory.recall("successful_prompt_patterns", memory_type=MemoryType.LONG)
 
-            # 构建历史上下文
             historical_context = {
                 "historical_stats": historical_convert_stats,
                 "historical_issues": historical_convert_issues,
                 "successful_patterns": successful_prompts
             }
-            self.prompt_converter.apply_historical_context(historical_context)
 
-            # 检查是否有修复参数需要传递
+            # 只有存在有效内容时才应用历史上下文
+            if historical_context and any(historical_context.values()):
+                self.prompt_converter.apply_historical_context(historical_context)
+
+            # ========== 2. 加载修复参数 ==========
             repair_params = state.repair_params.get(PipelineNode.CONVERT_PROMPT, None)
 
             if repair_params:
                 self.prompt_converter.apply_repair_params(PipelineNode.CONVERT_PROMPT, repair_params)
-                # 记录修复来源
+
+                info(f"提示词转换节点收到修复参数，问题类型: {repair_params.issue_types}")
+                if repair_params.suggestions:
+                    info(f"修复建议: {repair_params.suggestions}")
+
                 self.memory.remember(
                     f"repair_{PipelineNode.CONVERT_PROMPT.value}",
                     {
@@ -484,7 +492,7 @@ class WorkflowNodes:
             else:
                 debug("提示词转换节点执行（无修复参数）")
 
-            # 执行提示词转换（传入修复参数）
+            # ========== 3. 执行提示词转换 ==========
             instructions = self.prompt_converter.process(
                 state.fragment_sequence,
                 parsed_script=state.parsed_script,
@@ -512,25 +520,25 @@ class WorkflowNodes:
             if styles:
                 debug(f"风格分布: {styles}")
 
-            # 保存转换结果
+            # ========== 4. 保存结果 ==========
             self.storage.save_obj_result(state.task_id, instructions, "prompt_converter_result.json")
 
-            # 检测转换过程中发现的问题（用于后续质量审查）
+            # ========== 5. 问题检测与记忆存储 ==========
             convert_issues = self.prompt_converter.detect_issues(instructions, state.fragment_sequence)
             if convert_issues:
                 debug(f"转换过程发现问题: {len(convert_issues)}个")
-                # state.convert_issues.extend(convert_issues)
                 self.memory.remember(
                     f"issues_{PipelineNode.CONVERT_PROMPT.value}",
                     [issue.dict() for issue in convert_issues],
                     memory_type=MemoryType.SHORT
                 )
 
+            # ========== 6. 更新状态 ==========
             state.instructions = instructions
             state.current_stage = AgentStage.CONVERTER
             state.current_node = PipelineNode.CONVERT_PROMPT
 
-            # 更新转换统计
+            # ========== 7. 存储转换统计（中期记忆） ==========
             current_stats = {
                 "timestamp": datetime.now().isoformat(),
                 "prompt_count": len(instructions.fragments),
@@ -549,20 +557,34 @@ class WorkflowNodes:
                 memory_type=MemoryType.MEDIUM
             )
 
+            # ========== 8. 存储修复历史 ==========
+            self.memory.remember(
+                f"repair_{PipelineNode.CONVERT_PROMPT.value}",
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "repair_params": repair_params.model_dump() if repair_params else None,
+                    "success": True,
+                    "stats": current_stats
+                },
+                memory_type=MemoryType.MEDIUM
+            )
+
+            # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.CONVERT_PROMPT.value}", memory_type=MemoryType.MEDIUM)
             prompt_count = stats.get("prompt_count", 0) if stats else 0
             info(f"提示词转换节点完成，指令数: {prompt_count}")
 
+            # ========== 10. 节点成功完成，清理临时状态 ==========
+            self.prompt_converter.clear_repair_params()
+            self.prompt_converter.clear_historical_context()
+
         except Exception as e:
             print_log_exception()
-            # 捕获异常，记录错误
             error_msg = f"片段指令转换异常: {str(e)}"
             error(error_msg)
             state.error = error_msg
-            # 添加到错误信息
             state.error_messages.append(error_msg)
 
-            # 设置错误状态
             state.current_node = PipelineNode.CONVERT_PROMPT
             state.current_stage = AgentStage.ERROR_HANDLER
             state.error_source = PipelineNode.CONVERT_PROMPT
@@ -973,6 +995,15 @@ class WorkflowNodes:
 
             # ========== 异步保存各类报告（不阻塞） ==========
             self.output_writer.save_all_reports(state, state.task_id)
+
+            # ========== 任务完成，清理所有智能体状态 ==========
+            self.script_parser.clear_all_state()
+            self.shot_segmenter.clear_all_state()
+            self.video_splitter.clear_all_state()
+            self.prompt_converter.clear_all_state()
+
+            # 可选：清理记忆模块中的短期记忆（任务级）
+            # self.memory.clear(memory_type=MemoryType.SHORT)
 
             info(f"生成输出完成，数据大小: {len(str(output_data))} 字符，阶段更新为 END")
 
