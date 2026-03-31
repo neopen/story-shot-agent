@@ -1599,23 +1599,26 @@ class WorkflowNodes:
         try:
             if self.task_manager:
                 # 使用枚举的 code 属性
-                self.task_manager.update_task_progress_detail(task_id, stage.code, progress, details)
+                self.task_manager.update_task_progress_detail(task_id, stage, progress, details)
         except Exception as e:
             warning(f"更新任务进度失败: {e}")
+            print_log_exception()
 
     def _complete_stage(self, task_id: str, stage: TaskStage, result: Dict = None):
         """完成阶段"""
         try:
             if self.task_manager:
-                self.task_manager.complete_stage(task_id, stage.code, result)
+                self.task_manager.complete_stage(task_id, stage, result)
         except Exception as e:
             warning(f"完成阶段失败: {e}")
+            print_log_exception()
 
     def _fail_stage(self, task_id: str, stage: TaskStage, error: str):
         """阶段失败"""
         try:
             if self.task_manager:
-                self.task_manager.update_task_progress_detail(task_id, TaskStage.ERROR_HANDLING.code, 0, {"error": error})
+                self.task_manager.update_task_progress_detail(task_id, TaskStage.ERROR_HANDLING, 0, {"error": error})
                 self.task_manager.fail_task(task_id, f"{stage.name}失败: {error}")
         except Exception as e:
-            warning(f"记录阶段失败失败: {e}")
+            warning(f"记录阶段失败: {e}")
+            print_log_exception()
