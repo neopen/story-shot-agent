@@ -182,8 +182,8 @@ class WorkflowNodes:
 
             # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.PARSE_SCRIPT.value}", memory_type=MemoryType.MEDIUM)
-            confidence = stats.get("parsing_confidence", {}).get("overall", 0) if stats else 0
-            info(f"剧本解析节点完成，置信度: {confidence}")
+            # confidence = stats.get("parsing_confidence", {}).get("overall", 0) if stats else 0
+            info(f"剧本解析节点完成，置信度: {stats}")
 
             # ========== 10. 节点成功完成，清理临时状态 ==========
             self.script_parser.clear_repair_params()
@@ -326,8 +326,8 @@ class WorkflowNodes:
 
             # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.SEGMENT_SHOT.value}", memory_type=MemoryType.MEDIUM)
-            shot_count = stats.get("shot_count", 0) if stats else 0
-            info(f"分镜生成节点完成，镜头数: {shot_count}")
+            # shot_count = stats.get("shot_count", 0) if stats else 0
+            info(f"分镜生成节点完成，镜头数: {stats}")
 
             # ========== 10. 节点成功完成，清理临时状态 ==========
             self.shot_segmenter.clear_repair_params()
@@ -475,8 +475,8 @@ class WorkflowNodes:
 
             # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.SPLIT_VIDEO.value}", memory_type=MemoryType.MEDIUM)
-            fragment_count = stats.get("fragment_count", 0) if stats else 0
-            info(f"视频分割节点完成，片段数: {fragment_count}")
+            # fragment_count = stats.get("fragment_count", 0) if stats else 0
+            info(f"视频分割节点完成，片段数: {stats}")
 
             # ========== 10. 节点成功完成，清理临时状态 ==========
             self.video_splitter.clear_repair_params()
@@ -631,8 +631,8 @@ class WorkflowNodes:
 
             # ========== 9. 日志输出 ==========
             stats = self.memory.recall(f"stats_{PipelineNode.CONVERT_PROMPT.value}", memory_type=MemoryType.MEDIUM)
-            prompt_count = stats.get("prompt_count", 0) if stats else 0
-            info(f"提示词转换节点完成，指令数: {prompt_count}")
+            # prompt_count = stats.get("prompt_count", 0) if stats else 0
+            info(f"提示词转换节点完成，指令数: {stats}")
 
             # ========== 10. 节点成功完成，清理临时状态 ==========
             self.prompt_converter.clear_repair_params()
@@ -704,7 +704,7 @@ class WorkflowNodes:
 
         try:
             # 执行质量审查（传入各阶段问题）
-            result = self.quality_auditor.qa_process(state.instructions, all_stage_issues, historical_context=historical_context)
+            result = self.quality_auditor.qa_process(state.instructions, all_stage_issues, historical_context)
 
             debug(f"质量审查完成:")
             debug(f"  - 审查状态: {result.status.value}")

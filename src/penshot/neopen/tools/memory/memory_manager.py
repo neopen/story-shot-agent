@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Any, Dict, List
 
+from penshot.logger import error
 from penshot.neopen.tools.memory.long_term_memory import LongTermMemory
 from penshot.neopen.tools.memory.medium_term_memory import MediumTermMemory
 from penshot.neopen.tools.memory.short_term_memory import ShortTermMemory
@@ -140,34 +141,38 @@ class MemoryManager:
             self._access_stats[key].access_count += 1
             self._access_stats[key].last_access = time.time()
 
-        # 指定类型查找
-        if memory_type:
-            if memory_type == MemoryType.MEDIUM:
-                return self.medium_term.get_stage_summary(key) or default
-            elif memory_type == MemoryType.LONG and self.long_term:
+        try:
+            # 指定类型查找
+            if memory_type:
+                if memory_type == MemoryType.MEDIUM:
+                    return self.medium_term.get_stage_summary(key) or default
+                elif memory_type == MemoryType.LONG and self.long_term:
+                    results = self.long_term.retrieve(key, k=1)
+                    if results:
+                        return results[0]["content"]
+                    return default
+                else:
+                    return self.short_term.get(key) or default
+
+            # 自动降级查找
+            # 1. 短期记忆
+            value = self.short_term.get(key)
+            if value is not None:
+                return value
+
+            # 2. 中期记忆
+            value = self.medium_term.get_stage_summary(key)
+            if value is not None:
+                return value
+
+            # 3. 长期记忆
+            if self.long_term:
                 results = self.long_term.retrieve(key, k=1)
                 if results:
                     return results[0]["content"]
-                return default
-            else:
-                return self.short_term.get(key) or default
 
-        # 自动降级查找
-        # 1. 短期记忆
-        value = self.short_term.get(key)
-        if value is not None:
-            return value
-
-        # 2. 中期记忆
-        value = self.medium_term.get_stage_summary(key)
-        if value is not None:
-            return value
-
-        # 3. 长期记忆
-        if self.long_term:
-            results = self.long_term.retrieve(key, k=1)
-            if results:
-                return results[0]["content"]
+        except Exception as e:
+            error(f"记忆检索异常: {e}")
 
         return default
 

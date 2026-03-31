@@ -27,6 +27,22 @@ class JSONObject:
         return str(self.__dict__)
 
 
+# 尝试导入 SecretStr，如果不存在则定义占位符
+try:
+    from pydantic import SecretStr
+except ImportError:
+    # 定义简单的 SecretStr 类用于类型检查
+    class SecretStr:
+        def __init__(self, value: str = ""):
+            self._value = value
+
+        def __str__(self):
+            return "**********"
+
+        def get_secret_value(self):
+            return self._value
+
+
 # ================================== obj 转 dict ==================================
 
 def obj_to_dict(
@@ -376,6 +392,17 @@ def dict_to_dataclass(data, cls) -> Any:
             return cls(**kwargs)
 
 
+def is_special_type(clazz) -> bool:
+    """检查是否为需要特殊处理的类型"""
+    # SecretStr 特殊处理
+    if clazz is SecretStr:
+        return True
+
+    # 可以扩展其他特殊类型
+    special_types = (SecretStr,)
+    return clazz in special_types
+
+
 def dict_to_obj(data: Any, clazz) -> Any:
     """将字典或其他数据结构转换为指定类型的对象。
 
@@ -385,6 +412,7 @@ def dict_to_obj(data: Any, clazz) -> Any:
     3. 增加对枚举类型的支持
     4. 更好的错误处理和类型校验
     5. 支持嵌套对象转换
+    6. 支持 SecretStr 等特殊类型
     """
     if data is None:
         return None
@@ -429,7 +457,22 @@ def dict_to_obj(data: Any, clazz) -> Any:
         except (ValueError, TypeError):
             return data
 
-    # 情况5: clazz 是普通类
+    # 情况5: clazz 是 SecretStr 等特殊类型
+    if is_special_type(clazz):
+        try:
+            # 如果已经是 SecretStr 类型，直接返回
+            if isinstance(data, SecretStr):
+                return data
+            # 如果是字符串，创建 SecretStr 实例
+            if isinstance(data, str):
+                return SecretStr(data)
+            # 如果是其他类型，尝试转换
+            return SecretStr(str(data))
+        except Exception:
+            # 转换失败，返回空 SecretStr
+            return SecretStr("")
+
+    # 情况6: clazz 是普通类
     if isinstance(clazz, type) and hasattr(clazz, '__init__'):
         # 处理基本类型：如果目标是基本类型，直接返回
         if clazz in (str, int, float, bool, complex, bytes, bytearray):
@@ -440,7 +483,6 @@ def dict_to_obj(data: Any, clazz) -> Any:
             try:
                 # 优先使用 dataclass 的字段信息
                 if is_dataclass(clazz):
-                    from dataclasses import fields
                     field_types = {f.name: f.type for f in fields(clazz)}
                 else:
                     # 使用类型注解
@@ -479,6 +521,14 @@ def dict_to_obj(data: Any, clazz) -> Any:
                     valid_params = set(sig.parameters.keys()) - {'self'}
                     filtered_kwargs = {k: v for k, v in kwargs.items()
                                        if k in valid_params}
+
+                    # 特殊处理 SecretStr 字段
+                    for param_name, param_value in filtered_kwargs.items():
+                        # 如果参数类型是 SecretStr 但值不是，进行转换
+                        param_type = field_types.get(param_name)
+                        if param_type is SecretStr and not isinstance(param_value, SecretStr):
+                            filtered_kwargs[param_name] = SecretStr(str(param_value))
+
                     return clazz(**filtered_kwargs)
                 raise
         else:
