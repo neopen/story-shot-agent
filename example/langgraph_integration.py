@@ -14,8 +14,8 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from penshot.api import PenshotFunction, PenshotResult
-from penshot.neopen import ShotConfig
-from penshot.neopen.shot_language import Language
+from penshot.config import ShotConfig
+from penshot import Language
 
 
 # ============================================================================

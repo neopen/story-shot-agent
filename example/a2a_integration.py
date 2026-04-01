@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Dict, Any, Optional, List
 
 from penshot.api import PenshotFunction, PenshotResult
-from penshot.neopen import ShotConfig
+from penshot.config import ShotConfig
 from penshot.neopen.shot_language import Language
 
 

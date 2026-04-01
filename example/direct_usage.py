@@ -7,8 +7,10 @@
 """
 import asyncio
 
+from pydantic import SecretStr
+
 from penshot.api import PenshotFunction
-from penshot.neopen import ShotConfig
+from penshot.config import EmbeddingBaseConfig, LLMBaseConfig, ShotConfig
 from penshot.neopen.shot_language import Language
 
 
@@ -138,9 +140,18 @@ async def with_custom_config():
 
     # 创建自定义配置
     custom_config = ShotConfig(
-        model_name="gpt-4",
-        temperature=0.3,
-        max_tokens=3000
+        llm=LLMBaseConfig(
+            base_url="https://api.openai.com/v1",
+            model_name="gpt-4",
+            api_key=SecretStr(""),
+            temperature=0.3,
+            max_tokens=3000
+        ),
+        embed=EmbeddingBaseConfig(
+            base_url="https://api.openai.com/v1",
+            model_name="gpt-4",
+            api_key=SecretStr(""),
+        )
     )
 
     agent = PenshotFunction(

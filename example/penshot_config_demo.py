@@ -8,8 +8,8 @@
 import asyncio
 
 from penshot.api import PenshotFunction
-from penshot.neopen import ShotConfig
-from penshot.neopen.shot_language import Language
+from penshot.config import ShotConfig
+from penshot import Language
 
 
 class ConfigFactory:

@@ -17,7 +17,7 @@ from typing import Optional
 class MCPClient:
     """MCP 客户端 - 同步版本，Windows 兼容"""
 
-    def __init__(self, server_module: str = "penshot.api.mcp_server"):
+    def __init__(self, server_module: str = "penshot.mcp_server"):
         self.server_module = server_module
         self.process: Optional[subprocess.Popen] = None
         self._request_id = 0

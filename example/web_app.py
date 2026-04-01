@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from penshot.api import PenshotFunction
-from penshot.neopen import ShotConfig
-from penshot.neopen.shot_language import Language
+from penshot.config import ShotConfig
+from penshot import Language
 from penshot.neopen.task.task_models import TaskStatus
 
 
