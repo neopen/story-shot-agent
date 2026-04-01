@@ -35,12 +35,12 @@ async def app_startup():
     data_paths = settings.get_data_paths()
     output_dir = os.path.join(PathResolver.get_project_root(), data_paths["data_output"])
     os.makedirs(output_dir, exist_ok=True)
-    # os.makedirs(data_paths["data_input"], exist_ok=True)
-    # os.makedirs(data_paths["model_cache"], exist_ok=True)
-    # os.makedirs(data_paths["embedding_cache"], exist_ok=True)
+    memory_dir = os.path.join(PathResolver.get_project_root(), data_paths["data_memory"])
+    os.makedirs(memory_dir, exist_ok=True)
+    embedding_dir = os.path.join(PathResolver.get_project_root(), data_paths["data_embedding"])
+    os.makedirs(embedding_dir, exist_ok=True)
 
     pass
-
 
 
 @asynccontextmanager

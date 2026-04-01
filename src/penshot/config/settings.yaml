@@ -102,17 +102,9 @@ paths:
   data:
     input: "./data/input"
     output: "./data/output"
+    memory: "./data/memory"
+    embedding: "./data/embedding"
     cache: "./data/cache"
-
-  models:
-    base: "./data/models"
-    embeddings: "./data/models/embeddings"
-    llm_cache: "./data/models/llm_cache"
-
-  cache:
-    base: "./data/cache"
-    embeddings: "./data/cache/embeddings"
-    llm_responses: "./data/cache/llm_responses"
 
   logs:
     base: "./logs"
