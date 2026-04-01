@@ -89,17 +89,10 @@ cp .env.example .env
 编辑 `.env` 文件，配置必要的参数：
 
 ```properties
-#  服务器主机
-API__HOST=localhost
-#  服务器端口
-API__PORT=8000
-
 ########################## LLM 模型配置 #########################
 # 系统支持的厂商（openai, qwen, deepseek, ollama）
 LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
-# LLM 厂商 KAY
 LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# LLM 厂商 模型
 LLM__DEFAULT__MODEL_NAME=qwen-plus
 
 ########################## 嵌入模型配置 #########################
@@ -171,27 +164,7 @@ curl --location --request GET 'http://localhost:8000/api/v1/result/HL20260306193
         "voice_description": "ambient sound design only, no voice, pure atmospheric field recording style",
         "emotion": "neutral"
       }
-    },
-    {
-      "fragment_id": "frag_002",
-      "prompt": "medium shot, cinematic lighting, Lin Ran curled up on a light gray fabric sofa, wrapped in a creamy off-white vintage wool blanket — thick, coarse-knit, slightly yellowed and pilled at edges, showing visible wear; she wears a neutral-toned (light gray/mushroom beige) soft cotton long-sleeve top, loose fit, subtle collar pleats, no jewelry or decoration; her expression is exhausted yet alert, eyes slightly red-rimmed, quiet emotional tension; background: modern small-city apartment living room — light gray fabric sofa, warm-toned wooden coffee table, vintage wall clock frozen at 11:00, half-drawn curtains revealing blurred neon lights and rain-streaked window; muted black-and-white old film playing silently on TV screen; ambient low-frequency rain, faint TV static hum, restrained vocal dynamic range\n\n中景，电影感布光：林然蜷坐于米灰布艺沙发中，裹着米白色旧羊毛毯——厚实粗纺、局部泛黄起球、边缘磨损，具明显生活使用痕迹；身穿中性灰/米白色素色棉质长袖上衣，宽松剪裁，领口微褶，无装饰；神情疲惫而警觉，眼眶微红，情绪张力内敛；背景为现代都市小户型客厅：米灰布艺沙发、暖调原木茶几、静止于11点的老式挂钟、半掩窗帘映出窗外模糊霓虹与雨痕；电视静音播放黑白老电影；环境音为低频雨声基底 + 微弱电视底噪 + 高度克制的人声动态范围",
-      "negative_prompt": "modern fashion clothing, bright colors, glossy textures, sharp focus on face only, text overlays, logos, cartoon style, anime, photorealistic skin imperfections, motion blur, shaky cam, high saturation, studio lighting, smiling, energetic pose, multiple people, clean unused objects",
-      "duration": 3.0,
-      "model": "runway_gen2",
-      "style": "cinematic, realistic, muted color palette, shallow depth of field, Kodak Portra 400 film grain, emotionally restrained tone",
-      "requires_special_attention": false,
-      "audio_prompt": {
-        "audio_id": "audio_002",
-        "prompt": "ambient low-frequency rainfall (intensity 0.9), distant faint television white noise (black-and-white film static), near-silence with subtle breath and micro-movement cues, highly compressed vocal dynamic range, no dialogue, immersive domestic stillness\n\n低频雨声（强度0.9）、远处微弱电视底噪（黑白电影静电声）、近乎寂静中夹杂细微呼吸与身体微动声、人声动态范围高度压缩、无台词、沉浸式居家静默氛围",
-        "negative_prompt": "dialogue, music, footsteps, door sounds, phone ring, laughter, wind, thunder, abrupt transients, high-frequency hiss, stereo panning effects",
-        "model_type": "AudioLDM_3",
-        "voice_type": "narration",
-        "audio_style": "cinematic",
-        "voice_description": "no voice, pure environmental atmosphere with ultra-low dynamic range and tactile silence",
-        "emotion": "neutral",
-        "previous_audio_id": "audio_001"
-      }
-    },
+    }，
     ......
   ]
 }
@@ -239,32 +212,28 @@ pip install penshot
 ### 1. 作为Python库使用
 
 ```python
-from penshot.api.function_calls import create_penshot_agent
+from penshot.api import create_penshot_agent
 
-async def async_usage():
-    """异步用法示例"""
-    penshot = create_penshot_agent(max_concurrent=5)
+penshot = create_penshot_agent(max_concurrent=5)
 
-    script = """
-    早晨，一个女孩在咖啡馆读书，阳光透过窗户...
-    """
+script = """
+早晨，一个女孩在咖啡馆读书，阳光透过窗户...
+"""
 
-    # 异步提交任务
-    task_id = penshot.breakdown_script_async(
-        script,
-        callback=lambda r: print(f"回调: 任务 {r.task_id} 完成")
-    )
+# 异步提交任务
+task_id = penshot.breakdown_script_async(
+    script,
+    callback=lambda r: print(f"回调: 任务 {r.task_id} 完成")
+)
 
-    print(f"任务已提交: {task_id}")
+# 查询状态
+status = penshot.get_task_status(task_id)
+print(f"初始状态: {status.get('status')}")
 
-    # 查询状态
-    status = penshot.get_task_status(task_id)
-    print(f"初始状态: {status.get('status')}")
+# 等待结果
+result = await penshot.wait_for_result_async(task_id)
 
-    # 等待结果
-    result = await penshot.wait_for_result_async(task_id)
-
-    print(f"最终结果: 成功={result.success}, 状态={result.status}")
+print(f"最终结果: 成功={result.success}, 状态={result.status}")
 ```
 
 示例代码：[video-shot-agent/example/direct_usage.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/direct_usage.py)
@@ -276,64 +245,54 @@ async def async_usage():
 可以通过 HTTP API 将剧本分镜智能体集成到各种 Web 应用中：
 
 ```python
-from penshot.api.function_calls import create_penshot_agent
-from penshot.neopen.task.task_models import TaskStatus
+from penshot.api import create_penshot_agent
+from penshot.neopen.task import TaskStatus
 
-def create_web_app() -> FastAPI:
-    app = FastAPI(
-        title="Penshot 分镜生成 API",
-        description="智能分镜视频生成服务",
-        version="0.1.0"
-    )
+app = FastAPI(
+    title="Penshot 分镜生成 API",
+    description="智能分镜视频生成服务",
+    version="0.1.0"
+)
 
-    # 初始化服务
-    penshot = create_penshot_agent(max_concurrent=5)
+# 初始化服务
+penshot = create_penshot_agent(max_concurrent=5)
 
-    # 启用 CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+@app.post("/api/generate", response_model=TaskResponse, tags=["Storyboard"])
+async def generate_storyboard(request: ScriptRequest):
+    """
+    生成视频分镜（异步）
+    """
+    try:
+        # 异步模式
+        task_id = penshot.breakdown_script_async(script_text=request.script_text)
 
-    @app.post("/api/generate", response_model=TaskResponse, tags=["Storyboard"])
-    async def generate_storyboard(request: ScriptRequest):
-        """
-        生成视频分镜（异步）
-        """
-        try:
-            # 异步模式
-            task_id = penshot.breakdown_script_async(script_text=request.script_text)
-
-            return TaskResponse(
-                task_id=task_id,
-                status=TaskStatus.PENDING,
-                message="任务已提交，请使用 /api/status/{task_id} 查询状态",
-                created_at=datetime.now(timezone.utc)
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
-            
-    @app.get("/api/result/{task_id}", response_model=TaskResultResponse, tags=["Task"])
-    async def get_task_result(task_id: str):
-        """
-        获取任务结果
-        """
-        result = penshot.get_task_result(task_id)
-
-        if not result:
-            raise HTTPException(status_code=404, detail=f"任务不存在或未完成: {task_id}")
-
-        return TaskResultResponse(
-            task_id=result.task_id,
-            success=result.success,
-            status=result.status,
-            data=result.data,
-            error=result.error,
-            processing_time_ms=result.processing_time_ms
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.PENDING,
+            message="任务已提交，请使用 /api/status/{task_id} 查询状态",
+            created_at=datetime.now(timezone.utc)
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+
+@app.get("/api/result/{task_id}", response_model=TaskResultResponse, tags=["Task"])
+async def get_task_result(task_id: str):
+    """
+    获取任务结果
+    """
+    result = penshot.get_task_result(task_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"任务不存在或未完成: {task_id}")
+
+    return TaskResultResponse(
+        task_id=result.task_id,
+        success=result.success,
+        status=result.status,
+        data=result.data,
+        error=result.error,
+        processing_time_ms=result.processing_time_ms
+    )
 ```
 
 示例代码：[video-shot-agent/example/web_app.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/web_app.py)
@@ -367,136 +326,48 @@ python -m penshot.mcp_server
 python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
-客户端示例
+客户端方法示例
 
 ```python
-class MCPClient:
-    """MCP 客户端 - 同步版本，Windows 兼容"""
-
-    def __init__(self, server_module: str = "penshot.mcp_server"):
-        self.server_module = server_module
-        self.process: Optional[subprocess.Popen] = None
-        self._request_id = 0
-        self._ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-
-    def start(self):
-        """启动 MCP Server 子进程"""
-        cmd = [sys.executable, "-m", self.server_module]
-
-        self.process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            bufsize=1
-        )
-        print(f"MCP Server 已启动，PID: {self.process.pid}")
-        time.sleep(2)
-
-    def _clean_ansi(self, text: str) -> str:
-        """清理 ANSI 转义码"""
-        return self._ansi_escape.sub('', text)
-
-    def read_json_response(self, timeout: float = 30) -> Optional[dict]:
-        """读取 JSON 响应，跳过非 JSON 行并清理 ANSI 转义码"""
-
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            try:
-                # 检查是否有数据可读（非阻塞）
-                import msvcrt
-                if msvcrt.kbhit():
-                    pass
-            except:
-                pass
-
-            # 使用非阻塞方式读取
-            try:
-                # Windows 上不能直接 select 管道，使用轮询方式
-                line = self.process.stdout.readline()
-                if line:
-                    cleaned_line = self._clean_ansi(line).strip()
-                    if cleaned_line and cleaned_line.startswith('{'):
-                        try:
-                            return json.loads(cleaned_line)
-                        except json.JSONDecodeError:
-                            continue
-            except Exception:
-                pass
-
-            # 短暂休眠，避免 CPU 占用过高
-            time.sleep(0.05)
-
-        return None
-
-    def _call(self, method: str, params: dict = None) -> dict:
-        """调用 MCP 方法"""
-        self._request_id += 1
-        request = {
-            "jsonrpc": "2.0",
-            "id": self._request_id,
-            "method": method,
-            "params": params or {}
+def breakdown_script(self, script: str, wait: bool = False, timeout: int = 300) -> dict:
+    """拆分剧本"""
+    result = self._call("tools/call", {
+        "name": "breakdown_script",
+        "arguments": {
+            "script": script.strip(),
+            "wait": wait,
+            "timeout": timeout
         }
+    })
 
-        # 发送请求
-        request_str = json.dumps(request, ensure_ascii=False)
+    if "error" in result:
+        raise Exception(result["error"]["message"])
+
+    content = result.get("result", {}).get("content", [])
+    if content and content[0].get("type") == "text":
+        text_content = content[0]["text"]
         try:
-            self.process.stdin.write(request_str + "\n")
-            self.process.stdin.flush()
-        except BrokenPipeError:
-            raise Exception("Server 进程已断开")
+            parsed = json.loads(text_content)
+            return parsed
+        except json.JSONDecodeError:
+            print(f"   [DEBUG] JSON解析失败，原始文本: {text_content}")
+            return {}
+    return {}
 
-        # 读取响应
-        response = self.read_json_response()
-        if response is None:
-            stderr = self.process.stderr.read()
-            raise Exception(f"Server 无响应: {stderr}")
+def get_task_result(self, task_id: str) -> dict:
+    """获取任务结果"""
+    result = self._call("tools/call", {
+        "name": "get_task_result",
+        "arguments": {"task_id": task_id}
+    })
 
-        return response
-
-    def breakdown_script(self, script: str, wait: bool = False, timeout: int = 300) -> dict:
-        """拆分剧本"""
-        result = self._call("tools/call", {
-            "name": "breakdown_script",
-            "arguments": {
-                "script": script.strip(),
-                "wait": wait,
-                "timeout": timeout
-            }
-        })
-
-        if "error" in result:
-            raise Exception(result["error"]["message"])
-
-        content = result.get("result", {}).get("content", [])
-        if content and content[0].get("type") == "text":
-            text_content = content[0]["text"]
-            try:
-                parsed = json.loads(text_content)
-                return parsed
-            except json.JSONDecodeError:
-                print(f"   [DEBUG] JSON解析失败，原始文本: {text_content}")
-                return {}
-        return {}
-
-    def get_task_result(self, task_id: str) -> dict:
-        """获取任务结果"""
-        result = self._call("tools/call", {
-            "name": "get_task_result",
-            "arguments": {"task_id": task_id}
-        })
-
-        content = result.get("result", {}).get("content", [])
-        if content and content[0].get("type") == "text":
-            return json.loads(content[0]["text"])
-        return {}
+    content = result.get("result", {}).get("content", [])
+    if content and content[0].get("type") == "text":
+        return json.loads(content[0]["text"])
+    return {}
 ```
 
-详细示例代码：[video-shot-agent/example/mcp_client.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
+示例代码：[video-shot-agent/example/mcp_client.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
 
 
 

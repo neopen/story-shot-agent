@@ -71,20 +71,13 @@ cp .env.example .env
 Edit the `.env` file and configure the required parameters:
 
 ```properties
-# Server host
-API__HOST=localhost
-# Server port
-API__PORT=8000
-
 ########################## LLM CONFIG #########################
 # Supported providers (openai, qwen, deepseek, ollama).
-LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+LLM__DEFAULT__BASE_URL=https://api.openai.com/v1
 LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-LLM__DEFAULT__MODEL_NAME=qwen-plus
-LLM__DEFAULT__TIMEOUT=60
-LLM__DEFAULT__MAX_TOKENS=4096
+LLM__DEFAULT__MODEL_NAME=gpt-4
 
-# ================ embedding default config ================
+# ================ Embedding config ================
 # Supported providers（openai, qwen, HuggingFace, ollama）
 EMBED__DEFAULT__BASE_URL=https://api.openai.com/v1
 EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -157,26 +150,6 @@ Example (abbreviated) JSON output structure:
         "emotion": "neutral"
       }
     },
-    {
-      "fragment_id": "frag_002",
-      "prompt": "medium shot, cinematic lighting, Lin Ran curled up on a light gray fabric sofa, wrapped in a creamy off-white vintage wool blanket — thick, coarse-knit, slightly yellowed and pilled at edges, showing visible wear; she wears a neutral-toned (light gray/mushroom beige) soft cotton long-sleeve top, loose fit, subtle collar pleats, no jewelry or decoration; her expression is exhausted yet alert, eyes slightly red-rimmed, quiet emotional tension; background: modern small-city apartment living room — light gray fabric sofa, warm-toned wooden coffee table, vintage wall clock frozen at 11:00, half-drawn curtains revealing blurred neon lights and rain-streaked window; muted black-and-white old film playing silently on TV screen; ambient low-frequency rain, faint TV static hum, restrained vocal dynamic range",
-      "negative_prompt": "modern fashion clothing, bright colors, glossy textures, sharp focus on face only, text overlays, logos, cartoon style, anime, photorealistic skin imperfections, motion blur, shaky cam, high saturation, studio lighting, smiling, energetic pose, multiple people, clean unused objects",
-      "duration": 3.0,
-      "model": "runway_gen2",
-      "style": "cinematic, realistic, muted color palette, shallow depth of field, Kodak Portra 400 film grain, emotionally restrained tone",
-      "requires_special_attention": false,
-      "audio_prompt": {
-        "audio_id": "audio_002",
-        "prompt": "ambient low-frequency rainfall (intensity 0.9), distant faint television white noise (black-and-white film static), near-silence with subtle breath and micro-movement cues, highly compressed vocal dynamic range, no dialogue, immersive domestic stillness",
-        "negative_prompt": "dialogue, music, footsteps, door sounds, phone ring, laughter, wind, thunder, abrupt transients, high-frequency hiss, stereo panning effects",
-        "model_type": "AudioLDM_3",
-        "voice_type": "narration",
-        "audio_style": "cinematic",
-        "voice_description": "no voice, pure environmental atmosphere with ultra-low dynamic range and tactile silence",
-        "emotion": "neutral",
-        "previous_audio_id": "audio_001"
-      }
-    },
     ......
   ]
 }
@@ -212,7 +185,7 @@ Configuration notes:
 >    LLM__DEFAULT__MODEL_NAME=gpt-4-turbo-preview
 >    LLM__DEFAULT__TIMEOUT=30
 >    LLM__DEFAULT__MAX_TOKENS=4000
->       
+>          
 >    # ================ embedding default config ================
 >    # Supported providers（openai, qwen, HuggingFace, ollama）
 >    EMBED__DEFAULT__BASE_URL=https://api.openai.com/v1
@@ -227,10 +200,11 @@ Configuration notes:
 ### 1. Use as a Python library
 
 ```python
-from penshot.api.function_calls import create_penshot_agent
+from penshot import ShotLanguage
+from penshot.api import create_penshot_agent
 
 async def async_usage():
-    agent = create_penshot_agent(language=Language.EN, max_concurrent=5)
+    agent = create_penshot_agent(language=ShotLanguage.EN, max_concurrent=5)
 
     script = """
 	In the morning, a girl was reading in a coffee shop, with sunlight streaming through the window....
@@ -256,9 +230,9 @@ async def async_usage():
 You can expose a simple HTTP API endpoint to call the storyboard generator:
 
 ```python
-from penshot.api.function_calls import create_penshot_agent
-from penshot.neopen.shot_language import Language
-from penshot.neopen.task.task_models import TaskStatus
+from penshot.api import create_penshot_agent
+from penshot import ShotLanguage
+from penshot.neopen.task import TaskStatus
 
 def create_web_app() -> FastAPI:
     app = FastAPI(
@@ -268,16 +242,7 @@ def create_web_app() -> FastAPI:
         redoc_url="/redoc"
     )
 
-    penshot = create_penshot_agent(language=Language.EN, max_concurrent=5)
-
-    # CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    penshot = create_penshot_agent(language=ShotLanguage.EN, max_concurrent=5)
 
     @app.post("/api/generate", response_model=TaskResponse, tags=["Storyboard"])
     async def generate_storyboard(request: ScriptRequest):
@@ -346,115 +311,40 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 MCPClient
 
 ```python
-class MCPClient:
-    def __init__(self, server_module: str = "penshot.mcp_server"):
-        self.server_module = server_module
-        self.process: Optional[subprocess.Popen] = None
-        self._request_id = 0
-        self._ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-
-    def start(self):
-        cmd = [sys.executable, "-m", self.server_module]
-
-        self.process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            bufsize=1
-        )
-
-        time.sleep(2)
-
-    def _clean_ansi(self, text: str) -> str:
-        return self._ansi_escape.sub('', text)
-
-    def read_json_response(self, timeout: float = 30) -> Optional[dict]:
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            try:
-                import msvcrt
-                if msvcrt.kbhit():
-                    pass
-            except:
-                pass
-
-            try:
-                line = self.process.stdout.readline()
-                if line:
-                    cleaned_line = self._clean_ansi(line).strip()
-                    if cleaned_line and cleaned_line.startswith('{'):
-                        try:
-                            return json.loads(cleaned_line)
-                        except json.JSONDecodeError:
-                            continue
-            except Exception:
-                pass
-
-            time.sleep(0.05)
-
-        return None
-
-    def _call(self, method: str, params: dict = None) -> dict:
-        self._request_id += 1
-        request = {
-            "jsonrpc": "2.0",
-            "id": self._request_id,
-            "method": method,
-            "params": params or {}
+def breakdown_script(self, script: str, wait: bool = False, timeout: int = 300) -> dict:
+    result = self._call("tools/call", {
+        "name": "breakdown_script",
+        "arguments": {
+            "script": script.strip(),
+            "language": "en",
+            "wait": wait,
+            "timeout": timeout
         }
+    })
 
-        request_str = json.dumps(request, ensure_ascii=False)
+    if "error" in result:
+        raise Exception(result["error"]["message"])
+
+    content = result.get("result", {}).get("content", [])
+    if content and content[0].get("type") == "text":
+        text_content = content[0]["text"]
         try:
-            self.process.stdin.write(request_str + "\n")
-            self.process.stdin.flush()
-        except BrokenPipeError:
-            raise Exception("Server 进程已断开")
+            parsed = json.loads(text_content)
+            return parsed
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
-        response = self.read_json_response()
-        if response is None:
-            stderr = self.process.stderr.read()
-            raise Exception(f"Server 无响应: {stderr}")
+def get_task_result(self, task_id: str) -> dict:
+    result = self._call("tools/call", {
+        "name": "get_task_result",
+        "arguments": {"task_id": task_id}
+    })
 
-        return response
-
-    def breakdown_script(self, script: str, wait: bool = False, timeout: int = 300) -> dict:
-        result = self._call("tools/call", {
-            "name": "breakdown_script",
-            "arguments": {
-                "script": script.strip(),
-                "language": "en",
-                "wait": wait,
-                "timeout": timeout
-            }
-        })
-
-        if "error" in result:
-            raise Exception(result["error"]["message"])
-
-        content = result.get("result", {}).get("content", [])
-        if content and content[0].get("type") == "text":
-            text_content = content[0]["text"]
-            try:
-                parsed = json.loads(text_content)
-                return parsed
-            except json.JSONDecodeError:
-                return {}
-        return {}
-
-    def get_task_result(self, task_id: str) -> dict:
-        result = self._call("tools/call", {
-            "name": "get_task_result",
-            "arguments": {"task_id": task_id}
-        })
-
-        content = result.get("result", {}).get("content", [])
-        if content and content[0].get("type") == "text":
-            return json.loads(content[0]["text"])
-        return {}
+    content = result.get("result", {}).get("content", [])
+    if content and content[0].get("type") == "text":
+        return json.loads(content[0]["text"])
+    return {}
 ```
 
 

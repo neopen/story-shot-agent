@@ -43,11 +43,17 @@ pip install dashscope
 创建 `.env` 文件配置 LLM：
 
 ```properties
-# LLM 配置
+########################## LLM CONFIG #########################
+# Supported providers (openai, qwen, deepseek, ollama).
 LLM__DEFAULT__BASE_URL=https://api.openai.com/v1
 LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-LLM__DEFAULT__MODEL_NAME=gpt-4-turbo-preview
-LLM__DEFAULT__TIMEOUT=60
+LLM__DEFAULT__MODEL_NAME=gpt-4
+
+# ================ Embedding config ================
+# Supported providers（openai, qwen, HuggingFace, ollama）
+EMBED__DEFAULT__BASE_URL=https://api.openai.com/v1
+EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
 ```
 
 ## 使用方式
@@ -57,30 +63,28 @@ LLM__DEFAULT__TIMEOUT=60
 最简单的使用方式，直接作为 Python 库调用：
 
 ```python
-from penshot.api.function_calls import create_penshot_agent
+from penshot.api import create_penshot_agent
 
 async def async_usage():
     """异步用法示例"""
-    agent = create_penshot_agent()
+    penshot = create_penshot_agent(max_concurrent=5)
 
     script = """
     早晨，一个女孩在咖啡馆读书，阳光透过窗户...
     """
 
     # 异步提交任务
-    task_id = agent.breakdown_script_async(
+    task_id = penshot.breakdown_script_async(
         script,
         callback=lambda r: print(f"回调: 任务 {r.task_id} 完成")
     )
 
-    print(f"任务已提交: {task_id}")
-
     # 查询状态
-    status = agent.get_task_status(task_id)
+    status = penshot.get_task_status(task_id)
     print(f"初始状态: {status.get('status')}")
 
     # 等待结果
-    result = await agent.wait_for_result_async(task_id)
+    result = await penshot.wait_for_result_async(task_id)
 
     print(f"最终结果: 成功={result.success}, 状态={result.status}")
 ```
@@ -158,25 +162,86 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 #### Python MCP 客户端示例
 
 ```python
+"""
+@FileName: mcp_client.py
+@Description: MCP Client 测试脚本 - Windows 兼容版
+@Author: HiPeng
+@Github: https://github.com/neopen/video-shot-agent
+@Time: 2026/3/30
+"""
+
+import json
+import re
+import subprocess
+import sys
+import time
+from typing import Optional
+
+
 class MCPClient:
-    def __init__(self, server_module="penshot.mcp_server"):
+    """MCP 客户端 - 同步版本，Windows 兼容"""
+
+    def __init__(self, server_module: str = "penshot.mcp_server"):
         self.server_module = server_module
-        self.process = None
+        self.process: Optional[subprocess.Popen] = None
         self._request_id = 0
+        self._ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
     def start(self):
+        """启动 MCP Server 子进程"""
         cmd = [sys.executable, "-m", self.server_module]
+
         self.process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            bufsize=1
         )
+        print(f"MCP Server 已启动，PID: {self.process.pid}")
         time.sleep(2)
 
-    def _call(self, method, params=None):
+    def _clean_ansi(self, text: str) -> str:
+        """清理 ANSI 转义码"""
+        return self._ansi_escape.sub('', text)
+
+    def read_json_response(self, timeout: float = 30) -> Optional[dict]:
+        """读取 JSON 响应，跳过非 JSON 行并清理 ANSI 转义码"""
+
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            try:
+                # 检查是否有数据可读（非阻塞）
+                import msvcrt
+                if msvcrt.kbhit():
+                    pass
+            except:
+                pass
+
+            # 使用非阻塞方式读取
+            try:
+                # Windows 上不能直接 select 管道，使用轮询方式
+                line = self.process.stdout.readline()
+                if line:
+                    cleaned_line = self._clean_ansi(line).strip()
+                    if cleaned_line and cleaned_line.startswith('{'):
+                        try:
+                            return json.loads(cleaned_line)
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                pass
+
+            # 短暂休眠，避免 CPU 占用过高
+            time.sleep(0.05)
+
+        return None
+
+    def _call(self, method: str, params: dict = None) -> dict:
+        """调用 MCP 方法"""
         self._request_id += 1
         request = {
             "jsonrpc": "2.0",
@@ -184,54 +249,100 @@ class MCPClient:
             "method": method,
             "params": params or {}
         }
-        self.process.stdin.write(json.dumps(request) + "\n")
-        self.process.stdin.flush()
-        line = self.process.stdout.readline()
-        return json.loads(line)
 
-    def breakdown_script(self, script, wait=False):
+        # 发送请求
+        request_str = json.dumps(request, ensure_ascii=False)
+        try:
+            self.process.stdin.write(request_str + "\n")
+            self.process.stdin.flush()
+        except BrokenPipeError:
+            raise Exception("Server 进程已断开")
+
+        # 读取响应
+        response = self.read_json_response()
+        if response is None:
+            stderr = self.process.stderr.read()
+            raise Exception(f"Server 无响应: {stderr}")
+
+        return response
+
+    def get_tools(self) -> list:
+        """获取工具列表"""
+        result = self._call("tools/list")
+        return result.get("result", {}).get("tools", [])
+
+    def breakdown_script(self, script: str, language: str = "zh", wait: bool = False, timeout: int = 300) -> dict:
+        """拆分剧本"""
         result = self._call("tools/call", {
             "name": "breakdown_script",
-            "arguments": {"script": script, "wait": wait}
+            "arguments": {
+                "script": script.strip(),
+                "language": language,
+                "wait": wait,
+                "timeout": timeout
+            }
         })
+
+        print(f"   [DEBUG] 原始响应: {result}")
+
         if "error" in result:
             raise Exception(result["error"]["message"])
+
         content = result.get("result", {}).get("content", [])
-        if content:
+        if content and content[0].get("type") == "text":
+            text_content = content[0]["text"]
+            try:
+                parsed = json.loads(text_content)
+                print(f"   [DEBUG] 解析后: {parsed}")
+                return parsed
+            except json.JSONDecodeError:
+                print(f"   [DEBUG] JSON解析失败，原始文本: {text_content}")
+                return {}
+        return {}
+
+    def get_task_status(self, task_id: str) -> dict:
+        """获取任务状态"""
+        result = self._call("tools/call", {
+            "name": "get_task_status",
+            "arguments": {"task_id": task_id}
+        })
+
+        content = result.get("result", {}).get("content", [])
+        if content and content[0].get("type") == "text":
             return json.loads(content[0]["text"])
         return {}
 
-    def get_task_result(self, task_id):
+    def get_task_result(self, task_id: str) -> dict:
+        """获取任务结果"""
         result = self._call("tools/call", {
             "name": "get_task_result",
             "arguments": {"task_id": task_id}
         })
+
         content = result.get("result", {}).get("content", [])
-        if content:
+        if content and content[0].get("type") == "text":
             return json.loads(content[0]["text"])
         return {}
 
     def stop(self):
+        """停止 Server"""
         if self.process:
             self.process.terminate()
-            self.process.wait()
-
-            
-if __name__ == "__main__":            
-    # 使用示例
-    client = MCPClient()
-    client.start()
-    result = client.breakdown_script("你的剧本...")
-    print(result)
-    client.stop()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+            print("MCP Server 已停止")
 ```
+
+示例代码：[video-shot-agent/example/mcp_client.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
 
 
 
 ### 4. LangGraph 节点集成
 
 ```python
-from penshot.api.function_calls import create_penshot_agent
+from penshot.api import create_penshot_agent
 
 class StoryboardWorkflowNodes:
     """分镜生成工作流节点"""
@@ -357,6 +468,8 @@ class StoryboardWorkflowNodes:
                 "progress": 0
             }
 ```
+
+示例代码：[video-shot-agent/example/langgraph_integration.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/langgraph_integration.py)
 
 
 
