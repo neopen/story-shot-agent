@@ -141,17 +141,21 @@ async def with_custom_config():
     # 创建自定义配置
     custom_config = ShotConfig(
         llm=LLMBaseConfig(
-            base_url="https://api.openai.com/v1",
+            base_url="https://api.deepseek.com",
             model_name="gpt-4",
-            api_key=SecretStr(""),
+            api_key=SecretStr("xxxxxxxxxxxx"),
             temperature=0.3,
+            timeout=60,
             max_tokens=3000
         ),
         embed=EmbeddingBaseConfig(
-            base_url="https://api.openai.com/v1",
-            model_name="gpt-4",
-            api_key=SecretStr(""),
-        )
+            base_url="http://localhost:11434",
+            model_name="text-embedding-3-small",
+            api_key=SecretStr("xxxxxxxxxxx"),
+            timeout=60,
+        ),
+        max_fragment_duration=10,
+        video_model="sora-2-2025-12-08",
     )
 
     agent = PenshotFunction(
