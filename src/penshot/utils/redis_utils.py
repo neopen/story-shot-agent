@@ -6,6 +6,7 @@
 """
 import json
 import os
+from functools import lru_cache
 from typing import Optional, Any
 
 import redis
@@ -274,6 +275,11 @@ class RedisClient:
             error(f"哈希表获取失败: {e}")
             return default
 
+
+@lru_cache(maxsize=1)
+def get_redis_url() -> str:
+    redis_client = RedisClient()
+    return redis_client.connection_url
 
 # 使用示例
 if __name__ == "__main__":

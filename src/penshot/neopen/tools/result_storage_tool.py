@@ -6,13 +6,13 @@
 @Time: 2025/12/18
 """
 
-import os
 import json
-from typing import Any, Dict, Optional
+import os
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from penshot.config.config import settings
-from penshot.logger import debug, info, warning, error
+from penshot.logger import debug, warning, error
 from penshot.utils.obj_utils import obj_to_dict
 
 
@@ -33,54 +33,54 @@ class ResultStorage:
         self.base_output_dir = base_output_dir or settings.get_data_paths()['data_output']
         debug(f"结果存储初始化完成，基础目录: {self.base_output_dir}")
 
-    def get_result_path(self, uuid: str, result_filename: str = "script_parser_result.json") -> str:
+    def get_result_path(self, task_id: str, result_filename: str = "script_parser_result.json") -> str:
         """
         获取特定结果文件的完整路径
         
         Args:
-            uuid: 请求的唯一标识符
+            task_id: 请求的唯一标识符
             result_filename: 结果文件名
             
         Returns:
             结果文件的完整路径
         """
         # 创建以uuid命名的子目录
-        uuid_dir = os.path.join(self.base_output_dir, uuid)
+        uuid_dir = os.path.join(self.base_output_dir, task_id)
         os.makedirs(uuid_dir, exist_ok=True)
 
         # 返回完整的结果文件路径
         return os.path.join(uuid_dir, result_filename)
 
-    def save_obj(self, uuid: str, result_data: Any):
-            # 转换为字典
-        return self.save_json_result(uuid, obj_to_dict(result_data), f"{uuid}.json")
+    def save_obj(self, task_id: str, result_data: Any):
+        # 转换为字典
+        return self.save_json_result(task_id, obj_to_dict(result_data), f"{task_id}.json")
 
-    def save_obj_result(self, uuid: str, result_data: Any, result_filename: str):
-            # 转换为字典
-        return self.save_json_result(uuid, obj_to_dict(result_data), result_filename)
+    def save_obj_result(self, task_id: str, result_data: Any, result_filename: str):
+        # 转换为字典
+        return self.save_json_result(task_id, obj_to_dict(result_data), result_filename)
 
-    def save_json_result(self, uuid: str, data_dict: Dict[str, Any], result_filename: str):
+    def save_json_result(self, task_id: str, data_dict: Dict[str, Any], result_filename: str):
         """保存json"""
         try:
             # 递归检查并处理可能被截断的字符串
             self._ensure_string_integrity(data_dict)
 
-            save_result = self.save_result(uuid, data_dict, result_filename)
-            debug(f"成功保存: data/output/{uuid}/{result_filename}")
+            save_result = self.save_result(task_id, data_dict, result_filename)
+            debug(f"成功保存: data/output/{task_id}/{result_filename}")
             return save_result
         except Exception as save_error:
             error(f"保存{result_filename}失败: {str(save_error)}")
             # 抛出异常以便上层处理
             raise
 
-    def save_result(self, uuid: str, result_data: Dict[str, Any],
+    def save_result(self, task_id: str, result_data: Dict[str, Any],
                     result_filename: str = "script_parser_result.json",
                     add_timestamp: bool = True) -> str:
         """
         保存智能体结果到指定文件
 
         Args:
-            uuid: 请求的唯一标识符
+            task_id: 请求的唯一标识符
             result_data: 要保存的结果数据
             result_filename: 结果文件名
             add_timestamp: 是否添加时间戳
@@ -93,7 +93,7 @@ class ResultStorage:
         """
         try:
             # 获取保存路径
-            result_path = self.get_result_path(uuid, result_filename)
+            result_path = self.get_result_path(task_id, result_filename)
 
             # 创建要保存的数据副本
             save_data = result_data.copy()
@@ -102,7 +102,7 @@ class ResultStorage:
             if add_timestamp:
                 save_data["metadata"] = save_data.get("metadata", {})
                 save_data["metadata"]["saved_at"] = datetime.now().isoformat()
-                save_data["metadata"]["uuid"] = uuid
+                save_data["metadata"]["uuid"] = task_id
 
             # === 保存数据到JSON文件（增强版）===
             with open(result_path, 'w', encoding='utf-8') as f:
@@ -111,9 +111,9 @@ class ResultStorage:
                     save_data,
                     f,
                     ensure_ascii=False,  # 确保中文正常显示
-                    indent=2,             # 保持缩进以便阅读
+                    indent=2,  # 保持缩进以便阅读
                     separators=(',', ': '),  # 使用标准分隔符，不压缩
-                    default=str           # 处理不可序列化的对象
+                    default=str  # 处理不可序列化的对象
                 )
                 # 确保所有数据都被写入
                 f.flush()
@@ -128,7 +128,7 @@ class ResultStorage:
             return result_path
 
         except Exception as e:
-            error(f"保存结果失败 (UUID: {uuid}): {str(e)}")
+            error(f"保存结果失败 (UUID: {task_id}): {str(e)}")
             raise IOError(f"无法保存结果: {str(e)}")
 
     def _ensure_string_integrity(self, data: Any) -> None:
