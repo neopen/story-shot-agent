@@ -28,14 +28,15 @@ from ...shot_config import ShotConfig
 class MultiAgentPipeline:
     """多智能体协作流程"""
 
-    def __init__(self, task_id, config: ShotConfig, task_manager):
+    def __init__(self, task_id, script_id, config: ShotConfig, task_manager):
         """
         初始化多智能体流程
         
         Args:
-            task_id: 任务ID
+            script_id: 剧本ID
             config: 用户配置（LLM）
         """
+        self.script_id = script_id
         self.task_id = task_id
         self.memory = MemorySaver()  # 状态记忆器
         self.config = config or ShotConfig()
@@ -57,6 +58,7 @@ class MultiAgentPipeline:
 
         # 初始化工作流节点集合
         self.workflow_nodes = WorkflowNodes(
+            script_id=self.script_id,
             script_parser=self.script_parser,
             shot_segmenter=self.shot_segmenter,
             video_splitter=self.video_splitter,
@@ -320,6 +322,7 @@ class MultiAgentPipeline:
             raw_script=raw_script,
             user_config=config or {},
             task_id=self.task_id,
+            script_id=self.script_id,
             current_stage=AgentStage.INIT,
             # 镜头及片段参数
             max_shot_duration=config.max_shot_duration,

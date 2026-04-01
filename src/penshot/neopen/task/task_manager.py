@@ -788,7 +788,7 @@ class TaskManager:
             if getattr(self, "pipeline_factory", None) is not None:
                 pipeline = self.pipeline_factory(task_id, config)
             else:
-                pipeline = MultiAgentPipeline(task_id, config, task_manager)
+                pipeline = MultiAgentPipeline(task_id, task_id, config, task_manager)
             info(f"创建新工作流: {key}")
         except Exception as e:
             error(f"创建工作流失败: {e}")

@@ -25,6 +25,7 @@ class InputState(BaseModel):
     """工作流输入状态"""
     raw_script: str  # 原始剧本文本
     user_config: ShotConfig = {}  # 用户配置（模型选择、风格偏好等）
+    script_id: str = str(uuid.uuid4())  # 剧本ID
     task_id: str = str(uuid.uuid4())  # 唯一标识符
 
 
