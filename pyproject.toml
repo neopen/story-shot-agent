@@ -63,6 +63,7 @@ dependencies = [
     "numpy>=1.24.0",
     "jieba>=0.42.1",
     "redis",
+    "chromadb",
 
     # 工具库
 #    "requests>=2.31.0",
