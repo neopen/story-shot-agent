@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 from penshot.logger import warning, debug, info, error
-
+try:
+    from importlib.resources import files as res_files
+    IMPORTLIB_AVAILABLE = True
+except ImportError:
+    IMPORTLIB_AVAILABLE = False
 
 class DotEnvLoader:
     """智能 .env 文件加载器"""
@@ -34,42 +38,95 @@ class DotEnvLoader:
         按优先级查找所有可能的 .env 文件位置
 
         优先级（从高到低）：
-        1. 当前工作目录: ./ .env
-        2. 用户配置目录: ~/.config/penshot/.env
-        3. 包安装目录: site-packages/penshot/.env
-        4. 开发模式项目根目录: ../../.env
+        1. 当前工作目录：./ .env
+        2. 父级目录：../ .env, ../../ .env (新增，最多两级)
+        3. 用户配置目录：~/.config/penshot/.env
+        4. 包安装目录：site-packages/penshot/.env
+        5. 开发模式项目根目录：(基于 _find_dev_dotenv)
+
+        :return: 所有存在的 .env 文件绝对路径列表 (已去重)
         """
         candidates: List[Path] = []
+        # 使用 set 存储已解析的绝对路径，用于高效去重
+        resolved_paths = set()
+
+        def add_candidate(path: Optional[Path]):
+            if path and path.exists():
+                abs_path = path.resolve()
+                if abs_path not in resolved_paths:
+                    resolved_paths.add(abs_path)
+                    candidates.append(path)  # 保留原始路径对象或统一用 abs_path，这里保留原始
 
         # 1. 当前工作目录（最高优先级）
         cwd_env = Path.cwd() / ".env"
-        if cwd_env.exists():
-            candidates.append(cwd_env)
+        add_candidate(cwd_env)
 
-        # 2. 用户配置目录
+        # 2. 父级目录查找（新增，最多两级）
+        parent_envs = self._find_parent_dotenv(max_levels=2)
+        for env in parent_envs:
+            add_candidate(env)
+
+        # 3. 用户配置目录
         user_config_dir = self._get_user_config_dir()
         user_env = user_config_dir / ".env"
-        if user_env.exists():
-            candidates.append(user_env)
+        add_candidate(user_env)
 
-        # 3. 包内部（安装后）
-        try:
-            import importlib.resources as res
-            # Python 3.9+
-            with res.path(self.package_name, "__init__.py") as pkg_init:
-                pkg_dir = pkg_init.parent
-                pkg_env = pkg_dir / ".env"
-                if pkg_env.exists():
-                    candidates.append(pkg_env)
-        except (ImportError, FileNotFoundError, AttributeError):
-            pass
+        # 4. 包内部（安装后）
+        if IMPORTLIB_AVAILABLE:
+            try:
+                # 使用 files API (Python 3.9+ 推荐)
+                pkg_files = res_files(self.package_name)
+                # 尝试定位包根目录，通常 .env 会放在包根下
+                # 注意：如果 .env 不在包内，这里不会报错，只是找不到
+                pkg_env_path = pkg_files.joinpath(".env")
+                # 检查文件是否存在 (as_file 用于获取真实路径)
+                from importlib.resources import as_file
+                with as_file(pkg_env_path) as pkg_env:
+                    if pkg_env.exists():
+                        add_candidate(Path(pkg_env))
+            except (ImportError, FileNotFoundError, AttributeError, ValueError):
+                pass
+        else:
+            # 兼容旧版本 Python 的 fallback 逻辑 (保留你原有的逻辑)
+            try:
+                import importlib.resources as res
+                with res.path(self.package_name, "__init__.py") as pkg_init:
+                    pkg_dir = pkg_init.parent
+                    pkg_env = pkg_dir / ".env"
+                    add_candidate(pkg_env)
+            except (ImportError, FileNotFoundError, AttributeError):
+                pass
 
-        # 4. 开发模式：项目根目录（向上查找）
+        # 5. 开发模式：项目根目录
         dev_env = self._find_dev_dotenv()
-        if dev_env and dev_env not in candidates:
-            candidates.append(dev_env)
+        add_candidate(dev_env)
 
         return candidates
+
+    def _find_parent_dotenv(self, max_levels: int = 2) -> List[Path]:
+        """
+        向父级目录查找 .env 文件
+
+        :param max_levels: 向上查找的最大层级数 (默认 2 级)
+        :return: 找到的 .env 文件路径列表
+        """
+        found_files: List[Path] = []
+        current_dir = Path.cwd()
+
+        for _ in range(max_levels):
+            parent_dir = current_dir.parent
+            # 防止在根目录死循环 (虽然 parent 会保持为 /，但逻辑上无需继续)
+            if parent_dir == current_dir:
+                break
+
+            env_path = parent_dir / ".env"
+            if env_path.exists() and env_path.is_file():
+                found_files.append(env_path)
+
+            current_dir = parent_dir
+
+        return found_files
+
 
     def _get_user_config_dir(self) -> Path:
         """获取用户配置目录（跨平台）"""

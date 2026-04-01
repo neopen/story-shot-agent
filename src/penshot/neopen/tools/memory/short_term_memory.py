@@ -8,7 +8,7 @@ from typing import Optional, Any, Dict, List
 from collections import deque
 
 from langchain.memory import ConversationBufferMemory
-from langchain.memory.chat_message_histories import RedisChatMessageHistory
+from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langchain.schema import HumanMessage, AIMessage
 
 from penshot.logger import debug, warning
