@@ -112,7 +112,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     """全局异常处理器"""
     error(f"[ERROR] Unhandled exception: {str(exc)}")
-    # traceback.print_exc()
+    traceback.print_exc()
     return JSONResponse(
         status_code=500,
         content={
