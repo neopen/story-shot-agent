@@ -442,3 +442,34 @@ def get_task_result(self, task_id: str) -> dict:
 2. **功能建议**：希望添加的新功能
 3. **代码优化**：性能优化或代码重构
 4. **文档改进**：补充或修正文档
+
+## 问题反馈
+
+- **提交 Issue**：https://github.com/neopen/video-shot-agent/issues
+- **功能建议**：使用 Enhancement 标签
+- **Bug 报告**：使用 Bug 标签并提供复现步骤
+- **安全漏洞**：请直接发送邮件至作者邮箱
+
+------
+
+## 许可证
+
+MIT License - 详见 [LICENSE](https://license/) 文件
+
+Copyright (c) 2024 HiPeng
+
+------
+
+## 致谢
+
+感谢所有贡献者和开源社区的支持。
+
+------
+
+## 联系方式
+
+- 项目主页：https://github.com/neopen/video-shot-agent
+- 作者：NeoPen
+- 邮箱：helpenx@gmail.com
+- 文档：https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/
+
