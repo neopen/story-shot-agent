@@ -358,14 +358,13 @@ class QualityAuditorAgent:
                     if isinstance(issue, dict):
                         # 如果是字典，转换为 BasicViolation 对象
                         try:
-                            from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation
                             basic_issue = BasicViolation(
                                 rule_code=issue.get("rule_code", ""),
                                 rule_name=issue.get("rule_name", ""),
-                                issue_type=issue.get("issue_type"),
-                                source_node=issue.get("source_node", node),
+                                issue_type=IssueType(issue.get("issue_type", IssueType.OTHER.value)),
+                                source_node=PipelineNode(issue.get("source_node", node.value)),
                                 description=issue.get("description", ""),
-                                severity=issue.get("severity"),
+                                severity=SeverityLevel(issue.get("severity", SeverityLevel.WARNING.value)),
                                 fragment_id=issue.get("fragment_id"),
                                 suggestion=issue.get("suggestion")
                             )
@@ -375,6 +374,7 @@ class QualityAuditorAgent:
                             merged.violations.append(basic_issue)
                         except Exception as e:
                             error(f"转换问题为 BasicViolation 失败: {e}")
+                            print_log_exception()
                             continue
                     else:
                         # 已经是对象，直接使用

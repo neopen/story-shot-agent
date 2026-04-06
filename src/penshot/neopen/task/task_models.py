@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import field, dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 
 from pydantic import BaseModel, Field
 
@@ -139,6 +139,37 @@ class TaskPriority(int, Enum):
     NORMAL = 2
     HIGH = 3
     CRITICAL = 4
+
+
+
+class QueuedTask:
+    """队列中的任务"""
+
+    def __init__(
+            self,
+            task_id: str,
+            priority: TaskPriority = TaskPriority.NORMAL,
+            callback: Optional[Callable] = None,
+            metadata: Optional[Dict] = None
+    ):
+        self.task_id = task_id
+        self.priority = priority
+        self.callback = callback
+        self.metadata = metadata or {}
+        self.created_at = datetime.now(timezone.utc)
+        self.enqueued_at = None
+        self.started_at = None
+
+    def to_dict(self) -> Dict:
+        return {
+            "task_id": self.task_id,
+            "priority": self.priority.value,
+            "priority_name": self.priority.name,
+            "metadata": self.metadata,
+            "created_at": self.created_at.isoformat(),
+            "enqueued_at": self.enqueued_at.isoformat() if self.enqueued_at else None,
+            "started_at": self.started_at.isoformat() if self.started_at else None
+        }
 
 
 class ProcessingStatus(BaseModel):

@@ -8,10 +8,9 @@
 from datetime import datetime
 from typing import Optional, Any, Dict, List
 
-from langchain.memory import (
-    VectorStoreRetrieverMemory
-)
-from langchain_community.vectorstores import Chroma
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_chroma import Chroma
 
 from penshot.logger import error, debug
 from penshot.neopen.tools.memory.memory_models import MemoryConfig
@@ -42,14 +41,43 @@ class LongTermMemory:
             }
         )
 
-        # 创建向量检索记忆
-        self.memory = VectorStoreRetrieverMemory(
-            retriever=self.retriever,
-            memory_key="relevant_memories",
-            input_key="input"
-        )
+        # 会话历史存储
+        self._session_histories: Dict[str, ChatMessageHistory] = {}
+
+        # 创建带记忆的链
+        self.memory = self._create_memory_chain()
 
         debug(f"初始化长期记忆: script={script_id}, k={config.long_term_k}, threshold={config.long_term_score_threshold}")
+
+    def _get_session_history(self, session_id: str) -> ChatMessageHistory:
+        """获取或创建会话历史"""
+        if session_id not in self._session_histories:
+            self._session_histories[session_id] = ChatMessageHistory()
+        return self._session_histories[session_id]
+
+    def _create_memory_chain(self):
+        """创建带记忆的链"""
+        from langchain_core.runnables import RunnableLambda
+
+        def retrieve_memories(input_dict):
+            """检索相关记忆"""
+            query = input_dict.get("input", "")
+            if query:
+                memories = self.search(query)
+                if memories:
+                    return "\n".join([m["content"] for m in memories])
+            return ""
+
+        # 创建检索链
+        retrieval_chain = RunnableLambda(retrieve_memories)
+
+        # 包装为带记忆的链
+        return RunnableWithMessageHistory(
+            retrieval_chain,
+            self._get_session_history,
+            input_messages_key="input",
+            history_messages_key="history"
+        )
 
     def add(self, text: str, metadata: Optional[Dict] = None):
         """添加记忆"""
@@ -147,11 +175,9 @@ class LongTermMemory:
                     "score_threshold": self.config.long_term_score_threshold
                 }
             )
-            self.memory = VectorStoreRetrieverMemory(
-                retriever=self.retriever,
-                memory_key="relevant_memories",
-                input_key="input"
-            )
+            # 清空会话历史
+            self._session_histories.clear()
+            self.memory = self._create_memory_chain()
         except Exception as e:
             error(f"清空长期记忆失败: {e}")
 

@@ -14,6 +14,7 @@ from typing import Optional, List, Dict, Any, Callable
 from concurrent.futures import Future, TimeoutError
 
 from penshot.logger import info, error, debug
+from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_language import ShotLanguage
 from penshot.neopen.task.task_manager import TaskManager
@@ -96,35 +97,36 @@ class TaskFactory:
     def submit(
             self,
             script: str,
-            task_id: Optional[str] = None,
+            script_id: Optional[str] = None,
+            style: Optional[VideoStyle] = None,
             config: Optional[ShotConfig] = None,
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
             callback: Optional[Callable] = None,
             callback_url: Optional[str] = None
-    ) -> str:
+    ) -> tuple[str, str]:
         """提交任务（异步，立即返回task_id）"""
-        task_id = task_id or self._generate_task_id()
         config = config or self.default_config
         language = language or self.default_language
 
-        created_task_id = self.task_manager.create_task(
+        script_id, task_id = self.task_manager.create_task(
+            script_id=script_id,
             script=script,
+            style=style,
             config=config,
-            task_id=task_id
         )
 
-        debug(f"[TaskFactory] 任务已创建: {created_task_id}")
+        debug(f"[TaskFactory] 任务已创建: {task_id}")
 
         if callback_url:
-            self.task_manager.set_task_callback(created_task_id, callback_url)
+            self.task_manager.set_task_callback(task_id, callback_url)
 
         if callback:
-            self._callbacks[created_task_id] = callback
+            self._callbacks[task_id] = callback
 
         # 创建 Future 用于同步等待
         future = Future()
-        self._task_futures[created_task_id] = future
+        self._task_futures[task_id] = future
 
         def on_task_complete(task_id: str, result: TaskResponse):
             debug(f"[TaskFactory] 任务完成回调: {task_id}")
@@ -145,22 +147,22 @@ class TaskFactory:
                     del self._callbacks[task_id]
 
         async def submit_task():
-            success = await self.processor.submit_task(created_task_id, priority, on_task_complete)
+            success = await self.processor.submit_task(task_id, priority, on_task_complete)
             if not success:
-                error(f"[TaskFactory] 任务提交失败: {created_task_id}")
-                future = self._task_futures.pop(created_task_id, None)
+                error(f"[TaskFactory] 任务提交失败: {task_id}")
+                future = self._task_futures.pop(task_id, None)
                 if future and not future.done():
-                    future.set_exception(RuntimeError(f"任务提交失败: {created_task_id}"))
+                    future.set_exception(RuntimeError(f"任务提交失败: {task_id}"))
 
         self._run_async_in_background(submit_task())
 
-        info(f"任务已提交: {created_task_id}, 优先级: {priority.name}")
-        return created_task_id
+        info(f"任务已提交: {task_id}, 优先级: {priority.name}")
+        return script_id, task_id
 
     def submit_and_wait(
             self,
             script: str,
-            task_id: Optional[str] = None,
+            script_id: Optional[str] = None,
             config: Optional[ShotConfig] = None,
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
@@ -168,9 +170,9 @@ class TaskFactory:
             callback_url: Optional[str] = None
     ) -> TaskResponse:
         """提交任务并等待完成（同步）"""
-        task_id = self.submit(
+        script_id2, task_id = self.submit(
             script=script,
-            task_id=task_id,
+            script_id=script_id,
             config=config,
             language=language,
             priority=priority,
@@ -181,7 +183,7 @@ class TaskFactory:
     async def submit_and_wait_async(
             self,
             script: str,
-            task_id: Optional[str] = None,
+            script_id: Optional[str] = None,
             config: Optional[ShotConfig] = None,
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
@@ -193,7 +195,7 @@ class TaskFactory:
 
         Args:
             script: 剧本文本
-            task_id: 任务ID（可选）
+            script_id: 剧本ID（可选）
             config: 配置
             language: 语言
             priority: 优先级
@@ -204,9 +206,9 @@ class TaskFactory:
             TaskResponse: 任务结果
         """
         # 提交任务
-        task_id = self.submit(
+        script_id2, task_id = self.submit(
             script=script,
-            task_id=task_id,
+            script_id=script_id,
             config=config,
             language=language,
             priority=priority,
@@ -462,7 +464,7 @@ class TaskFactory:
         """批量处理（同步，等待全部完成）"""
         task_ids = []
         for script in scripts:
-            task_id = self.submit(
+            script_id, task_id = self.submit(
                 script=script,
                 config=config,
                 language=language,
@@ -520,7 +522,7 @@ class TaskFactory:
         task_ids = []
 
         for script in scripts:
-            task_id = self.submit(
+            script_id, task_id = self.submit(
                 script=script,
                 config=config,
                 language=language,
@@ -699,12 +701,6 @@ class TaskFactory:
         """
         return self.task_manager.get_pending_tasks(max_age_hours=max_age_hours)
 
-    # ==================== 辅助方法 ====================
-
-    def _generate_task_id(self) -> str:
-        """生成任务ID"""
-        import random
-        return "TSK" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9999))
 
     def _generate_batch_id(self) -> str:
         """生成批次ID"""

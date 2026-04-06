@@ -71,33 +71,32 @@ class WorkflowOutputWriter:
                 return
         return asyncio.run_coroutine_threadsafe(coro, self._background_loop)
 
-    def save_all_reports(self, state: WorkflowState, task_id: str):
+    def save_all_reports(self, state: WorkflowState):
         """
         保存所有报告（异步）
 
         Args:
             state: 工作流状态
-            task_id: 任务ID
         """
-        self._run_async(self._save_all_reports_async(state, task_id))
+        self._run_async(self._save_all_reports_async(state))
 
-    async def _save_all_reports_async(self, state: WorkflowState, task_id: str):
+    async def _save_all_reports_async(self, state: WorkflowState):
         """异步保存所有报告"""
         tasks = [
-            self._save_execution_summary(state, task_id),
-            self._save_stage_statistics(state, task_id),
-            self._save_issues_report(state, task_id),
-            self._save_repair_history(state, task_id),
-            self._save_quality_report(state, task_id),
-            self._save_continuity_report(state, task_id),
-            self._save_memory_report(state.script_id, task_id)
+            self._save_execution_summary(state),
+            self._save_stage_statistics(state),
+            self._save_issues_report(state),
+            self._save_repair_history(state),
+            self._save_quality_report(state),
+            self._save_continuity_report(state),
+            self._save_memory_report(state.script_id, state.task_id)
         ]
 
         # 并发执行所有保存任务
         await asyncio.gather(*tasks, return_exceptions=True)
-        debug(f"任务 {task_id} 所有报告已保存")
+        debug(f"剧本 {state.script_id} 的任务 {state.task_id} 所有报告已保存")
 
-    async def _save_execution_summary(self, state: WorkflowState, task_id: str):
+    async def _save_execution_summary(self, state: WorkflowState):
         """保存执行摘要"""
         try:
             # 计算总时长
@@ -110,7 +109,8 @@ class WorkflowOutputWriter:
             audit_status = state.audit_report.status.value if state.audit_report else "unknown"
 
             summary = {
-                "task_id": task_id,
+                "task_id": state.task_id,
+                "script_id": state.script_id,
                 "status": "completed",
                 "created_at": state.final_output.get("created_at") if state.final_output else datetime.now().isoformat(),
                 "completed_at": state.final_output.get("completed_at") if state.final_output else datetime.now().isoformat(),
@@ -128,12 +128,12 @@ class WorkflowOutputWriter:
                 }
             }
 
-            await self._save_json_async(task_id, summary, "execution_summary.json")
-            debug(f"执行摘要已保存: {task_id}")
+            await self._save_json_async(state.script_id, state.task_id, summary, "execution_summary.json")
+            debug(f"执行摘要已保存: {state.script_id} -> {state.task_id}")
         except Exception as e:
             error(f"保存执行摘要失败: {e}")
 
-    async def _save_stage_statistics(self, state: WorkflowState, task_id: str):
+    async def _save_stage_statistics(self, state: WorkflowState):
         """保存阶段统计"""
         try:
             # 从记忆模块获取各阶段统计（使用 get 方法）
@@ -161,12 +161,12 @@ class WorkflowOutputWriter:
                 "prompt_converter": convert_stats
             }
 
-            await self._save_json_async(task_id, stage_stats, "stage_statistics.json")
-            debug(f"阶段统计已保存: {task_id}")
+            await self._save_json_async(state.script_id, state.task_id, stage_stats, "stage_statistics.json")
+            debug(f"阶段统计已保存: {state.script_id} -> {state.task_id}")
         except Exception as e:
             error(f"保存阶段统计失败: {e}")
 
-    async def _save_issues_report(self, state: WorkflowState, task_id: str):
+    async def _save_issues_report(self, state: WorkflowState):
         """保存问题追踪报告"""
         try:
             # 从记忆模块获取各阶段问题（使用 get 方法，默认返回列表）
@@ -227,7 +227,8 @@ class WorkflowOutputWriter:
                 return severity_groups
 
             issues_report = {
-                "task_id": task_id,
+                "task_id": state.task_id,
+                "script_id": state.script_id,
                 "total_issues": len(parse_issues) + len(segment_issues) + len(split_issues) + len(convert_issues),
                 "by_stage": {
                     "script_parser": {
@@ -258,12 +259,12 @@ class WorkflowOutputWriter:
                 }
             }
 
-            await self._save_json_async(task_id, issues_report, "issues_report.json")
-            debug(f"问题报告已保存: {task_id}")
+            await self._save_json_async(state.script_id, state.task_id, issues_report, "issues_report.json")
+            debug(f"问题报告已保存: {state.script_id} -> {state.task_id}")
         except Exception as e:
             error(f"保存问题报告失败: {e}")
 
-    async def _save_repair_history(self, state: WorkflowState, task_id: str):
+    async def _save_repair_history(self, state: WorkflowState):
         """保存修复历史记录"""
         try:
             # 从记忆模块获取修复历史（使用 get 方法）
@@ -285,7 +286,8 @@ class WorkflowOutputWriter:
             )
 
             repair_history = {
-                "task_id": task_id,
+                "task_id": state.task_id,
+                "script_id": state.script_id,
                 "repair_count": sum(1 for r in [repair_parse, repair_segment, repair_split, repair_convert] if r),
                 "repairs": {
                     "script_parser": repair_parse,
@@ -295,12 +297,12 @@ class WorkflowOutputWriter:
                 }
             }
 
-            await self._save_json_async(task_id, repair_history, "repair_history.json")
-            debug(f"修复历史已保存: {task_id}")
+            await self._save_json_async(state.script_id, state.task_id, repair_history, "repair_history.json")
+            debug(f"修复历史已保存: {state.script_id} -> {state.task_id}")
         except Exception as e:
             error(f"保存修复历史失败: {e}")
 
-    async def _save_quality_report(self, state: WorkflowState, task_id: str):
+    async def _save_quality_report(self, state: WorkflowState):
         """保存质量审查报告"""
         try:
             # 从记忆模块获取审查历史（使用 get 方法）
@@ -327,7 +329,8 @@ class WorkflowOutputWriter:
                 })
 
             quality_report = {
-                "task_id": task_id,
+                "task_id": state.task_id,
+                "script_id": state.script_id,
                 "total_audits": len(audit_history),
                 "latest_audit": latest_audit,
                 "audit_history": audit_history,
@@ -336,12 +339,12 @@ class WorkflowOutputWriter:
                 "final_status": state.audit_report.status.value if state.audit_report else "unknown"
             }
 
-            await self._save_json_async(task_id, quality_report, "quality_report.json")
-            debug(f"质量报告已保存: {task_id}")
+            await self._save_json_async(state.script_id, state.task_id, quality_report, "quality_report.json")
+            debug(f"质量报告已保存: {state.script_id} -> {state.task_id}")
         except Exception as e:
             error(f"保存质量报告失败: {e}")
 
-    async def _save_continuity_report(self, state: WorkflowState, task_id: str):
+    async def _save_continuity_report(self, state: WorkflowState):
         """保存连续性检查报告"""
         try:
             # 从记忆模块获取连续性历史（使用 get 方法）
@@ -373,7 +376,8 @@ class WorkflowOutputWriter:
                     issues_by_severity[severity] += 1
 
             continuity_report = {
-                "task_id": task_id,
+                "task_id": state.task_id,
+                "script_id": state.script_id,
                 "total_continuity_issues": len(continuity_history),
                 "issues_by_type": issues_by_type,
                 "issues_by_severity": issues_by_severity,
@@ -382,8 +386,8 @@ class WorkflowOutputWriter:
                 "issues": continuity_history[-50:]  # 只保留最近50条
             }
 
-            await self._save_json_async(task_id, continuity_report, "continuity_report.json")
-            debug(f"连续性报告已保存: {task_id}")
+            await self._save_json_async(state.script_id, state.task_id, continuity_report, "continuity_report.json")
+            debug(f"连续性报告已保存: {state.script_id} -> {state.task_id}")
         except Exception as e:
             error(f"保存连续性报告失败: {e}")
 
@@ -408,12 +412,12 @@ class WorkflowOutputWriter:
             }
 
             # 同步保存，因为这是最后的报告
-            self.storage.save_json_result(task_id, memory_report, "memory_report.json")
-            debug(f"记忆报告已保存: {script_id}")
+            self.storage.save_json_result(script_id, task_id, memory_report, "memory_report.json")
+            debug(f"记忆报告已保存: {script_id} -> {task_id}")
         except Exception as e:
             error(f"保存记忆报告失败: {e}")
 
-    async def _save_json_async(self, task_id: str, data: Dict, filename: str):
+    async def _save_json_async(self, script_id: str, task_id: str, data: Dict, filename: str):
         """异步保存 JSON 文件"""
         try:
             # 使用线程池执行同步保存操作
@@ -421,6 +425,7 @@ class WorkflowOutputWriter:
             await loop.run_in_executor(
                 None,
                 self.storage.save_json_result,
+                script_id,
                 task_id,
                 data,
                 filename

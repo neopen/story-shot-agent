@@ -8,7 +8,7 @@
 import json
 from typing import Optional, Any, Dict, List
 
-from langchain.llms.base import BaseLLM
+from langchain_core.language_models import BaseLLM
 
 from penshot.logger import info, debug
 from penshot.neopen.tools.memory.memory_context import MemoryContext

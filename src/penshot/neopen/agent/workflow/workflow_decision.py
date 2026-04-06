@@ -444,12 +444,26 @@ class PipelineDecision:
             state.error_messages.append(f"连续性检查节点循环检查失败: {loop_reason}")
             return loop_decision
 
+        # ========== 检查连续性重试次数 ==========
+        # 初始化连续性重试计数（如果不存在）
+        if not hasattr(state, 'continuity_retry_count'):
+            state.continuity_retry_count = 0
+
+        max_continuity_retries = getattr(state, 'max_continuity_retries', 3)
+
         # 获取连续性问题
-        issues = getattr(state, 'continuity_issues', [])  # 使用 getattr 避免属性不存在
+        issues = getattr(state, 'continuity_issues', [])
+
+        # 如果有问题且超过重试次数，需要人工干预
+        if issues and state.continuity_retry_count >= max_continuity_retries:
+            warning(f"连续性检查重试次数已达上限: {state.continuity_retry_count}/{max_continuity_retries}，需要人工干预")
+            return PipelineState.NEEDS_HUMAN
 
         # 检查是否有连续性问题
         if not issues:
-            # 没有连续性问题，可以直接生成输出
+            # 没有连续性问题，重置重试计数
+            state.continuity_retry_count = 0
+            # 可以直接生成输出
             return PipelineState.SUCCESS
 
         # 根据问题严重性分类（兼容不同格式）
@@ -473,8 +487,13 @@ class PipelineDecision:
             elif severity == "minor" or severity == "MINOR":
                 minor_issues.append(issue)
             else:
-                # 默认归类为中度
-                moderate_issues.append(issue)
+                # 默认归类为轻微
+                minor_issues.append(issue)
+
+        # ========== 增加重试计数 ==========
+        state.continuity_retry_count += 1
+        info(f"连续性检查第 {state.continuity_retry_count}/{max_continuity_retries} 次重试，"
+             f"发现严重:{len(critical_issues)}, 中度:{len(moderate_issues)}, 轻微:{len(minor_issues)}")
 
         if critical_issues:
             warning(f"发现{len(critical_issues)}个严重连续性问题")
@@ -483,14 +502,18 @@ class PipelineDecision:
             return PipelineState.NEEDS_REPAIR
         elif moderate_issues:
             warning(f"发现{len(moderate_issues)}个中度连续性问题")
+            # 如果已经重试过多次，考虑人工干预
+            if state.continuity_retry_count >= max_continuity_retries - 1:
+                warning(f"中度问题持续存在，已达重试上限，{state.continuity_retry_count} 次")
+                return PipelineState.NEEDS_HUMAN
             return PipelineState.NEEDS_REPAIR
         elif minor_issues:
             warning(f"发现{len(minor_issues)}个轻微连续性问题")
+            # 轻微问题可以继续
             return PipelineState.VALID
         else:
             warning(f"发现{len(issues)}个连续性问题，但严重性未知")
             return PipelineState.VALID
-
 
     def decide_after_error(self, state: WorkflowState) -> PipelineState:
         """错误处理后的决策
@@ -499,9 +522,10 @@ class PipelineDecision:
         1. 检查是否超过重试次数
         2. 分析错误类型
         3. 根据错误类型决定下一步
+        4. 支持延迟重试机制
 
         错误类型分类：
-        - 网络/超时错误: 可以重试
+        - 网络/超时错误: 可以重试，可能需要延迟
         - 验证/无效错误: 可恢复错误
         - 配置错误: 需要修复
         - 其他错误: 普通失败
@@ -541,12 +565,108 @@ class PipelineDecision:
             info("错误需要人工干预")
             return PipelineState.NEEDS_HUMAN
 
-        # 检查延迟标志
+        # ========== 增强的延迟检查逻辑 ==========
+        # 1. 检查延迟标志（从recovery_flags获取）
         if hasattr(state, 'recovery_flags') and state.recovery_flags.get('need_delay', False):
             delay_seconds = state.recovery_flags.get('delay_seconds', 5)
-            warning(f"错误处理建议延迟 {delay_seconds} 秒后重试")
-            # 在实际实现中，这里可以添加实际的延迟逻辑
-            # 暂时返回 RETRY，由工作流调度器处理延迟
+            max_delay = state.recovery_flags.get('max_delay', 60)
+            delay_count = state.recovery_flags.get('delay_count', 0)
+            total_delay = state.recovery_flags.get('total_delay', 0)
+
+            # 检查是否超过最大延迟时间
+            if total_delay + delay_seconds > max_delay:
+                warning(f"延迟总时间将超过限制: {total_delay + delay_seconds}/{max_delay}秒")
+                return PipelineState.NEEDS_HUMAN
+
+            # 更新延迟计数
+            state.recovery_flags['delay_count'] = delay_count + 1
+            state.recovery_flags['total_delay'] = total_delay + delay_seconds
+
+            # 检查延迟次数限制
+            max_delay_count = state.recovery_flags.get('max_delay_count', 3)
+            if delay_count + 1 >= max_delay_count:
+                warning(f"延迟次数已达上限: {delay_count + 1}/{max_delay_count}")
+                return PipelineState.NEEDS_HUMAN
+
+            # 动态调整延迟时间（指数退避）
+            if delay_count > 0:
+                delay_seconds = min(delay_seconds * 2, max_delay - total_delay)
+                state.recovery_flags['delay_seconds'] = delay_seconds
+
+            info(f"错误处理建议延迟 {delay_seconds} 秒后重试 (第{delay_count + 1}次延迟)")
+
+            # 执行实际延迟（使用 asyncio.sleep 或 time.sleep）
+            import asyncio
+            import time
+
+            # 检测是否在事件循环中运行
+            try:
+                loop = asyncio.get_running_loop()
+                # 异步环境
+                future = asyncio.ensure_future(self._execute_delay(delay_seconds))
+                # 注意：这里不能直接阻塞，返回RETRY并设置延迟标志
+                # 实际延迟由调度器处理
+            except RuntimeError:
+                # 同步环境
+                info(f"同步环境中执行延迟 {delay_seconds} 秒...")
+                time.sleep(delay_seconds)
+
+            return PipelineState.RETRY
+
+        # 2. 检查错误类型相关的延迟需求
+        error_messages = state.error_messages
+        if error_messages:
+            last_error = error_messages[-1] if error_messages else ""
+            error_lower = last_error.lower()
+
+            # 根据错误类型判断是否需要延迟
+            delay_needed = False
+            delay_seconds = 0
+
+            # 网络相关错误
+            if any(keyword in error_lower for keyword in ['timeout', 'connection', 'network', 'socket', 'http', 'request failed']):
+                delay_needed = True
+                delay_seconds = 3
+                info(f"检测到网络/超时错误，需要延迟 {delay_seconds} 秒后重试")
+
+            # API限流错误
+            elif any(keyword in error_lower for keyword in ['rate limit', 'too many requests', '429', 'quota']):
+                delay_needed = True
+                delay_seconds = 10
+                info(f"检测到API限流错误，需要延迟 {delay_seconds} 秒后重试")
+
+            # 资源繁忙错误
+            elif any(keyword in error_lower for keyword in ['busy', 'resource', 'locked', 'conflict']):
+                delay_needed = True
+                delay_seconds = 2
+                info(f"检测到资源繁忙错误，需要延迟 {delay_seconds} 秒后重试")
+
+            # 服务不可用错误
+            elif any(keyword in error_lower for keyword in ['unavailable', 'service', '503', '502', '500']):
+                delay_needed = True
+                delay_seconds = 5
+                info(f"检测到服务不可用错误，需要延迟 {delay_seconds} 秒后重试")
+
+            if delay_needed:
+                # 初始化 recovery_flags（如果不存在）
+                if not hasattr(state, 'recovery_flags'):
+                    state.recovery_flags = {}
+
+                state.recovery_flags['need_delay'] = True
+                state.recovery_flags['delay_seconds'] = delay_seconds
+                state.recovery_flags['delay_reason'] = f"错误类型: {last_error[:100]}"
+
+                # 执行延迟
+                try:
+                    import asyncio
+                    loop = asyncio.get_running_loop()
+                    asyncio.ensure_future(self._execute_delay(delay_seconds))
+                except RuntimeError:
+                    import time
+                    info(f"同步环境中执行延迟 {delay_seconds} 秒...")
+                    time.sleep(delay_seconds)
+
+                return PipelineState.RETRY
 
         # 检查修复标志
         if hasattr(state, 'recovery_flags') and state.recovery_flags.get('need_repair', False):
@@ -580,6 +700,13 @@ class PipelineDecision:
         info("尝试重试流程")
         return PipelineState.RETRY
 
+    async def _execute_delay(self, delay_seconds: float):
+        """异步执行延迟（辅助方法）"""
+        import asyncio
+        info(f"异步延迟执行 {delay_seconds} 秒...")
+        await asyncio.sleep(delay_seconds)
+        info(f"异步延迟结束，继续执行")
+
 
     def decide_next_after_error(self, graph_state: WorkflowState) -> str:
         """错误处理后决定下一个节点"""
@@ -589,10 +716,16 @@ class PipelineDecision:
         # 2. 根据决策决定下一个节点
         if decision_state == PipelineState.VALID:
             # 可恢复错误，根据错误来源决定重试节点
-            return self._get_retry_node_based_on_error_source(graph_state, PipelineState.VALID)
+            retry_node = self._get_retry_node_based_on_error_source(graph_state, PipelineState.VALID)
+            # 增加重试计数
+            self._increment_stage_retry(graph_state, retry_node)
+            return retry_node.value
         elif decision_state == PipelineState.RETRY:
             # 需要重试，根据错误来源决定重试节点
-            return self._get_retry_node_based_on_error_source(graph_state, PipelineState.RETRY)
+            retry_node = self._get_retry_node_based_on_error_source(graph_state, PipelineState.RETRY)
+            # 增加重试计数
+            self._increment_stage_retry(graph_state, retry_node)
+            return retry_node.value
         elif decision_state == PipelineState.NEEDS_REPAIR:
             # 需要修复，通常回到提示词生成
             return PipelineNode.CONVERT_PROMPT.value
@@ -605,7 +738,10 @@ class PipelineDecision:
         else:
             # 默认情况，重新开始
             warning(f"未知错误决策: {decision_state}，默认回到剧本解析")
-            return PipelineNode.PARSE_SCRIPT.value
+            retry_node = PipelineNode.PARSE_SCRIPT
+            # 增加重试计数
+            self._increment_stage_retry(graph_state, retry_node)
+            return retry_node.value
 
 
     def decide_after_human(self, state: WorkflowState) -> PipelineState:
@@ -745,7 +881,7 @@ class PipelineDecision:
             return retry_mapping[last_node]
         else:
             # 默认回到剧本解析重新开始
-            info(f"未知错误来源 {last_node}，回到剧本解析重新开始")
+            warning(f"未知错误来源 {last_node}，回到剧本解析重新开始")
             return PipelineNode.PARSE_SCRIPT
 
     def _can_retry_stage(self, state: WorkflowState, stage_node: PipelineNode) -> Tuple[bool, str]:

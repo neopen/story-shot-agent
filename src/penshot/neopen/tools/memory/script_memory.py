@@ -8,7 +8,7 @@
 from datetime import datetime
 from typing import Optional, Any, Dict, List
 
-from langchain.llms.base import BaseLLM
+from langchain_core.language_models import BaseLLM
 
 from penshot.logger import info
 from penshot.neopen.tools.memory.long_term_memory import LongTermMemory

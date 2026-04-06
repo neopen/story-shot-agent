@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import json
+import random
 import uuid
 from collections import OrderedDict
 from dataclasses import is_dataclass
@@ -21,10 +22,12 @@ from threading import RLock
 from typing import Optional, Dict, Any, List
 
 from penshot.logger import info, error, warning, debug
+from penshot.neopen.agent.base_models import VideoStyle
 # if TYPE_CHECKING:
 from penshot.neopen.agent.workflow.workflow_pipeline import MultiAgentPipeline
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.task.task_models import TaskStatus, TaskStage
+from penshot.utils.hash_utils import text_to_id
 from penshot.utils.log_utils import print_log_exception
 from penshot.utils.obj_utils import obj_to_dict
 from penshot.utils.redis_utils import RedisClient
@@ -70,6 +73,20 @@ class TaskManager:
             warning(f"Redis 不可用，将使用内存存储: {e}")
             self.redis = None
             self.use_redis = False
+
+
+    # ==================== 辅助方法 ====================
+    def _generate_script_code(self, script: str) -> str:
+        return text_to_id(script)
+
+    def _generate_script_id(self, script_code: str) -> str:
+        return "HL" + datetime.now(timezone.utc).strftime("%y%m%d") + script_code
+
+    def _generate_task_id(self, script_code: str) -> str:
+        """生成任务ID"""
+        # return "TSK" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + str(random.randint(10, 99)) + str(hash(script_id))
+        return "TSK" + script_code + str(random.randint(1000, 9999))
+
 
     # ---------------------- serialization helpers ----------------------
     def _safe_serialize(self, value: Any) -> Any:
@@ -146,17 +163,24 @@ class TaskManager:
         return f"penshot:tasks:metrics:{name}"
 
     # ---------------------- core operations ----------------------
-    def create_task(self, script: str, config: Optional[ShotConfig] = None, task_id: str = None) -> str:
+    def create_task(self, script: str, script_id: Optional[str] = None,
+                    style: Optional[VideoStyle] = None, config: Optional[ShotConfig] = None) -> (str, str):
         if not isinstance(script, str) or not script.strip():
             raise ValueError("script must be a non-empty string")
-        task_id = task_id or str(uuid.uuid4())
+        script_code = self._generate_script_code(script)
+        script_id = script_id or self._generate_script_id(script_code)
+        task_id = self._generate_task_id(script_code)
+        shot_config = config or ShotConfig()
+        if style:
+            shot_config.default_style = style.value
 
         record = {
             "task_id": task_id,
+            "script_id": script_id,
             "script": script,
-            "config": config,
+            "config": shot_config,
             "status": TaskStatus.PENDING,
-            "stage": "initialized",
+            "stage": TaskStage.INIT.code,
             "progress": 0,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -206,7 +230,7 @@ class TaskManager:
                 self._metrics["created"] += 1
 
         info(f"创建任务: {task_id}")
-        return task_id
+        return script_id, task_id
 
     def _read_record_local(self, task_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
@@ -757,7 +781,7 @@ class TaskManager:
         return True
 
     # keep get_workflow behavior similar to previous (in-memory pipeline cache)
-    def get_workflow(self, task_manager, task_id: Optional[str] = None, config: Optional[Any] = None) -> "Any":
+    def get_workflow(self, task_manager, script_id, task_id: str, config: Optional[Any] = None) -> "Any":
         # prefer local raw config when available
         if task_id is not None and (config is None or isinstance(config, dict)):
             with self._lock:
@@ -788,7 +812,7 @@ class TaskManager:
             if getattr(self, "pipeline_factory", None) is not None:
                 pipeline = self.pipeline_factory(task_id, config)
             else:
-                pipeline = MultiAgentPipeline(task_id, task_id, config, task_manager)
+                pipeline = MultiAgentPipeline(script_id, task_id, config, task_manager)
             info(f"创建新工作流: {key}")
         except Exception as e:
             error(f"创建工作流失败: {e}")
@@ -1142,8 +1166,6 @@ class TaskManager:
         return False
 
     #     ============================ 恢复任务 ================================
-
-    # task_manager.py - 添加 update_task_status 方法
 
     def update_task_status(self, task_id: str, status: TaskStatus) -> bool:
         """

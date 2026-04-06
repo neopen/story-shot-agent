@@ -6,7 +6,6 @@
 """
 import asyncio
 import functools
-import random
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
@@ -15,18 +14,15 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from penshot.logger import info, error, log_with_context
+from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
-from penshot.neopen.shot_context import task_id_ctx
+from penshot.neopen.shot_context import script_id_ctx
 from penshot.neopen.shot_language import set_language, ShotLanguage
 from penshot.neopen.task.task_init import get_task_factory
 from penshot.neopen.task.task_models import (
     ProcessingStatus, TaskStatus, TaskResponse, TaskStage
 )
 from penshot.utils.log_utils import print_log_exception
-
-
-def _generate_task_id() -> str:
-    return "HL" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9999))
 
 
 # ============================================================================
@@ -52,7 +48,7 @@ class CancelTaskResponse(BaseModel):
 class SyncProcessRequest(BaseModel):
     """同步处理请求"""
     script: str
-    task_id: Optional[str] = None
+    script_id: Optional[str] = None
     language: ShotLanguage = ShotLanguage.ZH
     config: Optional[ShotConfig] = None
     timeout: float = 300
@@ -63,13 +59,14 @@ class ProcessRequest(BaseModel):
 
     Notes:
     - `config` 使用通用字典以保证可序列化并与内部 dataclass 互操作。
-    - `task_id` 使用生成器作为默认值。
+    - `script_id` 使用生成器作为默认值。
     """
     script: str = Field(..., min_length=1, description="原始剧本文本")
+    style: VideoStyle = Field(default=VideoStyle.REALISTIC, min_length=1, description="视频风格")
     config: Optional[ShotConfig] = Field(default_factory=ShotConfig, description="处理配置（序列化形式）")
     callback_url: Optional[str] = Field(default=None, description="回调URL，处理完成后通知（可选）")
-    task_id: str = Field(default_factory=_generate_task_id, description="外部请求ID（可选）")
-    language: ShotLanguage = Field(default=ShotLanguage.ZH, description='剧本语言，例如 "zh" 或 "en"')
+    script_id: Optional[str] = Field(default=None, description="剧本ID：如果是属于同一个剧本的不同请求，可以使用相同的ID，否则就是不同（可选）")
+    language: Optional[ShotLanguage] = Field(default=ShotLanguage.ZH, description='剧本语言，例如 "zh" 或 "en"')
 
     @field_validator("language")
     def validate_language(cls, v):
@@ -81,6 +78,7 @@ class ProcessRequest(BaseModel):
 class ProcessResult(BaseModel):
     """处理结果响应模型（用于回调和最终响应）"""
     task_id: str
+    script_id: Optional[str] = None
     status: TaskStatus = Field(..., description="success | failed")
     success: bool = False
     data: Optional[Dict[str, Any]] = None
@@ -155,15 +153,15 @@ def generate_storyboard(
             "INFO",
             "接收到分镜生成请求",
             {
-                "task_id": request.task_id,
+                "script_id": request.script_id,
                 "script_length": len(request.script),
                 "language": request.language
             }
         )
 
         # 设置上下文
-        if request.task_id:
-            task_id_ctx.set(request.task_id)
+        if request.script_id:
+            script_id_ctx.set(request.script_id)
 
         # 设置语言
         set_language(request.language)
@@ -171,9 +169,10 @@ def generate_storyboard(
         factory = get_task_factory()
 
         # 提交任务到工厂
-        task_id = factory.submit(
+        script_id, task_id = factory.submit(
             script=request.script,
-            task_id=request.task_id,
+            script_id=request.script_id,
+            style=request.style,
             config=request.config,
             language=request.language,
             callback_url=request.callback_url
@@ -184,6 +183,7 @@ def generate_storyboard(
         return ProcessResult(
             success=True,
             task_id=task_id,
+            script_id=script_id,
             status=TaskStatus.PENDING,
             message="任务已提交，请使用任务ID查询状态",
             created_at=datetime.now(timezone.utc)
@@ -228,7 +228,7 @@ async def generate_storyboard_sync(
         result: TaskResponse = await asyncio.to_thread(
             lambda: factory.submit_and_wait(
                 script=request.script,
-                task_id=request.task_id,
+                script_id=request.script_id,
                 config=request.config,
                 language=request.language,
                 timeout=request.timeout
@@ -238,6 +238,7 @@ async def generate_storyboard_sync(
         if result.success:
             return ProcessResult(
                 task_id=result.task_id,
+                script_id=request.script_id,
                 success=True,
                 status=TaskStatus.SUCCESS,
                 data=result.data,
@@ -376,6 +377,7 @@ async def batch_process_scripts_sync(
         return [
             ProcessResult(
                 task_id=r.task_id,
+                script_id="",
                 success=r.success,
                 status=TaskStatus.SUCCESS if r.success else TaskStatus.FAILED,
                 data=r.data,
@@ -592,6 +594,7 @@ def get_task_result(task_id: str):
 
     return ProcessResult(
         task_id=result.task_id,
+        script_id="",
         success=True,
         status=result.status,
         data=result.data,
@@ -778,6 +781,7 @@ async def recover_tasks(max_age_hours: int = 2):
         "max_age_hours": max_age_hours,
         "message": f"已恢复 {recovered_count} 个任务（{max_age_hours}小时内）"
     }
+
 
 # ============================================================================
 # 配置接口

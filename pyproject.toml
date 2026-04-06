@@ -7,7 +7,7 @@ version = {attr = "penshot.__version__"}
 
 [project]
 name = "penshot"
-version = "0.2.2"
+version = "0.2.3"
 description = "长剧本分镜智能体：支持将任意自然语言剧本，转换为结构化分镜数据，支持视频生成与编辑。"
 readme = "README.md"
 authors = [
@@ -40,10 +40,11 @@ dependencies = [
 #    "httpx>=0.25.0",
 
     # 核心AI/LLM
-    "langchain==0.3.27",
-    "langchain-community==0.3.31",
-    "langchain-ollama>=0.1.0",
-    "langgraph==0.6.11",
+    "langchain>=1.0.0",
+    "langchain-community",
+    "langchain-ollama>=1.0.0",
+    "langchain-chroma>=1.0.0",
+    "langgraph>=1.0.0",
 #    "langchain-deepseek>=0.1.0",
 #    "dashscope==1.23.9",
 
@@ -63,7 +64,6 @@ dependencies = [
     "numpy>=1.24.0",
     "jieba>=0.42.1",
     "redis",
-    "chromadb",
 
     # 工具库
 #    "requests>=2.31.0",

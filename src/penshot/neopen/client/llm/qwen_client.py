@@ -5,6 +5,7 @@
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/10 23:13
 """
+import os
 
 from langchain_community.chat_models import ChatTongyi  # Qwen via Tongyi
 from langchain_community.embeddings import DashScopeEmbeddings
@@ -20,7 +21,8 @@ class QwenClient(BaseClient):
 
     def __init__(self, config: AIConfig):
         super().__init__(config)
-        self.base_url = "https://dashscope.aliyuncs.com/api/v1"
+        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        os.environ["DASHSCOPE_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
     def llm_model(self) -> BaseLanguageModel:
         return ChatTongyi(

@@ -33,11 +33,12 @@ class ResultStorage:
         self.base_output_dir = base_output_dir or settings.get_data_paths()['data_output']
         debug(f"结果存储初始化完成，基础目录: {self.base_output_dir}")
 
-    def get_result_path(self, task_id: str, result_filename: str = "script_parser_result.json") -> str:
+    def get_result_path(self, script_id: str, task_id: str, result_filename: str = "script_parser_result.json") -> str:
         """
         获取特定结果文件的完整路径
         
         Args:
+            script_id: 剧本ID
             task_id: 请求的唯一标识符
             result_filename: 结果文件名
             
@@ -45,41 +46,42 @@ class ResultStorage:
             结果文件的完整路径
         """
         # 创建以uuid命名的子目录
-        uuid_dir = os.path.join(self.base_output_dir, task_id)
+        uuid_dir = os.path.join(self.base_output_dir, script_id, task_id)
         os.makedirs(uuid_dir, exist_ok=True)
 
         # 返回完整的结果文件路径
         return os.path.join(uuid_dir, result_filename)
 
-    def save_obj(self, task_id: str, result_data: Any):
+    def save_obj(self, script_id: str, task_id: str, result_data: Any):
         # 转换为字典
-        return self.save_json_result(task_id, obj_to_dict(result_data), f"{task_id}.json")
+        return self.save_json_result(script_id, task_id, obj_to_dict(result_data), f"{task_id}.json")
 
-    def save_obj_result(self, task_id: str, result_data: Any, result_filename: str):
+    def save_obj_result(self, script_id: str, task_id: str, result_data: Any, result_filename: str):
         # 转换为字典
-        return self.save_json_result(task_id, obj_to_dict(result_data), result_filename)
+        return self.save_json_result(script_id, task_id, obj_to_dict(result_data), result_filename)
 
-    def save_json_result(self, task_id: str, data_dict: Dict[str, Any], result_filename: str):
+    def save_json_result(self, script_id: str, task_id: str, data_dict: Dict[str, Any], result_filename: str):
         """保存json"""
         try:
             # 递归检查并处理可能被截断的字符串
             self._ensure_string_integrity(data_dict)
 
-            save_result = self.save_result(task_id, data_dict, result_filename)
-            debug(f"成功保存: data/output/{task_id}/{result_filename}")
+            save_result = self.save_result(script_id, task_id, data_dict, result_filename)
+            debug(f"成功保存: data/output/{script_id}/{task_id}/{result_filename}")
             return save_result
         except Exception as save_error:
             error(f"保存{result_filename}失败: {str(save_error)}")
             # 抛出异常以便上层处理
             raise
 
-    def save_result(self, task_id: str, result_data: Dict[str, Any],
+    def save_result(self, script_id: str, task_id: str, result_data: Dict[str, Any],
                     result_filename: str = "script_parser_result.json",
                     add_timestamp: bool = True) -> str:
         """
         保存智能体结果到指定文件
 
         Args:
+            script_id: 剧本ID
             task_id: 请求的唯一标识符
             result_data: 要保存的结果数据
             result_filename: 结果文件名
@@ -93,7 +95,7 @@ class ResultStorage:
         """
         try:
             # 获取保存路径
-            result_path = self.get_result_path(task_id, result_filename)
+            result_path = self.get_result_path(script_id, task_id, result_filename)
 
             # 创建要保存的数据副本
             save_data = result_data.copy()
@@ -179,12 +181,13 @@ class ResultStorage:
                 return json.dumps(result, ensure_ascii=False, default=str)
             return json.dumps({"error": "序列化失败", "original": str(data)}, ensure_ascii=False)
 
-    def load_result(self, uuid: str, result_filename: str = "script_parser_result.json") -> Optional[Dict[str, Any]]:
+    def load_result(self, script_id: str, task_id: str, result_filename: str = "script_parser_result.json") -> Optional[Dict[str, Any]]:
         """
         从文件加载智能体结果
 
         Args:
-            uuid: 请求的唯一标识符
+             script_id: 剧本ID
+            task_id: 请求的唯一标识符
             result_filename: 结果文件名
 
         Returns:
@@ -195,7 +198,7 @@ class ResultStorage:
         """
         try:
             # 获取文件路径
-            result_path = self.get_result_path(uuid, result_filename)
+            result_path = self.get_result_path(script_id, task_id, result_filename)
 
             # 检查文件是否存在
             if not os.path.exists(result_path):
@@ -214,39 +217,41 @@ class ResultStorage:
             return result_data
 
         except json.JSONDecodeError as e:
-            error(f"解析结果文件失败 (UUID: {uuid}): {str(e)}")
+            error(f"解析结果文件失败 (UUID: {task_id}): {str(e)}")
             raise IOError(f"无法解析结果文件: {str(e)}")
         except Exception as e:
-            error(f"加载结果失败 (UUID: {uuid}): {str(e)}")
+            error(f"加载结果失败 (UUID: {task_id}): {str(e)}")
             raise IOError(f"无法加载结果: {str(e)}")
 
-    def result_exists(self, uuid: str, result_filename: str = "script_parser_result.json") -> bool:
+    def result_exists(self, script_id: str, task_id: str, result_filename: str = "script_parser_result.json") -> bool:
         """
         检查特定UUID的结果文件是否存在
 
         Args:
-            uuid: 请求的唯一标识符
+             script_id: 剧本ID
+            task_id: 请求的唯一标识符
             result_filename: 结果文件名
 
         Returns:
             文件是否存在
         """
-        result_path = self.get_result_path(uuid, result_filename)
+        result_path = self.get_result_path(script_id, task_id, result_filename)
         return os.path.exists(result_path)
 
-    def delete_result(self, uuid: str, result_filename: str = "script_parser_result.json") -> bool:
+    def delete_result(self, script_id: str, task_id: str, result_filename: str = "script_parser_result.json") -> bool:
         """
         删除特定UUID的结果文件
 
         Args:
-            uuid: 请求的唯一标识符
+            script_id: 剧本ID
+            task_id: 请求的唯一标识符
             result_filename: 结果文件名
 
         Returns:
             删除是否成功
         """
         try:
-            result_path = self.get_result_path(uuid, result_filename)
+            result_path = self.get_result_path(script_id, task_id, result_filename)
 
             if os.path.exists(result_path):
                 os.remove(result_path)
@@ -257,7 +262,7 @@ class ResultStorage:
                 return False
 
         except Exception as e:
-            error(f"删除结果失败 (UUID: {uuid}): {str(e)}")
+            error(f"删除结果失败 (UUID: {task_id}): {str(e)}")
             return False
 
     def list_available_results(self) -> Dict[str, Dict[str, str]]:
@@ -329,35 +334,3 @@ def create_result_storage(base_output_dir: Optional[str] = None) -> ResultStorag
     """
     return ResultStorage(base_output_dir)
 
-
-def save_script_parser_result(uuid: str, result_data: Dict[str, Any],
-                              base_output_dir: str = "data/output") -> str:
-    """
-    保存剧本解析器结果的便捷函数
-
-    Args:
-        uuid: 请求的唯一标识符
-        result_data: 剧本解析结果数据
-        base_output_dir: 基础输出目录路径
-
-    Returns:
-        保存的文件路径
-    """
-    storage = create_result_storage(base_output_dir)
-    return storage.save_result(uuid, result_data, "script_parser_result.json")
-
-
-def load_script_parser_result(uuid: str,
-                              base_output_dir: str = "data/output") -> Optional[Dict[str, Any]]:
-    """
-    加载剧本解析器结果的便捷函数
-
-    Args:
-        uuid: 请求的唯一标识符
-        base_output_dir: 基础输出目录路径
-
-    Returns:
-        剧本解析结果数据，如果不存在则返回None
-    """
-    storage = create_result_storage(base_output_dir)
-    return storage.load_result(uuid, "script_parser_result.json")

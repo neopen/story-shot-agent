@@ -9,10 +9,10 @@
 import asyncio
 import threading
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Dict, Optional, List, Any, Callable
 
 from penshot.logger import log_with_context, info, error
+from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_language import ShotLanguage, set_language
 from penshot.neopen.task.task_factory import create_task_factory, TaskFactory, TaskResponse, TaskPriority
@@ -115,7 +115,7 @@ class PenshotFunction:
     def breakdown_script(
             self,
             script_text: str,
-            task_id: Optional[str] = None,
+            script_id: Optional[str] = None,
             language: Optional[ShotLanguage] = None,
             wait_timeout: float = 300.0,
             priority: TaskPriority = TaskPriority.NORMAL
@@ -125,7 +125,7 @@ class PenshotFunction:
 
         Args:
             script_text: 剧本文本
-            task_id: 任务ID（可选）
+            script_id: 剧本ID：如果是属于同一个剧本的不同请求，可以使用相同的ID，否则就是不同（可选）
             language: 输出语言
             wait_timeout: 等待超时时间（秒）
             priority: 任务优先级
@@ -135,7 +135,7 @@ class PenshotFunction:
         """
         task_id = self.breakdown_script_async(
             script_text=script_text,
-            task_id=task_id,
+            script_id=script_id,
             language=language,
             priority=priority
         )
@@ -144,7 +144,8 @@ class PenshotFunction:
     def breakdown_script_async(
             self,
             script_text: str,
-            task_id: Optional[str] = None,
+            script_id: Optional[str] = None,
+            style: Optional[VideoStyle] = None,
             language: Optional[ShotLanguage] = None,
             callback: Optional[Callable] = None,
             priority: TaskPriority = TaskPriority.NORMAL
@@ -154,7 +155,8 @@ class PenshotFunction:
 
         Args:
             script_text: 剧本文本
-            task_id: 任务ID（可选）
+            style: 视频风格
+            script_id: 剧本ID：如果是属于同一个剧本的不同请求，可以使用相同的ID，否则就是不同（可选）
             language: 输出语言
             callback: 任务完成回调函数
             priority: 任务优先级
@@ -163,24 +165,53 @@ class PenshotFunction:
             str: 任务ID
         """
         # 生成任务ID
-        task_id = task_id or self._generate_task_id()
         lang = language or self.language
-
-        # 保存回调
-        if callback:
-            self._callbacks[task_id] = callback
 
         # 设置语言
         set_language(lang)
 
-        # 使用 TaskFactory 提交任务
-        self.task_factory.submit(
+        # 内部回调：TaskFactory 会在任务完成时把 TaskResponse 传入
+        def _internal_callback(task_response: TaskResponse):
+            try:
+                # 先让 PenshotFunction 自身处理完成事件（日志/内部清理/兼容行为）
+                try:
+                    self._on_task_complete(task_response.task_id, task_response)
+                except Exception as _e:
+                    # _on_task_complete 内部已经有日志与异常打印，但这里再捕获以防止阻断用户回调
+                    error(f"内部任务完成处理失败: {task_response.task_id}, 错误: {_e}")
+                    print_log_exception()
+
+                # 如果有用户回调，直接调用（使用 TaskResponse 中的 task_id），避免竞态和重复调用
+                if callback:
+                    try:
+                        user_result = PenshotResult(
+                            task_id=task_response.task_id,
+                            success=task_response.success,
+                            status=task_response.status,
+                            data=task_response.data,
+                            error=task_response.error,
+                            processing_time_ms=task_response.processing_time_ms
+                        )
+                        callback(user_result)
+                    except Exception as e:
+                        error(f"用户回调执行失败: {task_response.task_id}, 错误: {e}")
+                        print_log_exception()
+
+            except Exception as e:
+                # 最外层保护，确保任何异常不会破坏 TaskFactory 的流程
+                error(f"任务回调处理异常: {str(e)}")
+                print_log_exception()
+
+        # 使用 TaskFactory 提交任务，TaskFactory 会在任务完成时调用上面的 _internal_callback
+        script_id2, task_id = self.task_factory.submit(
+            script_id=script_id,
             script=script_text,
-            task_id=task_id,
+            style=style,
             config=self.config,
             language=lang,
             priority=priority,
-            callback=lambda r: self._on_task_complete(task_id, r)
+            # callback=lambda r: self._on_task_complete(task_id, r)
+            callback=_internal_callback
         )
 
         log_with_context("INFO", f"任务已提交: {task_id}", {"priority": priority.name})
@@ -264,7 +295,6 @@ class PenshotFunction:
             error=result.error,
             processing_time_ms=result.processing_time_ms
         )
-
 
     def wait_for_result(
             self,
@@ -376,7 +406,6 @@ class PenshotFunction:
             for r in results
         ]
 
-
     async def batch_breakdown_async(
             self,
             scripts: List[str],
@@ -406,7 +435,6 @@ class PenshotFunction:
             )
             for r in results
         ]
-
 
     # ==================== 队列监控方法 ====================
 
@@ -463,13 +491,6 @@ class PenshotFunction:
             self._background_thread.join(timeout=5)
 
         info("PenshotFunction 已关闭")
-
-    # ==================== 辅助方法 ====================
-
-    def _generate_task_id(self) -> str:
-        """生成任务ID"""
-        import random
-        return "TSK" + datetime.now().strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9999))
 
 
 # ==================== 便捷函数 ====================

@@ -5,6 +5,7 @@
 @Github: https://github.com/neopen/video-shot-agent
 @Time: 2026/1/10 23:17
 """
+import os
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseLanguageModel
@@ -18,7 +19,9 @@ class DeepSeekClient(BaseClient):
 
     def __init__(self, config: AIConfig):
         super().__init__(config)
-        self.base_url = self.llm_config.base_url or "https://api.deepseek.com/v1/chat/completions"
+        # self.base_url = self.llm_config.base_url or "https://api.deepseek.com/v1/chat/completions"
+        self.base_url = self.llm_config.base_url or "https://api.deepseek.com"
+        os.environ["DEEPSEEK_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
     def llm_model(self) -> BaseLanguageModel:
         from langchain_openai import ChatOpenAI

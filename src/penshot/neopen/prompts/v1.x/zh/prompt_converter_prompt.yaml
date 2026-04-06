@@ -131,7 +131,7 @@ prompt_converter_user:
           "audio_style": "cinematic/realistic/anime/commercial",
           "voice_character": "说话角色（可选）",
           "voice_description": "音色文字描述（英文）",
-          "speed": 1.0,
+          "speed": 1,
           "pitch_shift": 0,
           "emotion": "neutral/happy/sad/angry/tender",
           "stability": 0.7,
@@ -139,7 +139,7 @@ prompt_converter_user:
           "sound_attributes": {{"intensity": 0.8, "reverb": 0.3}},
           "format": "wav/mp3/flac",
           "sample_rate": 24000,
-          "seed": "随机种子。用于重现相同结果",
+          "seed": 751512420,
           "scene_context": "场景描述（英文）"
         }}
       }}

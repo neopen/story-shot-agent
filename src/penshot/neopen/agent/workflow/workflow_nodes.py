@@ -138,7 +138,7 @@ class WorkflowNodes:
             })
 
             # ========== 4. 保存结果 ==========
-            self.storage.save_obj_result(state.task_id, parsed_script, "script_parser_result.json")
+            self.storage.save_obj_result(state.script_id, state.task_id, parsed_script, "script_parser_result.json")
 
             # ========== 5. 问题检测与记忆存储 ==========
             parse_issues = self.script_parser.detect_issues(parsed_script, state.raw_script)
@@ -303,7 +303,7 @@ class WorkflowNodes:
             debug(f"镜头类型分布: {shot_types}")
 
             # ========== 4. 保存结果 ==========
-            self.storage.save_obj_result(state.task_id, shot_sequence, "shot_segmenter_result.json")
+            self.storage.save_obj_result(state.script_id, state.task_id, shot_sequence, "shot_segmenter_result.json")
 
             # ========== 5. 问题检测与记忆存储 ==========
             segment_issues = self.shot_segmenter.detect_issues(shot_sequence, state.parsed_script)
@@ -449,7 +449,7 @@ class WorkflowNodes:
             debug(f"时长分布: 最小={min(durations):.1f}s, 最大={max(durations):.1f}s, 平均={sum(durations) / len(durations):.1f}s")
 
             # ========== 4. 保存结果 ==========
-            self.storage.save_obj_result(state.task_id, fragment_sequence, "video_splitter_result.json")
+            self.storage.save_obj_result(state.script_id, state.task_id, fragment_sequence, "video_splitter_result.json")
 
             # ========== 5. 问题检测与记忆存储 ==========
             split_issues = self.video_splitter.detect_issues(fragment_sequence, state.shot_sequence)
@@ -612,7 +612,7 @@ class WorkflowNodes:
                 debug(f"风格分布: {styles}")
 
             # ========== 4. 保存结果 ==========
-            self.storage.save_obj_result(state.task_id, instructions, "prompt_converter_result.json")
+            self.storage.save_obj_result(state.script_id, state.task_id, instructions, "prompt_converter_result.json")
 
             # ========== 5. 问题检测与记忆存储 ==========
             convert_issues = self.prompt_converter.detect_issues(instructions, state.fragment_sequence)
@@ -871,10 +871,10 @@ class WorkflowNodes:
                         state.error_messages.append(f"修复{node.value}失败: {str(e)}")
 
             # 保存审查结果
-            self.storage.save_obj_result(state.task_id, result, "quality_auditor_result.json")
+            self.storage.save_obj_result(state.script_id, state.task_id, result, "quality_auditor_result.json")
 
             if hasattr(result, 'detailed_analysis'):
-                self.storage.save_obj_result(state.task_id, result.detailed_analysis, "quality_auditor_detailed_analysis.json")
+                self.storage.save_obj_result(state.script_id, state.task_id, result.detailed_analysis, "quality_auditor_detailed_analysis.json")
 
             state.audit_report = result
             state.current_stage = AgentStage.AUDITOR
@@ -920,6 +920,12 @@ class WorkflowNodes:
         self._update_task_progress(state.task_id, TaskStage.CONTINUITY_START, 0)
 
         try:
+            # ========== 初始化或获取重试计数 ==========
+            if not hasattr(state, 'continuity_retry_count'):
+                state.continuity_retry_count = 0
+            if not hasattr(state, 'max_continuity_retries'):
+                state.max_continuity_retries = 3
+
             # 回忆历史连续性问题
             historical_continuity_issues = self._get_memory_list("continuity_issues_history", level=MemoryLevel.MEDIUM_TERM, default=[])
             successful_continuity_fixes = self._get_memory_list("successful_continuity_fixes", level=MemoryLevel.LONG_TERM, default=[])
@@ -949,7 +955,8 @@ class WorkflowNodes:
             self._update_task_progress(state.task_id, TaskStage.CONTINUITY_COMPLETE, 100)
             self._complete_stage(state.task_id, TaskStage.CONTINUITY_COMPLETE, {
                 "passed": check_result.passed,
-                "total_issues": check_result.total_issues
+                "total_issues": check_result.total_issues,
+                "retry_count": state.continuity_retry_count
             })
 
             # 3. 如果没有问题，通过检查
@@ -957,6 +964,8 @@ class WorkflowNodes:
                 debug("连续性检查通过")
                 state.continuity_passed = True
                 state.current_stage = AgentStage.CONTINUITY
+                # 重置重试计数
+                state.continuity_retry_count = 0
                 return state
 
             # 4. 获取问题列表
@@ -979,12 +988,13 @@ class WorkflowNodes:
             if len(continuity_history) > 100:
                 continuity_history = continuity_history[-100:]
             self.memory.add("continuity_issues_history", continuity_history, level=MemoryLevel.MEDIUM_TERM,
-                metadata={"_serialized": True})
+                            metadata={"_serialized": True})
 
-            warning(f"发现 {len(continuity_issues)} 个连续性问题，分布在: {[s.name for s in issues_by_stage.keys()]}")
+            warning(f"发现 {len(continuity_issues)} 个连续性问题，分布在: {[s.name for s in issues_by_stage.keys()]}, "
+                    f"重试次数: {state.continuity_retry_count}/{state.max_continuity_retries}")
 
             # 6. 检查重试限制
-            if self._can_retry_continuity(state):
+            if state.continuity_retry_count < state.max_continuity_retries:
                 # 7. 生成修复参数并触发重试
                 for stage, issues in issues_by_stage.items():
                     repair_params = self._create_continuity_repair_params(issues, stage)
@@ -992,19 +1002,20 @@ class WorkflowNodes:
                     info(f"为阶段 {stage.value} 生成连续性修复参数，共{len(issues)}个问题")
 
                 # 标记需要重试
-                state.continuity_retry_count = getattr(state, 'continuity_retry_count', 0) + 1
+                state.continuity_retry_count += 1
                 state.needs_continuity_repair = True
                 state.error_source = PipelineNode.CONTINUITY_CHECK
+
+                info(f"连续性修复重试 ({state.continuity_retry_count}/{state.max_continuity_retries})")
 
                 # 返回到需要修复的阶段
                 return self._route_to_fix_stage(state, issues_by_stage)
             else:
                 # 重试次数超限，需要人工干预
-                error(f"连续性修复重试次数超限: {state.continuity_retry_count}")
+                error(f"连续性修复重试次数超限: {state.continuity_retry_count}/{state.max_continuity_retries}")
                 state.needs_human_review = True
                 state.error_source = PipelineNode.CONTINUITY_GUARDIAN
-
-            state.current_stage = AgentStage.CONTINUITY
+                state.current_stage = AgentStage.CONTINUITY
 
         except Exception as e:
             error(f"连续性守护节点异常: {e}")
@@ -1124,7 +1135,7 @@ class WorkflowNodes:
             self._update_task_progress(state.task_id, TaskStage.OUTPUT_GENERATING, 50)
 
             # ========== 异步保存各类报告（不阻塞） ==========
-            self.output_writer.save_all_reports(state, state.task_id)
+            self.output_writer.save_all_reports(state)
 
             # 更新状态：完成
             self._update_task_progress(state.task_id, TaskStage.COMPLETE, 100)
@@ -1162,12 +1173,12 @@ class WorkflowNodes:
         输入：需要人工决策的状态
         输出：人工处理后的状态
         """
-        state.current_stage = AgentStage.HUMAN
+        state.current_stage = AgentStage.HUMAN_INTERVENTION
         # 这里应该等待外部系统（如Web界面）提供反馈
         # 实际实现时可以通过回调或消息队列处理
 
         # 模拟人工反馈（实际应从外部获取）
-        if state.human_feedback:
+        if state.needs_human_review:
             # 应用人工修正
             self.human_intervention(state)
 
@@ -1279,6 +1290,7 @@ class WorkflowNodes:
             "system": ["system", "os", "kernel", "fatal", "critical", "segmentation"],
             "data": ["data", "corrupt", "missing", "empty", "null"],
             "loop": ["循环", "loop", "exceeded", "超过限制"],
+            "auth": ["401", "unauthorized", "authentication", "api-key", "apikey", "invalid api"],
             "unknown": ["unknown", "未定义", "不明"],
         }
 
@@ -1311,6 +1323,10 @@ class WorkflowNodes:
         if type_counts.get("system", 0) > 0 or type_counts.get("fatal", 0) > 0:
             analysis["suggested_action"] = "abort"
             analysis["can_recover"] = False
+        elif type_counts.get("auth", 0) > 0:
+            # 认证错误（如401）需要人工干预
+            analysis["suggested_action"] = "human_intervention"
+            analysis["can_recover"] = False
         elif type_counts.get("loop", 0) > 0:
             analysis["suggested_action"] = "human_intervention"
             analysis["can_recover"] = False
@@ -1336,6 +1352,13 @@ class WorkflowNodes:
         Returns:
             str: 恢复行动类型
         """
+        # 检查是否超过30分钟超时
+        if hasattr(state, 'workflow_start_time'):
+            elapsed_time = time.time() - state.workflow_start_time
+            if elapsed_time > 1800:  # 30分钟 = 1800秒
+                warning(f"工作流执行超时: {elapsed_time:.1f}秒，超过30分钟限制")
+                return "abort"
+        
         # 检查循环限制
         if getattr(state, 'global_loop_exceeded', False):
             return "abort"

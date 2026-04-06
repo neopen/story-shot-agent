@@ -10,11 +10,13 @@ from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
+from penshot.neopen.agent.base_models import VideoStyle
+
 
 class LLMBaseConfig(BaseModel):
     """LLM提供商配置"""
     base_url: str = Field(default="")  # https://api.openai.com/v1
-    api_key: SecretStr = Field(default=SecretStr(""))
+    api_key: Optional[SecretStr] = Field(default=SecretStr(""))
     model_name: str = Field(default="") # gpt-4o
     timeout: int = Field(default=60, ge=1)
     seed: int = Field(default=random.randint(1000000, 99999999999), ge=1)
@@ -42,7 +44,7 @@ class LLMBaseConfig(BaseModel):
 class EmbeddingBaseConfig(BaseModel):
     """嵌入模型提供商配置"""
     base_url: str = Field(default="")  # https://api.openai.com/v1
-    api_key: SecretStr = Field(default=SecretStr(""))
+    api_key: Optional[SecretStr] = Field(default=SecretStr(""))
     model_name: str = Field(default="text-embedding-3-small")
     device: str = Field(default="gpu")
     normalize_embeddings: bool = Field(default=True)
@@ -108,7 +110,7 @@ class StoryboardGenerationConfig(BaseModel):
     default_duration_per_shot: int = Field(default=5, ge=1)
     max_duration_deviation: float = Field(default=0.5, ge=0.0)
     max_retries: int = Field(default=2, ge=0)
-    default_style: str = Field(default="realistic")
+    default_style: VideoStyle = Field(default=VideoStyle.REALISTIC)
     supported_styles: List[str] = Field(
         default_factory=lambda: [
             "realistic", "anime", "cinematic", "cartoon", "fantasy", "sci-fi", "documentary"

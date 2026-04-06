@@ -28,7 +28,7 @@ from ...shot_config import ShotConfig
 class MultiAgentPipeline:
     """多智能体协作流程"""
 
-    def __init__(self, task_id, script_id, config: ShotConfig, task_manager):
+    def __init__(self, script_id, task_id, config: ShotConfig, task_manager):
         """
         初始化多智能体流程
         
