@@ -74,8 +74,8 @@ def start_app():
         log(f"[entrypoint] main.py not found at {MAIN_PY}")
         return 1
 
-    host = os.environ.get("API__HOST") or os.environ.get("HOST") or "0.0.0.0"
-    port = os.environ.get("API__PORT") or os.environ.get("PORT") or "8000"
+    host = os.environ.get("PENSHOT_API__HOST") or os.environ.get("PENSHOT_HOST") or "0.0.0.0"
+    port = os.environ.get("PENSHOT_API__PORT") or os.environ.get("PENSHOT_PORT") or "8000"
 
     # Allow callers to pass extra uvicorn args via UVCORN_ARGS if needed
     uvicorn_args = os.environ.get("UVCORN_ARGS", "").strip()

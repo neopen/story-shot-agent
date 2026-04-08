@@ -31,7 +31,34 @@ class ConfigLoader(PydanticBaseSettingsSource):
         self.env_config = self._load_env_config()
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> Tuple[Any, str, bool]:
+        """
+        返回 (值, 来源, 是否已解析)
+        让 pydantic 知道这个 source 能提供值
+        """
+        # 从合并后的配置中查找字段值（支持嵌套）
+        value = self._get_nested_value(self.yaml_config, field_name)
+        if value is not None:
+            return value, "yaml", True
+
+        value = self._get_nested_value(self.env_config, field_name)
+        if value is not None:
+            return value, "env", True
+
         return None, "", False
+
+    def _get_nested_value(self, config: Dict[str, Any], field_name: str) -> Any:
+        """
+        从嵌套字典中获取字段值
+        支持: field_name="llm.default.base_url" → config['llm']['default']['base_url']
+        """
+        keys = field_name.split('.')
+        current = config
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return None
+        return current
 
     def __call__(self) -> Dict[str, Any]:
         """合并YAML和环境变量配置"""
@@ -79,42 +106,55 @@ class ConfigLoader(PydanticBaseSettingsSource):
         return config
 
     def _load_env_config(self) -> Dict[str, Any]:
-        """从环境变量加载配置"""
+        """从环境变量加载配置（支持 env_prefix）"""
         env_config = {}
 
-        # 遍历所有环境变量
+        # 关键：从 model_config 读取配置项
+        model_config = self.settings_cls.model_config
+        env_prefix = model_config.get('env_prefix', 'PENSHOT_').upper()
+        nested_delimiter = model_config.get('env_nested_delimiter', '__')
+        case_sensitive = model_config.get('case_sensitive', False)
+
+        debug(f"加载环境变量: prefix='{env_prefix}', delimiter='{nested_delimiter}'")
+
         for env_key, env_value in os.environ.items():
-            if env_value:
-                # 转换为小写并分割（因为 case_sensitive=False）
-                key_parts = env_key.lower().split('__')
+            if not env_value:
+                continue
 
-                # 跳过不相关的环境变量
-                if len(key_parts) < 2:  # 至少要有两级，如 llm__default
-                    continue
+            # 步骤1: 过滤前缀（必须先用大写比较）
+            if env_prefix and not env_key.startswith(env_prefix):
+                continue  # 跳过不带项目前缀的变量
 
-                # 构建嵌套字典
-                current = env_config
-                for i, part in enumerate(key_parts[:-1]):
-                    if part not in current:
-                        current[part] = {}
-                    current = current[part]
+            # 步骤2: 去掉前缀后再处理
+            key_without_prefix = env_key[len(env_prefix):]
 
-                # 设置值
-                last_part = key_parts[-1]
+            # 步骤3: 大小写处理
+            if not case_sensitive:
+                key_without_prefix = key_without_prefix.lower()
 
-                # 类型转换
-                if env_value.lower() in ('true', 'false'):
-                    current[last_part] = env_value.lower() == 'true'
-                elif env_value.isdigit():
-                    current[last_part] = int(env_value)
-                else:
-                    try:
-                        # 尝试转换为浮点数
-                        float_val = float(env_value)
-                        current[last_part] = float_val
-                    except ValueError:
-                        # 保持字符串
-                        current[last_part] = env_value
+            # 步骤4: 按嵌套分隔符分割
+            key_parts = [p for p in key_without_prefix.split(nested_delimiter) if p]  # 过滤空片段
+            if not key_parts:
+                continue
+
+            # 步骤5: 构建嵌套字典
+            current = env_config
+            for part in key_parts[:-1]:
+                current = current.setdefault(part, {})
+                if not isinstance(current, dict):
+                    current = {}  # 类型冲突时重置
+
+            # 步骤6: 设置叶子节点 + 类型转换
+            last_part = key_parts[-1]
+            if env_value.lower() in ('true', 'false'):
+                current[last_part] = env_value.lower() == 'true'
+            elif env_value.isdigit():
+                current[last_part] = int(env_value)
+            else:
+                try:
+                    current[last_part] = float(env_value)
+                except ValueError:
+                    current[last_part] = env_value
 
         return env_config
 

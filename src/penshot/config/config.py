@@ -48,7 +48,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         # env_file=str(ENV_FILE),  # 明确指定.env文件路径
         extra="ignore",
-        env_prefix="",  # 清除前缀
+        env_prefix="PENSHOT_",  # 清除前缀
         env_ignore_empty=True,
         env_nested_delimiter="__",  # 使用双下划线表示嵌套
     )
@@ -69,9 +69,9 @@ class Settings(BaseSettings):
         3. 初始化参数（代码中传入的 kwargs，最高优先级）
         """
         return (
-            ConfigLoader(settings_cls),  # 统一的配置源
-            env_settings,  # 系统环境变量（覆盖）
-            init_settings,  # 初始化参数（最高）
+            ConfigLoader(settings_cls),  # 1. 最低优先级
+            env_settings,  # 2. 中优先级
+            init_settings,  # 3. 最高优先级
         )
 
     def get_llm_config(self, provider: str = "default") -> LLMBaseConfig:

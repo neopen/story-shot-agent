@@ -44,7 +44,7 @@ class RedisClient:
             Redis连接URL
         """
         # 如果设置了完整的REDIS_URL，直接使用
-        redis_url = os.getenv('REDIS_URL')
+        redis_url = os.getenv('PENSHOT_REDIS_URL')
         if redis_url:
             return redis_url
 
