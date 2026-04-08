@@ -43,12 +43,13 @@ class PipelineDecision:
         决策逻辑：
         1. 检查解析结果是否存在
         2. 检查解析结果是否有效
-        3. 根据检查结果返回相应决策状态
+        3. 根据重试次数决定：重试次数过多则进入人工干预
 
         可能的返回状态：
         - SUCCESS: 解析成功，可以继续下一步
-        - NEEDS_HUMAN: 解析数据有问题，需要人工判断
-        - FAILED: 解析完全失败，需要错误处理
+        - NEEDS_HUMAN: 解析数据有问题且重试次数超限，需要人工判断
+        - RETRY: 解析数据有问题但还有重试机会
+        - FAILED: 解析完全失败
 
         Args:
             state: 包含解析结果的工作流状态
@@ -67,13 +68,31 @@ class PipelineDecision:
         # 检查解析结果是否存在
         if not parsed_script:
             error("剧本解析，数据为空")
-            return PipelineState.FAILED
+            # 检查是否还有重试机会
+            can_retry, retry_reason = self._can_retry_stage(state, PipelineNode.PARSE_SCRIPT)
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.PARSE_SCRIPT)
+                warning(f"剧本解析数据为空，{retry_reason}，准备重试")
+                return PipelineState.RETRY
+            else:
+                error(f"剧本解析数据为空，且{retry_reason}，需要人工干预")
+                return PipelineState.NEEDS_HUMAN
 
         # 检查解析质量
         if not parsed_script.is_valid:
             error("剧本解析，数据有问题")
-            # 数据无效时，需要人工判断是否可以继续
-            return PipelineState.NEEDS_HUMAN
+            # 检查是否还有重试机会
+            can_retry, retry_reason = self._can_retry_stage(state, PipelineNode.PARSE_SCRIPT)
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.PARSE_SCRIPT)
+                warning(f"剧本解析数据无效，{retry_reason}，准备重试")
+                return PipelineState.RETRY
+            else:
+                error(f"剧本解析数据无效，且{retry_reason}，需要人工干预")
+                return PipelineState.NEEDS_HUMAN
+
+        # 解析成功，重置该阶段的重试计数
+        state.stage_current_retries[PipelineNode.PARSE_SCRIPT] = 0
 
         # 解析成功，可以继续下一步
         return PipelineState.SUCCESS
@@ -444,76 +463,45 @@ class PipelineDecision:
             state.error_messages.append(f"连续性检查节点循环检查失败: {loop_reason}")
             return loop_decision
 
-        # ========== 检查连续性重试次数 ==========
-        # 初始化连续性重试计数（如果不存在）
-        if not hasattr(state, 'continuity_retry_count'):
-            state.continuity_retry_count = 0
-
-        max_continuity_retries = getattr(state, 'max_continuity_retries', 3)
+        # 使用统一的重试判断
+        can_retry, retry_reason = self._can_retry_stage(state, PipelineNode.CONTINUITY_CHECK)
 
         # 获取连续性问题
         issues = getattr(state, 'continuity_issues', [])
 
-        # 如果有问题且超过重试次数，需要人工干预
-        if issues and state.continuity_retry_count >= max_continuity_retries:
-            warning(f"连续性检查重试次数已达上限: {state.continuity_retry_count}/{max_continuity_retries}，需要人工干预")
-            return PipelineState.NEEDS_HUMAN
-
-        # 检查是否有连续性问题
+        # 如果没有问题，成功
         if not issues:
-            # 没有连续性问题，重置重试计数
-            state.continuity_retry_count = 0
-            # 可以直接生成输出
+            state.stage_current_retries[PipelineNode.CONTINUITY_CHECK] = 0
             return PipelineState.SUCCESS
 
-        # 根据问题严重性分类（兼容不同格式）
-        critical_issues = []
-        moderate_issues = []
-        minor_issues = []
+        # 分类问题严重性
+        critical_issues, moderate_issues, minor_issues = self._classify_continuity_issues(issues)
 
-        for issue in issues:
-            # 支持 ContinuityIssue 对象和字典格式
-            if hasattr(issue, 'severity'):
-                severity = issue.severity
-                if hasattr(severity, 'value'):
-                    severity = severity.value
-            else:
-                severity = issue.get("severity", "moderate")
-
-            if severity == "critical" or severity == "CRITICAL":
-                critical_issues.append(issue)
-            elif severity == "moderate" or severity == "MODERATE":
-                moderate_issues.append(issue)
-            elif severity == "minor" or severity == "MINOR":
-                minor_issues.append(issue)
-            else:
-                # 默认归类为轻微
-                minor_issues.append(issue)
-
-        # ========== 增加重试计数 ==========
-        state.continuity_retry_count += 1
-        info(f"连续性检查第 {state.continuity_retry_count}/{max_continuity_retries} 次重试，"
-             f"发现严重:{len(critical_issues)}, 中度:{len(moderate_issues)}, 轻微:{len(minor_issues)}")
-
+        # 根据问题严重性决定
         if critical_issues:
-            warning(f"发现{len(critical_issues)}个严重连续性问题")
-            if len(critical_issues) >= 5:
+            if can_retry and len(critical_issues) < 5:
+                state = self._increment_stage_retry(state, PipelineNode.CONTINUITY_CHECK)
+                warning(f"发现{len(critical_issues)}个严重问题，{retry_reason}，准备重试")
+                return PipelineState.RETRY
+            else:
+                warning(f"发现{len(critical_issues)}个严重问题，且{retry_reason}，需要人工干预")
                 return PipelineState.NEEDS_HUMAN
-            return PipelineState.NEEDS_REPAIR
-        elif moderate_issues:
-            warning(f"发现{len(moderate_issues)}个中度连续性问题")
-            # 如果已经重试过多次，考虑人工干预
-            if state.continuity_retry_count >= max_continuity_retries - 1:
-                warning(f"中度问题持续存在，已达重试上限，{state.continuity_retry_count} 次")
+
+        if moderate_issues:
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.CONTINUITY_CHECK)
+                warning(f"发现{len(moderate_issues)}个中度问题，{retry_reason}，准备重试")
+                return PipelineState.RETRY
+            else:
+                warning(f"发现{len(moderate_issues)}个中度问题，且{retry_reason}，需要人工干预")
                 return PipelineState.NEEDS_HUMAN
-            return PipelineState.NEEDS_REPAIR
-        elif minor_issues:
-            warning(f"发现{len(minor_issues)}个轻微连续性问题")
-            # 轻微问题可以继续
+
+        # 轻微问题可以继续
+        if minor_issues:
+            warning(f"发现{len(minor_issues)}个轻微问题，继续执行")
             return PipelineState.VALID
-        else:
-            warning(f"发现{len(issues)}个连续性问题，但严重性未知")
-            return PipelineState.VALID
+
+        return PipelineState.SUCCESS
 
     def decide_after_error(self, state: WorkflowState) -> PipelineState:
         """错误处理后的决策
@@ -595,21 +583,10 @@ class PipelineDecision:
 
             info(f"错误处理建议延迟 {delay_seconds} 秒后重试 (第{delay_count + 1}次延迟)")
 
-            # 执行实际延迟（使用 asyncio.sleep 或 time.sleep）
-            import asyncio
+            # 使用同步延迟替代异步延迟，避免事件循环问题
             import time
-
-            # 检测是否在事件循环中运行
-            try:
-                loop = asyncio.get_running_loop()
-                # 异步环境
-                future = asyncio.ensure_future(self._execute_delay(delay_seconds))
-                # 注意：这里不能直接阻塞，返回RETRY并设置延迟标志
-                # 实际延迟由调度器处理
-            except RuntimeError:
-                # 同步环境
-                info(f"同步环境中执行延迟 {delay_seconds} 秒...")
-                time.sleep(delay_seconds)
+            info(f"执行延迟 {delay_seconds} 秒...")
+            time.sleep(delay_seconds)
 
             return PipelineState.RETRY
 
@@ -648,7 +625,6 @@ class PipelineDecision:
                 info(f"检测到服务不可用错误，需要延迟 {delay_seconds} 秒后重试")
 
             if delay_needed:
-                # 初始化 recovery_flags（如果不存在）
                 if not hasattr(state, 'recovery_flags'):
                     state.recovery_flags = {}
 
@@ -656,15 +632,10 @@ class PipelineDecision:
                 state.recovery_flags['delay_seconds'] = delay_seconds
                 state.recovery_flags['delay_reason'] = f"错误类型: {last_error[:100]}"
 
-                # 执行延迟
-                try:
-                    import asyncio
-                    loop = asyncio.get_running_loop()
-                    asyncio.ensure_future(self._execute_delay(delay_seconds))
-                except RuntimeError:
-                    import time
-                    info(f"同步环境中执行延迟 {delay_seconds} 秒...")
-                    time.sleep(delay_seconds)
+                # 使用同步延迟
+                import time
+                info(f"执行延迟 {delay_seconds} 秒...")
+                time.sleep(delay_seconds)
 
                 return PipelineState.RETRY
 
@@ -699,13 +670,6 @@ class PipelineDecision:
         # 最后的选择：重试
         info("尝试重试流程")
         return PipelineState.RETRY
-
-    async def _execute_delay(self, delay_seconds: float):
-        """异步执行延迟（辅助方法）"""
-        import asyncio
-        info(f"异步延迟执行 {delay_seconds} 秒...")
-        await asyncio.sleep(delay_seconds)
-        info(f"异步延迟结束，继续执行")
 
 
     def decide_next_after_error(self, graph_state: WorkflowState) -> str:
@@ -978,3 +942,47 @@ class PipelineDecision:
                 return PipelineState.FAILED, f"全局循环超限: {state.global_current_loops}/{state.global_max_loops}"
 
         return PipelineState.SUCCESS, f"节点 {stage_node.value} 循环正常 ({current_loops + 1}/{max_loops})"
+
+    # ===================
+    async def _execute_delay(self, delay_seconds: float):
+        """异步执行延迟（辅助方法）"""
+        import asyncio
+        try:
+            # 检查事件循环是否正在运行
+            loop = asyncio.get_running_loop()
+            if loop.is_closed():
+                info("事件循环已关闭，跳过延迟执行")
+                return
+            info(f"异步延迟执行 {delay_seconds} 秒...")
+            await asyncio.sleep(delay_seconds)
+            info(f"异步延迟结束，继续执行")
+        except RuntimeError as e:
+            # 事件循环已关闭或不在运行
+            warning(f"无法执行异步延迟: {e}")
+            # 降级到同步延迟
+            import time
+            time.sleep(delay_seconds)
+
+
+    def _classify_continuity_issues(self, issues):
+        """分类连续性问题的严重程度"""
+        critical = []
+        moderate = []
+        minor = []
+
+        for issue in issues:
+            if hasattr(issue, 'severity'):
+                severity = issue.severity
+                if hasattr(severity, 'value'):
+                    severity = severity.value
+            else:
+                severity = issue.get("severity", "moderate")
+
+            if severity in ("critical", "CRITICAL"):
+                critical.append(issue)
+            elif severity in ("moderate", "MODERATE"):
+                moderate.append(issue)
+            else:
+                minor.append(issue)
+
+        return critical, moderate, minor

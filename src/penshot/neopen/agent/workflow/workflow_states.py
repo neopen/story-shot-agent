@@ -28,6 +28,7 @@ class InputState(BaseModel):
     user_config: ShotConfig = None  # 用户配置（模型选择、风格偏好等）
     script_id: str = str(uuid.uuid4())  # 剧本ID
     task_id: str = str(uuid.uuid4())  # 唯一标识符
+    timeout: int = 600  # 工作流执行超时时间（秒）
 
 
 class ScriptParsingState(BaseModel):
@@ -94,12 +95,12 @@ class NodeLoopState(BaseModel):
 
     # ==== 阶段重试控制（每个阶段独立） ====
     stage_max_retries: Dict[PipelineNode, int] = {
-        PipelineNode.PARSE_SCRIPT: 2,
-        PipelineNode.SEGMENT_SHOT: 3,
-        PipelineNode.SPLIT_VIDEO: 3,
-        PipelineNode.CONVERT_PROMPT: 2,
-        PipelineNode.AUDIT_QUALITY: 1,
-        PipelineNode.CONTINUITY_CHECK: 1,
+        PipelineNode.PARSE_SCRIPT: 3,  # 剧本解析
+        PipelineNode.SEGMENT_SHOT: 3,  # 镜头拆分
+        PipelineNode.SPLIT_VIDEO: 3,  # AI分段
+        PipelineNode.CONVERT_PROMPT: 3,  # 提示词生成
+        PipelineNode.AUDIT_QUALITY: 2,  # 质量审查（通常不需要太多重试）
+        PipelineNode.CONTINUITY_CHECK: 2,  # 连续性检查
     }
     # 每个阶段的当前重试次数
     stage_current_retries: Dict[PipelineNode, int] = {}
