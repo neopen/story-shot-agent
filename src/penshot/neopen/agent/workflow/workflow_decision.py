@@ -743,20 +743,15 @@ class PipelineDecision:
             self._increment_stage_retry(graph_state, retry_node)
             return retry_node.value
 
-
     def decide_after_human(self, state: WorkflowState) -> PipelineState:
-        """人工干预后的决策（简化版）
+        """人工干预后的决策
 
         流程：
-        1. 从状态中提取输入
+        1. 从状态中提取人工输入
         2. 调用转换器进行转换
-        3. 返回决策状态
+        3. 根据决策类型返回合适的 PipelineState
 
-        Args:
-            state: 工作流状态
-
-        Returns:
-            PipelineState: 决策状态
+        注意：不同决策应该路由到不同的节点，而不是统一到 GENERATE_OUTPUT
         """
         # 检查节点循环限制
         loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.HUMAN_INTERVENTION)
@@ -798,6 +793,8 @@ class PipelineDecision:
 
         info(f"决策完成: {raw_input} -> {normalized_input} -> {decision_state.value} ({description})")
 
+        # 注意：返回的 PipelineState 会被 workflow 的路由映射使用
+        # 路由映射在 workflow_pipeline.py 的 HUMAN_INTERVENTION 条件边中定义
         return decision_state
 
     def decide_after_loop_check(self, graph_state: WorkflowState) -> Any:

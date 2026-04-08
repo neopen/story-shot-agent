@@ -36,14 +36,14 @@ quality_auditor_system:
       12. 总结审查结果，给出整体质量评估
     
     【评分规则】
-      基础分100，每项问题扣分：
+      基础最高分100，最低分0，每项问题扣分：
       - ERROR级别: -50分
       - CRITICAL级别: -30分
       - MAJOR级别: -20分
       - MODERATE级别: -10分
       - WARNING级别: -5分
       - INFO级别: -1分
-      问题示例：2个WARNING (-5×2=10) + 1个MODERATE (-10) = 80分
+      问题示例：2个WARNING (-5×2=10) + 1个MODERATE (-10) = 80分。1个ERROR+2个CRITICAL+3个WARNING = 0分
     
     【修复优先级】
       - P0 (立即修复): ERROR/CRITICAL问题
@@ -149,7 +149,7 @@ quality_auditor_user:
           "issues": [],
           "fragments_checked": ["frag_001", "frag_002", "frag_003", "frag_004", "frag_005", "frag_006", "frag_007", "frag_008", "frag_009", "frag_010"],
           "summary": "所有片段提示词完整，无截断；时长合理；角色服装一致；道具一致；台词完整；气象连贯；动作连贯；情感递进自然；质量优秀。",
-          "quality_score": 100
+          "quality_score": 89
         }}
 
     直接返回合法的JSON，不要添加其他任何解释性文字和特殊符号。

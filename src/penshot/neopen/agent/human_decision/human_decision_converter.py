@@ -27,10 +27,8 @@ class HumanDecisionConverter:
         "2": "APPROVE",
         "3": "RETRY",
         "4": "REPAIR",
-        "5": "REPAIR",
-        "6": "REPAIR",
-        "7": "ESCALATE",
-        "8": "ABORT",
+        "5": "ESCALATE",
+        "6": "ABORT",
 
         # 常见输入变体
         "CONTINUE": "CONTINUE",

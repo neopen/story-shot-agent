@@ -112,14 +112,14 @@ prompt_converter_user:
       - 提示词内容必须在两种语言中完全一致，表达相同的视觉元素、动作和情感
       - 提示词中不得包含任何敏感词汇或不适当内容
       - 提示词应尽量具体、清晰，避免使用过于抽象或模糊的描述
-      - 提示词长度应适中，既要包含足够的细节，又要保持简洁明了（{min_length}-{max_length}单词最佳）
+      - 提示词长度应适中，既要包含足够的细节，又要保持简洁明了（每个prompt的单词数量范围限制在 {min_length}-{max_length}个）
       - 视频提示词和音频提示词应相互补充，确保整体内容的一致性和完整性
       - audio 必须包含所有声音，如：手机铃声、风声、脚步声、说话声、鸣笛声、鸟叫声等等。如果没有任何声音就不用添加该节点。
     
     【输出格式】
       {{
         "prompt": "生成的英文视频提示词，基于{dm_model}模型，{video_style}风格",
-        "original_prompt": "{original_language}视频提示词",
+        "original_prompt": "{original_language}视频提示词，与 prompt 中对应",
         "negative_prompt": "视频负面提示词",
         "style_hint": "视频风格提示",
         "audio": {{

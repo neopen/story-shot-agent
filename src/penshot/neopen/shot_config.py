@@ -44,7 +44,7 @@ class ShotConfig(AIConfig):
     audio_model: str = AudioModelType.XTTSv2.value
     default_negative_prompt: str = "blurry, distorted, low quality, cartoonish, bad anatomy"
     default_style: str = VideoStyle.CINEMATIC.value
-    max_prompt_length: int = 100    # 提示词最大长度（单词数）
+    max_prompt_length: int = 200    # 提示词最大长度（单词数）
     min_prompt_length: int = 20
 
     # ======================质量审查

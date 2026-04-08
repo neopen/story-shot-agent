@@ -285,23 +285,26 @@ class MultiAgentPipeline:
         # ========== 人工干预后的分支 ==========
         workflow.add_conditional_edges(
             PipelineNode.HUMAN_INTERVENTION,  # 当前节点：人工干预
-            lambda graph_state: self.decision_funcs.decide_after_human(graph_state),  # 决策函数：干预后判断
+            lambda graph_state: self.decision_funcs.decide_after_human(graph_state),
             {
-                # 人工决定继续流程
+                # 继续/批准 - 继续到生成输出（或回到中断点）
                 PipelineState.SUCCESS: PipelineNode.GENERATE_OUTPUT,
                 PipelineState.VALID: PipelineNode.GENERATE_OUTPUT,
 
-                # 人工要求重试
+                # 重试 - 回到剧本解析重新开始
                 PipelineState.RETRY: PipelineNode.PARSE_SCRIPT,
 
-                # 人工要求修复/调整
+                # 修复 - 回到提示词生成阶段进行修复
                 PipelineState.NEEDS_REPAIR: PipelineNode.CONVERT_PROMPT,
 
-                # 人工需要进一步干预
+                # 需要进一步人工干预 - 再次进入人工干预（理论上不会发生，但保留）
                 PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION,
 
-                # 人工决定中止流程
-                PipelineState.ABORT: END
+                # 中止流程
+                PipelineState.ABORT: END,
+
+                # 失败 - 进入错误处理
+                PipelineState.FAILED: PipelineNode.ERROR_HANDLER,
             }
         )
 

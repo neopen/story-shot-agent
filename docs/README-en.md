@@ -1,424 +1,292 @@
-# Storyboard Generation Agent
+# video-shot-agent (Penshot)
 
-English | [中文](../README.md)
+A multi-agent collaborative screenplay storyboarding system that splits scripts in various formats into script units optimized for AI text-to-video generation durations. It outputs high-quality storyboard fragment descriptions while ensuring narrative continuity. Built on LangChain and LangGraph, the system leverages LLMs to parse any script format into "Text-to-Video" prompt fragments compatible with mainstream AI video models. It supports task pool priority queuing, multi-level memory management, and Chroma vector retrieval.
 
-A multi-agent collaborative storyboard generation system that splits scripts in various formats into short AI-generatable video script units, outputs high-quality shot fragment descriptions, and preserves narrative continuity. It supports multiple AI providers, is highly extensible and easy to use. 
+[Chinese](#) | English | [Architecture Documentation](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/) | [PyPI](https://pypi.org/project/penshot/)
 
-> Using LangChain + LangGraph, any format script can be parsed and converted into "Text to Video" script prompt words that conform to the model (5-20 seconds), while maintaining the continuity and consistency of the character story between the segments. It can be directly applied to models such as Sora, Veo, Runway, Pika, Kling, Tongyi Wanxiang, Stable Video Diffusion, etc. It supports MCP, REST API protocols and Function Call, and can be integrated and used through methods such as A2A, LangGraph, API, and Python libraries.
->
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![LangGraph](https://img.shields.io/badge/built_with-LangGraph-purple)](https://langchain-ai.github.io/langgraph/) [![PyPI](https://img.shields.io/pypi/v/penshot.svg)](https://pypi.org/project/penshot/) [![Downloads](https://static.pepy.tech/badge/penshot)](https://pepy.tech/project/penshot)
 
+---
 
-Video creation pipeline: Client → LLM script authoring → <u>[Storyboard parsing](https://github.com/neopen/video-shot-agent) (splitting)</u> → DM video synthesis (text-to-video) → video assembly & rendering (FFmpeg)
+## Core Features
 
-> Note: This agent does not author scripts, does not generate video, nor does it perform final composition in the current version (future releases may add these). The highlighted step above is the agent's responsibility.
->
+| Feature | Description |
+|---|---|
+| Intelligent Script Parsing | Automatically identifies scenes, dialogue, and action cues; understands narrative structure; supports long-text chunking. |
+| Precise Temporal Planning | Intelligently segments content at the shot level, allocating optimal durations that strictly comply with AI video model constraints. |
+| Continuity Guard | Leverages task pool priority queuing, multi-level memory (short/mid/long-term), and Chroma vector retrieval to ensure high consistency in character states, scenes, and plot across adjacent shots. |
+| High-Quality Prompt Output | Generates detailed bilingual (Chinese/English) visual descriptions, negative prompts, and audio prompts, ready for immediate use. |
+| Multi-Model Compatibility | Supports OpenAI, Qwen, DeepSeek, Ollama, and other major LLM providers with plug-and-play switching. |
+| Multi-Protocol Integration | Provides Python SDK, REST API, LangGraph nodes, A2A collaboration protocol, and standard MCP interfaces. |
+| Robustness & Traceability | Built-in auto-retry and error fallback mechanisms. Every storyboard fragment is bidirectionally traceable to its original script location. |
 
+---
 
+## System Architecture & Workflow
 
-## Core features
+```mermaid
+flowchart TD
+    A[Client / Upstream Agent] -->|Raw Script Input| B[LLM Script Creation & Preprocessing]
+    B -->|Structured Text| C[Storyboard Agent Core]
+    
+    subgraph Agent_System [LangGraph-Based Multi-Agent Collaboration]
+        direction TB
+        C --> D[Task Pool & Priority Scheduler]
+        D --> E[Script Parsing & Scene Recognition]
+        E --> F[Precise Temporal Planning & Fragmentation]
+        F --> G[Prompt Generation & Model Adaptation]
+        G --> H[Continuity Guard & Consistency Check]
+        H --> I[Three-View Character Prompt Generation]
+    end
+    
+    J[(Multi-Level Memory Pool<br/>Short/Mid/Long-Term)] <-->|State Read/Write & RAG| E
+    J <-->|Character/Scene/Prop Vectors| K[(Chroma Vector DB)]
+    
+    H -->|Structured JSON Output| L[REST API / Python SDK / MCP / A2A]
+    L --> M[Downstream AI Text-to-Video Models<br/>Sora / Veo / Runway / Kling / SVD]
+    M -->|Video Clip Sequence| N[FFmpeg Composition & Rendering]
+    N --> O[Final Cut / Professional Timeline]
+```
 
-- Intelligent script parsing: automatically identify scenes, dialogues and action directives; understand story structure.
-- Precise timing planning: split content into shot-sized fragments and assign reasonable durations (AI-compatible).
-- Continuity guardian: ensure adjacent fragments preserve character state, scene and plot consistency.
-- High-quality storyboard generation: produce detailed Chinese visual descriptions and English AI video prompts.
-- Audio prompt support: generate environment and audio design prompts for each fragment.
-- Multi-model support: compatible with OpenAI, Qwen, DeepSeek, Ollama and others.
-- Easy-to-use APIs: provide a Python library, Web API, LangGraph node and A2A integration options.
-- Configurable generation parameters: temperature, durations, model selection, and other controls.
-- Error handling and retry: automatic retries for failed generation tasks to improve success rates.
-- Traceability: every fragment can be traced back to its original position in the script for verification and editing.
+This system is a typical Natural Language Processing (NLP) application that achieves end-to-end storyboard transcoding through multi-agent collaboration and memory mechanisms. For detailed architectural design, memory pool implementation, and continuity assurance, please refer to: [Storyboard Agent Architecture Design & Implementation (v1.0)](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
 
+------
 
-## Quick start
+## Quick Start
 
-### 1. Environment
-
-Prerequisites: Python 3.10 or newer
+### 1. Environment Setup
 
 ```bash
-# Clone the project
+# Clone the repository
 git clone https://github.com/neopen/video-shot-agent.git
 cd video-shot-agent
 
-# Install as an editable package
+# Option A: Install via PyPI (Recommended)
+pip install penshot
+
+# Option B: Install in editable mode (from source)
 pip install -e .
-
-######### Option 1: automatic install #########
-# The script will attempt to create a virtual environment, install dependencies and start the service. If it fails, follow the manual steps.
-python main.py
-
-######### Option 2: manual install #########
-python -m venv .venv
-
-# Activate virtual environment (Windows)
-.venv\Scripts\activate
-# Or (Linux/Mac)
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
 ```
 
+> Note: `penshot` is the PyPI package name, while `video-shot-agent` is the GitHub repository name. Both refer to the same project.
 
 ### 2. Configuration
-
-Copy the example environment file and set environment variables:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit the `.env` file and configure the required parameters:
+Edit the `.env` file to configure the required LLM and Embedding parameters:
 
 ```properties
-########################## LLM CONFIG #########################
-# Supported providers (openai, qwen, deepseek, ollama).
-LLM__DEFAULT__BASE_URL=https://api.openai.com/v1
-LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-LLM__DEFAULT__MODEL_NAME=gpt-4
+########################## LLM Configuration #########################
+LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LLM__DEFAULT__MODEL_NAME=qwen-plus
+LLM__DEFAULT__TIMEOUT=30
 
-# ================ Embedding config ================
-# Supported providers（openai, qwen, HuggingFace, ollama）
-EMBED__DEFAULT__BASE_URL=https://api.openai.com/v1
-EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+########################## Embedding Model Configuration #########################
+EMBED__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
 ```
 
-
-### 3. Start the application
+### 3. Start the Service
 
 ```bash
 python main.py
 ```
 
-> The service will start at `http://0.0.0.0:8000` and expose API endpoints.
->
+The service will run on `http://0.0.0.0:8000` and expose a complete REST API.
 
+### 4. API Usage Example
 
-### 4. Submit a task
+Submit a storyboard task:
 
-Submit a storyboard generation task (example request):
-
-```sh
-curl --location --request POST 'http://localhost:8000/api/v1/storyboard' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "script": "Late at night, 11 PM. In a city apartment living room, heavy rain slams the windows. Lin Ran is wrapped in an old wool blanket on the sofa while a muted black-and-white movie plays on the TV. A half-drunk cup of cold tea beads on the coffee table. An old photo album lies open. The phone suddenly vibrates and shows 'Unknown Number'. She stares for three seconds, fingertip hovering above the answer key, throat tightening. Finally she accepts and puts the phone to her ear. Silence for two seconds, then a hoarse male voice says, 'It's me.' Lin Ran's fingers clench and her knuckles turn white. She breathes and speaks with a trembling voice: '...Chen Mo? Are you okay?' The caller pauses and whispers: 'I'm back.' Lin Ran jolts upright, pupils constrict, tears welling; she opens her mouth but no sound comes out; only the blanket slips from her shoulders."
+```bash
+curl -X POST 'http://localhost:8000/api/v1/storyboard' \
+-H 'Content-Type: application/json' \
+-d '{
+  "script": "Late at night, 11 PM in a city apartment living room. Heavy rain pours outside the window..."
 }'
 ```
 
-
-### 5. Get results
-
 Check task status:
 
-```sh
-# Example task_id returned after submission
-curl --location --request GET 'http://localhost:8000/api/v1/status/HL202603061937129004'
+```bash
+curl 'http://localhost:8000/api/v1/status/{task_id}'
 ```
 
-Retrieve task result:
+Retrieve task results:
 
-```sh
-# Example task_id returned after submission
-curl --location --request GET 'http://localhost:8000/api/v1/result/HL202603061937129004'
+```bash
+curl 'http://localhost:8000/api/v1/result/{task_id}'
 ```
 
-Output: structured storyboard result (the `audio_prompt` section contains audio prompt information)
+------
 
-Example (abbreviated) JSON output structure:
+## Integration Methods
+
+### 1. Python SDK
+
+```python
+from penshot.api import create_penshot_agent
+
+agent = create_penshot_agent(max_concurrent=5)
+
+script = "Morning, a girl reading in a cafe, sunlight streaming through the window..."
+task_id = agent.breakdown_script_async(
+    script,
+    callback=lambda r: print(f"Task {r.task_id} completed")
+)
+
+status = agent.get_task_status(task_id)
+result = await agent.wait_for_result_async(task_id)
+```
+
+Full example: [direct_usage.py](https://github.com/neopen/video-shot-agent/blob/main/example/direct_usage.py)
+
+### 2. FastAPI Web Application Integration
+
+Integrate into existing systems via standard HTTP endpoints:
+
+```python
+from fastapi import FastAPI, HTTPException
+from penshot.api import create_penshot_agent
+
+app = FastAPI(title="Penshot API", version="0.1.0")
+agent = create_penshot_agent(max_concurrent=5)
+
+@app.post("/api/generate")
+async def generate(script_text: str):
+    task_id = agent.breakdown_script_async(script_text)
+    return {"task_id": task_id, "status": "PENDING"}
+```
+
+Full example: [web_app.py](https://github.com/neopen/video-shot-agent/blob/main/example/web_app.py)
+
+### 3. LangGraph Node Integration
+
+Can be embedded as an independent node in LangChain/LangGraph workflows for end-to-end automation. Full example: [langgraph_integration.py](https://github.com/neopen/video-shot-agent/blob/main/example/langgraph_integration.py)
+
+### 4. A2A Protocol Collaboration
+
+Supports context passing and task orchestration with upstream scriptwriting agents and downstream text-to-video/editing agents. Full example: [a2a_integration.py](https://github.com/neopen/video-shot-agent/blob/main/example/a2a_integration.py)
+
+### 5. MCP (Model Context Protocol) Support
+
+Start the MCP Server:
+
+```bash
+python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
+```
+
+Clients can call the `breakdown_script` and `get_task_result` tools to seamlessly integrate with MCP-compatible IDEs or agent frameworks. Full example: [mcp_client.py](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
+
+------
+
+## Output Data Structure
+
+The system returns standardized JSON containing video prompts, negative prompts, duration estimates, style parameters, and accompanying audio prompts:
 
 ```json
 {
   "fragments": [
     {
       "fragment_id": "frag_001",
-      "prompt": "Cinematic wide shot: midnight 11 PM in a compact urban apartment living room — rain lashes violently against the window, blurring distant neon signs (pink, cyan, magenta) into soft streaks; dim ambient light from a silent black-and-white vintage film playing on an old CRT TV casts faint flickering glow; medium-gray fabric sofa, weathered oak coffee table, analog wall clock frozen at 11:00, half-drawn beige curtains; woman (Lin Ran) curled on sofa under a thick, off-white hand-knitted wool blanket — coarse texture, yellowed edges, visible pilling and wear; she wears a loose, muted gray cotton long-sleeve top with subtle collar folds; her face is tired but alert, eyes slightly red, jaw gently tensed; shallow depth of field, film grain, naturalistic color grading, moody chiaroscuro lighting, 35mm cinematic realism",
-      "negative_prompt": "cartoon, anime, 3D render, photorealistic stock photo, bright lighting, smiling face, modern fashion, high saturation, text, logo, watermark, sharp focus everywhere, clean unused objects, glossy surfaces, daylight, people walking, dialogue subtitles",
+      "prompt": "Cinematic wide shot: midnight 11 PM in a compact urban apartment living room...",
+      "negative_prompt": "cartoon, anime, 3D render, bright lighting, text, watermark...",
       "duration": 4.2,
       "model": "runway_gen2",
-      "style": "cinematic 35mm film, moody realism, shallow depth of field, natural lighting, muted palette, subtle motion blur on rain streaks",
-      "requires_special_attention": false,
+      "style": "cinematic 35mm film, moody realism, shallow depth of field...",
       "audio_prompt": {
         "audio_id": "audio_001",
-        "prompt": "Low-frequency rain ambience (intensity 0.95), distant muffled TV static hiss (black-and-white film tone), near-silence punctuated by faint breath and fabric rustle — no speech, no music, no sudden transients; highly restrained dynamic range, immersive spatial audio, slight reverb suggesting small enclosed apartment space",
-        "negative_prompt": "speech, dialogue, footsteps, door creak, music, birdsong, wind howl, thunderclap, laughter, applause, narration",
+        "prompt": "Low-frequency rain ambience (intensity 0.95), distant muffled TV static...",
         "model_type": "AudioLDM_3",
-        "voice_type": "narration",
-        "audio_style": "cinematic",
-        "voice_description": "ambient sound design only, no voice, pure atmospheric field recording style",
-        "emotion": "neutral"
+        "audio_style": "cinematic"
       }
-    },
-    ......
+    }
   ]
 }
 ```
 
-(Actual output will contain a structured list of fragments with prompts, timing, audio prompts, metadata and continuity notes.)
+------
 
-## Integration examples
+## System Notes & Considerations
 
-### Environment
+| Category              | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| Network Dependency    | Requires stable access to external LLM APIs. Proxy or domestic mirrors are recommended. |
+| Long Text Processing  | For extremely long scripts, segmented input is advised. The system includes built-in context memory and RAG mechanisms. |
+| Generation Duration   | AI video models may output clips with ±10% duration variance, which is industry-standard. |
+| Multilingual Support  | Currently optimized for Chinese scripts. Support for other languages is under active iteration. |
+| Audio Synchronization | Audio prompts are provided. Lip-sync and environmental sound fusion require downstream tooling. |
+| Error Handling        | Auto-retry and fallback mechanisms are built-in. Extreme edge cases may require manual intervention. |
 
-Notes on packaging and installation:
+## Development Roadmap
 
-```sh
-pip install penshot
+### Short-Term
 
-# The package defaults to using Ollama; install provider-specific LLM clients as required:
-# pip install langchain-openai  # for OpenAI/DeepSeek
-# pip install dashscope        # for Qwen
-```
+- Optimize long-shot segmentation logic for action continuity
+- Implement consistency validators for character clothing, positioning, and props
+- Specialized prompt format adaptation for Sora, Pika, and other models
+- Hybrid architecture combining rule-based engines and LLMs
+- Full English script support and intelligent node failure fallback
+- Fragment confidence scoring and debug mode (intermediate result persistence)
 
-Configuration notes:
+### Mid-Term
 
-> 1. Copy the example env file: `cp .env.example .env`
->
-> 2. Edit `.env` and fill in real values (API keys, base URLs, model names)
->
->    ```python
->    # ================= LLM default config =================
->    # Supported providers（openai, qwen, deepseek, ollama）
->    LLM__DEFAULT__BASE_URL=https://api.openai.com/v1
->    LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
->    LLM__DEFAULT__MODEL_NAME=gpt-4-turbo-preview
->    LLM__DEFAULT__TIMEOUT=30
->    LLM__DEFAULT__MAX_TOKENS=4000
->          
->    # ================ embedding default config ================
->    # Supported providers（openai, qwen, HuggingFace, ollama）
->    EMBED__DEFAULT__BASE_URL=https://api.openai.com/v1
->    EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
->    EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
->    ```
->
+- Advanced camera language support (pan, tilt, zoom, tracking, follow)
+- Emotion-driven automatic visual style adjustment
+- Ultra-long script chunking + vector DB context memory
+- Multi-script batch queue processing & Web visualization interface
+- Character/scene reference image integration & multi-format export (XML/EDL/JSON)
 
+### Long-Term
 
+- Multimodal input (image + audio + text hybrid)
+- Real-time low-resolution preview & automatic continuity repair
+- Professional editing software plugins (Premiere/FCP/DaVinci)
+- Multi-user collaboration, version control, & autonomous learning from feedback
+- Bidirectional script-fragment traceability, semantic alignment detection, & multi-round correction mechanisms
 
+### Ultimate Goal
 
-### 1. Use as a Python library
+Achieve zero-information-loss visualization for scripts of any length, language, or genre, delivering a standardized workflow that meets professional director-level storyboarding standards. The system will feature customizable styles, full traceability, automatic optimization loops, and cross-modal high consistency.
 
-```python
-from penshot import ShotLanguage
-from penshot.api import create_penshot_agent
-
-async def async_usage():
-    agent = create_penshot_agent(language=ShotLanguage.EN, max_concurrent=5)
-
-    script = """
-	In the morning, a girl was reading in a coffee shop, with sunlight streaming through the window....
-    """
-
-    task_id = agent.breakdown_script_async(
-        script,
-        callback=lambda r: print(f"Callback: Task {r.task_id} Completed")
-    )
-
-    status = agent.get_task_status(task_id)
-    print(f"status: {status.get('status')}")
-
-    result = await agent.wait_for_result_async(task_id)
-
-    print(f"success={result.success}, status={result.status}")
-    print(f"result={result}")
-```
-
-
-### 2. Integrate into a Web application (API)
-
-You can expose a simple HTTP API endpoint to call the storyboard generator:
-
-```python
-from penshot.api import create_penshot_agent
-from penshot import ShotLanguage
-from penshot.neopen.task import TaskStatus
-
-def create_web_app() -> FastAPI:
-    app = FastAPI(
-        title="Penshot 分镜生成 API",
-        version="0.1.0",
-        docs_url="/docs",
-        redoc_url="/redoc"
-    )
-
-    penshot = create_penshot_agent(language=ShotLanguage.EN, max_concurrent=5)
-
-    @app.post("/api/generate", response_model=TaskResponse, tags=["Storyboard"])
-    async def generate_storyboard(request: ScriptRequest):
-        try:
-            task_id = penshot.breakdown_script_async(
-                script_text=request.script_text
-            )
-
-            return TaskResponse(
-                task_id=task_id,
-                status=TaskStatus.PENDING,
-                message="Task submited，to: /api/status/{task_id}",
-                created_at=datetime.now(timezone.utc)
-            )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Task error: {str(e)}")
-            
-            
-    @app.get("/api/result/{task_id}", response_model=TaskResultResponse, tags=["Task"])
-    async def get_task_result(task_id: str):
-        result = penshot.get_task_result(task_id)
-
-        if not result:
-            raise HTTPException(status_code=404, detail=f"not found: {task_id}")
-
-        return TaskResultResponse(
-            task_id=result.task_id,
-            success=result.success,
-            status=result.status,
-            data=result.data,
-            error=result.error,
-            processing_time_ms=result.processing_time_ms
-        )
-```
-
-
-### 3. LangGraph node integration
-
-The agent can be used as a node in a LangGraph workflow — see the repository docs for examples and wiring instructions.
-
-Sample code：[video-shot-agent/example/langgraph_integration.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/langgraph_integration.py)
-
-
-
-
-### 4. A2A integration
-
-Integrate the storyboard agent into agent-to-agent workflows where upstream agents provide scripts and downstream agents perform text-to-video generation and editing.
-
-Sample code: [video-shot-agent/example/a2a_integration.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/a2a_integration.py)
-
-
-
-### 5. MCP Client
-
-Sample code: [video-shot-agent/example/mcp_client.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
-
-```python
-# start MCP Server
-python -m penshot.mcp_server
-# or
-python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
-```
-
-MCPClient
-
-```python
-def breakdown_script(self, script: str, wait: bool = False, timeout: int = 300) -> dict:
-    result = self._call("tools/call", {
-        "name": "breakdown_script",
-        "arguments": {
-            "script": script.strip(),
-            "language": "en",
-            "wait": wait,
-            "timeout": timeout
-        }
-    })
-
-    if "error" in result:
-        raise Exception(result["error"]["message"])
-
-    content = result.get("result", {}).get("content", [])
-    if content and content[0].get("type") == "text":
-        text_content = content[0]["text"]
-        try:
-            parsed = json.loads(text_content)
-            return parsed
-        except json.JSONDecodeError:
-            return {}
-    return {}
-
-def get_task_result(self, task_id: str) -> dict:
-    result = self._call("tools/call", {
-        "name": "get_task_result",
-        "arguments": {"task_id": task_id}
-    })
-
-    content = result.get("result", {}).get("content", [])
-    if content and content[0].get("type") == "text":
-        return json.loads(content[0]["text"])
-    return {}
-```
-
-
-
-
-## Outlook
-
-
-### Short-term roadmap
-
-1. Smarter splitting: improve long-shot splitting to keep action continuity.
-2. Continuity checks: verify costume, position and prop consistency.
-3. Multi-model prompt tuning: optimize prompts for Sora, Pika and other models.
-4. Rules + LLM hybrid: combine local rules with LLM processing.
-5. English script support: full support for English input.
-6. Error fallback: graceful degradation on node failure.
-7. Configuration expansion: finer-grained parameters.
-8. Quality scoring: output confidence per fragment.
-9. Debug mode: save intermediate results for troubleshooting.
-10. Audio prompts: generate audio prompts aligned with visuals.
-
-
-### Mid-term roadmap
-
-1. Advanced camera language: support complex camera moves (push/pull/track/pan/tilt).
-2. Emotion analysis: adjust visual style according to script sentiment.
-3. Long-script processing: chunking with context memory (RAG + vector DB).
-4. Auto-optimization: learn successful patterns from history.
-5. Batch processing: multi-script queue handling.
-6. Web UI: visual operations and editing.
-7. Asset library integration: support reference images for characters/scenes.
-8. Multi-format export: storyboard, timeline XML, dataset formats.
-9. More parameters: support camera motion types, composition rules, color grading presets.
-10. Result download: export complete storyboard files.
-
-
-### Long-term roadmap
-
-1. Multi-modal inputs: support images + audio + text inputs.
-2. Real-time preview: low-resolution quick previews.
-3. Smart repair: automatically detect and fix continuity issues.
-4. Ecosystem integrations: Premiere/FCP/DaVinci plugins.
-5. Collaboration: multi-user collaboration and version control.
-6. Learning evolution: automatically improve from feedback.
-7. Commercialization: usage analytics, team management, enterprise SLAs.
-8. Script repository: historical script management and versioning.
-9. Incremental processing: reprocess only changed parts, reuse existing results.
-10. AI director assistant: provide creative suggestions and shot design guidance.
-11. Cross-modal consistency: ensure visuals align with script emotion and style.
-12. Personalization: adapt style, pacing and composition to user preferences.
-
-
-### Ultimate goals
-
-1. Support any script length, language and genre.
-2. Zero information loss: fully visualize script content.
-3. Professional-grade outputs: match director-level storyboard quality.
-4. Real-time interaction: generate previews while writing.
-5. Style customization: support any director/film aesthetic.
-6. Continuous optimization loop: each use improves the system.
-7. Fragment↔script traceability: map fragments back to original text locations.
-8. Semantic alignment checks: evaluate fragment-to-script match.
-9. Multi-round correction: auto-adjust and regenerate based on checks.
-10. Deep script understanding: visualize subtext, metaphor and symbolism.
-11. Global style engine: unify visual style across the whole script.
-12. Automatic storyboard scoring from a director's perspective.
-13. Human feedback loop: incorporate manual corrections into model updates.
-
+------
 
 ## Contributing
 
-Contributions are welcome. Please open issues or PRs for:
+We welcome contributions via Issues or Pull Requests:
 
-1. Bug reports
-2. Feature requests
-3. Code improvements and refactors
-   1. Documentation updates
+- **Bug Reports:** Please provide reproduction steps, environment details, and error logs.
+- **Feature Requests:** Use the `enhancement` label.
+- **Code Optimization:** Performance tuning, architectural refactoring, or adding test cases.
+- **Documentation:** Translations, example additions, or technical corrections.
+
+Quick dev environment setup:
+
+```bash
+git clone https://github.com/neopen/video-shot-agent.git
+cd video-shot-agent
+pip install -e ".[dev]"
+pytest tests/
+```
+
+------
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](https://chat.qwen.ai/c/LICENSE) file for details. Copyright (c) 2024 HiPeng
+
+------
+
+## Contact
+
+- Project Homepage: https://github.com/neopen/video-shot-agent
+- Author: NeoPen
+- Email: helpenx@gmail.com
+- Architecture Documentation: https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/
+
+Special thanks to LangChain, LangGraph, Chroma, Ollama, and the open-source community for their technical support. If this project has been helpful to your work, please consider starring the repository and sharing your feedback.

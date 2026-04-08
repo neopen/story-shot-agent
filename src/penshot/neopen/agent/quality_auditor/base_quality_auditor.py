@@ -192,9 +192,9 @@ class BaseQualityAuditor(ABC):
                 total_penalty += penalty
 
         # 最终得分（不能低于0）
-        final_score = max(0.0, base_score - total_penalty)
+        final_score = max(0.0, round(base_score - total_penalty, 2))
 
-        return round(final_score, 2)
+        return final_score
 
     def _generate_conclusion(self, status: AuditStatus, violation_counts: Dict[SeverityLevel, int]) -> str:
         """生成审查结论"""

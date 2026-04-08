@@ -29,7 +29,7 @@ async def basic_usage():
     """
 
     # 同步调用（等待完成）
-    result = agent.breakdown_script(script)
+    result = agent.breakdown_script(script, script_id="ddd123456")
 
     print(f"任务ID: {result.task_id}")
     print(f"成功: {result.success}, 状态: {result.status}")

@@ -1174,13 +1174,31 @@ class WorkflowNodes:
         输出：人工处理后的状态
         """
         state.current_stage = AgentStage.HUMAN_INTERVENTION
-        # 这里应该等待外部系统（如Web界面）提供反馈
-        # 实际实现时可以通过回调或消息队列处理
+        state.current_node = PipelineNode.HUMAN_INTERVENTION
 
-        # 模拟人工反馈（实际应从外部获取）
+        # 只有在需要人工审查时才执行干预
         if state.needs_human_review:
-            # 应用人工修正
-            self.human_intervention(state)
+            info(f"进入人工干预节点，任务ID: {state.task_id}")
+
+            # 执行人工干预（会更新 state.human_feedback）
+            state = self.human_intervention(state)
+
+            # 清理人工审查标志，避免重复进入
+            state.needs_human_review = False
+
+            # 记录干预结果
+            decision = state.human_feedback.get("decision", "CONTINUE")
+            info(f"人工干预完成，决策: {decision}")
+        else:
+            # 如果不需要人工审查但进入了此节点，使用默认继续
+            warning("进入人工干预节点但不需要人工审查，使用默认继续")
+            state.human_feedback = {
+                "decision": "CONTINUE",
+                "timeout": False,
+                "auto_decision": True,
+                "timestamp": time.time(),
+                "raw_input": "AUTO_CONTINUE",
+            }
 
         return state
 

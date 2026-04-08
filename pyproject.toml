@@ -7,31 +7,38 @@ version = {attr = "penshot.__version__"}
 
 [project]
 name = "penshot"
-version = "0.2.3"
-description = "长剧本分镜智能体：支持将任意自然语言剧本，转换为结构化分镜数据，支持视频生成与编辑。"
-readme = "README.md"
+version = "0.2.4"
+description = "AI agent that converts screenplays to consistent Text-to-Video prompts. Supports Sora, Runway, Kling, Veo via LangGraph & LLMs."
+
+keywords = [
+    "text-to-video", "script-to-prompt", "langgraph", "llm-agent",
+    "prompt-engineering", "video-consistency", "ai-video-generation",
+    "screenplay-parser", "mcp-protocol", "rest-api", "function-calling",
+    "sora", "runway", "kling", "stable-video-diffusion",
+    "文生视频", "剧本解析", "剧本分镜", "视频分镜", "分镜生成", "提示词工程", "AI视频"
+]
+
 authors = [
     {name = "HiPeng", email = "helpenx+shot@gmail.com"}
 ]
+readme = { file = "README.md", content-type = "text/markdown" }
 license = {text = "MIT"}
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
     "Topic :: Multimedia :: Video",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Framework :: FastAPI",
 ]
-
-keywords = ["剧本分镜", "shot-detection", "视频分割", "视频生成", "fastapi"]
 
 dependencies = [
     # Web框架
@@ -113,7 +120,7 @@ full = [
 [project.urls]
 Homepage = "https://github.com/neopen/video-shot-agent"
 Repository = "https://github.com/neopen/video-shot-agent"
-Documentation = "https://github.com/neopen/video-shot-agent/blob/main/docs/#PenShot"
+Documentation = "https://github.com/neopen/video-shot-agent/blob/main/docs/PenShot.md"
 Changelog = "https://github.com/neopen/video-shot-agent/releases"
 Issues = "https://github.com/neopen/video-shot-agent/issues"
 

@@ -116,6 +116,7 @@ class PenshotFunction:
             self,
             script_text: str,
             script_id: Optional[str] = None,
+            style: Optional[VideoStyle] = None,
             language: Optional[ShotLanguage] = None,
             wait_timeout: float = 300.0,
             priority: TaskPriority = TaskPriority.NORMAL
@@ -127,6 +128,7 @@ class PenshotFunction:
             script_text: 剧本文本
             script_id: 剧本ID：如果是属于同一个剧本的不同请求，可以使用相同的ID，否则就是不同（可选）
             language: 输出语言
+            style: 视频风格
             wait_timeout: 等待超时时间（秒）
             priority: 任务优先级
 
@@ -136,6 +138,7 @@ class PenshotFunction:
         task_id = self.breakdown_script_async(
             script_text=script_text,
             script_id=script_id,
+            style=style,
             language=language,
             priority=priority
         )
