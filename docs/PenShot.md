@@ -1,14 +1,70 @@
 # PenShot - 剧本分镜智能体
 
-一个基于多智能体协作的剧本分镜系统，能够将任意格式剧本自动拆分为AI可生成的短视频脚本单元。
-
-## 概述
-
 PenShot 是一个智能剧本分镜工具，能够将用户提供的原始自然语言剧本，自动拆分为多个**n秒长度的短视频片段脚本**，并确保**画面连贯性、角色一致性、动作延续性**，适用于主流 AI 视频生成模型（如 Runway、Pika、Sora、Wan、Stable Video等）。
 
-### 核心挑战
+> 当前 AI 视频模型仅支持生成 5-10 秒的视频，要生成完整视频只能通过拼接多个片段实现。PenShot 解决了这个问题的第一步：**智能拆分剧本，确保每个片段符合模型时长限制，同时保持视觉和叙事的连贯性**。
 
-当前 AI 视频模型仅支持生成 5-10 秒的视频，要生成完整视频只能通过拼接多个片段实现。PenShot 解决了这个问题的第一步：**智能拆分剧本，确保每个片段符合模型时长限制，同时保持视觉和叙事的连贯性**。
+```mermaid
+flowchart TD
+    subgraph Input [输入层]
+        A1[客户端 / 上游智能体] --> A2[REST API / MCP / A2A]
+        A2 --> A3[任务管理器]
+    end
+
+    subgraph Core [LangGraph 多智能体核心工作流]
+        direction TB
+        
+        P1[剧本解析智能体] --> P2[分镜生成智能体]
+        P2 --> P3[视频分割智能体]
+        P3 --> P4[提示词转换智能体]
+        P4 --> P5[质量审计智能体]
+        P5 --> P6[连续性守护智能体]
+        P6 --> P7[辅助生成智能体<br/>三视图/背景图/关键帧]
+        
+        subgraph Control [控制节点]
+            C1[循环检查] --> C2[错误处理]
+            C2 --> C3[人工干预]
+            C3 --> C4[结果生成]
+        end
+        
+        P1 -.->|重试/修复| Control
+        P2 -.->|重试/修复| Control
+        P3 -.->|重试/修复| Control
+        P4 -.->|重试/修复| Control
+        P5 -.->|重试/修复| Control
+        P6 -.->|重试/修复| Control
+        Control -.->|路由决策| P1
+    end
+
+    subgraph Memory [记忆层]
+        M1[(短期记忆)]
+        M2[(中期记忆)]
+        M3[(长期记忆)]
+        M4[(向量数据库<br/>Chroma)]
+        
+        M1 <--> Core
+        M2 <--> Core
+        M3 <--> Core
+        M4 <--> Core
+    end
+
+    subgraph Output [输出层]
+        O1[Workflow Output Fixer<br/>片段序列修复] --> O2[结果格式化]
+        O2 --> O3[JSON / SDK / MCP / A2A]
+    end
+
+    subgraph Downstream [下游渲染]
+        D1[多模型适配器] --> D2[Sora/Veo/Runway/可灵/SVD]
+        D2 --> D3[FFmpeg 合成]
+        D3 --> D4[最终成片]
+    end
+
+    A3 --> P1
+    P7 --> O1
+    O3 --> D1
+```
+
+
 
 ### 主要特性
 
@@ -24,13 +80,13 @@ PenShot 是一个智能剧本分镜工具，能够将用户提供的原始自然
 
 ### 安装
 
-```sh
+```bash
 pip install penshot
 ```
 
 如需使用特定 LLM 提供商，安装对应依赖：
 
-```python
+```bash
 # OpenAI / DeepSeek
 pip install langchain-openai
 

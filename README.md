@@ -27,29 +27,65 @@
 
 ```mermaid
 flowchart TD
-    A[客户端 / 上游智能体] -->|输入原始剧本| B[LLM 剧本创作 & 预处理]
-    B -->|剧本文本| C[剧本分镜智能体核心]
-    
-    subgraph Agent_System [基于 LangGraph 的多智能体协作]
-        direction TB
-        C --> D[任务池 & 优先级调度]
-        D --> E[剧本解析 & 场景识别]
-        E --> F[精准时序规划 & 片段分割]
-        F --> G[提示词生成 & 多模型适配]
-        G --> H[连续性守护 & 一致性校验]
-        H --> I[角色等三视图提示词生成]
+    subgraph Input [输入层]
+        A1[客户端 / 上游智能体] --> A2[REST API / MCP / A2A]
+        A2 --> A3[任务管理器]
     end
-    
-    J[(多层级记忆池<br/>短期/中期/长期)] <-->|状态读写 & RAG 检索| E
-    J <-->|角色/场景/道具向量特征| K[(Chroma 向量数据库)]
-    
-    H -->|输出结构化 JSON| L[REST API / Python SDK / MCP / A2A]
-    L --> M[下游 AI 文生视频模型<br/>Sora / Veo / Runway / 可灵 / SVD]
-    M -->|视频片段序列| N[FFmpeg 合成渲染]
-    N --> O[最终成片 / 专业时间线]
+
+    subgraph Core [LangGraph 多智能体核心工作流]
+        direction TB
+        
+        P1[剧本解析智能体] --> P2[分镜生成智能体]
+        P2 --> P3[视频分割智能体]
+        P3 --> P4[提示词转换智能体]
+        P4 --> P5[质量审计智能体]
+        P5 --> P6[连续性守护智能体]
+        P6 --> P7[辅助生成智能体<br/>三视图/背景图/关键帧]
+        
+        subgraph Control [控制节点]
+            C1[循环检查] --> C2[错误处理]
+            C2 --> C3[人工干预]
+            C3 --> C4[结果生成]
+        end
+        
+        P1 -.->|重试/修复| Control
+        P2 -.->|重试/修复| Control
+        P3 -.->|重试/修复| Control
+        P4 -.->|重试/修复| Control
+        P5 -.->|重试/修复| Control
+        P6 -.->|重试/修复| Control
+        Control -.->|路由决策| P1
+    end
+
+    subgraph Memory [记忆层]
+        M1[(短期记忆)]
+        M2[(中期记忆)]
+        M3[(长期记忆)]
+        M4[(向量数据库<br/>Chroma)]
+        
+        M1 <--> Core
+        M2 <--> Core
+        M3 <--> Core
+        M4 <--> Core
+    end
+
+    subgraph Output [输出层]
+        O1[Workflow Output Fixer<br/>片段序列修复] --> O2[结果格式化]
+        O2 --> O3[JSON / SDK / MCP / A2A]
+    end
+
+    subgraph Downstream [下游渲染]
+        D1[多模型适配器] --> D2[Sora/Veo/Runway/可灵/SVD]
+        D2 --> D3[FFmpeg 合成]
+        D3 --> D4[最终成片]
+    end
+
+    A3 --> P1
+    P7 --> O1
+    O3 --> D1
 ```
 
-该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《剧本分镜智能体架构设计与实现（v1.0）》](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
+该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《剧本分镜智能体架构设计与实现》](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
 
 ------
 
