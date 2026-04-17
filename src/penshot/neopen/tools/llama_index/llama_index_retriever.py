@@ -2,7 +2,7 @@
 @FileName: llama_index_retriever.py
 @Description: LlamaIndex 文档检索模块，提供高效的文档检索功能，支持多种检索策略
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """
 

@@ -2,7 +2,7 @@
 @FileName: keyword_config.py
 @Description: 统一关键词配置加载器
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """
 import os

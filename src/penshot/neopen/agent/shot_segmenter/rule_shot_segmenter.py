@@ -2,7 +2,7 @@
 @FileName: rule_shot_generator.py
 @Description: 基于规则的镜头生成器
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 17:40
 """
 from typing import List, Optional, Dict, Any

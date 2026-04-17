@@ -3,7 +3,7 @@
 @Description: 剧本语法解析器模块
             提供自定义剧本格式的解析功能，支持场景、角色、对话、动作等元素的提取
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
 import re

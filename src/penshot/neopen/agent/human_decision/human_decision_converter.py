@@ -2,7 +2,7 @@
 @FileName: human_decision_converter.py
 @Description: 人工决策转换器
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/5 17:09
 """
 import time

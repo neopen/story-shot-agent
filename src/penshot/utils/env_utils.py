@@ -2,7 +2,7 @@
 @FileName: env_utils.py
 @Description: 环境工具模块，提供环境相关的辅助功能
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """
 import os

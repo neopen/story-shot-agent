@@ -2,7 +2,7 @@
 @FileName: task_factory.py
 @Description: 任务工厂 - 封装任务提交和执行
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/24 11:56
 """
 

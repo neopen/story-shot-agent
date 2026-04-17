@@ -5,7 +5,7 @@
     - Otherwise tasks are stored in-process memory (protected by RLock).
     - Workflow cache and pipeline instances remain in-memory.
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 16:42
 """
 

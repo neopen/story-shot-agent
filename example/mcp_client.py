@@ -2,7 +2,7 @@
 @FileName: mcp_client.py
 @Description: MCP Client 测试脚本 - Windows 兼容版
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30
 """
 

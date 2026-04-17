@@ -2,7 +2,7 @@
 @FileName: mcp_http_client.py
 @Description: HTTP MCP 客户端测试
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30 17:19
 """
 

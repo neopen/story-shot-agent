@@ -2,7 +2,7 @@
 @FileName: script_parser_models.py
 @Description:  剧本解析相关模型
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19 21:44
 """
 

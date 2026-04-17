@@ -2,7 +2,7 @@
 @FileName: llm_quality_auditor.py
 @Description: LLM深度审查器 - 只负责LLM审查逻辑
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/27 0:00
 """
 import json

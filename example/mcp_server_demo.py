@@ -2,7 +2,7 @@
 @FileName: mcp_server_demo.py
 @Description: MCP Server 使用示例
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30 13:02
 """
 

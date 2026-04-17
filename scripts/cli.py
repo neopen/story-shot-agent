@@ -491,7 +491,7 @@ def cmd_version(args):
     """显示版本信息"""
     print(f"Penshot v{__version__}")
     print(f"作者: HiPeng")
-    print(f"GitHub: https://github.com/neopen/video-shot-agent")
+    print(f"GitHub: https://github.com/neopen/story-shot-agent")
 
 
 def create_parser() -> argparse.ArgumentParser:

@@ -2,7 +2,7 @@
 @FileName: prompt_utils.py
 @Description: 提示词处理工具
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/5 23:46
 """
 

@@ -2,7 +2,7 @@
 @FileName: web_app.py
 @Description: 集成到Web应用（FastAPI示例）
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/10 19:44
 """
 from datetime import datetime, timezone

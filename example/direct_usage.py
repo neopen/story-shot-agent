@@ -2,7 +2,7 @@
 @FileName: direct_usage.py
 @Description: 作为Python库直接使用
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/10 19:46
 """
 import asyncio

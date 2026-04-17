@@ -2,7 +2,7 @@
 @FileName: short_term_memory.py
 @Description: 短期记忆 - 滑动窗口 + TTL过期
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30 13:06
 """
 import time

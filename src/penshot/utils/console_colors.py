@@ -2,7 +2,7 @@
 @FileName: console_colors.py
 @Description: 控制台颜色输出工具，提供带颜色的日志输出功能
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """
 import logging

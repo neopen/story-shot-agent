@@ -2,7 +2,7 @@
 @FileName: shot_generator_agent.py
 @Description: 分镜生成智能体
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
 import time

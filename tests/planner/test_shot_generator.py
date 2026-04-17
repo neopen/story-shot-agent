@@ -2,7 +2,7 @@
 @FileName: test_shot_generator.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/17 23:22
 """
 

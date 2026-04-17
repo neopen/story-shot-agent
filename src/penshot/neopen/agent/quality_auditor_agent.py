@@ -2,7 +2,7 @@
 @FileName: quality_auditor_agent.py
 @Description: 质量审查器 - 合并基本规则和LLM审查结果
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/25 21:59
 """
 from typing import Optional, Dict, List, Any

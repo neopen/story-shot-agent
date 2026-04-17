@@ -3,7 +3,7 @@
 @FileName: index_api.py
 @Description: FastAPI应用，提供索引接口
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/22 23:40
 """
 import uvicorn

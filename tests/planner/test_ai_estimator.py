@@ -2,7 +2,7 @@
 @FileName: test_ai_estimator.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/14 21:13
 """
 from penshot.neopen.agent.script_parser2.script_parser_models import UnifiedScript

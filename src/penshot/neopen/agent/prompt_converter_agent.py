@@ -2,7 +2,7 @@
 @FileName: prompt_converter_agent.py
 @Description: 提示词转换智能体
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/18 14:23
 """
 import time

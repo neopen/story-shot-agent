@@ -2,7 +2,7 @@
 @FileName: template_prompt_converter.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 23:41
 """
 from typing import Optional, Dict, Any

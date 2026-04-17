@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  video-shot-agent:
+  story-shot-agent:
     build: .
-    image: video-shot-agent:latest
+    image: story-shot-agent:latest
     restart: unless-stopped
     ports:
       - "8000:8000"

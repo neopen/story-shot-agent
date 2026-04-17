@@ -375,7 +375,7 @@ class MCPClient:
             print("MCP Server 已停止")
 ```
 
-示例代码：[video-shot-agent/example/mcp_client.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
+示例代码：[story-shot-agent/example/mcp_client.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
 
 
 
@@ -509,7 +509,7 @@ class StoryboardWorkflowNodes:
             }
 ```
 
-示例代码：[video-shot-agent/example/langgraph_integration.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/langgraph_integration.py)
+示例代码：[story-shot-agent/example/langgraph_integration.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
 
 
 
@@ -567,9 +567,9 @@ class StoryboardWorkflowNodes:
 
 ## 相关链接
 
-- [GitHub 仓库](https://github.com/neopen/video-shot-agent)
+- [GitHub 仓库](https://github.com/neopen/story-shot-agent)
 - [详细文档](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
-- [示例代码](https://github.com/neopen/video-shot-agent/tree/main/example)
+- [示例代码](https://github.com/neopen/story-shot-agent/tree/main/example)
 
 
 

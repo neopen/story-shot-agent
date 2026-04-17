@@ -11,7 +11,7 @@
         5. 启动应用
     步骤严格按顺序执行，只有上一步成功才执行下一步
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """
 
@@ -290,7 +290,7 @@ class AppBaseEnv:
         print_large_ascii()
         info("==================================================================")
         info("<                   欢迎使用 Neopen 剧本分镜智能体                 >")
-        info("<           ⭐https://github.com/neopen/video-shot-agent       >")
+        info("<           ⭐https://github.com/neopen/story-shot-agent       >")
         info("==================================================================")
         debug(f"当前工作目录: {os.getcwd()}")
         debug(f"将使用的虚拟环境: {VENV_DIR}")

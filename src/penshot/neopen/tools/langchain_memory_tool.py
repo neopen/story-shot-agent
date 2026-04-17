@@ -2,7 +2,7 @@
 @FileName: langchain_memory_tool.py
 @Description: 使用LangChain的VectorStoreRetrieverMemory实现时序规划智能体的状态记忆功能
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
 import json

@@ -2,7 +2,7 @@
 @FileName: action_uration_tool.py
 @Description: 动作时长估算算法
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/24 14:01
 """
 from typing import Dict, Any

@@ -2,7 +2,7 @@
 @FileName: prompts_manager.py
 @Description: 提示词模板管理类
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/23 21:54
 """
 from pathlib import Path

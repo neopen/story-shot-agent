@@ -2,7 +2,7 @@
 @FileName: log_utils.py
 @Description: 日志工具模块，提供异常信息详细打印等功能
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """
 import sys

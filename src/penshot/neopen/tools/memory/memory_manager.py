@@ -2,7 +2,7 @@
 @FileName: memory_manager.py
 @Description: 基于LangChain的记忆管理系统
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/4/1
 """
 import json

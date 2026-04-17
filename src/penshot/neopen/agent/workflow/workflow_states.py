@@ -2,7 +2,7 @@
 @FileName: workflow_states.py
 @Description: 分镜生成工作流的状态定义
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
 import time

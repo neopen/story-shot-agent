@@ -2,7 +2,7 @@
 @FileName: base_llm_agent.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/9 21:23
 """
 import time

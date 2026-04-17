@@ -1,4 +1,4 @@
-# video-shot-agent (Penshot)
+# story-shot-agent (Penshot)
 
 A multi-agent collaborative screenplay storyboarding system that splits scripts in various formats into script units optimized for AI text-to-video generation durations. It outputs high-quality storyboard fragment descriptions while ensuring narrative continuity. Built on LangChain and LangGraph, the system leverages LLMs to parse any script format into "Text-to-Video" prompt fragments compatible with mainstream AI video models. It supports task pool priority queuing, multi-level memory management, and Chroma vector retrieval.
 
@@ -6,6 +6,9 @@ A multi-agent collaborative screenplay storyboarding system that splits scripts 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![LangGraph](https://img.shields.io/badge/built_with-LangGraph-purple)](https://langchain-ai.github.io/langgraph/) [![PyPI](https://img.shields.io/pypi/v/penshot.svg)](https://pypi.org/project/penshot/) [![Downloads](https://static.pepy.tech/badge/penshot)](https://pepy.tech/project/penshot)
 
+**From Story to Shot** - Transform your scripts into AI-powered storyboards.
+
+> Named "penshot" on PyPI - because every story starts with a pen.
 ---
 
 ## Core Features
@@ -61,12 +64,12 @@ This system is a typical Natural Language Processing (NLP) application that achi
 pip install penshot
 
 # Option B: Install in editable mode (from source)
-git clone https://github.com/neopen/video-shot-agent.git
-cd video-shot-agent
+git clone https://github.com/neopen/story-shot-agent.git
+cd story-shot-agent
 pip install -e .
 ```
 
-> Note: `penshot` is the PyPI package name, while `video-shot-agent` is the GitHub repository name. Both refer to the same project.
+> Note: `penshot` is the PyPI package name, while `story-shot-agent` is the GitHub repository name. Both refer to the same project.
 
 ### 2. Configuration
 
@@ -142,7 +145,7 @@ status = agent.get_task_status(task_id)
 result = await agent.wait_for_result_async(task_id)
 ```
 
-Full example: [direct_usage.py](https://github.com/neopen/video-shot-agent/blob/main/example/direct_usage.py)
+Full example: [direct_usage.py](https://github.com/neopen/story-shot-agent/blob/main/example/direct_usage.py)
 
 ### 2. FastAPI Web Application Integration
 
@@ -161,15 +164,15 @@ async def generate(script_text: str):
     return {"task_id": task_id, "status": "PENDING"}
 ```
 
-Full example: [web_app.py](https://github.com/neopen/video-shot-agent/blob/main/example/web_app.py)
+Full example: [web_app.py](https://github.com/neopen/story-shot-agent/blob/main/example/web_app.py)
 
 ### 3. LangGraph Node Integration
 
-Can be embedded as an independent node in LangChain/LangGraph workflows for end-to-end automation. Full example: [langgraph_integration.py](https://github.com/neopen/video-shot-agent/blob/main/example/langgraph_integration.py)
+Can be embedded as an independent node in LangChain/LangGraph workflows for end-to-end automation. Full example: [langgraph_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
 
 ### 4. A2A Protocol Collaboration
 
-Supports context passing and task orchestration with upstream scriptwriting agents and downstream text-to-video/editing agents. Full example: [a2a_integration.py](https://github.com/neopen/video-shot-agent/blob/main/example/a2a_integration.py)
+Supports context passing and task orchestration with upstream scriptwriting agents and downstream text-to-video/editing agents. Full example: [a2a_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/a2a_integration.py)
 
 ### 5. MCP (Model Context Protocol) Support
 
@@ -179,7 +182,7 @@ Start the MCP Server:
 python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
-Clients can call the `breakdown_script` and `get_task_result` tools to seamlessly integrate with MCP-compatible IDEs or agent frameworks. Full example: [mcp_client.py](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
+Clients can call the `breakdown_script` and `get_task_result` tools to seamlessly integrate with MCP-compatible IDEs or agent frameworks. Full example: [mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
 
 ------
 
@@ -266,8 +269,8 @@ We welcome contributions via Issues or Pull Requests:
 Quick dev environment setup:
 
 ```bash
-git clone https://github.com/neopen/video-shot-agent.git
-cd video-shot-agent
+git clone https://github.com/neopen/story-shot-agent.git
+cd story-shot-agent
 pip install -e ".[dev]"
 pytest tests/
 ```
@@ -282,7 +285,7 @@ This project is licensed under the MIT License. See the [LICENSE](https://chat.q
 
 ## Contact
 
-- Project Homepage: https://github.com/neopen/video-shot-agent
+- Project Homepage: https://github.com/neopen/story-shot-agent
 - Author: NeoPen
 - Email: helpenx@gmail.com
 - Architecture Documentation: https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/

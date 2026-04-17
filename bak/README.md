@@ -12,7 +12,7 @@
 
 
 
-**创作流程**：客户端  → LLM 剧本创作  →  <u>***[剧本解析](https://github.com/neopen/video-shot-agent)（分镜转码）***</u> → DM 视频生成（文生视频） →  视频合成渲染（FFmpeg）
+**创作流程**：客户端  → LLM 剧本创作  →  <u>***[剧本解析](https://github.com/neopen/story-shot-agent)（分镜转码）***</u> → DM 视频生成（文生视频） →  视频合成渲染（FFmpeg）
 
 **该项目是典型的自然语言处理（NLP）应用场景**
 
@@ -55,8 +55,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/neopen/video-shot-agent.git
-cd video-shot-agent
+git clone https://github.com/neopen/story-shot-agent.git
+cd story-shot-agent
 
 # 安装为可编辑包
 pip install -e .
@@ -233,7 +233,7 @@ result = await penshot.wait_for_result_async(task_id)
 print(f"最终结果: 成功={result.success}, 状态={result.status}")
 ```
 
-示例代码：[video-shot-agent/example/direct_usage.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/direct_usage.py)
+示例代码：[story-shot-agent/example/direct_usage.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/direct_usage.py)
 
 
 
@@ -292,7 +292,7 @@ async def get_task_result(task_id: str):
     )
 ```
 
-示例代码：[video-shot-agent/example/web_app.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/web_app.py)
+示例代码：[story-shot-agent/example/web_app.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/web_app.py)
 
 
 
@@ -300,7 +300,7 @@ async def get_task_result(task_id: str):
 
 可以将剧本分镜智能体作为 LangGraph 工作流中的一个节点。
 
-示例代码：[video-shot-agent/example/langgraph_integration.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/langgraph_integration.py)
+示例代码：[story-shot-agent/example/langgraph_integration.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
 
 
 
@@ -308,7 +308,7 @@ async def get_task_result(task_id: str):
 
 将剧本分镜智能体集成到 Agent-to-Agent 协作系统中。如：上游是剧本创作智能体，下游是 文生视频+剪辑 智能体。
 
-示例代码：[video-shot-agent/example/a2a_integration.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/a2a_integration.py)
+示例代码：[story-shot-agent/example/a2a_integration.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/a2a_integration.py)
 
 
 
@@ -364,7 +364,7 @@ def get_task_result(self, task_id: str) -> dict:
     return {}
 ```
 
-示例代码：[video-shot-agent/example/mcp_client.py at main · neopen/video-shot-agent](https://github.com/neopen/video-shot-agent/blob/main/example/mcp_client.py)
+示例代码：[story-shot-agent/example/mcp_client.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
 
 
 
@@ -442,7 +442,7 @@ def get_task_result(self, task_id: str) -> dict:
 
 ## 问题反馈
 
-- **提交 Issue**：https://github.com/neopen/video-shot-agent/issues
+- **提交 Issue**：https://github.com/neopen/story-shot-agent/issues
 - **功能建议**：使用 Enhancement 标签
 - **Bug 报告**：使用 Bug 标签并提供复现步骤
 - **安全漏洞**：请直接发送邮件至作者邮箱
@@ -465,7 +465,7 @@ Copyright (c) 2024 HiPeng
 
 ## 联系方式
 
-- 项目主页：https://github.com/neopen/video-shot-agent
+- 项目主页：https://github.com/neopen/story-shot-agent
 - 作者：NeoPen
 - 邮箱：helpenx@gmail.com
 - 文档：https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/

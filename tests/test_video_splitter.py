@@ -2,7 +2,7 @@
 @FileName: test_video_splitter.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 23:15
 """
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence

@@ -2,7 +2,7 @@
 @FileName: multi_agent_pipeline.py
 @Description: 多智能体协作流程，负责协调各个智能体完成端到端的分镜生成
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 至今
 """
 import asyncio

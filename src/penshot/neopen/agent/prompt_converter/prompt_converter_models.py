@@ -2,7 +2,7 @@
 @FileName: prompt_converter_models.py
 @Description: 模型
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/18 14:25
 """
 from datetime import datetime

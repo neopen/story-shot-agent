@@ -2,7 +2,7 @@
 @FileName: estimator_factory.py
 @Description: 时长估算器工厂
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19
 """
 from typing import Dict

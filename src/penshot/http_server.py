@@ -2,7 +2,7 @@
 @FileName: http_server.py
 @Description: Penshot HTTP 服务 - 可直接在命令行启动
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30
 """
 

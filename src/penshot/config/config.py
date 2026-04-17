@@ -2,7 +2,7 @@
 @FileName: config.py
 @Description: 配置管理模块 - 严格遵循 env > yaml > default 优先级
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/01
 """
 import os

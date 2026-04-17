@@ -2,7 +2,7 @@
 @FileName: client_factory.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/10 23:13
 """
 from typing import Dict, Type, List, Optional

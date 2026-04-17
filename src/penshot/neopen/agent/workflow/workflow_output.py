@@ -2,7 +2,7 @@
 @FileName: workflow_output.py
 @Description: 工作流输出封装 - 异步保存各类报告，不阻塞主流程
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30
 """
 import asyncio

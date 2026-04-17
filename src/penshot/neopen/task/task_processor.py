@@ -2,7 +2,7 @@
 @FileName: task_processor.py
 @Description: 异步任务处理器（支持并发控制和任务队列）
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 16:40
 """
 import asyncio

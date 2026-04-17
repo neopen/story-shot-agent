@@ -2,7 +2,7 @@
 @FileName: penshot_config_demo.py
 @Description: Penshot 配置示例
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/10 19:52
 """
 import asyncio

@@ -2,7 +2,7 @@
 @FileName: llm_shot_segmenter.py
 @Description: 基于LLM的镜头生成器
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 17:35
 """
 import json

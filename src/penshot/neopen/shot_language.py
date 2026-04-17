@@ -2,7 +2,7 @@
 @FileName: shot_language.py
 @Description: 语言管理模块
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18 14:10
 """
 import os

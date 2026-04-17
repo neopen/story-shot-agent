@@ -3,7 +3,7 @@
 @FileName: __init__.py
 @Description: 智能体模块初始化
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
 # from .prompt_converter_agent import PromptConverterAgent

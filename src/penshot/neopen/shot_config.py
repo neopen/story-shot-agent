@@ -2,7 +2,7 @@
 @FileName: neopen_config.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/28 12:25
 """
 from dataclasses import dataclass

@@ -10,7 +10,7 @@
 
     步骤严格按顺序执行，只有上一步成功才执行下一步
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """
 import argparse

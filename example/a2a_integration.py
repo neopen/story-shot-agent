@@ -2,7 +2,7 @@
 @FileName: a2a_integration.py
 @Description: 集成到A2A系统（代理到代理）
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/10 19:45
 """
 import asyncio

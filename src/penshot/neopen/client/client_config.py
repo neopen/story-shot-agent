@@ -2,7 +2,7 @@
 @FileName: client_type.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/11 16:31
 """
 from dataclasses import dataclass

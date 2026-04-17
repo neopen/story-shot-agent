@@ -2,7 +2,7 @@
 @FileName: api_utils.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/3 12:45
 """
 from typing import Union

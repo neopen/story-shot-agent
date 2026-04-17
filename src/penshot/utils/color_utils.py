@@ -2,7 +2,7 @@
 @FileName: color_utils.py
 @Description: 色彩处理工具
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/6 15:12
 """
 import colorsys

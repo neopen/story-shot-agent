@@ -2,7 +2,7 @@
 @FileName: shot_context.py
 @Description: 上下文变量
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/17 22:51
 """
 import contextvars

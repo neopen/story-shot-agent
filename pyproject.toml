@@ -118,20 +118,20 @@ full = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/neopen/video-shot-agent"
-Repository = "https://github.com/neopen/video-shot-agent"
-Documentation = "https://github.com/neopen/video-shot-agent/blob/main/docs/PenShot.md"
-Changelog = "https://github.com/neopen/video-shot-agent/releases"
-Issues = "https://github.com/neopen/video-shot-agent/issues"
+Homepage = "https://github.com/neopen/story-shot-agent"
+Repository = "https://github.com/neopen/story-shot-agent"
+Documentation = "https://github.com/neopen/story-shot-agent/blob/main/docs/PenShot.md"
+Changelog = "https://github.com/neopen/story-shot-agent/releases"
+Issues = "https://github.com/neopen/story-shot-agent/issues"
 
 # 注意：这里引用的是内部的Python包名 penshot
 [project.scripts]
-video-shot-agent = "penshot.cli:main"
+story-shot-agent = "penshot.cli:main"
 vs-agent = "penshot.cli:main"  # 简写别名
 
 # 如果使用FastAPI，可以添加一个serve命令
 [project.entry-points."console_scripts"]
-video-shot-agent-serve = "penshot.cli:serve"
+story-shot-agent-serve = "penshot.cli:serve"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

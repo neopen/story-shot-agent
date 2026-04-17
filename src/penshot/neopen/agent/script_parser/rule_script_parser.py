@@ -2,7 +2,7 @@
 @FileName: RuleScriptParser.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 14:38
 """
 from typing import Any, Optional, Dict

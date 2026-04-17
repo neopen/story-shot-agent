@@ -2,7 +2,7 @@
 @FileName: base_repairable_agent.py
 @Description: 可修复智能体基类 - 定义统一的修复接口
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/28
 """
 import json

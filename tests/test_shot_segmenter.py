@@ -2,7 +2,7 @@
 @FileName: test_shot_splitter.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 22:11
 """
 import logging

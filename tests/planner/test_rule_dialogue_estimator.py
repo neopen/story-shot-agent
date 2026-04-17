@@ -2,7 +2,7 @@
 @FileName: test_temporal_scene_planner.py
 @Description: 对话估算器演示
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/13 16:12
 """
 from penshot.neopen.agent.script_parser2.script_parser_models import Dialogue

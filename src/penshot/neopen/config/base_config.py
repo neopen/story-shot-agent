@@ -2,7 +2,7 @@
 @FileName: base_config.py
 @Description: 
 @Author: HiPeng
-@Github: https://github.com/neopen/video-shot-agent
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/13 16:36
 """
 from abc import abstractmethod
