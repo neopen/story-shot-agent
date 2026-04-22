@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penshot - 智能分镜视频生成</title>
+    <meta name="description" content="Penshot - AI驱动的剧本分镜视频生成工具，从剧本到视频，智能分镜，一键生成">
+    <meta name="keywords" content="AI视频,分镜生成,剧本转视频,智能分镜">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #ec4899;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --gray: #64748b;
+            --gray-light: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: var(--dark);
+            background: var(--light);
+            line-height: 1.6;
+        }
+
+        /* 导航栏 */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 1000;
+            padding: 1rem 2rem;
+        }
+
+        .nav-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .github-btn {
+            background: var(--dark);
+            color: white !important;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .github-btn:hover {
+            background: var(--primary);
+        }
+
+        /* 按钮样式 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Hero 区域 */
+        .hero {
+            padding: 120px 2rem 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            opacity: 0.9;
+            animation: fadeInUp 0.6s ease 0.1s both;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            animation: fadeInUp 0.6s ease 0.2s both;
+        }
+
+        .hero-buttons .btn-outline {
+            border-color: white;
+            color: white;
+        }
+
+        .hero-buttons .btn-outline:hover {
+            background: white;
+            color: var(--primary);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 容器 */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* 章节 */
+        .section {
+            padding: 80px 0;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--gray);
+            margin-bottom: 3rem;
+            font-size: 1.1rem;
+        }
+
+        /* 卡片网格 */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -12px rgba(0,0,0,0.1);
+        }
+
+        .card-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card h3 {
+            margin-bottom: 0.75rem;
+        }
+
+        .card p {
+            color: var(--gray);
+            line-height: 1.6;
+        }
+
+        /* 代码块 */
+        .code-block {
+            background: var(--dark);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .code-block pre {
+            color: #e2e8f0;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        /* 特性列表 */
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-light);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        /* 工作流步骤 */
+        .workflow {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .step {
+            flex: 1;
+            min-width: 180px;
+            text-align: center;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 16px;
+            position: relative;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 1rem;
+        }
+
+        /* 页脚 */
+        .footer {
+            background: var(--dark);
+            color: var(--gray-light);
+            padding: 3rem 0;
+            text-align: center;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .section-title {
+                font-size: 2rem;
+            }
+            .workflow {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 导航栏 -->
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="logo">
+            <div class="logo-icon">✍️</div>
+            <span>PenShot</span>
+        </div>
+        <div class="nav-links">
+            <a href="#features">功能特性</a>
+            <a href="#workflow">工作流程</a>
+            <a href="#usage">快速开始</a>
+            <a href="#api">API文档</a>
+            <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5" target="_blank" class="blog-btn">Blog</a>
+            <a href="https://github.com/neopen/story-shot-agent" target="_blank" class="github-btn">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero 区域 -->
+<section class="hero">
+    <h1>从剧本到视频，AI 智能分镜</h1>
+    <p>Penshot 是一个 AI 驱动的智能分镜视频生成工具，将剧本自动转换为分镜序列，一键生成 AI 视频。</p>
+    <div class="hero-buttons">
+        <a href="#usage" class="btn btn-primary">快速开始</a>
+        <a href="https://github.com/neopen/story-shot-agent" target="_blank" class="btn btn-outline">GitHub</a>
+    </div>
+</section>
+
+<!-- 核心特性 -->
+<section id="features" class="section">
+    <div class="container">
+        <h2 class="section-title">核心特性</h2>
+        <p class="section-subtitle">专为 AI 视频生成设计的智能工作流</p>
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon">📝</div>
+                <h3>智能剧本解析</h3>
+                <p>支持多种格式剧本输入，自动识别场景、角色、对话，提取核心元素。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">🎬</div>
+                <h3>AI 分镜拆分</h3>
+                <p>基于内容智能拆分镜头，自动判断景别、时长和镜头运动。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">✂️</div>
+                <h3>视频片段切割</h3>
+                <p>将镜头切割为适合 AI 生成的短片段，确保每段不超过 5 秒。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">🤖</div>
+                <h3>AI 提示词生成</h3>
+                <p>自动生成高质量 AI 视频提示词，支持 Runway、Pika 等主流模型。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">📊</div>
+                <h3>质量审查</h3>
+                <p>自动检查片段时长、连续性，确保生成质量。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">🔌</div>
+                <h3>多协议支持</h3>
+                <p>支持 REST API、MCP 协议、Python SDK，轻松集成到现有系统。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 工作流程 -->
+<section id="workflow" class="section" style="background: var(--gray-light);">
+    <div class="container">
+        <h2 class="section-title">工作流程</h2>
+        <p class="section-subtitle">5 个步骤，从剧本到视频</p>
+        <div class="workflow">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h4>剧本解析</h4>
+                <p>输入剧本文本，AI 解析场景、角色、对话</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h4>镜头拆分</h4>
+                <p>智能拆分镜头，确定景别和时长</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h4>片段切割</h4>
+                <p>切割为 ≤5 秒的 AI 生成片段</p>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <h4>提示词生成</h4>
+                <p>生成高质量 AI 视频提示词</p>
+            </div>
+            <div class="step">
+                <div class="step-number">5</div>
+                <h4>视频生成</h4>
+                <p>调用 AI 模型生成视频</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 快速开始 -->
+<section id="usage" class="section">
+    <div class="container">
+        <h2 class="section-title">快速开始</h2>
+        <p class="section-subtitle">3 分钟上手 Penshot</p>
+
+        <div class="card" style="margin-bottom: 2rem;">
+            <h3>📦 安装</h3>
+            <div class="code-block">
+                <pre>pip install penshot</pre>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 2rem;">
+            <h3>🚀 基础用法</h3>
+            <div class="code-block">
+                <pre>import asyncio
+from penshot import PenshotFunction
+
+async def main():
+    # 创建智能体
+    agent = PenshotFunction()
+
+    # 提交任务并等待结果
+    result = agent.breakdown_script("""
+        场景：现代办公室
+        人物：小李（程序员）
+        动作：小李正在写代码，突然接到电话
+    """)
+
+    if result.success:
+        print(f"生成成功！共 {len(result.data['shots'])} 个镜头")
+    else:
+        print(f"生成失败: {result.error}")
+
+asyncio.run(main())</pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🌐 REST API</h3>
+            <div class="code-block">
+                <pre># 启动服务
+penshot serve-rest --port 8000
+
+# 提交任务
+curl -X POST http://localhost:8000/api/v1/storyboard \
+  -H "Content-Type: application/json" \
+  -d '{"script": "你的剧本内容...", "language": "zh"}'
+
+# 查询状态
+curl http://localhost:8000/api/v1/status/{task_id}
+
+# 获取结果
+curl http://localhost:8000/api/v1/result/{task_id}</pre>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- API 文档 -->
+<section id="api" class="section" style="background: var(--gray-light);">
+    <div class="container">
+        <h2 class="section-title">API 接口</h2>
+        <p class="section-subtitle">完整的 REST API 接口文档</p>
+
+        <div class="grid">
+            <div class="card">
+                <h3>📝 POST /api/v1/storyboard</h3>
+                <p>异步提交分镜生成任务</p>
+                <div class="code-block">
+                    <pre>{
+  "script": "剧本文本",
+  "language": "zh",
+  "callback_url": "可选的回调地址"
+}</pre>
+                </div>
+                <p><strong>返回:</strong> task_id 和状态</p>
+            </div>
+
+            <div class="card">
+                <h3>🔄 POST /api/v1/storyboard/sync</h3>
+                <p>同步提交，等待完成</p>
+                <div class="code-block">
+                    <pre>{
+  "script": "剧本文本",
+  "timeout": 300
+}</pre>
+                </div>
+                <p><strong>返回:</strong> 完整的分镜结果</p>
+            </div>
+
+            <div class="card">
+                <h3>📊 GET /api/v1/status/{task_id}</h3>
+                <p>查询任务状态</p>
+                <p><strong>返回:</strong> 状态、进度、阶段信息</p>
+            </div>
+
+            <div class="card">
+                <h3>📄 GET /api/v1/result/{task_id}</h3>
+                <p>获取任务结果</p>
+                <p><strong>返回:</strong> 分镜序列、统计数据</p>
+            </div>
+
+            <div class="card">
+                <h3>🗑️ DELETE /api/v1/task/{task_id}</h3>
+                <p>取消任务</p>
+            </div>
+
+            <div class="card">
+                <h3>❤️ GET /api/v1/health</h3>
+                <p>健康检查</p>
+                <p><strong>返回:</strong> 服务状态和统计</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 技术栈 -->
+<section class="section">
+    <div class="container">
+        <h2 class="section-title">技术架构</h2>
+        <div class="features-list">
+            <div class="feature-item">
+                <div class="feature-icon">🐍</div>
+                <div><strong>Python 3.9+</strong><br>核心开发语言</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">⚡</div>
+                <div><strong>FastAPI</strong><br>高性能 Web 框架</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🧠</div>
+                <div><strong>LangGraph</strong><br>工作流编排</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🗄️</div>
+                <div><strong>Redis</strong><br>任务持久化</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🔌</div>
+                <div><strong>MCP 协议</strong><br>AI 智能体集成</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🎨</div>
+                <div><strong>Runway/Pika</strong><br>AI 视频生成</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 页脚 -->
+<footer class="footer">
+    <div class="container">
+        <p>Penshot - 智能分镜视频生成工具</p>
+        <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+            <a href="https://github.com/neopen/story-shot-agent" style="color: var(--primary-light);">GitHub</a> |
+            <a href="#" style="color: var(--primary-light);">文档</a> |
+            <a href="#" style="color: var(--primary-light);">问题反馈</a>
+        </p>
+        <p style="margin-top: 1rem; font-size: 0.75rem;">© 2024 Penshot. MIT License.</p>
+    </div>
+</footer>
+
+<script>
+    // 平滑滚动
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+
+    // 动态显示当前时间
+    function updateTime() {
+        const timeElement = document.getElementById('current-time');
+        if (timeElement) {
+            timeElement.textContent = new Date().toLocaleString('zh-CN');
+        }
+    }
+    updateTime();
+
+    // 添加滚动动画效果
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.card, .step, .feature-item').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(20px)';
+        el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        observer.observe(el);
+    });
+</script>
+</body>
+</html>
