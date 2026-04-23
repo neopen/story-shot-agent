@@ -13,7 +13,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_chroma import Chroma
 
 from penshot.logger import error, debug
-from penshot.neopen.tools.memory.memory_models import MemoryConfig
+from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
 
 
 class LongTermMemory:

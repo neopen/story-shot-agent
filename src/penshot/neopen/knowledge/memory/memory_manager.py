@@ -11,9 +11,9 @@ from typing import Optional, Any, Dict, List
 from langchain_core.language_models import BaseLLM
 
 from penshot.logger import info, debug
-from penshot.neopen.tools.memory.memory_context import MemoryContext
-from penshot.neopen.tools.memory.memory_models import MemoryConfig, MemoryLevel
-from penshot.neopen.tools.memory.script_memory import ScriptMemory
+from penshot.neopen.knowledge.memory.memory_context import MemoryContext
+from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
+from penshot.neopen.knowledge.memory.script_memory import ScriptMemory
 
 
 class MemoryManager:

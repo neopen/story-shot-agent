@@ -10,8 +10,8 @@ from typing import Dict, List, Optional, Any
 
 from penshot.logger import info, warning, error
 from penshot.neopen.agent.workflow.workflow_states import WorkflowState
-from penshot.neopen.tools.memory.memory_manager import MemoryManager
-from penshot.neopen.tools.memory.memory_models import MemoryLevel
+from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
+from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.knowledge.llamaIndex.llama_index_retriever import DocumentRetriever
 

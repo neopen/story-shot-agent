@@ -16,7 +16,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableLambda
 
 from penshot.logger import debug, info, error
-from penshot.neopen.tools.memory.memory_models import MemoryConfig
+from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
 from penshot.neopen.tools.result_storage_tool import create_result_storage
 
 

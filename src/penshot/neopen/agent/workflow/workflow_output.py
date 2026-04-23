@@ -13,8 +13,8 @@ from typing import Dict, Optional, List, Any
 from penshot.logger import debug, error, info
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.agent.workflow.workflow_states import WorkflowState
-from penshot.neopen.tools.memory.memory_manager import MemoryManager
-from penshot.neopen.tools.memory.memory_models import MemoryLevel
+from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
+from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
 from penshot.neopen.tools.result_storage_tool import ResultStorage
 
 

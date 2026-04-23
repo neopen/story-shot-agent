@@ -11,11 +11,11 @@ from typing import Optional, Any, Dict, List
 from langchain_core.language_models import BaseLLM
 
 from penshot.logger import info
-from penshot.neopen.tools.memory.long_term_memory import LongTermMemory
-from penshot.neopen.tools.memory.medium_term_memory import MediumTermMemory
-from penshot.neopen.tools.memory.memory_context import MemoryContext
-from penshot.neopen.tools.memory.memory_models import MemoryConfig, MemoryLevel
-from penshot.neopen.tools.memory.short_term_memory import ShortTermMemory
+from penshot.neopen.knowledge.memory.long_term_memory import LongTermMemory
+from penshot.neopen.knowledge.memory.medium_term_memory import MediumTermMemory
+from penshot.neopen.knowledge.memory.memory_context import MemoryContext
+from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
+from penshot.neopen.knowledge.memory.short_term_memory import ShortTermMemory
 
 
 class ScriptMemory:

@@ -13,7 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableLambda
 
 from penshot.logger import debug, warning
-from penshot.neopen.tools.memory.memory_models import MemoryConfig
+from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
 
 
 class ShortTermMemory:

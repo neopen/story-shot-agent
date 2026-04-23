@@ -20,8 +20,8 @@ from penshot.neopen.agent.workflow.workflow_models import AgentStage, PipelineNo
 from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_states import WorkflowState
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
-from penshot.neopen.tools.memory.memory_manager import MemoryManager
-from penshot.neopen.tools.memory.memory_models import MemoryConfig, MemoryLevel
+from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
+from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
 from penshot.neopen.tools.result_storage_tool import create_result_storage
 from penshot.utils.log_utils import print_log_exception
 
