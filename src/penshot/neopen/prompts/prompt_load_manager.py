@@ -1,5 +1,5 @@
 """
-@FileName: prompts_manager.py
+@FileName: prompt_load_manager.py
 @Description: 提示词模板管理类
 @Author: HiPeng
 @Github: https://github.com/neopen/story-shot-agent
