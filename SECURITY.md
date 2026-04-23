@@ -14,7 +14,7 @@
 ### 如何报告
 
 1. **请勿**在 GitHub 上公开创建 issue 报告安全漏洞
-2. 发送邮件至 **security@penshot.ai**（请替换为您的实际邮箱）
+2. 发送邮件至  helpengx@gmail.com
 3. 或者通过 **GitHub 安全通告**（私密披露）进行报告
 
 请在报告中包含以下信息：
