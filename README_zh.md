@@ -1,10 +1,12 @@
 # 剧本分镜智能体 (PenShot)
 
-一个基于多智能体协作的剧本分镜系统，能够将多种格式的剧本拆分为符合 AI 文生视频时长的脚本单元，输出高质量分镜片段描述，并保证叙事连续性。系统基于 LangChain + LangGraph 构建，通过 LLM 将任意格式剧本解析转换为符合主流模型的“Text to Video”提示词片段，支持任务池优先级排队、多层级记忆管理与 Chroma 向量检索。
+一个基于多智能体协作的剧本分镜系统，能够将多种格式的剧本（电影、短剧、小说等）拆分为符合 AI 文生视频时长的脚本单元，输出高质量分镜片段提示词描述，并保证叙事连续性。系统基于 LangChain + LangGraph 构建，通过 LLM 将任意格式剧本解析转换为符合主流模型的“Text to Video”提示词片段，支持任务池优先级排队、多层级记忆管理与 Chroma 向量检索。
 
-中文 | [English](README) | [文档](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/) | [PyPI](https://pypi.org/project/penshot/) | [官网](https://shot.pengline.cn/)
+中文 | [English](./README.md) | [文档](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/) | [PyPI](https://pypi.org/project/penshot/) | [官网](https://shot.pengline.cn/)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![LangGraph](https://img.shields.io/badge/built_with-LangGraph-purple)](https://langchain-ai.github.io/langgraph/) [![PyPI](https://img.shields.io/pypi/v/penshot.svg)](https://pypi.org/project/penshot/) [![Downloads](https://static.pepy.tech/badge/penshot)](https://pepy.tech/project/penshot)
+
+
 
 ------
 
@@ -20,6 +22,8 @@
 | 多模型兼容       | 支持 OpenAI、Qwen、DeepSeek、Ollama 等主流 LLM 提供商，可插拔切换 |
 | 多协议集成       | 提供 Python SDK、REST API、LangGraph 节点、A2A 协作协议与 MCP 标准接口 |
 | 健壮性与可追溯   | 内置自动重试、错误降级机制，每个分镜片段均可双向追溯至原剧本位置 |
+
+
 
 ------
 
@@ -85,22 +89,19 @@ flowchart TD
     O3 --> D1
 ```
 
-该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《剧本分镜智能体架构设计与实现》](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
+该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《架构设计与实现》](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
+
+
 
 ------
 
 ## 快速开始
 
-### 1. 环境准备
+### 1. 依赖安装
 
 ```bash
-# 方式 A：直接安装 PyPI 包（推荐）
+# 直接安装 PyPI 包
 pip install penshot
-
-# 方式 B：开发模式安装（源码）
-git clone https://github.com/neopen/story-shot-agent.git
-cd story-shot-agent
-pip install -e .
 ```
 
 ### 2. 环境配置
@@ -127,43 +128,9 @@ PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
 PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0
 ```
 
-### 3. 启动服务
+### 3. 使用方式
 
-```python
-python main.py
-```
-
-服务默认运行于 `http://0.0.0.0:8000`，提供完整的 REST API 接口。
-
-### 4. API 调用示例
-
-提交分镜任务：
-
-```bash
-curl -X POST 'http://localhost:8000/api/v1/storyboard' \
--H 'Content-Type: application/json' \
--d '{
-  "script": "深夜11点，城市公寓客厅，窗外大雨滂沱。林然裹着旧羊毛毯蜷在沙发里，电视静音播放着黑白老电影..."
-}'
-```
-
-查询任务状态：
-
-```bash
-curl 'http://localhost:8000/api/v1/status/{task_id}'
-```
-
-获取任务结果：
-
-```bash
-curl 'http://localhost:8000/api/v1/result/{task_id}'
-```
-
-------
-
-## 多场景集成方式
-
-### 1. Python SDK 调用
+#### 1. Python SDK 调用
 
 ```python
 from penshot.api import create_penshot_agent
@@ -182,7 +149,7 @@ result = await agent.wait_for_result_async(task_id)
 
 完整示例：[direct_usage.py](https://github.com/neopen/story-shot-agent/blob/main/example/direct_usage.py)
 
-### 2. 嵌入 FastAPI Web 应用
+#### 2. 嵌入 FastAPI Web 应用
 
 可通过标准 HTTP 接口集成至现有业务系统：
 
@@ -201,15 +168,15 @@ async def generate(script_text: str):
 
 完整示例：[web_app.py](https://github.com/neopen/story-shot-agent/blob/main/example/web_app.py)
 
-### 3. LangGraph 节点集成
+#### 3. LangGraph 节点集成
 
 支持作为独立 Node 接入 LangChain/LangGraph 工作流，实现端到端自动化流水线。 完整示例：[langgraph_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
 
-### 4. A2A 协议协作
+#### 4. A2A 协议协作
 
 支持与上游剧本创作 Agent、下游文生视频/剪辑 Agent 进行上下文传递与任务编排。 完整示例：[a2a_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/a2a_integration.py)
 
-### 5. MCP (Model Context Protocol) 支持
+#### 5. MCP (Model Context Protocol) 支持
 
 启动 MCP Server：
 
@@ -218,6 +185,8 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
 客户端调用工具 `breakdown_script` 与 `get_task_result` 即可无缝接入支持 MCP 的 IDE 或 Agent 框架。 完整示例：[mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
+
+
 
 ------
 
@@ -246,6 +215,8 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 }
 ```
 
+
+
 ------
 
 ## 系统说明与注意事项
@@ -258,6 +229,8 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 | 多语言支持 | 当前针对中文剧本深度优化，其他语言效果持续迭代中       |
 | 声音同步   | 当前提供音频提示词，口型同步与环境音融合需下游工具配合 |
 | 错误处理   | 内置自动重试与降级机制，极端异常情况可能需人工介入     |
+
+
 
 ------
 
@@ -292,6 +265,8 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 
 实现任意长度/语言/类型剧本的零信息损失视觉化，输出达到专业导演分镜水准的标准化工作流。系统具备风格可定制、结果可追溯、自动优化循环与跨模态高度一致性能力。
 
+
+
 ------
 
 ## 贡献指南
@@ -312,11 +287,15 @@ pip install -e ".[dev]"
 pytest tests/
 ```
 
+
+
 ------
 
 ## 许可证
 
 本项目采用 MIT 开源协议，详见 [LICENSE](https://chat.qwen.ai/c/LICENSE) 文件。 Copyright (c) 2025 HiPeng
+
+
 
 ------
 
