@@ -56,11 +56,11 @@ dependencies = [
 #    "dashscope==1.23.9",
 
     # RAG/向量存储
-#    "llama-index-core==0.14.4",
+    "llama-index-core>=0.14.20",
 #    "llama-index-embeddings-openai>=0.1.0",
 #    "llama-index-embeddings-huggingface>=0.1.0",
 #    "llama-index-embeddings-ollama>=0.1.0",
-#    "chromadb>=0.4.22",
+    "chromadb>=1.5.6",
 
     # 配置与数据验证
     "pydantic>=2.11.10",
@@ -177,7 +177,7 @@ disallow_untyped_defs = true
 module = [
     "langchain.*",
     "langchain_community.*",
-#    "llama_index.*",
+#    "llamaIndex.*",
 ]
 ignore_missing_imports = true
 

@@ -8,8 +8,8 @@ langchain-deepseek>=1.0.0
 langchain-ollama>=1.0.0
 langchain-openai>=1.0.0
 dashscope>=1.0.0
-#chromadb
-#llama-index-core==0.14.4
+chromadb>=1.5.6
+llama-index-core>=0.14.20
 #llama-index-embeddings-openai
 #llama-index-embeddings-huggingface
 #llama-index-embeddings-ollama
