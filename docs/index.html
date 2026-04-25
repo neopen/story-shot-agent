@@ -136,7 +136,7 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
+            padding: 0.5rem 1rem;
             border-radius: 10px;
             font-weight: 600;
             text-decoration: none;
@@ -183,7 +183,7 @@
 
         .hero p {
             font-size: 1.25rem;
-            max-width: 600px;
+            max-width: 620px;
             margin: 0 auto 2rem;
             opacity: 0.9;
             animation: fadeInUp 0.6s ease 0.1s both;
@@ -724,8 +724,7 @@ PENSHOT_EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
 
 ########################## Redis 配置 ##########################
-PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0
-                </pre>
+PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0</pre>
             </div>
         </div>
 
@@ -748,8 +747,7 @@ async def main():
     # 获取结果
     result = await agent.wait_for_result_async(task_id)
     print(f"最终结果: 成功={result.success}, 状态={result.status}")
-    print(f"result={result}")     
-    </pre>
+    print(f"result={result}")</pre>
             </div>
         </div>
 
@@ -778,7 +776,7 @@ curl http://localhost:8000/api/v1/result/{task_id}</pre>
 <section id="api" class="section" style="background: var(--gray-light);">
     <div class="container">
         <h2 class="section-title">API 接口</h2>
-        <p class="section-subtitle">常用的 REST API 接口（更多参考 <a href="https://pengline.cn/2026/02/df16e7d36e5d41d2ad9d7934b28f94e4" target="_blank">博客</a>）</p>
+        <p class="section-subtitle">常用的 REST API 接口（更多 API 参考 <a href="https://pengline.cn/2026/02/df16e7d36e5d41d2ad9d7934b28f94e4" target="_blank">博客</a>）</p>
 
         <div class="comparison">
             <table class="comparison-table">
@@ -790,7 +788,6 @@ curl http://localhost:8000/api/v1/result/{task_id}</pre>
                     <tr><td>POST</td><td>/api/v1/storyboard/sync</td><td>同步提交，等待完成</td></tr>
                     <tr><td>GET</td><td>/api/v1/status/{task_id}</td><td>查询任务状态</td></tr>
                     <tr><td>GET</td><td>/api/v1/result/{task_id}</td><td>获取任务结果</td></tr>
-                    <tr><td>DELETE</td><td>/api/v1/task/{task_id}</td><td>取消任务</td></tr>
                 </tbody>
             </table>
         </div>
@@ -807,7 +804,7 @@ curl http://localhost:8000/api/v1/result/{task_id}</pre>
             <div class="feature-item"><div class="feature-icon">🧠</div><div><strong>LangGraph</strong><br>工作流编排</div></div>
             <div class="feature-item"><div class="feature-icon">🗄️</div><div><strong>Redis</strong><br>任务持久化</div></div>
             <div class="feature-item"><div class="feature-icon">🔌</div><div><strong>MCP 协议</strong><br>AI 智能体集成</div></div>
-            <div class="feature-item"><div class="feature-icon">🎨</div><div><strong>Runway/Pika</strong><br>AI 视频生成</div></div>
+            <div class="feature-item"><div class="feature-icon">🎨</div><div><strong>Runway/Pika/Sora</strong><br>AI 视频生成</div></div>
         </div>
     </div>
 </section>
@@ -830,9 +827,8 @@ curl http://localhost:8000/api/v1/result/{task_id}</pre>
             <div class="footer-col">
                 <h4>资源</h4>
                 <a href="https://github.com/neopen/story-shot-agent" target="_blank">GitHub</a>
-                <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5" target="_blank">Blog</a>
-                <a href="#">文档</a>
-                <a href="#">问题反馈</a>
+                <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5" target="_blank">文档</a>
+                <a href="https://github.com/neopen/story-shot-agent/issues">问题反馈</a>
             </div>
             <div class="footer-col">
                 <h4>联系方式</h4>
