@@ -710,22 +710,21 @@
         <div class="card" style="margin-bottom: 2rem;">
             <h3>环境配置</h3>
             <div class="code-block">
-                <pre>
-                    编辑 .env 文件，配置必要的 LLM 与 Embedding 参数：
+                <pre>编辑 .env 文件，配置必要的 LLM 与 Embedding 参数：
                     
-                    ########################## LLM 模型配置 #########################
-                    PENSHOT_LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
-                    PENSHOT_LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                    PENSHOT_LLM__DEFAULT__MODEL_NAME=qwen-plus
-                    PENSHOT_LLM__DEFAULT__TIMEOUT=30
-                    
-                    ########################## 嵌入模型配置 #########################
-                    PENSHOT_EMBED__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
-                    PENSHOT_EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                    PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
-                    
-                    ########################## Redis 配置 ##########################
-                    PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0
+########################## LLM 模型配置 #########################
+PENSHOT_LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+PENSHOT_LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+PENSHOT_LLM__DEFAULT__MODEL_NAME=qwen-plus
+PENSHOT_LLM__DEFAULT__TIMEOUT=30
+
+########################## 嵌入模型配置 #########################
+PENSHOT_EMBED__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+PENSHOT_EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
+
+########################## Redis 配置 ##########################
+PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0
                 </pre>
             </div>
         </div>
@@ -749,8 +748,7 @@ async def main():
     # 获取结果
     result = await agent.wait_for_result_async(task_id)
     print(f"最终结果: 成功={result.success}, 状态={result.status}")
-    print(f"result={result}")
-                    
+    print(f"result={result}")     
     </pre>
             </div>
         </div>
@@ -780,7 +778,7 @@ curl http://localhost:8000/api/v1/result/{task_id}</pre>
 <section id="api" class="section" style="background: var(--gray-light);">
     <div class="container">
         <h2 class="section-title">API 接口</h2>
-        <p class="section-subtitle">常用的 REST API 接口（更多参考 <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5" target="_blank">Blog</a>）</p>
+        <p class="section-subtitle">常用的 REST API 接口（更多参考 <a href="https://pengline.cn/2026/02/df16e7d36e5d41d2ad9d7934b28f94e4" target="_blank">博客</a>）</p>
 
         <div class="comparison">
             <table class="comparison-table">
