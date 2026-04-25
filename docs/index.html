@@ -501,7 +501,7 @@
             <a href="#demo">在线演示</a>
             <a href="#pricing">定价</a>
             <a href="#usage">快速开始</a>
-            <a href="#api">API文档</a>
+            <a href="#api">API 接口</a>
             <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5" target="_blank" class="blog-btn">文档</a>
             <a href="https://github.com/neopen/story-shot-agent" target="_blank" class="github-btn">GitHub</a>
         </div>
@@ -653,7 +653,7 @@
             </div>
 
             <p style="font-size: 0.875rem; color: var(--gray); margin-top: 1rem;">
-                💡 提示：这是一个演示接口，实际使用请部署本地服务或调用 API。
+                💡 提示：这是一个演示接口，实际应该调用服务 API。
             </p>
         </div>
     </div>
@@ -701,35 +701,57 @@
         <p class="section-subtitle">3 分钟上手 PenShot</p>
 
         <div class="card" style="margin-bottom: 2rem;">
-            <h3>📦 安装</h3>
+            <h3>安装</h3>
             <div class="code-block">
                 <pre>pip install penshot</pre>
             </div>
         </div>
 
         <div class="card" style="margin-bottom: 2rem;">
-            <h3>🚀 基础用法</h3>
+            <h3>环境配置</h3>
             <div class="code-block">
-                <pre>import asyncio
-from penshot import PenshotFunction
+                <pre>
+                    编辑 .env 文件，配置必要的 LLM 与 Embedding 参数：
+                    
+                    ########################## LLM 模型配置 #########################
+                    PENSHOT_LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+                    PENSHOT_LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                    PENSHOT_LLM__DEFAULT__MODEL_NAME=qwen-plus
+                    PENSHOT_LLM__DEFAULT__TIMEOUT=30
+                    
+                    ########################## 嵌入模型配置 #########################
+                    PENSHOT_EMBED__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+                    PENSHOT_EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                    PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
+                    
+                    ########################## Redis 配置 ##########################
+                    PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0
+                </pre>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 2rem;">
+            <h3>基础用法（Python SDK 调用）</h3>
+            <div class="code-block">
+                <pre>from penshot.api import create_penshot_agent
 
 async def main():
     # 创建智能体
-    agent = PenshotFunction()
+    agent = create_penshot_agent(max_concurrent=5)
 
-    # 提交任务并等待结果
-    result = agent.breakdown_script("""
-        场景：现代办公室
-        人物：小李（程序员）
-        动作：小李正在写代码，突然接到电话
-    """)
+    # 提交任务
+    script = "早晨，一个女孩在咖啡馆读书，阳光透过窗户..."
+    task_id = agent.breakdown_script_async(
+        script,
+        callback=lambda r: print(f"任务 {r.task_id} 已完成")
+    )
 
-    if result.success:
-        print(f"生成成功！共 {len(result.data['shots'])} 个镜头")
-    else:
-        print(f"生成失败: {result.error}")
-
-asyncio.run(main())</pre>
+    # 获取结果
+    result = await agent.wait_for_result_async(task_id)
+    print(f"最终结果: 成功={result.success}, 状态={result.status}")
+    print(f"result={result}")
+                    
+    </pre>
             </div>
         </div>
 
