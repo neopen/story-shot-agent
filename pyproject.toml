@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = {attr = "penshot.__version__"}
+version = { attr = "penshot.__version__" }
 
 [project]
 name = "penshot"
@@ -19,10 +19,10 @@ keywords = [
 ]
 
 authors = [
-    {name = "HiPeng", email = "helpenx+shot@gmail.com"}
+    { name = "HiPeng", email = "helpenx+shot@gmail.com" }
 ]
 readme = { file = "README.md", content-type = "text/markdown" }
-license = {text = "MIT"}
+license = { text = "MIT" }
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -42,40 +42,39 @@ classifiers = [
 
 dependencies = [
     # Web框架
-#    "fastapi>=0.104.0",
+    #    "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-#    "httpx>=0.25.0",
-
     # 核心AI/LLM
-    "langchain>=1.0.0",
+    "langchain>=1.2.14",
     "langchain-community",
     "langchain-ollama>=1.0.0",
     "langchain-chroma>=1.0.0",
-    "langgraph>=1.0.0",
-#    "langchain-deepseek>=0.1.0",
-#    "dashscope==1.23.9",
+    "langgraph>=1.1.4",
+    #    "langchain-deepseek>=0.1.0",
+    #    "dashscope==1.23.9",
 
     # RAG/向量存储
     "chromadb>=1.5.6",
     "llama-index-core>=0.14.20",
     "llama-index-embeddings-langchain>=0.4.0",
-#    "llama-index-embeddings-openai>=0.1.0",
-#    "llama-index-embeddings-huggingface>=0.1.0",
-#    "llama-index-embeddings-ollama>=0.1.0",
+    #    "llama-index-embeddings-openai>=0.1.0",
+    #    "llama-index-embeddings-huggingface>=0.1.0",
+    #    "llama-index-embeddings-ollama>=0.1.0",
 
     # 配置与数据验证
     "pydantic>=2.11.10",
     "pydantic-settings>=2.10.1",
     "python-dotenv>=1.0.0",
-
+    "pyyaml",
     # 数据处理
     "numpy>=1.24.0",
+    # pip install git+https://github.com/fxsjy/jieba.git@master
+    # git -c http.proxy=http://127.0.0.1:7890 clone https://github.com/fxsjy/jieba.git
     "jieba>=0.42.1",
     "redis",
-
     # 工具库
-#    "requests>=2.31.0",
     "tiktoken>=0.5.0",
+    "colorama"
 ]
 
 [project.optional-dependencies]
@@ -115,7 +114,13 @@ full = [
     "pillow>=10.0.0",
     "aiofiles>=23.2.0",
     "redis>=5.0.0",
-    "celery>=5.3.0",
+    "fastapi>=0.104.0",
+    "httpx>=0.25.0",
+    "requests>=2.31.0",
+    "langchain-deepseek>=0.1.0",
+    "dashscope>=1.0.0",
+    #    "celery>=5.3.0",
+    "langchain-openai>=1.0.0",
 ]
 
 [project.urls]
@@ -135,7 +140,7 @@ vs-agent = "penshot.cli:main"  # 简写别名
 story-shot-agent-serve = "penshot.cli:serve"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -178,7 +183,7 @@ disallow_untyped_defs = true
 module = [
     "langchain.*",
     "langchain_community.*",
-#    "llamaIndex.*",
+    #    "llamaIndex.*",
 ]
 ignore_missing_imports = true
 
