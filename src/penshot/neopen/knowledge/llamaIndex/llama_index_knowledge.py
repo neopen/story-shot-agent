@@ -158,8 +158,8 @@ class ScriptKnowledgeBase:
             return {
                 "status": "success",
                 "script_id": script_id,
-                "scene_count": parsed_result["stats"]["scene_count"],
-                "character_count": parsed_result["stats"]["character_count"],
+                "scene_count": parsed_result.stats["scene_count"],
+                "character_count": parsed_result.stats["character_count"],
                 "document_count": len(documents)
             }
 
@@ -210,8 +210,8 @@ class ScriptKnowledgeBase:
                 "status": "success",
                 "script_id": script_id,
                 "file_path": file_path,
-                "scene_count": parsed_result["stats"]["scene_count"],
-                "character_count": parsed_result["stats"]["character_count"],
+                "scene_count": parsed_result.stats["scene_count"],
+                "character_count": parsed_result.stats["character_count"],
                 "document_count": len(documents)
             }
 

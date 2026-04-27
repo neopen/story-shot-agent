@@ -10,10 +10,9 @@ import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from llama_index.core import VectorStoreIndex, Document
+from llama_index.core import VectorStoreIndex, Document, load_index_from_storage
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.storage import StorageContext
-from llama_index.core.vector_stores import SimpleVectorStore
 
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, warning
@@ -37,10 +36,10 @@ class PromptTemplateManager:
             self,
             embedding_model,
             memory_manager: Optional[MemoryManager] = None,
-            storage_dir: Optional[str] = settings.get_data_paths().get('data_template'),
+            storage_dir: Optional[str] = settings.get_data_paths().get('data_embedding'),
             chunk_size: int = 512,
             chunk_overlap: int = 20,
-            min_similarity_score: float = 0.7,
+            min_similarity_score: float = 0.5,
             top_k: int = 3
     ):
         """
@@ -82,48 +81,159 @@ class PromptTemplateManager:
 
     def _init(self):
         """初始化管理器"""
-        # 创建存储目录
         if self.storage_dir:
             os.makedirs(self.storage_dir, exist_ok=True)
 
-        # 加载已有索引
+        # 先加载缓存
+        self._load_cache()
+
+        # 尝试加载索引
         self._load_index()
 
-        # 从记忆层加载历史模板
-        self._load_from_memory()
+        # 如果缓存有数据但索引不存在，从缓存重建索引
+        if self._templates_cache and not self.index:
+            self._rebuild_index_from_cache()
+            self._save_index()  # 保存重建的索引
+
+        # 如果缓存为空但索引存在，从索引重建缓存
+        if not self._templates_cache and self.index:
+            self._rebuild_cache_from_index()
+
+        # 从记忆层加载历史模板（如果仍然没有数据）
+        if not self._templates_cache:
+            self._load_from_memory()
 
         info(f"提示词模板管理器初始化完成，当前模板数: {len(self._templates_cache)}")
 
-    def _load_index(self):
-        """加载已有向量索引"""
-        if not self.storage_dir:
+    def _rebuild_index_from_cache(self):
+        """从缓存重建索引"""
+        if not self._templates_cache:
             return
 
         try:
-            vector_store_path = os.path.join(self.storage_dir, "prompt_vector_store.json")
-            if os.path.exists(vector_store_path):
-                vector_store = SimpleVectorStore.from_persist_path(vector_store_path)
-                storage_context = StorageContext.from_defaults(vector_store=vector_store)
-                self.index = VectorStoreIndex.from_vector_store(
-                    vector_store,
-                    storage_context=storage_context,
-                    embed_model=self.embedding_model
+            documents = []
+            for item in self._templates_cache:
+                doc = Document(
+                    text=item["prompt"],
+                    metadata={
+                        "type": "prompt_template",
+                        "prompt": item["prompt"],
+                        "timestamp": item.get("added_at", datetime.now().isoformat()),
+                        **item.get("metadata", {})
+                    }
                 )
-                info(f"已加载提示词模板索引: {vector_store_path}")
+                documents.append(doc)
+
+            self.index = VectorStoreIndex.from_documents(
+                documents,
+                embed_model=self.embedding_model,
+                transformations=[self.node_parser]
+            )
+            info(f"从缓存重建索引，共 {len(documents)} 个模板")
         except Exception as e:
-            warning(f"加载提示词模板索引失败: {e}")
+            error(f"重建索引失败: {e}")
+
 
     def _save_index(self):
-        """保存向量索引"""
+        """保存索引（包含文档存储）"""
         if not self.storage_dir or not self.index:
             return
 
         try:
-            vector_store_path = os.path.join(self.storage_dir, "prompt_vector_store.json")
-            self.index.storage_context.vector_store.persist(persist_path=vector_store_path)
-            debug(f"已保存提示词模板索引: {vector_store_path}")
+            # 保存完整的存储上下文（包含文档存储和向量存储）
+            persist_dir = os.path.join(self.storage_dir, "index_store")
+            os.makedirs(persist_dir, exist_ok=True)
+
+            # 使用 persist 方法保存整个存储上下文
+            self.index.storage_context.persist(persist_dir=persist_dir)
+            debug(f"已保存完整索引到: {persist_dir}")
         except Exception as e:
-            warning(f"保存提示词模板索引失败: {e}")
+            warning(f"保存索引失败: {e}")
+
+    def _load_index(self):
+        """加载已有索引（完整加载）"""
+        if not self.storage_dir:
+            return
+
+        try:
+            persist_dir = os.path.join(self.storage_dir, "index_store")
+            if os.path.exists(persist_dir):
+                # 从持久化目录加载
+                storage_context = StorageContext.from_defaults(persist_dir=persist_dir)
+
+                # 使用 load_index_from_storage 加载索引
+                # 重要：必须传入 embed_model，否则会使用默认的 MockEmbedding [citation:7]
+                self.index = load_index_from_storage(
+                    storage_context=storage_context,
+                    embed_model=self.embedding_model
+                )
+                info(f"已加载完整索引: {persist_dir}")
+
+                # 重建缓存
+                self._rebuild_cache_from_index()
+            else:
+                debug(f"索引目录不存在，将创建新索引: {persist_dir}")
+        except Exception as e:
+            warning(f"加载索引失败: {e}")
+
+    def _rebuild_cache_from_index(self):
+        """从索引重建缓存（当缓存文件丢失但索引存在时使用）"""
+        if not self.index:
+            return
+
+        try:
+            # 更可靠的方式：直接从 docstore 获取文档
+            docstore = self.index.storage_context.docstore
+
+            # 获取所有文档ID
+            all_doc_ids = list(docstore.docs.keys())
+
+            self._templates_cache = []
+            for doc_id in all_doc_ids:
+                doc = docstore.get_document(doc_id)
+                if doc.metadata.get("type") == "prompt_template":
+                    self._templates_cache.append({
+                        "prompt": doc.text,
+                        "metadata": doc.metadata,
+                        "added_at": doc.metadata.get("timestamp", datetime.now().isoformat())
+                    })
+
+            # 保存重建的缓存
+            self._save_cache()
+
+            info(f"从索引重建缓存，共 {len(self._templates_cache)} 个模板")
+        except Exception as e:
+            warning(f"重建缓存失败: {e}")
+
+
+    def _save_cache(self):
+        """保存缓存到文件"""
+        if not self.storage_dir:
+            return
+
+        try:
+            import json
+            cache_path = os.path.join(self.storage_dir, "vector_store_cache.json")
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(self._templates_cache, f, ensure_ascii=False, indent=2)
+            debug(f"已保存缓存: {cache_path}")
+        except Exception as e:
+            warning(f"保存缓存失败: {e}")
+
+    def _load_cache(self):
+        """从文件加载缓存"""
+        if not self.storage_dir:
+            return
+
+        try:
+            import json
+            cache_path = os.path.join(self.storage_dir, "vector_store_cache.json")
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    self._templates_cache = json.load(f)
+                info(f"已加载缓存，共 {len(self._templates_cache)} 个模板")
+        except Exception as e:
+            warning(f"加载缓存失败: {e}")
 
 
     def _load_from_memory(self):
@@ -317,6 +427,7 @@ class PromptTemplateManager:
 
             # 保存到磁盘
             self._save_index()
+            self._save_cache()
 
             # 保存到记忆层
             if save_to_memory and self.memory_manager:
@@ -553,5 +664,10 @@ class PromptTemplateManager:
             vector_store_path = os.path.join(self.storage_dir, "prompt_vector_store.json")
             if os.path.exists(vector_store_path):
                 os.remove(vector_store_path)
+
+            # ========== 删除缓存文件 ==========
+            cache_path = os.path.join(self.storage_dir, "vector_store_cache.json")
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
 
         info("提示词模板知识库已清空")
