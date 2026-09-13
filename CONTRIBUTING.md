@@ -62,16 +62,14 @@ story-shot-agent/
 ├── logs/                      # 日志目录
 ├── scripts/                   # 脚本工具
 │
-├── example/                   # 示例代码
-│   ├── json_demo/             # JSON示例数据
-│   ├── script_txt/            # 剧本示例文本
-│   ├── a2a_integration.py     # A2A集成示例
-│   ├── direct_usage.py        # 直接使用示例
-│   ├── langgraph_integration.py # LangGraph集成示例
-│   ├── mcp_*.py               # MCP相关示例
-│   ├── neopen_demo.py         # NeoOpen演示
-│   ├── web_app.py             # Web应用示例
-│   └── workflow_node_demo     # 工作流节点示例
+├── examples/                  # 示例代码（按功能场景分目录，见 examples/README.md 索引）
+│   ├── data/                  # 样例数据（scripts/ 剧本文本、results/ 阶段产物 JSON）
+│   ├── sdk/                   # Python 库直调：同步/异步/批量/队列/配置/解析
+│   ├── rest/                  # REST API 客户端（httpx，需先启动 http_server）
+│   ├── mcp/                   # MCP：stdio/HTTP 客户端、配置文件与端到端自测
+│   ├── cli/                   # 子进程驱动命令行（python -m penshot.cli）
+│   ├── workflow/              # LangGraph 集成 + 离线可跑的 PipelineNode 阶段演示
+│   └── integrations/          # 上层框架封装（A2A 编排 / FastAPI Web 应用）
 │
 ├── src/penshot/               # 核心源代码
 │   ├── api/                   # API接口

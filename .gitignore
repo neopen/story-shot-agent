@@ -5,7 +5,7 @@ uploads/
 *.egg-info/
 .venv/
 .env/
-data/
+/data
 venv/
 build/
 temp/

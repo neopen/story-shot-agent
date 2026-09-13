@@ -198,7 +198,7 @@ status = agent.get_task_status(task_id)
 result = await agent.wait_for_result_async(task_id)
 ```
 
-完整示例：[direct_usage.py](https://github.com/neopen/story-shot-agent/blob/main/example/direct_usage.py)
+完整示例：[sdk/01_sync_breakdown.py](https://github.com/neopen/story-shot-agent/blob/main/examples/sdk/01_sync_breakdown.py)
 
 #### 2. 嵌入 FastAPI Web 应用
 
@@ -217,15 +217,15 @@ async def generate(script_text: str):
     return {"task_id": task_id, "status": "PENDING"}
 ```
 
-完整示例：[web_app.py](https://github.com/neopen/story-shot-agent/blob/main/example/web_app.py)
+完整示例：[integrations/fastapi_web_app.py](https://github.com/neopen/story-shot-agent/blob/main/examples/integrations/fastapi_web_app.py)
 
 #### 3. LangGraph 节点集成
 
-支持作为独立 Node 接入 LangChain/LangGraph 工作流，实现端到端自动化流水线。 完整示例：[langgraph_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
+支持作为独立 Node 接入 LangChain/LangGraph 工作流，实现端到端自动化流水线。 完整示例：[workflow/01_langgraph_integration.py](https://github.com/neopen/story-shot-agent/blob/main/examples/workflow/01_langgraph_integration.py)
 
 #### 4. A2A 协议协作
 
-支持与上游剧本创作 Agent、下游文生视频/剪辑 Agent 进行上下文传递与任务编排。 完整示例：[a2a_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/a2a_integration.py)
+支持与上游剧本创作 Agent、下游文生视频/剪辑 Agent 进行上下文传递与任务编排。 完整示例：[integrations/a2a_integration.py](https://github.com/neopen/story-shot-agent/blob/main/examples/integrations/a2a_integration.py)
 
 #### 5. MCP (Model Context Protocol) 支持
 
@@ -235,7 +235,7 @@ async def generate(script_text: str):
 python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
-客户端调用工具 `breakdown_script` 与 `get_task_result` 即可无缝接入支持 MCP 的 IDE 或 Agent 框架。 完整示例：[mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
+客户端调用工具 `breakdown_script` 与 `get_task_result` 即可无缝接入支持 MCP 的 IDE 或 Agent 框架。 完整示例：[mcp/mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/examples/mcp/mcp_client.py)
 
 
 
