@@ -43,3 +43,5 @@ ai-config:
       - any-glob-to-any-file:
           - '.claude/**/*'
           - '.qoder/**/*'
+          - '.agents/**/*'
+          - '.codex/**/*'
