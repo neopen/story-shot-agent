@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: scene_estimator.py
 @Description: 场景时长估算器
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19
 """

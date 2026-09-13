@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: short_term_memory.py
 @Description: 短期记忆 - 基于LangChain的缓冲记忆，支持剧本ID数据隔离
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/1
 """
 import json

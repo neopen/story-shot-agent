@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 06_parse_result.py
 @Description: SDK 结果解析示例：data.instructions 结构讲解与遍历
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:10
 """

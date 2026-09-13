@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_task_lifecycle_service.py
 @Description: 任务生命周期服务单元测试
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/29
 """
 

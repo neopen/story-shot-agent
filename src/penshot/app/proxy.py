@@ -6,7 +6,7 @@ see license File For Details.
 
 @FileName: proxy.py
 @Description: 代理服务模块 - 处理API请求的代理和转发
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/6
 """

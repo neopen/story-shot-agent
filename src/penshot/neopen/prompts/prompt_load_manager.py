@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: prompt_load_manager.py
 @Description: 提示词模板管理类
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/23 21:54
 """

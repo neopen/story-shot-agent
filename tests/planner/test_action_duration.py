@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: action_duration_example_improved.py
 @Description: 动作时长估算和分镜切分示例
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/24 14:21
 """

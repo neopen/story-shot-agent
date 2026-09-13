@@ -74,7 +74,7 @@ from penshot.neopen.task.task_factory import create_task_factory
   """
   @FileName: xxx.py
   @Description: 一句话说明
-  @Author: HiPeng
+  @Author: NeoPen
   @Time: 2026/x/x xx:xx
   """
   ```

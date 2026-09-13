@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: langchain_memory_test.py
 @Description: 测试LangChainMemoryTool的功能
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/11
 """

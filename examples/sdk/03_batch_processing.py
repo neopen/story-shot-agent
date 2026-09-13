@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 03_batch_processing.py
 @Description: SDK 直调示例：批量分镜处理（同步/异步）
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:10
 """

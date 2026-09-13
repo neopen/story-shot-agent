@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: function_calls.py
 @Description: Function Call接口 - 供其他Python智能体调用
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/23 18:39
 """

@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 05_custom_config.py
 @Description: SDK 直调示例：运行时自定义配置（ShotConfig / LLM / 嵌入模型）
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:10
 """

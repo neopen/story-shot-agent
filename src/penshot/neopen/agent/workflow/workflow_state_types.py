@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_state_types.py
 @Description: 分离的状态类型定义 - 执行状态与领域状态
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/29
 """
 

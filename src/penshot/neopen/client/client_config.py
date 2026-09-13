@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: client_type.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/11 16:31
 """

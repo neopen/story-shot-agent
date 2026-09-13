@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: task_factory.py
 @Description: 任务工厂 - 封装任务提交和执行
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/24 11:56
 """

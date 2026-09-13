@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 01_langgraph_integration.py
 @Description: 集成示例：把 Penshot SDK 封装成 LangGraph 工作流节点
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:50
 """

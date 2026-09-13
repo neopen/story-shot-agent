@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_rerank.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/20 22:12
 """
 

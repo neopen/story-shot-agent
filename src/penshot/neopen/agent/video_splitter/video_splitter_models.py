@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: video_assembler_models.py
 @Description: 视频组装合成模型
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19 23:02
 """

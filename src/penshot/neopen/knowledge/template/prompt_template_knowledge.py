@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: prompt_template_knowledge.py
 @Description: 专门的提示词模板知识库
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/23 22:45
 """
 from pathlib import Path

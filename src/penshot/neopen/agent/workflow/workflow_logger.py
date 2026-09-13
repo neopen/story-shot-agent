@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_logger.py
 @Description: 统一日志格式工具 - 定义工作流的结构化日志规范
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/29
 """
 

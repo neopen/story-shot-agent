@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: json_parser_tool.py
 @Description: JSON响应解析工具模块，提供从LLM响应中提取和解析JSON数据的功能，支持处理Markdown代码块中的JSON
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """

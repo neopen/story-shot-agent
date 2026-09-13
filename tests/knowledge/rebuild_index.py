@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: rebuild_index.py
 @Description: 手动重建索引
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/21 16:19
 """
 import asyncio

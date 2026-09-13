@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_function_calls.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/24 12:23
 """
 from penshot.api import PenshotResult

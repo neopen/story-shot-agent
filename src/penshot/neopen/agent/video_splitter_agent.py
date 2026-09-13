@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: video_assembler_agent.py
 @Description: 视频片段分割器
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/22 22:00
 """

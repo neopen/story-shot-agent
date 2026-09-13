@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: __init__.py.py
 @Description: Workflow package exports
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/9 20:53
 """

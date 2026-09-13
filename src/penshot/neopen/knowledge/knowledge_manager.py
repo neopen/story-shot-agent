@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: knowledge_manager.py
 @Description:  统一知识管理入口
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/21 15:04
 """
 

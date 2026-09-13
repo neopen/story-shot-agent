@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: fastapi_web_app.py
 @Description: Web 应用集成示例：把 Penshot SDK 封装为 FastAPI 服务
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 10:00
 """

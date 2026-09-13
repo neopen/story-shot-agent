@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 02_async_submit_poll.py
 @Description: SDK 直调示例：异步提交 + 回调/轮询 + 异步等待
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:10
 """

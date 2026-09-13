@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: long_script_chunker.py
 @Description: 超长剧本分块处理器
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/28 0:21
 """
 

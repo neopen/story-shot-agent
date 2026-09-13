@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: memory_manager.py
 @Description: 统一记忆管理器 - 支持剧本级隔离
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30 13:10
 """

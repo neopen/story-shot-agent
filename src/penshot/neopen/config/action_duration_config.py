@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: action_uration_tool.py
 @Description: 动作时长估算算法
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/24 14:01
 """

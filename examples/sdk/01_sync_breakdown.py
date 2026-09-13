@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 01_sync_breakdown.py
 @Description: SDK 直调示例：同步分镜拆分（等待结果返回）
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:10
 """

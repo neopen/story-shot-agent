@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_checkpointer.py
 @Description: 工作流检查点管理器 - 简化版（仅同步）
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/5/14 20:55
 """

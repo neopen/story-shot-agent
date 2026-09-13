@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: memory_models.py
 @Description: 记忆系统配置模型
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/1
 """
 from dataclasses import dataclass

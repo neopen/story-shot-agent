@@ -7,7 +7,7 @@ see license File For Details.
 @Description: TaskManager - 任务管理协调层，对外统一入口
     协调 TaskLifecycleService、TaskRepository 和 WorkflowRegistry
     保持向后兼容性
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/4/29
 """

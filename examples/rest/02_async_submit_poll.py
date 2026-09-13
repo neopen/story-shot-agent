@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 02_async_submit_poll.py
 @Description: REST 场景示例：异步提交 + 轮询状态 + 拉取结果
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:20
 """

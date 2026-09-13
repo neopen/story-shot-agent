@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_mcp.py
 @Description: MCP 客户端测试脚本
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/30
 """
 

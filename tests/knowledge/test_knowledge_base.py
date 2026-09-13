@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_knowledge_base.py
 @Description: 测试知识库功能
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/27 22:09
 """
 

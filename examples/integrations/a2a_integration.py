@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: a2a_integration.py
 @Description: A2A（代理到代理）集成示例：把 Penshot 封装为可编排的分镜生成 Agent
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 10:00
 """

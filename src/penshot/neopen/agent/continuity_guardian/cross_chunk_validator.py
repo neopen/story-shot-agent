@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: cross_chunk_validator.py
 @Description: 跨块一致性验证器
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/28 15:29
 """
 

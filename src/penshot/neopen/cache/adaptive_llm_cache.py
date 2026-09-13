@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: adaptive_llm_cache.py
 @Description: 短期缓存 + 人工反馈清除
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/20 18:52
 """
 from datetime import datetime, timedelta

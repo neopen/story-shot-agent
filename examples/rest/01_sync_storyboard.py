@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 01_sync_storyboard.py
 @Description: REST 场景示例：同步分镜拆分（POST /api/v1/storyboard/sync）
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:20
 """

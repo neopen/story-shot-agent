@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: huggingface_client.py
 @Description: huggingface
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/30 18:24
 """

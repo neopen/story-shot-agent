@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: continuity_guardian_config.py
 @Description: 连续性守护智能体配置
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/11/3 21:31
 """

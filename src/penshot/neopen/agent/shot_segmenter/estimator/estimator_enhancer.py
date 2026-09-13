@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: estimator_enhancer.py
 @Description: 时长估算增强器（后处理优化）
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19
 """

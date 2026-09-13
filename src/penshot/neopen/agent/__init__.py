@@ -6,7 +6,7 @@ see license File For Details.
 
 @FileName: __init__.py
 @Description: 智能体模块初始化
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """

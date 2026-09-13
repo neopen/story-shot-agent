@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: prompt_style_guardian.py
 @Description: 提示词风格守护者 - 确保多片段提示词风格一致
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/28 15:17
 """
 

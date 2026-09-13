@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: diagnose_index.py
 @Description: 检查索引
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/21 16:18
 """
 import asyncio

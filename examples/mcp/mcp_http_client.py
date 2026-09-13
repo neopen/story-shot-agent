@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: mcp_http_client.py
 @Description: MCP HTTP 客户端示例：直连 penshot.mcp_http_server 的 /tools 路由
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:30
 """

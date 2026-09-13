@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: mcp_server_demo.py
 @Description: MCP Server 端到端自测：自动拉起 mcp_server 并走完整流程
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:30
 """

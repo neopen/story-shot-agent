@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: script_parser_tool.py
 @Description: 剧本语法解析器模块 - 支持中文剧本
-@Author: HiPeng
+@Author: NeoPen
 """
 
 import re

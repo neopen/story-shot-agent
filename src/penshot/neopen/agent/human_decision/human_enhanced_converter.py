@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: human_enhanced_converter.py
 @Description: 增强版人工决策转换器
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/5 17:47
 """

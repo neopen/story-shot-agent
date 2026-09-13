@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: rest_server.py
 @Description: REST API 服务器 - 供非Python智能体通过HTTP调用
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/23 18:54
 """
 import asyncio

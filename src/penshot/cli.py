@@ -16,7 +16,7 @@ see license File For Details.
     story-shot-agent cancel <task_id>      # 取消任务
     story-shot-agent batch -f scripts.txt  # 批量处理
     story-shot-agent-serve                 # 直接启动 REST API 服务器
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/23 18:56
 """
 

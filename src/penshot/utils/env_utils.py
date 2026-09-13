@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: env_utils.py
 @Description: 环境工具模块，提供环境相关的辅助功能
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """

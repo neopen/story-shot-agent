@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: llm_video_splitter.py
 @Description: 基于LLM的视频智能分割器 - 从ParsedScript获取全局信息
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 22:30
 """

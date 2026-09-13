@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 04_queue_and_task_mgmt.py
 @Description: SDK 直调示例：任务管理 / 队列监控 / 并发调整
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:10
 """

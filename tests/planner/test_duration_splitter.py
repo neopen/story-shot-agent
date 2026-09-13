@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_duration_splitter.py
 @Description: 5秒分片模块使用示例
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/15 15:57
 """

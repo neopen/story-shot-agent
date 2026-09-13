@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: 02_pipeline_stages_demo.py
 @Description: 工作流阶段离线演示：读取各阶段样例产物并映射到 PipelineNode
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/6 09:50
 """
