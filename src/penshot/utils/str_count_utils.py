@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: str_count_utils.py
 @Description: 统计单词数的工具函数
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/29 16:41
 """
 import re

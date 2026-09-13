@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: quality_auditor_enum.py
 @Description: 质量审查枚举
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/6/11 10:40
 """
 from dataclasses import dataclass

@@ -375,7 +375,7 @@ class MCPClient:
             print("MCP Server 已停止")
 ```
 
-示例代码：[story-shot-agent/example/mcp_client.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
+示例代码：[story-shot-agent/examples/mcp/mcp_client.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/examples/mcp/mcp_client.py)
 
 
 
@@ -509,7 +509,7 @@ class StoryboardWorkflowNodes:
             }
 ```
 
-示例代码：[story-shot-agent/example/langgraph_integration.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
+示例代码：[story-shot-agent/examples/workflow/01_langgraph_integration.py at main · neopen/story-shot-agent](https://github.com/neopen/story-shot-agent/blob/main/examples/workflow/01_langgraph_integration.py)
 
 
 

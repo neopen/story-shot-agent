@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: enum_utils.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/28 20:18
 """
 from enum import Enum

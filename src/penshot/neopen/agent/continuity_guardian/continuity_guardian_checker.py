@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: continuity_guardian_checker.py
 @Description: 连续性检查器 - 实现连续性检测逻辑
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/28 20:45
 """
 import time

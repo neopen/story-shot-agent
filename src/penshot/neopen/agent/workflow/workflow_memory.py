@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_memory.py
 @Description: 工作流节点记忆管理，封装所有工作流节点的记忆功能
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/5/4 23:38
 """

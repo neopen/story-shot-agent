@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: hash_utils.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/2 18:04
 """
 import hashlib

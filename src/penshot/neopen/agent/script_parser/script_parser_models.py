@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: script_parser_models.py
 @Description:  剧本解析相关模型
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19 21:44
 """

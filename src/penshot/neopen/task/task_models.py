@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: task_models.py
 @Description: API-friendly request/response models for task processing
-@Author: HiPeng (adapted)
+@Author: NeoPen (adapted)
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/03/17
 """

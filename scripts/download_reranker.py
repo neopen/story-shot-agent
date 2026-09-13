@@ -6,7 +6,7 @@ see license File For Details.
 @FileName: download_reranker.py
 @Description: 自动下载 BAAI/bge-reranker-large 模型
             需要安装 pip install sentence-transformers  或 pip install modelscope
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/20 22:30
 """
 

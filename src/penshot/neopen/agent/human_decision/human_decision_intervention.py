@@ -6,7 +6,7 @@ see license File For Details.
 
 @FileName: human_decision_intervention.py
 @Description: 人工干预工作流节点 - 控制台版本
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/2/5 17:28
 """
 import threading

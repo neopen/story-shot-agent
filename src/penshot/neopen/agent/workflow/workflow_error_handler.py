@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_error_handler.py
 @Description: 统一错误处理服务 - 集中管理工作流中的错误处理逻辑
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/29
 """
 

@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: llama_index_tool.py
 @Description: LlamaIndex 工具函数模块
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """

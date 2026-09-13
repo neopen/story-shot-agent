@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: quality_auditor_agent.py
 @Description: 质量审查器 - 合并基本规则和LLM审查结果
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/25 21:59
 """

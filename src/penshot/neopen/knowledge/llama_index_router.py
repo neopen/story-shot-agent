@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: llama_index_router.py
 @Description: 知识访问路由器 - 统一LlamaIndex与现有记忆层的访问接口
-@Author: HiPeng
+@Author: NeoPen
 """
 
 from dataclasses import dataclass

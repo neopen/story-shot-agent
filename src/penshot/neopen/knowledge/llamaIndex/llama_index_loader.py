@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: llama_index_loader.py
 @Description: LlamaIndex 文档加载模块，提供各种文档加载器，支持不同格式的文档导入
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """

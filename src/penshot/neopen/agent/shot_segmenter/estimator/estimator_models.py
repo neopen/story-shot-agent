@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: estimator_models.py
 @Description: 时长估算相关模型
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19
 """

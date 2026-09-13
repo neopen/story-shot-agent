@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: RuleScriptParser.py
 @Description: 规则剧本解析器 - 基于正则表达式的本地解析，作为 LLM 解析器的备用方案
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 14:38
 """

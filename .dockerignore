@@ -40,3 +40,5 @@ Thumbs.db
 # AI
 .claude
 .qoder
+.agents
+.codex

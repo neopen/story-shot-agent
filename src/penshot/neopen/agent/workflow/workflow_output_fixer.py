@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_output_fixer.py
 @Description: 修复workflow最终输出中的片段序列问题
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/9
 """

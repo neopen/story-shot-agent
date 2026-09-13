@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: workflow_registry.py
 @Description: In-memory workflow registry with LRU eviction.
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/28 17:02
 """
 

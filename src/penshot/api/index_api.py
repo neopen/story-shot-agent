@@ -6,7 +6,7 @@ see license File For Details.
 
 @FileName: index_api.py
 @Description: FastAPI应用，提供索引接口
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/22 23:40
 """

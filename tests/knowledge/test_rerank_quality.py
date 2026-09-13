@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_rerank_quality.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/20 22:13
 """
 from penshot.config.config import settings

@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: task_lifecycle_service.py
 @Description: 任务生命周期服务 - 负责任务状态机管理和生命周期控制
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/29
 """
 

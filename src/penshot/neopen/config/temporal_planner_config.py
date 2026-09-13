@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: temporal_planner_config.py
 @Description: 时序规划智能体配置管理
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10/27 17:24
 """

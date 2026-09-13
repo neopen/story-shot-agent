@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: http_server.py
 @Description: Penshot HTTP 服务 - 可直接在命令行启动
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30
 """

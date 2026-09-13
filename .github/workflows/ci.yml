@@ -13,6 +13,8 @@ on:
       - '.gitignore'
       - '.claude/**'
       - '.qoder/**'
+      - '.agents/**'
+      - '.codex/**'
       # 忽略 GitHub 目录下的非工作流配置文件（如 ISSUE_TEMPLATE 等），保留 workflow 的触发
       - '.github/*.md'
       - '.github/ISSUE_TEMPLATE/**'
@@ -28,6 +30,8 @@ on:
       - '.gitignore'
       - '.claude/**'
       - '.qoder/**'
+      - '.agents/**'
+      - '.codex/**'
       - '.github/*.md'
       - '.github/ISSUE_TEMPLATE/**'
 

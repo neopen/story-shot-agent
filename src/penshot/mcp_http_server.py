@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: mcp_http_server.py
 @Description: HTTP MCP Server - 用于本地联调
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/30
 """

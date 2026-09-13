@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: continuity_repair_generator.py
 @Description: 连续性修复参数生成器
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/28 21:03
 """
 from typing import Dict, List

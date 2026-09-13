@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: mcp_server.py
 @Description: MCP Server - 所有日志输出到 stderr
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/23 18:39
 """

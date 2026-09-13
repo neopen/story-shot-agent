@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_time_annotation.py
 @Description: 测试动作时长估算器对时间标注的处理
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """

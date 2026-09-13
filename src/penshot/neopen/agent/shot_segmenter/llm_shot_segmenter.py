@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: llm_shot_segmenter.py
 @Description: 基于LLM的镜头生成器
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 17:35
 """

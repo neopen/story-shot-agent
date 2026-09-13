@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_memory.py
 @Description: 
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/1 14:15
 """
 from langchain.chat_models import ChatOpenAI

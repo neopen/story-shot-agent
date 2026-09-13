@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: result_storage_tool.py
 @Description: 结果存储工具模块，提供智能体结果的保存、加载和管理功能
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """

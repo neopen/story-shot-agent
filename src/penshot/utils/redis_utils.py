@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: redis_utils.py
 @Description: 从 env中加载配置创建redis 客户端
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/17 15:39
 """
 import json

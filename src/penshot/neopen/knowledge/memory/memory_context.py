@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: memory_context.py
 @Description: 记忆上下文管理器
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/1 14:01
 """
 from typing import Any, Dict, List

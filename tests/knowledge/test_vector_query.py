@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: test_vector_query.py
 @Description: 查询相似度分数
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/5/21 16:34
 """
 import numpy as np

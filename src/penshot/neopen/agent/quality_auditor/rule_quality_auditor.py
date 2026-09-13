@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: rule_quality_auditor.py
 @Description: 基于基本规则的审查器
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/27 0:00
 """

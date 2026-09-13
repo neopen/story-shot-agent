@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "penshot": {
+      "command": "python",
+      "args": [
+        "-m",
+        "penshot.mcp_server",
+        "--max-concurrent",
+        "5",
+        "--queue-size",
+        "500"
+      ]
+    }
+  },
+  "_comment": "前提：先执行 pip install -e .，并保证命令行中的 python 可导入 penshot。env 键（如 LLM key）请通过 PENSHOT_LLM__DEFAULT__API_KEY 环境变量或仓库根目录 .env 注入，勿写入本文件。"
+}

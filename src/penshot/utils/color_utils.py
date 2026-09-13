@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: color_utils.py
 @Description: 色彩处理工具
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/6 15:12
 """

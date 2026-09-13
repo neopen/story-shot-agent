@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: llm_script_parser.py
 @Description: LLM 剧本解析智能体实现
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/9 21:23
 """

@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: task_init.py
 @Description: 任务初始化
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/3/24 21:48
 """
 from penshot.logger import info

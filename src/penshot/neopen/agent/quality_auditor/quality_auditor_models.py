@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: quality_auditor_models.py
 @Description: 质量审核模型
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19 22:58
 """

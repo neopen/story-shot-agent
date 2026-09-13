@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: memory_manager.py
 @Description: 基于LangChain的记忆管理系统
-@Author: HiPeng
+@Author: NeoPen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/4/1
 """

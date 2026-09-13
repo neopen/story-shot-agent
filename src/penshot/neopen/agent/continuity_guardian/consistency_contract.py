@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: consistency_contract.py
 @Description: 全局一致性契约 - 贯穿剧本解析、分镜、分割、提示词生成
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/28 0:18
 """
 from dataclasses import dataclass, field

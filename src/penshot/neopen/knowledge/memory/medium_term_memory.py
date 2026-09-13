@@ -5,7 +5,7 @@ see license File For Details.
 
 @FileName: medium_term_memory.py
 @Description: 中期记忆 - 基于LangChain的摘要记忆
-@Author: HiPeng
+@Author: NeoPen
 @Time: 2026/4/1
 """
 import json
