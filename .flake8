@@ -9,6 +9,7 @@ exclude =
     .qoder,
     assets,
     docs,
+    web,
     examples,
     build,
     dist,
@@ -23,7 +24,7 @@ exclude =
 # W503: 换行符在二元运算符之前
 ignore = E203, W503
 
-# 针对特定路径自定义忽略规则（可选）
+# 针对特定路径自定义忽略规则
 per-file-ignores =
     # 允许 __init__.py 中导出未使用的包，不报 F401 错误
     __init__.py: F401

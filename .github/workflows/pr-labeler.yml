@@ -1,7 +1,9 @@
 name: Pull Request Labeler
 
+# 🎯 优化触发条件：明确 PR 的生命周期动作，避免非必要触发
 on:
-  - pull_request_target
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -16,5 +18,9 @@ jobs:
     steps:
       - uses: actions/labeler@v5
         with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          # 🎯 v5 升级点：参数从 repo-token 改为 sync-token 或直接使用默认 token
+          # 显式传入 GITHUB_TOKEN 以保障权限
+          sync-token: "${{ secrets.GITHUB_TOKEN }}"
           configuration-path: ".github/labeler.yml"
+          # 可选：如果希望在移除对应文件改动时自动移除 Label，可设为 true
+          dot: true

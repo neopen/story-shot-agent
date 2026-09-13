@@ -1,11 +1,18 @@
 name: Docker Build & Push
 
+# 1. 触发条件优化：仅在合并到 main 分支或推送标签时触发，移除 PR 触发
 on:
   push:
     branches: [ "main" ]
     tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ "main" ]
+    # 🎯 核心控制：仅当以下路径有修改时才触发 Docker 构建与发布
+    # 修改 scripts/、tests/、docs/ 等目录可以正常合并，但不会触发镜像发布
+    paths:
+      - 'src/**'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'main.py'
+      - '.github/workflows/docker-publish.yml'
 
 permissions:
   contents: read
@@ -19,49 +26,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. 设置 Docker Buildx
+      # 1. 设置 Docker Buildx（开启多架构与缓存支持）
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       # 2-A. 登录到 GitHub Container Registry (GHCR)
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2-B. 登录到 Docker Hub
+      # 2-B. 登录到 Docker Hub（判空防护：只有配置了 Secret 才执行）
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: ${{ env.DOCKERHUB_USER != '' && env.DOCKERHUB_PASS != '' }}
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USER }}
+          password: ${{ env.DOCKERHUB_PASS }}
 
-      # 3. 同时生成 GHCR 与 Docker Hub 的元数据标签
+      # 3. 生成元数据标签（自动将 GitHub 拥有者名称转为小写）
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         with:
-          # 在 images 列表中同时写入两个 Registry 的目标路径
           images: |
             ghcr.io/${{ github.repository_owner }}/penshot
-            ${{ secrets.DOCKERHUB_USERNAME }}/penshot
+            ${{ env.DOCKERHUB_USER != '' && format('{0}/penshot', env.DOCKERHUB_USER) || '' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      # 4. 一键打包并同时推送到两端
+      # 4. 构建并推送到 GHCR 和 Docker Hub
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

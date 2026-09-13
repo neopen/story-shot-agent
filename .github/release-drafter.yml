@@ -1,23 +1,59 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
+
+# 🎯 核心控制：自动排除非产品代码变更（文档、CI、AI规则等），不计入 Release Notes
+exclude-labels:
+  - 'documentation'
+  - 'ci/cd'
+  - 'ai-config'
+  - 'skip-changelog'
+
+# 🎯 变更分类（依照 Keep a Changelog 及 Standard Version 规范定义）
 categories:
-  - title: '🚀 Features'
+  - title: '🚨 Breaking Changes'
+    labels:
+      - 'breaking-change'
+      - 'breaking'
+  - title: '🚀 New Features'
     labels:
       - 'feature'
       - 'enhancement'
-  - title: '🐛 Bug Fixes'
+      - 'core-code'
+  - title: '🐛 Bug Fixes & Stability'
     labels:
       - 'bug'
       - 'fix'
-  - title: '🧰 Maintenance & Docs'
+  - title: '⚡ Performance Improvements'
     labels:
-      - 'documentation'
+      - 'performance'
+      - 'perf'
+  - title: '🧪 Testing & Verification'
+    labels:
+      - 'testing'
+  - title: '🧰 Internal Refactoring & Maintenance'
+    labels:
+      - 'refactoring'
       - 'chore'
       - 'dependencies'
-change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+
+# 条目渲染格式：包含 PR 标题、PR 链接及贡献者属性
+change-template: '- $TITLE ([#$NUMBER]($URL)) by @$AUTHOR'
+
+# 基于 Semantic Versioning (SemVer) 规范的自动版本号推导
+version-resolver:
+  method: semver
+  default: patch
+
+# 🎯 正式且详细的 Release Notes 格式模板
 template: |
-  ## What's Changed
+  # Release $RESOLVED_VERSION
+
+  Welcome to version `$RESOLVED_VERSION` of **Penshot**. Below is a summary of the key changes, bug fixes, and improvements included in this release.
 
   $CHANGES
 
-  **Full Changelog**: $PREVIOUS_TAG...$NEW_TAG
+  ---
+
+  ### 🔗 Links & References
+  * **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_VERSION
+  * **Docker Images**: `ghcr.io/$OWNER/penshot:$RESOLVED_VERSION`

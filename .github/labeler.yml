@@ -1,28 +1,33 @@
-# 修改了测试文件
+# 测试相关改动
 testing:
   - changed-files:
       - any-glob-to-any-file: 'tests/**/*'
 
-# 修改了核心业务逻辑
+# 核心代码与入口文件
 core-code:
   - changed-files:
-      - any-glob-to-any-file: 'src/**/*'
+      - any-glob-to-any-file:
+          - 'src/**/*'
+          - 'main.py'
 
-# 修改了文档或说明
+# 嵌入式前端 UI 界面
+web-ui:
+  - changed-files:
+      - any-glob-to-any-file: 'web/**/*'
+
+# 文档与静态资源
 documentation:
   - changed-files:
       - any-glob-to-any-file:
           - 'docs/**/*'
           - 'assets/**/*'
-          - '*.md'
+          - '**/*.md'
 
-# 修改了 CI 或配置文件
+# CI/CD 与工具链配置
 ci/cd:
   - changed-files:
       - any-glob-to-any-file:
           - '.github/**/*'
-          - '.claude/**/*'
-          - '.qoder/**/*'
           - '.flake8'
           - 'pytest.ini'
           - '.dockerignore'
@@ -30,5 +35,11 @@ ci/cd:
           - 'docker-compose.yml'
           - 'Dockerfile'
           - '.env.example'
-          - '.dockerignore'
           - 'pyproject.toml'
+
+# AI 辅助规则与 Prompt 配置
+ai-config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.claude/**/*'
+          - '.qoder/**/*'
