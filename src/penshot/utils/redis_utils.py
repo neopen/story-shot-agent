@@ -12,6 +12,7 @@ import json
 import os
 from functools import lru_cache
 from typing import Optional, Any
+from urllib.parse import urlsplit, urlunsplit
 
 import redis
 
@@ -101,6 +102,21 @@ class RedisClient:
 
         return params
 
+    def _sanitize_redis_url_for_log(self, url: str) -> str:
+        """脱敏Redis URL，避免在日志中输出明文凭据"""
+        try:
+            parsed = urlsplit(url)
+            netloc = parsed.netloc
+            if '@' not in netloc:
+                return url
+
+            _, host_part = netloc.rsplit('@', 1)
+            safe_netloc = f"***@{host_part}"
+            return urlunsplit((parsed.scheme, safe_netloc, parsed.path, parsed.query, parsed.fragment))
+        except Exception:
+            # 任何解析异常都不影响主流程，返回占位信息避免泄露
+            return "***"
+
     def _connect(self):
         """建立Redis连接"""
         try:
@@ -131,7 +147,8 @@ class RedisClient:
 
             # 测试连接
             self.client.ping()
-            debug(f"Redis连接成功: {self.connection_url}")
+            safe_url = self._sanitize_redis_url_for_log(self.connection_url)
+            debug(f"Redis连接成功: {safe_url}")
 
         except redis.ConnectionError as e:
             error(f"Redis连接失败: {e}")
