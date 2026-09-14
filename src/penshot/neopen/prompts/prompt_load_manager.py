@@ -21,9 +21,26 @@ from penshot.utils.log_utils import print_log_exception
 
 
 class PromptManager:
+    @staticmethod
+    def _coerce_language(language: Any) -> ShotLanguage:
+        """将输入安全转换为 ShotLanguage，非法值回退到默认中文"""
+        if isinstance(language, ShotLanguage):
+            return language
+        if isinstance(language, str):
+            return ShotLanguage.from_string(language) or ShotLanguage.ZH
+        return ShotLanguage.ZH
+
     def __init__(self, version: str = "v1.x", language: ShotLanguage = ShotLanguage.ZH):
-        # 默认使用当前文件的父目录
-        self.prompt_dir = Path(__file__).parent / version / language.value
+        # 默认使用当前文件的父目录，并确保路径不会逃逸
+        safe_root = Path(__file__).parent.resolve()
+        safe_version = Path(str(version)).name or "v1.x"
+        safe_language = self._coerce_language(language)
+
+        candidate_dir = (safe_root / safe_version / safe_language.value).resolve()
+        if candidate_dir != safe_root and safe_root not in candidate_dir.parents:
+            candidate_dir = (safe_root / "v1.x" / ShotLanguage.ZH.value).resolve()
+
+        self.prompt_dir = candidate_dir
         # 缓存已加载的提示词模板 - 最大缓存1024个提示词
         self._prompt_cache: Dict[str, Dict[str, Any]] = {}
         self._all_prompts_loaded = False
