@@ -12,6 +12,7 @@ see license File For Details.
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import Optional
+from urllib.parse import urlparse
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseLanguageModel
@@ -56,23 +57,26 @@ def detect_ai_provider_by_url(base_url: str) -> ClientType:
     if not base_url or not isinstance(base_url, str):
         raise ModuleNotFoundError("未找到默认 LLM 配置")
 
-    # 统一转为小写便于匹配
-    url_lower = base_url.lower()
+    parsed = urlparse(base_url)
+    host = parsed.hostname.lower() if parsed.hostname else ""
 
-    # 1. OpenAI - 严格匹配官方域名
-    if "openai.com" in url_lower:
+    def _host_matches(domain: str) -> bool:
+        return host == domain or host.endswith(f".{domain}")
+
+    # 1. OpenAI - 严格匹配官方域名（含子域）
+    if _host_matches("openai.com"):
         return ClientType.OPENAI
 
-    # 2. Qwen (通义千问) - 阿里云 DashScope
-    if "aliyuncs.com" in url_lower:
+    # 2. Qwen (通义千问) - 阿里云 DashScope（含子域）
+    if _host_matches("aliyuncs.com"):
         return ClientType.QWEN
 
-    # 3. DeepSeek
-    if "deepseek.com" in url_lower:
+    # 3. DeepSeek（含子域）
+    if _host_matches("deepseek.com"):
         return ClientType.DEEPSEEK
 
-    # 4. HuggingFace
-    if "huggingface.co" in url_lower:
+    # 4. HuggingFace（含子域）
+    if _host_matches("huggingface.co"):
         return ClientType.HUGGINGFACE
 
     # 5. Ollama - 两种识别方式：
