@@ -147,8 +147,11 @@ class RedisClient:
 
             # 测试连接
             self.client.ping()
-            safe_url = self._sanitize_redis_url_for_log(self.connection_url)
-            debug(f"Redis连接成功: {safe_url}")
+            params = self._get_connection_params()
+            host = params.get('host', 'localhost')
+            port = params.get('port', 6379)
+            db = params.get('db', 0)
+            debug(f"Redis连接成功: host={host}, port={port}, db={db}")
 
         except redis.ConnectionError as e:
             error(f"Redis连接失败: {e}")
