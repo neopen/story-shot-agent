@@ -193,6 +193,17 @@ class KnowledgeBaseViewer:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
+                def _mask_text(value, keep: int = 1) -> str:
+                    """对可能包含敏感信息的文本做脱敏显示。"""
+                    if value is None:
+                        return "未知"
+                    text = str(value)
+                    if not text:
+                        return "未知"
+                    if len(text) <= keep:
+                        return "*" * len(text)
+                    return text[:keep] + "*" * (len(text) - keep)
+
                 print(f"\n{'=' * 60}")
                 print(f"剧本详情: {file_path.name}")
                 print(f"{'=' * 60}")
@@ -202,7 +213,10 @@ class KnowledgeBaseViewer:
                 if characters:
                     print(f"\n【角色列表】({len(characters)}个)")
                     for char in characters:
-                        print(f"  - {char.get('name')} ({char.get('gender', '未知')}) - {char.get('role', '配角')}")
+                        masked_name = _mask_text(char.get('name'))
+                        masked_gender = _mask_text(char.get('gender', '未知'))
+                        masked_role = _mask_text(char.get('role', '配角'))
+                        print(f"  - {masked_name} ({masked_gender}) - {masked_role}")
 
                 # 场景列表
                 scenes = data.get('scenes', [])
