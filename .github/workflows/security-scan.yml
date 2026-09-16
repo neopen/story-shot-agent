@@ -1,40 +1,41 @@
-name: Security Scan
+name: Security Scan  # 工作流名称：自动化安全诊断与扫描
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  # 每周一定时扫描（捕获新公布的已知漏洞）
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: '0 0 * * 1'  # 定时任务：每周一 00:00 UTC 自动执行一次全局扫描
 
 permissions:
   contents: read
 
 jobs:
-  # 1. 扫描 Python 代码中的安全隐患（CodeQL）
+  # Job 1：使用 GitHub 官方 CodeQL 静态分析 Python 代码的安全风险
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
-      security-events: write  # 上报安全问题到 GitHub Security 标签页
+      security-events: write  # 用于向 GitHub "Security" 面板报告发现的安全缺陷
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 初始化 CodeQL 引擎，指定目标语言为 python
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: python
 
+      # 执行安全代码分析
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
 
-  # 2. PR 提交流程中审查第三方依赖漏洞
+  # Job 2：在 PR 提交时审查第三方新增依赖包是否存在高危漏洞
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
@@ -47,5 +48,4 @@ jobs:
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
         with:
-          # 如果 PR 新增的依赖存在高危/致命漏洞，直接阻断合并
-          fail-on-severity: high
+          fail-on-severity: high  # 如果引入了高危或严重级别的漏洞依赖，阻断 PR 的合并

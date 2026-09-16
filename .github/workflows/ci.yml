@@ -1,31 +1,27 @@
-name: CI Checks
+name: CI Checks  # 工作流名称：持续集成检查
 
-# 触发条件：推送到 main 分支，或者针对 main 分支提交 Pull Request 时触发
+# 触发条件配置
 on:
   push:
-    branches: [ "main" ]
-    # 🎯 忽略以下文件/文件夹的变动（当改动仅发生在这些路径时，跳过 CI 检查）
+    branches: [ "main" ]  # 当代码推送到 main 分支时触发
+    # 过滤路径：当修改仅发生在以下文件或目录时，跳过当前工作流以节省计算资源
     paths-ignore:
       - 'docs/**'
       - 'assets/**'
-      - 'web/**'
       - '**.md'
       - '.gitignore'
       - '.claude/**'
       - '.qoder/**'
       - '.agents/**'
       - '.codex/**'
-      # 忽略 GitHub 目录下的非工作流配置文件（如 ISSUE_TEMPLATE 等），保留 workflow 的触发
       - '.github/*.md'
       - '.github/ISSUE_TEMPLATE/**'
 
   pull_request:
-    branches: [ "main" ]
-    # 🎯 PR 时同步忽略相同路径
+    branches: [ "main" ]  # 当提交针对 main 分支的拉取请求（PR）时触发
     paths-ignore:
       - 'docs/**'
       - 'assets/**'
-      - 'web/**'
       - '**.md'
       - '.gitignore'
       - '.claude/**'
@@ -35,50 +31,47 @@ on:
       - '.github/*.md'
       - '.github/ISSUE_TEMPLATE/**'
 
-# 设置任务权限（仅读取权限）
+# 权限设置：仅需要读取仓库内容的权限
 permissions:
   contents: read
 
 jobs:
   test-and-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # 使用最新的 Ubuntu 运行环境
 
     steps:
-      # 1. 拉取仓库代码
+      # 第一步：检出仓库代码到运行器中
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 设置 Python 环境（使用 3.10 版本）
+      # 第二步：配置指定版本的 Python 环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          # 开启 pip 依赖缓存，加快后续 CI 执行速度
-          cache: 'pip'
+          cache: 'pip'  # 开启 pip 缓存，加速后续依赖安装速度
 
-      # 3. 安装项目依赖与测试工具
+      # 第三步：安装项目所需的依赖包及代码质量检查工具
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # 安装测试工具和必要的依赖包
           pip install flake8 pytest pyyaml
           
-          # 优先通过 pyproject.toml 安装项目及 full/dev 组依赖
+          # 根据项目配置文件优先安装本地包及其可选依赖
           if [ -f pyproject.toml ] || [ -f setup.py ]; then
             pip install -e ".[full,dev]" || pip install -e .
           elif [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
 
-      # 4. 代码规范与语法检查 (Lint)
+      # 第四步：使用 Flake8 进行严苛的语法与错误检查（遇到致命错误直接中断 CI）
       - name: Lint with flake8
         run: |
-          # flake8 会自动读取根目录下的 .flake8 / setup.cfg 配置文件
-          # 检查致命语法错误 (Syntax Errors)，如果存在严重语法错误，该步骤会立即报错停止
+          # --config 指向 .github 目录下的配置文件，仅检查 Syntax Error 及严重变量问题
           flake8 . --config=.github/.flake8 --count --select=E9,F63,F7,F82 --show-source --statistics
 
+      # 第五步：检查代码样式规范（非阻塞式，仅用于输出警告提示）
       - name: Style with flake8
-        # 检查代码格式规范 (Style Enforcement)，将 exit-zero 设为 true 或允许失败，仅输出样式警告
         run: |
           flake8 . --config=.github/.flake8 --count --exit-zero --max-complexity=10 --statistics
 

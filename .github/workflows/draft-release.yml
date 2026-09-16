@@ -9,7 +9,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'assets/**'
-      - 'web/**'
       - '**.md'
       - '.gitignore'
       - '.claude/**'
@@ -25,7 +24,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'assets/**'
-      - 'web/**'
       - '**.md'
       - '.gitignore'
       - '.claude/**'

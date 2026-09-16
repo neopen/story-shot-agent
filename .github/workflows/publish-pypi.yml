@@ -1,13 +1,14 @@
-name: Upload Python Package
+name: Upload Python Package  # 工作流名称：打包并发布 Python 包至 PyPI
 
 on:
   release:
-    types: [published, prereleased]  # 仅在正式发布或预发布 Release 时触发
+    types: [published, prereleased]  # 仅当在 GitHub 上发布新的 Release 时触发
 
 permissions:
   contents: read
 
 jobs:
+  # 构建 Job：将源码编译为 sdist (.tar.gz) 和 wheel (.whl) 文件
   release-build:
     name: Build release distributions
     runs-on: ubuntu-latest
@@ -22,51 +23,57 @@ jobs:
           python-version: "3.10"
           cache: 'pip'
 
+      # 安装官方推荐的打包工具 build 与元数据校验工具 twine
       - name: Install build tools & twine
         run: |
           python -m pip install --upgrade pip
           pip install build twine
 
+      # 执行打包命令
       - name: Build source and wheel distributions
         run: |
           python -m build
 
+      # 检查打包产物中的 README 及描述信息是否符合 PyPI 格式规范
       - name: Check package metadata with twine
         run: |
-          # 检查打包出的 whl 和 tar.gz 元数据格式（如 README 渲染是否正常）
           twine check dist/*
 
+      # 暂存打包出来的文件，供下个 发布 Job 下载使用
       - name: Upload distributions artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-dists
           path: dist/
-          retention-days: 7  # 构建产物保存 7 天
+          retention-days: 7
 
+  # 发布 Job：将打包产物无缝上传至 PyPI
   pypi-publish:
     name: Publish package to PyPI
     needs:
-      - release-build
+      - release-build  # 必须等 release-build 成功完成后才能运行
     runs-on: ubuntu-latest
-    
-    # 🎯 现代化发布的关键配置：使用 OIDC 凭证（Trusted Publishing）
+
+    # 必须显式声明 id-token: write 权限，以启用基于 OIDC 的 Trusted Publishing 认证机制
     permissions:
-      id-token: write  # PyPI 认证必填权限
+      id-token: write
+      contents: read
 
     environment:
       name: pypi
-      url: https://pypi.org/p/penshot  # 可根据需要填入项目的 PyPI 页面地址
+      url: https://pypi.org/p/penshot  # 发布成功后会在 GitHub 上展示对应环境链接
 
     steps:
+      # 下载上一步产生的构建包
       - name: Download release distributions
         uses: actions/download-artifact@v4
         with:
           name: release-dists
           path: dist/
 
+      # 自动推送至真实 PyPI 平台
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
-          # 如果推送失败可以打印更详细的调试日志（默认 false）
           verbose: false

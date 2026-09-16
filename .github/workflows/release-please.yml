@@ -1,11 +1,11 @@
-# 自动管理 Python 项目 的版本号更新、变更日志（Changelog）生成以及 GitHub Release 的创建
-name: release-please
+name: release-please  # 工作流名称：自动化版本与发布管理
 
 on:
   push:
     branches:
-      - main
+      - main  # 当代码合并或推送到 main 分支时触发
 
+# 赋予自动更新仓库内容（打 Tag、建 Release）以及自动创建修改 PR 的权限
 permissions:
   contents: write
   pull-requests: write
@@ -16,6 +16,6 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          # 指向位于 .github 目录下的配置文件路径
+          # 显式指向位于 .github 目录下的自定义配置文件与版本清单文件
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json

@@ -2,10 +2,9 @@
 # 最大允许的单行长度（匹配 Black 等常见格式化工具的标准）
 max-line-length = 120
 
-# 忽略/排除检查的文件和文件夹
+# 忽略/排除检查的文件和文件夹（移除了 .github 以保证 CI 正确读取）
 exclude =
     .claude,
-    .github,
     .qoder,
     .agents,
     .codex,

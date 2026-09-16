@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # 监控 Python (pip / pyproject.toml) 依赖更新
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly" # 每周检查一次
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+
+  # 监控 GitHub Actions 工作流自身的 Action 版本更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
