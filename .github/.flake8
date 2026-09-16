@@ -7,12 +7,10 @@ exclude =
     .claude,
     .github,
     .qoder,
-    .agents
-    .codex
+    .agents,
+    .codex,
     assets,
     docs,
-    web,
-    examples,
     build,
     dist,
     .git,
