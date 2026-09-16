@@ -1,3 +1,4 @@
+# 自动管理 Python 项目 的版本号更新、变更日志（Changelog）生成以及 GitHub Release 的创建
 name: release-please
 
 on:
