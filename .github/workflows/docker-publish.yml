@@ -1,12 +1,10 @@
-name: Docker Build & Push
+name: Docker Build & Push  # 工作流名称：Docker 镜像构建与发布
 
-# 1. 触发条件优化：仅在合并到 main 分支或推送标签时触发，移除 PR 触发
 on:
   push:
-    branches: [ "main" ]
-    tags: [ 'v*.*.*' ]
-    # 🎯 核心控制：仅当以下路径有修改时才触发 Docker 构建与发布
-    # 修改 scripts/、tests/、docs/ 等目录可以正常合并，但不会触发镜像发布
+    branches: [ "main" ]       # 推送到 main 分支时触发
+    tags: [ 'v*.*.*' ]          # 打上语义化版本 Tag 时触发 (如 v1.0.0)
+    # 仅当涉及核心代码及构建文件变动时才触发镜像构建
     paths:
       - 'src/**'
       - 'Dockerfile'
@@ -16,21 +14,22 @@ on:
 
 permissions:
   contents: read
-  packages: write  # 允许发布到 GitHub Packages (GHCR)
+  packages: write  # 必须开启写入权限，以便能够推送镜像到 GHCR (GitHub Packages)
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 检出代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. 设置 Docker Buildx（开启多架构与缓存支持）
+      # 2. 配置 Docker Buildx 环境
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 2-A. 登录到 GitHub Container Registry (GHCR)
+      # 3. 登录到 GHCR (GitHub Container Registry)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -38,34 +37,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2-B. 登录到 Docker Hub（判空防护：只有配置了 Secret 才执行）
+      # 4. 尝试登录到 Docker Hub（关键修改：增加容错与状态标记）
       - name: Log in to Docker Hub
-        env:
-          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
-        if: ${{ env.DOCKERHUB_USER != '' && env.DOCKERHUB_PASS != '' }}
+        id: login-dockerhub
+        # 允许该步骤失败，即使登录报错也不中断整个工作流
+        continue-on-error: true
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKERHUB_USER }}
-          password: ${{ env.DOCKERHUB_PASS }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 3. 生成元数据标签（自动将 GitHub 拥有者名称转为小写）
+      # 5. 解析并自动生成 Docker 标签（关键修改：仅在 Docker Hub 登录成功时为其生成标签）
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
-        env:
-          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/penshot
-            ${{ env.DOCKERHUB_USER != '' && format('{0}/penshot', env.DOCKERHUB_USER) || '' }}
+            ${{ steps.login-dockerhub.outcome == 'success' && format('{0}/penshot', secrets.DOCKERHUB_USERNAME) || '' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      # 4. 构建并推送到 GHCR 和 Docker Hub
+      # 6. 执行镜像构建并推送到仓库
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -74,5 +71,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: type=gha         # 利用 GitHub Actions 缓存加速构建
           cache-to: type=gha,mode=max

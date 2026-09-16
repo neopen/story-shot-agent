@@ -4,6 +4,9 @@
     ".": {
       "release-type": "python",
       "package-name": "penshot",
+      "default-bump-level": "patch",
+      "include-component-in-tag": false,
+
       "changelog-sections": [
         { "type": "feat", "section": "✨ Features (新功能)", "hidden": false },
         { "type": "fix", "section": "🐛 Bug Fixes (问题修复)", "hidden": false },
@@ -11,8 +14,8 @@
         { "type": "refactor", "section": "♻️ Code Refactoring (代码重构)", "hidden": false },
         { "type": "docs", "section": "📝 Documentation (文档更新)", "hidden": false },
         { "type": "style", "section": "💄 Styles (代码样式)", "hidden": false },
-        { "type": "test", "section": "✅ Tests (测试相关)", "hidden": true },
-        { "type": "chore", "section": "🔧 Chore (杂务/构建)", "hidden": true }
+        { "type": "chore", "section": "🔧 Other Changes (其他变更)", "hidden": false },
+        { "type": "test", "section": "✅ Tests (测试相关)", "hidden": true }
       ]
     }
   }

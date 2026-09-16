@@ -1,13 +1,12 @@
-name: Pull Request Labeler
+name: Pull Request Labeler  # 工作流名称：自动根据修改路径为 PR 打标签
 
-# 🎯 优化触发条件：明确 PR 的生命周期动作，避免非必要触发
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]  # 当 PR 打开、重新打开或更新提交时触发
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: write  # 必须赋予写 PR 权限以自动添加/修改 Label
 
 jobs:
   labeler:
@@ -18,9 +17,8 @@ jobs:
     steps:
       - uses: actions/labeler@v5
         with:
-          # 🎯 v5 升级点：参数从 repo-token 改为 sync-token 或直接使用默认 token
-          # 显式传入 GITHUB_TOKEN 以保障权限
+          # 传入 GitHub 自动生成的 Token 用于 API 授权
           sync-token: "${{ secrets.GITHUB_TOKEN }}"
+          # 配置文件路径（用于定义哪些路径对应什么 Label）
           configuration-path: ".github/labeler.yml"
-          # 可选：如果希望在移除对应文件改动时自动移除 Label，可设为 true
-          dot: true
+          dot: true  # 允许匹配以点号开头的隐藏文件
