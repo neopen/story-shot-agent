@@ -193,16 +193,14 @@ class KnowledgeBaseViewer:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
-                def _mask_text(value, keep: int = 1) -> str:
-                    """对可能包含敏感信息的文本做脱敏显示。"""
+                def _mask_text(value) -> str:
+                    """对可能包含敏感信息的文本做脱敏显示（不保留任何原文字符）。"""
                     if value is None:
                         return "未知"
-                    text = str(value)
+                    text = str(value).strip()
                     if not text:
                         return "未知"
-                    if len(text) <= keep:
-                        return "*" * len(text)
-                    return text[:keep] + "*" * (len(text) - keep)
+                    return "***"
 
                 print(f"\n{'=' * 60}")
                 print(f"剧本详情: {file_path.name}")
