@@ -1,30 +1,50 @@
 version: 2
+
 updates:
-  # 监控 GitHub Actions 工作流依赖项
+  # ============================================================================
+  # GitHub Actions 依赖
+  # ============================================================================
   - package-ecosystem: "github-actions"
     directory: "/"
+
     schedule:
       interval: "weekly"
+
     labels:
       - "dependencies"
       - "ci"
-    # 🎯 核心修复项：给 Dependabot 自动生成的提交信息与 PR 标题加上符合 Semantic Commits 的前缀
+
+    # 使用 Conventional Commits 格式
+    # 例如：chore(deps): bump actions/checkout from 4.x to 5.x
     commit-message:
       prefix: "chore"
-      prefix-development: "chore"
       include: "scope"
 
-  # 监控 Python (pip) 依赖项
+  # ============================================================================
+  # Python (pip) 依赖
+  # ============================================================================
   - package-ecosystem: "pip"
     directory: "/"
+
     schedule:
       interval: "weekly"
+
+    # 限制同时存在的 Dependabot PR 数量
     open-pull-requests-limit: 10
+
     labels:
       - "dependencies"
       - "python"
-    # 🎯 同样为 Python 依赖更新添加前缀
+
+    # 使用 Conventional Commits 格式
+    # 例如：chore(deps): bump pydantic from 2.x to 2.y
     commit-message:
       prefix: "chore"
-      prefix-development: "chore"
       include: "scope"
+
+    # 避免依赖刚发布新版本就立即创建更新 PR
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 3

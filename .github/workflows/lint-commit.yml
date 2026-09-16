@@ -16,6 +16,7 @@ jobs:
   validate-pr-title:
     name: Validate PR Title Standard
     runs-on: ubuntu-latest
+
     steps:
       - name: Check PR title conforms to Conventional Commits
         uses: amannn/action-semantic-pull-request@v5
@@ -32,9 +33,11 @@ jobs:
             style
             test
             chore
+
           # 要求类型后必须带有冒号和空格，例如 "feat: add user login"
           requireScope: false
-          # 如果 PR 标题不合法，将在 Actions 日志中输出详细的修改指引
-          subjectPattern: ^(?![A-Z]).+$
+
+          # 要求主题部分首字母小写，并且不能以句号结尾
+          subjectPattern: ^(?![A-Z]).+[^.]$
           subjectPatternError: |
             PR 标题的主题部分首字母请保持小写，且不要以句号结尾！
