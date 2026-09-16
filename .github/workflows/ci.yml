@@ -74,7 +74,13 @@ jobs:
       - name: Lint with flake8
         run: |
           # flake8 会自动读取根目录下的 .flake8 / setup.cfg 配置文件
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # 检查致命语法错误 (Syntax Errors)，如果存在严重语法错误，该步骤会立即报错停止
+          flake8 . --config=.github/.flake8 --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Style with flake8
+        # 检查代码格式规范 (Style Enforcement)，将 exit-zero 设为 true 或允许失败，仅输出样式警告
+        run: |
+          flake8 . --config=.github/.flake8 --count --exit-zero --max-complexity=10 --statistics
 
       # 5. 执行单元测试 (Test)
       # - name: Run tests with pytest
