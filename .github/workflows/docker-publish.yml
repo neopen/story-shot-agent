@@ -14,7 +14,7 @@ on:
 
 permissions:
   contents: read
-  packages: write  # 必须开启写入权限，以便能够推送镜像到 GHCR (GitHub Packages)
+  packages: write  # 必须开启写入权限，以便推送镜像到 GHCR
 
 jobs:
   build-and-push:
@@ -37,10 +37,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 4. 尝试登录到 Docker Hub（关键修改：增加容错与状态标记）
+      # 4. 尝试登录到 Docker Hub（允许失败，不中断工作流）
       - name: Log in to Docker Hub
         id: login-dockerhub
-        # 允许该步骤失败，即使登录报错也不中断整个工作流
         continue-on-error: true
         if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@v3
@@ -48,14 +47,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 5. 解析并自动生成 Docker 标签（关键修改：仅在 Docker Hub 登录成功时为其生成标签）
+      # 5. 解析并自动生成 Docker 标签（修复：通过 env 映射解决 secrets 作用域问题）
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/penshot
-            ${{ steps.login-dockerhub.outcome == 'success' && format('{0}/penshot', secrets.DOCKERHUB_USERNAME) || '' }}
+            ${{ steps.login-dockerhub.outcome == 'success' && env.DOCKERHUB_USER != '' && format('{0}/penshot', env.DOCKERHUB_USER) || '' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
