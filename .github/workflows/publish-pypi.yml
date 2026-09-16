@@ -2,7 +2,7 @@ name: Upload Python Package  # 工作流名称：打包并发布 Python 包至 P
 
 on:
   release:
-    types: [published, prereleased]  # 仅当在 GitHub 上发布新的 Release 时触发
+    types: [published]  # 仅当在 GitHub 上发布新的 Release 时触发
 
 permissions:
   contents: read
@@ -14,9 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 检出 Release 对应的代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. 配置 Python 环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -39,7 +41,7 @@ jobs:
         run: |
           twine check dist/*
 
-      # 暂存打包出来的文件，供下个 发布 Job 下载使用
+      # 暂存打包出来的文件，供下个发布 Job 下载使用
       - name: Upload distributions artifact
         uses: actions/upload-artifact@v4
         with:

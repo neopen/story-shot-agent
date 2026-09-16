@@ -4,7 +4,7 @@ name: CI Checks  # 工作流名称：持续集成检查
 on:
   push:
     branches: [ "main" ]  # 当代码推送到 main 分支时触发
-    # 过滤路径：当修改仅发生在以下文件或目录时，跳过当前工作流以节省计算资源
+    # 仅当修改不是纯文档、资源或开发工具配置时运行 CI
     paths-ignore:
       - 'docs/**'
       - 'assets/**'
@@ -18,7 +18,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
 
   pull_request:
-    branches: [ "main" ]  # 当提交针对 main 分支的拉取请求（PR）时触发
+    branches: [ "main" ]  # 当提交针对 main 分支的 PR 时触发
     paths-ignore:
       - 'docs/**'
       - 'assets/**'
@@ -56,7 +56,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest pyyaml
-          
+
           # 根据项目配置文件优先安装本地包及其可选依赖
           if [ -f pyproject.toml ] || [ -f setup.py ]; then
             pip install -e ".[full,dev]" || pip install -e .
@@ -64,18 +64,22 @@ jobs:
             pip install -r requirements.txt
           fi
 
-      # 第四步：使用 Flake8 进行严苛的语法与错误检查（遇到致命错误直接中断 CI）
+      # 第四步：使用 Flake8 进行严苛的语法与错误检查
       - name: Lint with flake8
         run: |
-          # --config 指向 .github 目录下的配置文件，仅检查 Syntax Error 及严重变量问题
-          flake8 . --config=.github/.flake8 --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --config=.github/.flake8 --count \
+            --select=E9,F63,F7,F82 \
+            --show-source --statistics
 
       # 第五步：检查代码样式规范（非阻塞式，仅用于输出警告提示）
       - name: Style with flake8
         run: |
-          flake8 . --config=.github/.flake8 --count --exit-zero --max-complexity=10 --statistics
+          flake8 . --config=.github/.flake8 \
+            --count --exit-zero \
+            --max-complexity=10 --statistics
 
-      # 5. 执行单元测试 (Test)
+      # 第六步：执行单元测试
+      # 如果项目暂时没有测试，可以保持注释
       # - name: Run tests with pytest
       #   run: |
       #     pytest

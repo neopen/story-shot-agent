@@ -5,7 +5,7 @@ on:
     branches:
       - main  # 当代码合并或推送到 main 分支时触发
 
-# 赋予自动更新仓库内容（打 Tag、建 Release）以及自动创建修改 PR 的权限
+# 赋予自动更新仓库内容、创建 Release PR 以及发布版本所需的权限
 permissions:
   contents: write
   pull-requests: write
@@ -13,9 +13,13 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: googleapis/release-please-action@v4
+      - name: Run Release Please
+        uses: googleapis/release-please-action@v4
         with:
-          # 显式指向位于 .github 目录下的自定义配置文件与版本清单文件
+          # 自定义 Release Please 配置文件
           config-file: .github/release-please-config.json
+
+          # 版本清单文件
           manifest-file: .github/.release-please-manifest.json

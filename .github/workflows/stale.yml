@@ -1,9 +1,12 @@
-# 自动清理挂起/无活动 Issue
+# 自动清理长期无活动的 Issue 和 PR
 name: Mark Stale Issues and PRs
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天 midnight 运行一次
+    - cron: '0 0 * * *' # 每天 00:00 UTC 运行一次（日本时间 09:00）
+
+  # 支持手动执行，方便测试或需要时立即清理
+  workflow_dispatch:
 
 permissions:
   issues: write
@@ -12,13 +15,29 @@ permissions:
 jobs:
   stale:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/stale@v9
+      - name: Mark stale issues and pull requests
+        uses: actions/stale@v10
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          days-before-stale: 60      # 60 天无活动标记为 stale
-          days-before-close: 7       # 标记后 7 天仍无活动则自动关闭
-          stale-issue-message: '该 Issue 已超过 60 天无任何活动，将被标记为 Stale。如果问题仍存在，请留言。'
-          stale-pr-message: '该 PR 已超过 60 天无任何更新，将被标记为 Stale。'
-          stale-issue-label: 'stale'
-          stale-pr-label: 'stale'
+
+          # 60 天无活动后标记为 Stale
+          days-before-stale: 60
+
+          # 标记 Stale 后 7 天仍无活动则自动关闭
+          days-before-close: 7
+
+          # Issue 标记信息
+          stale-issue-message: |
+            该 Issue 已超过 60 天无任何活动，将被标记为 Stale。
+            如果问题仍然存在，请留言，我们会重新关注该问题。
+
+          # PR 标记信息
+          stale-pr-message: |
+            该 PR 已超过 60 天无任何更新，将被标记为 Stale。
+            如果仍然需要合并，请更新 PR 或留言。
+
+          # Stale 标签
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
