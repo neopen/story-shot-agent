@@ -1,16 +1,6 @@
 version: 2
 updates:
-  # 监控 Python (pip / pyproject.toml) 依赖更新
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "weekly" # 每周检查一次
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "python"
-
-  # 监控 GitHub Actions 工作流自身的 Action 版本更新
+  # 监控 GitHub Actions 工作流依赖项
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -18,3 +8,23 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    # 🎯 核心修复项：给 Dependabot 自动生成的提交信息与 PR 标题加上符合 Semantic Commits 的前缀
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+
+  # 监控 Python (pip) 依赖项
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    # 🎯 同样为 Python 依赖更新添加前缀
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
