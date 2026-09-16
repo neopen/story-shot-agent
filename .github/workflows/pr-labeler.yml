@@ -4,21 +4,21 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]  # 当 PR 打开、重新打开或更新提交时触发
 
-permissions:
-  contents: read
-  pull-requests: write  # 必须赋予写 PR 权限以自动添加/修改 Label
-
 jobs:
   labeler:
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write  # 必须赋予写 PR 权限以自动添加/修改 Label
+
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/labeler@v5
         with:
           # 传入 GitHub 自动生成的 Token 用于 API 授权
           sync-token: "${{ secrets.GITHUB_TOKEN }}"
+
           # 配置文件路径（用于定义哪些路径对应什么 Label）
           configuration-path: ".github/labeler.yml"
+
           dot: true  # 允许匹配以点号开头的隐藏文件

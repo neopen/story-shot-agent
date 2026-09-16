@@ -2,12 +2,9 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.dynamic]
-version = { attr = "penshot.__version__" }
-
 [project]
 name = "penshot"
-version = "0.3.8"
+version = "0.3.7"
 description = "剧本分镜,动漫分镜,电影分镜,短剧分镜,视频分镜,剧本解析,文生视频提示词。AI agent that converts screenplays to consistent Text-to-Video prompts. Supports Sora, Runway, Kling, Veo via LangGraph & LLMs."
 
 keywords = [
@@ -21,9 +18,11 @@ keywords = [
 authors = [
     { name = "HiPeng", email = "helpenx+shot@gmail.com" }
 ]
+
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "MIT" }
 requires-python = ">=3.10"
+
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -47,43 +46,54 @@ dependencies = [
     # Web框架
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
+
     # 核心AI/LLM
     "langchain>=1.2.14",
     "langchain-community",
     "langchain-ollama>=1.0.0",
     "langchain-chroma>=1.0.0",
     "langgraph>=1.1.4",
-        #    "langchain-deepseek>=0.1.0",
-    #    "dashscope==1.23.9",
+
+    # "langchain-deepseek>=0.1.0",
+    # "dashscope==1.23.9",
+
     # RAG/向量存储
     "chromadb>=1.5.6",
     "llama-index-core>=0.14.20",
     "llama-index-embeddings-langchain>=0.4.0",
-        #    "llama-index-embeddings-openai>=0.1.0",
-    #    "llama-index-embeddings-huggingface>=0.1.0",
-    #    "llama-index-embeddings-ollama>=0.1.0",
+
+    # "llama-index-embeddings-openai>=0.1.0",
+    # "llama-index-embeddings-huggingface>=0.1.0",
+    # "llama-index-embeddings-ollama>=0.1.0",
+
     "langgraph-checkpoint-sqlite",
+
     # 配置与数据验证
     "pydantic>=2.11.10",
     "pydantic-settings>=2.10.1",
     "python-dotenv>=1.0.0",
     "pyyaml",
+
     # 数据处理
     "numpy>=1.24.0",
+
     # pip install git+https://github.com/fxsjy/jieba.git@master
     # git -c http.proxy=http://127.0.0.1:7890 clone https://github.com/fxsjy/jieba.git
     "jieba>=0.42.1",
+
     "redis",
+
     # 工具库
     "tiktoken>=0.5.0",
-    "colorama"
+    "colorama",
 ]
 
 # ============================================================================
 # 可选依赖分组
 # ============================================================================
-[project.optional-dependencies]
+
 # 开发工具
+[project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
@@ -138,41 +148,29 @@ llm-providers = [
 ]
 
 # ============================================================================
-# full 组合：通过引用其他分组实现（TOML 不支持变量，但 pip 支持组合）
-# 安装时使用：pip install penshot[full]
+# full：完整运行时依赖集合
 # ============================================================================
 full = [
     # API服务
     "fastapi>=0.104.0",
     "aiofiles>=23.2.0",
+
     # 异步数据库
     "aiosqlite>=0.19.0",
     "asyncpg>=0.29.0",
+
     # 多LLM提供商
     "langchain-deepseek>=0.1.0",
     "langchain-openai>=1.0.0",
     "dashscope>=1.0.0",
+
     # 视频处理
     "opencv-python>=4.8.0",
     "moviepy>=1.0.3",
     "pillow>=10.0.0",
+
     # HTTP客户端
     "httpx>=0.25.0",
-]
-
-# ============================================================================
-# 注意：TOML 不支持变量引用，但 pip 支持组合安装
-# 用户可以通过以下方式安装组合：
-#   pip install penshot[api,async_db,llm-providers,video]
-# 或者我们提供一个 all 分组（安装所有可选依赖）
-# ============================================================================
-all = [
-    "penshot[dev,test,video,docs,api,async_db,llm-providers]",
-]
-
-# 便捷别名
-default = [
-    "penshot[api,async_db]",
 ]
 
 [project.urls]
@@ -182,12 +180,12 @@ Documentation = "https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5"
 Changelog = "https://github.com/neopen/story-shot-agent/releases"
 Issues = "https://github.com/neopen/story-shot-agent/issues"
 
-# 注意：这里引用的是内部的Python包名 penshot
+# 注意：这里引用的是内部 Python 包名 penshot
 [project.scripts]
 story-shot-agent = "penshot.cli:main"
 vs-agent = "penshot.cli:main"
 
-# 如果使用FastAPI，可以添加一个serve命令
+# FastAPI 服务命令
 [project.entry-points."console_scripts"]
 story-shot-agent-serve = "penshot.cli:serve"
 
@@ -213,12 +211,12 @@ penshot = [
     "config/**/*.yaml",
     "neopen/prompts/**/*.yaml",
     "neopen/config/**/*.yaml",
-    ".env.example"
+    ".env.example",
 ]
 
 [tool.black]
 line-length = 88
-target-version = ['py310']
+target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
@@ -253,21 +251,10 @@ addopts = [
 ]
 asyncio_mode = "auto"
 
-# 约定式提交与 Changelog 自动生成
+# ============================================================================
+# Commitizen
+# 仅用于 Conventional Commits，不参与版本、Tag、Changelog 管理
+# 版本与 Release 统一由 Release Please 管理
+# ============================================================================
 [tool.commitizen]
 name = "cz_conventional_commits"
-tag_format = "v$version"
-version_scheme = "semver"
-version = "0.1.0"
-version_files = [
-    "src/penshot/__init__.py:__version__",
-    "pyproject.toml:version"
-]
-changelog_file = "CHANGELOG.md"
-update_changelog_on_bump = true
-style = [
-    ["qmark", "fg:#ff9d00 bold"],
-    ["question", "bold"],
-    ["answer", "fg:#5f87d0 bold"],
-    ["pointer", "fg:#05f5ba bold"]
-]

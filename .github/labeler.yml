@@ -3,11 +3,11 @@ testing:
   - changed-files:
       - any-glob-to-any-file: 'tests/**/*'
 
-# 核心代码与入口文件
+# 核心 Python 代码与入口文件
 core-code:
   - changed-files:
       - any-glob-to-any-file:
-          - 'src/**/*'
+          - 'src/**/*.py'
           - 'main.py'
 
 # 嵌入式前端 UI 界面
@@ -24,7 +24,7 @@ documentation:
           - '**/*.md'
 
 # CI/CD 与工具链配置
-ci/cd:
+ci-cd:
   - changed-files:
       - any-glob-to-any-file:
           - '.github/**/*'

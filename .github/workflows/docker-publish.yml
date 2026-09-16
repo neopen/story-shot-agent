@@ -2,15 +2,16 @@ name: Docker Build & Push  # 工作流名称：Docker 镜像构建与发布
 
 on:
   push:
-    branches: [ "main" ]       # 推送到 main 分支时触发
-    tags: [ 'v*.*.*' ]          # 打上语义化版本 Tag 时触发 (如 v1.0.0)
-    # 仅当涉及核心代码及构建文件变动时才触发镜像构建
+    branches:
+      - "main"              # 推送到 main 分支时触发
+    tags:
+      - "v*.*.*"            # 打上语义化版本 Tag 时触发 (如 v1.0.0)
     paths:
-      - 'src/**'
-      - 'Dockerfile'
-      - 'pyproject.toml'
-      - 'main.py'
-      - '.github/workflows/docker-publish.yml'
+      - "src/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "main.py"
+      - ".github/workflows/docker-publish.yml"
 
 permissions:
   contents: read
@@ -19,6 +20,10 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
     steps:
       # 1. 检出代码
@@ -31,7 +36,7 @@ jobs:
 
       # 3. 登录到 GHCR (GitHub Container Registry)
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -41,22 +46,20 @@ jobs:
       - name: Log in to Docker Hub
         id: login-dockerhub
         continue-on-error: true
-        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-        uses: docker/login-action@v3
+        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
-      # 5. 解析并自动生成 Docker 标签（修复：通过 env 映射解决 secrets 作用域问题）
+      # 5. 解析并自动生成 Docker 标签
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
-        env:
-          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/penshot
-            ${{ steps.login-dockerhub.outcome == 'success' && env.DOCKERHUB_USER != '' && format('{0}/penshot', env.DOCKERHUB_USER) || '' }}
+            ${{ steps.login-dockerhub.outcome == 'success' && format('{0}/penshot', env.DOCKERHUB_USERNAME) || '' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -65,7 +68,7 @@ jobs:
 
       # 6. 执行镜像构建并推送到仓库
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
