@@ -65,7 +65,7 @@ jobs:
 
       # 6. 执行镜像构建并推送到仓库
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
