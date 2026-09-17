@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: RuleScriptParser.py
 @Description: 规则剧本解析器 - 基于正则表达式的本地解析，作为 LLM 解析器的备用方案

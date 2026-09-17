@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: fastapi_web_app.py
 @Description: Web 应用集成示例：把 Penshot SDK 封装为 FastAPI 服务

@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: a2a_integration.py
 @Description: A2A（代理到代理）集成示例：把 Penshot 封装为可编排的分镜生成 Agent

@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: json_parser_tool.py
 @Description: JSON响应解析工具模块，提供从LLM响应中提取和解析JSON数据的功能，支持处理Markdown代码块中的JSON

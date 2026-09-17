@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: short_term_memory.py
 @Description: 短期记忆 - 基于LangChain的缓冲记忆，支持剧本ID数据隔离

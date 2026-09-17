@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: 01_langgraph_integration.py
 @Description: 集成示例：把 Penshot SDK 封装成 LangGraph 工作流节点

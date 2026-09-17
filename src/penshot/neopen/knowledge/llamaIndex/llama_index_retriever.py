@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: llama_index_retriever.py
 @Description: LlamaIndex 文档检索模块，提供高效的文档检索功能，支持多种检索策略

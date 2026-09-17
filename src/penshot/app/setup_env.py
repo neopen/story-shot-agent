@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: app_env.py
 @Description: 环境设置脚本

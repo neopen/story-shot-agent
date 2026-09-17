@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: mcp_client.py
 @Description: MCP stdio 客户端示例：JSON-RPC 2.0 over stdio，自动拉起 mcp_server

@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: 01_sync_storyboard.py
 @Description: REST 场景示例：同步分镜拆分（POST /api/v1/storyboard/sync）

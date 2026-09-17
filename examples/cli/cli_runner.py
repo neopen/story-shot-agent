@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: cli_runner.py
 @Description: CLI 示例：用 Python 子进程依次驱动 `python -m penshot.cli` 各子命令

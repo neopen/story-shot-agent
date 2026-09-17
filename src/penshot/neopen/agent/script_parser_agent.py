@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: script_parser_agent.py
 @Description: 剧本解析智能体，将整段中文剧本转换为结构化动作序列

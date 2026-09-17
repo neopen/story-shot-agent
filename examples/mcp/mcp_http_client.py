@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: mcp_http_client.py
 @Description: MCP HTTP 客户端示例：直连 penshot.mcp_http_server 的 /tools 路由

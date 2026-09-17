@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: langchain_memory_tool.py
 @Description: 使用LangChain的VectorStoreRetrieverMemory实现时序规划智能体的状态记忆功能

@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: 04_queue_and_task_mgmt.py
 @Description: SDK 直调示例：任务管理 / 队列监控 / 并发调整

@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: mcp_server_demo.py
 @Description: MCP Server 端到端自测：自动拉起 mcp_server 并走完整流程
