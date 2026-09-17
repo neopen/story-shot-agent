@@ -79,7 +79,7 @@ class BaseLLMAgent(BaseAgent):
 
             except Exception as e:
                 if attempt == max_retries - 1:
-                    raise Exception(f"LLM调用失败: {e}")
+                    raise Exception(f"LLM调用失败: {str(e)}")
                 time.sleep(1)
 
 
@@ -136,7 +136,7 @@ class BaseLLMAgent(BaseAgent):
 
             except Exception as e:
                 if attempt == max_retries - 1:
-                    raise Exception(f"LLM调用失败: {e}")
+                    raise Exception(f"LLM调用失败: {str(e)}")
                 time.sleep(1)
 
     def _get_scene_info(self, scene_id: str, parsed_script: ParsedScript) -> str:
