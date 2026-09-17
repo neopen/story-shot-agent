@@ -24,6 +24,10 @@ class OllamaClient(BaseClient):
         super().__init__(config)
         self.base_url = self.llm_config.base_url or "http://localhost:11434"  # Ollama 默认本地地址
 
+    def check_package(self) -> bool:
+        """检测 Ollama 客户端所需依赖是否已安装"""
+        return self._check_packages((("langchain_ollama", "langchain-ollama"),))
+
     def llm_model(self) -> BaseLanguageModel:
         from langchain_ollama import ChatOllama
         return ChatOllama(

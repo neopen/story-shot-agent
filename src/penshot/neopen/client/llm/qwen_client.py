@@ -28,6 +28,15 @@ class QwenClient(BaseClient):
         self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         os.environ["DASHSCOPE_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
+    def check_package(self) -> bool:
+        """检测 Qwen 客户端所需依赖是否已安装"""
+        return self._check_packages(
+            (
+                ("langchain_community", "langchain-community"),
+                ("dashscope", "dashscope"),
+            )
+        )
+
     def llm_model(self) -> BaseLanguageModel:
         return ChatTongyi(
             model=self.llm_config.model_name,

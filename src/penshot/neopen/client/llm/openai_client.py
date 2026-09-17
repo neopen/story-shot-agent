@@ -26,6 +26,10 @@ class OpenAIClient(BaseClient):
         self.base_url = self.llm_config.base_url or "https://api.openai.com/v1"
         os.environ["OPENAI_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
+    def check_package(self) -> bool:
+        """检测 OpenAI 客户端所需依赖是否已安装"""
+        return self._check_packages((("langchain_openai", "langchain-openai"),))
+
     def llm_model(self) -> BaseLanguageModel:
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(

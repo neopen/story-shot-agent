@@ -27,6 +27,10 @@ class DeepSeekClient(BaseClient):
         self.base_url = self.llm_config.base_url or "https://api.deepseek.com"
         os.environ["DEEPSEEK_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
+    def check_package(self) -> bool:
+        """检测 DeepSeek 客户端所需依赖是否已安装"""
+        return self._check_packages((("langchain_openai", "langchain-openai"),))
+
     def llm_model(self) -> BaseLanguageModel:
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
