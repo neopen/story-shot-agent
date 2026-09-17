@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: workflow_nodes.py
 @Description: LangGraph工作流节点实现，包含所有工作流执行功能

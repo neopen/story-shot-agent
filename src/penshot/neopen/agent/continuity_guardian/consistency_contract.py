@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: consistency_contract.py
 @Description: 全局一致性契约 - 贯穿剧本解析、分镜、分割、提示词生成

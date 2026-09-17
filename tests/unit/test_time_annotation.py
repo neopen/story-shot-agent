@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: test_time_annotation.py
 @Description: 测试动作时长估算器对时间标注的处理

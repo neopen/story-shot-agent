@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: llm_script_parser.py
 @Description: LLM 剧本解析智能体实现

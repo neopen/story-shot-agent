@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: script_parser_agent.py
 @Description: LLM 剧本解析基类，包含复杂度评估和路由决策逻辑

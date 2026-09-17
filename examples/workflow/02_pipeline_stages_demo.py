@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: 02_pipeline_stages_demo.py
 @Description: 工作流阶段离线演示：读取各阶段样例产物并映射到 PipelineNode

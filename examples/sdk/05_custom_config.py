@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: 05_custom_config.py
 @Description: SDK 直调示例：运行时自定义配置（ShotConfig / LLM / 嵌入模型）

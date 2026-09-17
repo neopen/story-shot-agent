@@ -1,8 +1,8 @@
 # human_decision_intervention.py - 优化后的版本（保留控制台交互）
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: human_decision_intervention.py
 @Description: 人工干预工作流节点 - 控制台版本

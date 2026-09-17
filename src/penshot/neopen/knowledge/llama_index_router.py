@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: llama_index_router.py
 @Description: 知识访问路由器 - 统一LlamaIndex与现有记忆层的访问接口

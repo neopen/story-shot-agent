@@ -24,7 +24,7 @@
 **命名对照（易混淆）**：
 | 名称 | 用途 |
 |---|---|
-| `video-shot-agent` | 本地工作区目录名 |
+| `story-shot-agent` | 本地工作区目录名 |
 | `story-shot-agent` | GitHub 仓库名 |
 | `penshot` | PyPI 包名 / Python 包名（`src/penshot`） |
 | `neopen` | 核心领域模块名（`src/penshot/neopen`），也是组织名 |

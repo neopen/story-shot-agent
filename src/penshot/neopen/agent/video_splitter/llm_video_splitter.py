@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: llm_video_splitter.py
 @Description: 基于LLM的视频智能分割器 - 从ParsedScript获取全局信息

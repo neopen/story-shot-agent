@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: script_parser_agent.py
 @Description: 剧本解析智能体，将整段中文剧本转换为结构化动作序列
@@ -143,14 +143,21 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
 
         # 步骤2：AI深度解析（如果提供了修复参数，传递给LLM）
         debug(" 调用AI进行深度解析...")
-        parsed_script = self.script_parser.get(AgentMode.LLM).parser(
-            script_text, format_type, self.current_repair_params, self.current_historical_context
-        )
+        try:
+            parsed_script = self.script_parser.get(AgentMode.LLM).parser(
+                script_text, format_type, self.current_repair_params, self.current_historical_context
+            )
 
-        # 步骤3：规则校验和补全
-        if self.use_local_rules:
-            info("使用本地规则校验和补全...")
-            # parsed_script = self.script_parser.get(ParserType.RULE_PARSER).parser(script_text,format_type)
+            # 步骤3：规则校验和补全
+            if self.use_local_rules:
+                info("使用本地规则校验和补全...")
+                # parsed_script = self.script_parser.get(ParserType.RULE_PARSER).parser(script_text,format_type)
+
+        except Exception as e:
+            warning(f"使用LLM 解析异常: {str(e)}，尝试使用本地规则方式解析")
+            parsed_script = self.script_parser.get(AgentMode.RULE).parser(
+                script_text, format_type, self.current_repair_params, self.current_historical_context
+            )
 
         # 步骤4：质量评估 - 生成问题列表
         completeness_score, warnings, issues = self._evaluate_completeness(parsed_script, script_text)

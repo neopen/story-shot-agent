@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: knowledge_base_viewer.py
 @Description: 知识库可视化查看工具 - 支持提示词模板库和剧本知识库

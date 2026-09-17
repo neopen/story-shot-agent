@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: client_factory.py
 @Description: 
@@ -87,13 +87,13 @@ def get_default_llm(**kwargs) -> Optional[BaseLanguageModel]:
     try:
         return _get_default_llm(settings.get_llm_config(), **kwargs)
     except Exception as e:
-        warning("默认LLM模型初始化失败，尝试使用备用配置")
+        warning(f"默认LLM模型初始化失败: {str(e)}，尝试使用备用配置")
         try:
             return _get_default_llm(settings.get_llm_config("fallback"), **kwargs)
         except Exception as e:
-            print_log_exception()
+            # print_log_exception()
             error(f"LLM模型初始化失败（错误: {str(e)}），系统将自动使用规则引擎模式继续工作")
-            return None
+            raise ValueError("LLM 不可用，请检查配置及依赖")
 
 
 def _get_default_llm(ai_config: LLMBaseConfig, **kwargs) -> BaseLanguageModel:

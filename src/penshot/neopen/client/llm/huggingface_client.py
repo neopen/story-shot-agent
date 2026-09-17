@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: huggingface_client.py
 @Description: huggingface
@@ -41,6 +41,15 @@ class HuggingFaceClient(BaseClient):
             "all-MiniLM-L6-v2": "sentence-transformers/all-MiniLM-L6-v2",
             "all-mpnet-base-v2": "sentence-transformers/all-mpnet-base-v2",
         }
+
+    def check_package(self) -> bool:
+        """检测 HuggingFace 客户端所需依赖是否已安装"""
+        return self._check_packages(
+            (
+                ("langchain_community", "langchain-community"),
+                ("sentence_transformers", "sentence-transformers"),
+            )
+        )
 
     def llm_model(self) -> BaseLanguageModel:
         raise NotImplementedError("HuggingFace LLM model is not implemented yet.")

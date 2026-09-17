@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: 04_task_and_queue_admin.py
 @Description: REST 场景示例：任务/队列/配置/健康等管理接口

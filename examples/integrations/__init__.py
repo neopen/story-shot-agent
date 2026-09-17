@@ -1,7 +1,7 @@
 """
 Copyright (c) 2025 HiPeng (NeoPen)
-Licensed under the mit license.
-see license File For Details.
+Licensed under the MIT License.
+See LICENSE File For Details.
 
 @FileName: __init__.py.py
 @Description: 第三方 / 上层框架集成场景示例（A2A、FastAPI Web 应用等）
