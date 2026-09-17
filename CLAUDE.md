@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 PenShot (`penshot`) is a multi-agent system that converts screenplays/scripts of arbitrary format into shot-level, AI-video-ready prompt fragments (bilingual prompt + negative prompt + duration + audio prompt), ensuring character/scene/plot continuity across fragments. It sits between upstream scriptwriting and downstream text-to-video models (Sora/Veo/Runway/Kling).
 
 Naming — all refer to the same project:
-- `video-shot-agent` — local workspace directory
+- `story-shot-agent` — local workspace directory
 - `story-shot-agent` — GitHub repo name
 - `penshot` — PyPI package name AND Python package (`src/penshot`)
 - `neopen` — core domain module (`src/penshot/neopen`), also the org name

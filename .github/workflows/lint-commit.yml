@@ -17,6 +17,7 @@ jobs:
     name: Validate PR Title Standard
     runs-on: ubuntu-latest
 
+#  提示 git 说明时的格式为，fix: 修正 Redis 连接地址与超时配置
     steps:
       - name: Check PR title conforms to Conventional Commits
         uses: amannn/action-semantic-pull-request@v5
@@ -24,6 +25,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           # 定义允许的提交类型（必须与 release-please-config.json 中的配置保持一致）
+          # feat 新增功能，fix 修复缺陷，perf 性能优化，refactor 代码重构，
+          # docs 文档变更，style 格式调整，test 测试相关，chore 杂项事务
           types: |
             feat
             fix
@@ -35,6 +38,7 @@ jobs:
             chore
 
           # 要求类型后必须带有冒号和空格，例如 "feat: add user login"
+#          如，fix: 修正 Redis 连接地址与超时配置
           requireScope: false
 
           # 要求主题部分首字母小写，并且不能以句号结尾
