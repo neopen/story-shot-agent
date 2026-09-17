@@ -38,27 +38,27 @@ class RedisClient:
         从环境变量获取Redis连接URL
 
         支持的环境变量：
-        - REDIS_URL: 完整的Redis连接URL（优先级最高）
-        - REDIS_HOST: Redis主机地址
-        - REDIS_PORT: Redis端口
-        - REDIS_DB: Redis数据库编号
-        - REDIS_PASSWORD: Redis密码
-        - REDIS_SSL: 是否使用SSL连接
+        - PENSHOT_REDIS_URL: 完整的Redis连接URL（优先级最高）
+        - PENSHOT_REDIS_HOST: Redis主机地址
+        - PENSHOT_REDIS_PORT: Redis端口
+        - PENSHOT_REDIS_DB: Redis数据库编号
+        - PENSHOT_REDIS_PASSWORD: Redis密码
+        - PENSHOT_REDIS_SSL: 是否使用SSL连接
 
         Returns:
             Redis连接URL
         """
-        # 如果设置了完整的REDIS_URL，直接使用
+        # 如果设置了完整的PENSHOT_REDIS_URL，直接使用
         redis_url = os.getenv('PENSHOT_REDIS_URL')
         if redis_url:
             return redis_url
 
         # 从环境变量获取各个配置项
-        host = os.getenv('REDIS_HOST', 'localhost')
-        port = os.getenv('REDIS_PORT', '6379')
-        db = os.getenv('REDIS_DB', '0')
-        password = os.getenv('REDIS_PASSWORD', '')
-        ssl = os.getenv('REDIS_SSL', 'false').lower() == 'true'
+        host = os.getenv('PENSHOT_REDIS_HOST', 'localhost')
+        port = os.getenv('PENSHOT_REDIS_PORT', '6379')
+        db = os.getenv('PENSHOT_REDIS_DB', '0')
+        password = os.getenv('PENSHOT_REDIS_PASSWORD', '')
+        ssl = os.getenv('PENSHOT_REDIS_SSL', 'false').lower() == 'true'
 
         # 构建连接URL
         if password:
@@ -79,26 +79,30 @@ class RedisClient:
             连接参数字典
         """
         params = {
-            'host': os.getenv('REDIS_HOST', 'localhost'),
-            'port': int(os.getenv('REDIS_PORT', '6379')),
-            'db': int(os.getenv('REDIS_DB', '0')),
-            'password': os.getenv('REDIS_PASSWORD', None) or None,
-            'socket_timeout': float(os.getenv('REDIS_SOCKET_TIMEOUT', '5.0')),
-            'socket_connect_timeout': float(os.getenv('REDIS_CONNECT_TIMEOUT', '5.0')),
-            'retry_on_timeout': os.getenv('REDIS_RETRY_ON_TIMEOUT', 'true').lower() == 'true',
-            'max_connections': int(os.getenv('REDIS_MAX_CONNECTIONS', '10')),
-            'decode_responses': os.getenv('REDIS_DECODE_RESPONSES', 'true').lower() == 'true',
+            'host': os.getenv('PENSHOT_REDIS_HOST', 'localhost'),
+            'port': int(os.getenv('PENSHOT_REDIS_PORT', '6379')),
+            'db': int(os.getenv('PENSHOT_REDIS_DB', '0')),
+            'password': os.getenv('PENSHOT_REDIS_PASSWORD', None) or None,
+            'socket_timeout': float(os.getenv('PENSHOT_REDIS_SOCKET_TIMEOUT', '5.0')),
+            'socket_connect_timeout': float(os.getenv('PENSHOT_REDIS_CONNECT_TIMEOUT', '5.0')),
+            'retry_on_timeout': os.getenv('PENSHOT_REDIS_RETRY_ON_TIMEOUT', 'true').lower() == 'true',
+            'max_connections': int(os.getenv('PENSHOT_REDIS_MAX_CONNECTIONS', '10')),
+            'decode_responses': os.getenv('PENSHOT_REDIS_DECODE_RESPONSES', 'true').lower() == 'true',
+            # redis-py 8.x 默认使用 RESP3，握手时会发送 HELLO 命令；
+            # 旧版本 Redis(<6.0) 或不支持 RESP3 的代理/云实例会返回 unknown command 'HELLO'，
+            # 因此默认降级为 RESP2，可通过 PENSHOT_REDIS_PROTOCOL 显式切换。
+            'protocol': int(os.getenv('PENSHOT_REDIS_PROTOCOL', '2')),
         }
 
         # SSL配置
-        if os.getenv('REDIS_SSL', 'false').lower() == 'true':
+        if os.getenv('PENSHOT_REDIS_SSL', 'false').lower() == 'true':
             params['ssl'] = True
-            params['ssl_cert_reqs'] = os.getenv('REDIS_SSL_CERT_REQS', 'required')
+            params['ssl_cert_reqs'] = os.getenv('PENSHOT_REDIS_SSL_CERT_REQS', 'required')
 
         # 集群配置
-        if os.getenv('REDIS_CLUSTER', 'false').lower() == 'true':
+        if os.getenv('PENSHOT_REDIS_CLUSTER', 'false').lower() == 'true':
             params['redis_cluster'] = True
-            params['startup_nodes'] = os.getenv('REDIS_STARTUP_NODES', '').split(',')
+            params['startup_nodes'] = os.getenv('PENSHOT_REDIS_STARTUP_NODES', '').split(',')
 
         return params
 
@@ -120,7 +124,7 @@ class RedisClient:
     def _connect(self):
         """建立Redis连接"""
         try:
-            if os.getenv('REDIS_CLUSTER', 'false').lower() == 'true':
+            if os.getenv('PENSHOT_REDIS_CLUSTER', 'false').lower() == 'true':
                 # 集群模式连接
                 from redis.cluster import RedisCluster
                 params = self._get_connection_params()
