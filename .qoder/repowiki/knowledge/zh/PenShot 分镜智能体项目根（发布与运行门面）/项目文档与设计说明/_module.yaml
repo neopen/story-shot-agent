@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: docs_and_assets
+title: 项目文档与设计说明
+scope:
+    - docs/
+source_files: []
+depends_on: []
+related_to: []
