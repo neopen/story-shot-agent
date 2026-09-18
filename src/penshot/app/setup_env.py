@@ -276,8 +276,8 @@ class AppBaseEnv:
         """主函数 - 协调整个启动流程"""
         print_large_ascii()
         info("==================================================================")
-        info("<                   欢迎使用 Neopen 剧本分镜智能体                 >")
-        info("<           ⭐https://github.com/neopen/story-shot-agent       >")
+        info("<                   欢迎使用 Neopen 剧本分镜智能体 penshot          >")
+        info("<           ⭐https://github.com/neopen/story-shot-agent         >")
         info("==================================================================")
         debug(f"当前工作目录: {os.getcwd()}")
         debug(f"将使用的虚拟环境: {VENV_DIR}")

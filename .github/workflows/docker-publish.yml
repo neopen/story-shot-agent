@@ -53,13 +53,14 @@ jobs:
           password: ${{ env.DOCKERHUB_TOKEN }}
 
       # 5. 解析并自动生成 Docker 标签
+#      ${{ steps.login-dockerhub.outcome == 'success' && format('{0}/penshot', env.DOCKERHUB_USERNAME) || '' }}
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/penshot
-            ${{ steps.login-dockerhub.outcome == 'success' && format('{0}/penshot', env.DOCKERHUB_USERNAME) || '' }}
+            ${{ steps.login-dockerhub.outcome == 'success' && 'neotems/penshot' || '' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
