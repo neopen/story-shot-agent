@@ -1,9 +1,18 @@
 <p align="center">
+<pre align="center">
+____  _____ _   _ ____  _  _  ___  _____ 
+|  _ \| ____| \ | / ___|| || |/ _ \|_   _|
+| |_) |  _| |  \| \___ \| || | | | | | |  
+|  __/| |___| |\  |___) | __ | |_| | | |  
+|_|   |_____|_| \_|____/|_||_|\___/  |_|  
+
+</pre>
+
   <h1 align="center">🎬 剧本分镜智能体 (PenShot)</h1>
   <p align="center">
     <strong>基于 LangChain + LangGraph 多智能体协作的剧本转分镜系统，确保叙事连续性与镜头级提示词生成。</strong>
   </p>
-  
+
   <p align="center">
   <!-- 第一行：技术栈与生态依赖 -->
   <a href="https://langchain-ai.github.io/langgraph/"><img src="https://img.shields.io/badge/LangGraph-1C3C3C.svg?style=flat-square&logo=langchain&logoColor=white" alt="LangGraph"></a>
@@ -20,7 +29,7 @@
   <a href="https://github.com/neopen/story-shot-agent"><img src="https://img.shields.io/github/stars/neopen/story-shot-agent?style=flat-square&logo=github" alt="GitHub Stars"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
 </p>
-  
+
 <p align="center">
     <a href="./README.md">English</a> •
     <a href="https://shot.helpenx.com/">官网演示</a> •
@@ -77,7 +86,7 @@
 <summary>🔍 <strong>点击查看 《基础架构 UML 图》</strong></summary>
 
 <p align="center">
-  
+
 ```mermaid
 flowchart TD
     subgraph Input [输入层]
