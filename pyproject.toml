@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "penshot"
-version = "0.3.7"
+version = "0.3.8"
 description = "剧本分镜,动漫分镜,电影分镜,短剧分镜,视频分镜,剧本解析,文生视频提示词。AI agent that converts screenplays to consistent Text-to-Video prompts. Supports Sora, Runway, Kling, Veo via LangGraph & LLMs."
 
 keywords = [

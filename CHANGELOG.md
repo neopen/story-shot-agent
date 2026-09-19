@@ -7,6 +7,21 @@
 
 ---
 
+## [0.3.8](https://github.com/neopen/story-shot-agent/compare/v0.3.7...v0.3.8) (2026-09-19)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 修复并完善基于本地规则解析剧本，如果LLM异常将自动启用规则解析，但是效果将大打折扣 ([#60](https://github.com/neopen/story-shot-agent/issues/60)) ([f47d086](https://github.com/neopen/story-shot-agent/commit/f47d08650dc665760a18a7692fd77ba0330ff27a))
+
+
+### 🔧 Other Changes (其他变更)
+
+* Delete .qoder directory ([50dff09](https://github.com/neopen/story-shot-agent/commit/50dff0972ee0af101ef5c4840655a7a64d72c758))
+* **deps:** bump actions/dependency-review-action from 4 to 5 ([#52](https://github.com/neopen/story-shot-agent/issues/52)) ([9b5ac0a](https://github.com/neopen/story-shot-agent/commit/9b5ac0abeb2795d6d7a62c8ab6230919d53f05c8))
+* 代码合并 ([#57](https://github.com/neopen/story-shot-agent/issues/57)) ([3b2c998](https://github.com/neopen/story-shot-agent/commit/3b2c998b8af68908193773dca3d1c072764f5ff7))
+* 合并dev ([#59](https://github.com/neopen/story-shot-agent/issues/59)) ([285fed9](https://github.com/neopen/story-shot-agent/commit/285fed9bfcd2183457ae9b6ef5aef4fe7b311029))
+
 ## [Unreleased] - 未发布
 
 ### 新增
@@ -78,4 +93,3 @@ result = agent.breakdown_script(script)
 修订号 (0.0.X)：向下兼容的紧急修复与性能优化 (Patches)
 
 完整贡献者列表请参阅 [CONTRIBUTORS.md](./contributors.md)。
-
