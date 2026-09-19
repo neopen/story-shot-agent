@@ -46,7 +46,7 @@ jobs:
 
       # 第二步：配置指定版本的 Python 环境
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           cache: 'pip'  # 开启 pip 缓存，加速后续依赖安装速度
