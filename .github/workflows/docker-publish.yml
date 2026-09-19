@@ -32,7 +32,7 @@ jobs:
 
       # 2. 配置 Docker Buildx 环境
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # 3. 登录到 GHCR (GitHub Container Registry)
       - name: Log in to GHCR
