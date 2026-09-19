@@ -145,6 +145,42 @@ class KeywordConfig(BaseConfig):
         """
         return self._get_keywords('prop_keywords', language)
 
+    def get_costume_keywords(self, language: ShotLanguage = None) -> Dict[str, Any]:
+        """
+        获取服装相关关键词
+
+        Args:
+            language: 语言，使用Language枚举，默认使用当前设置的语言
+
+        Returns:
+            Dict: 服装关键词配置，格式为 {服装词: 标准化描述}
+        """
+        return self._get_keywords('costume_keywords', language)
+
+    def get_weather_keywords(self, language: ShotLanguage = None) -> Dict[str, Any]:
+        """
+        获取天气相关关键词
+
+        Args:
+            language: 语言，使用Language枚举，默认使用当前设置的语言
+
+        Returns:
+            Dict: 天气关键词配置，格式为 {天气词: 标准化天气值}
+        """
+        return self._get_keywords('weather_keywords', language)
+
+    def get_script_rule_keywords(self, language: ShotLanguage = None) -> Dict[str, Any]:
+        """
+        获取剧本规则解析补充词表
+
+        Args:
+            language: 语言，使用Language枚举，默认使用当前设置的语言
+
+        Returns:
+            Dict: 含元数据标签、颜色词、视觉线索词、表演提示词、音效词等词表
+        """
+        return self._get_keywords('script_rule_keywords', language)
+
     def get_action_split_keywords(self, language: ShotLanguage = None) -> Dict[str, Any]:
         """
         获取动作拆分相关关键词

@@ -9,14 +9,25 @@ See LICENSE File For Details.
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 14:38
 """
+
 from typing import Any, Optional, Dict
 
 from penshot.logger import error, info, warning, debug
 from penshot.neopen.agent.base_models import ScriptType, ElementType
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
+    QualityRepairParams,
+)
 from penshot.neopen.agent.script_parser.base_script_parser import BaseScriptParser
+from penshot.neopen.agent.script_parser.rule_parser import RuleParserEngine
+from penshot.neopen.agent.script_parser.rule_parser.script_builder import (
+    ParsedScriptBuilder,
+)
+from penshot.neopen.agent.script_parser.rule_parser.text_helpers import infer_gender
 from penshot.neopen.agent.script_parser.script_parser_models import (
-    ParsedScript, CharacterInfo, EmotionType, CharacterType, GlobalMetadata
+    ParsedScript,
+    CharacterInfo,
+    EmotionType,
+    CharacterType,
 )
 
 
@@ -25,20 +36,35 @@ class RuleScriptParser(BaseScriptParser):
     规则剧本解析器
 
     特点：
-    1. 基于正则表达式的本地解析，速度快
+    1. 基于规则与词表的本地解析，速度快
     2. 不依赖 LLM API，适合离线场景
     3. 作为 LLM 解析器的备用方案
     4. 支持修复参数的简单应用
+
+    解析本身由 ``rule_parser.RuleParserEngine`` 完成，本类只负责修复参数、
+    后处理与兜底，保持原有对外签名不变。
     """
 
     def __init__(self):
         """初始化规则解析器"""
         super().__init__()
+        self._engine: Optional[RuleParserEngine] = None
+        self._builder = ParsedScriptBuilder()
         info("规则剧本解析器初始化完成")
 
-    def parser(self, script_text: Any, script_format: ScriptType,
-               repair_params: Optional[QualityRepairParams],
-               historical_context: Optional[Dict[str, Any]]) -> Optional[ParsedScript]:
+    def _get_engine(self) -> RuleParserEngine:
+        """懒加载规则解析引擎，首次解析时才读取配置"""
+        if self._engine is None:
+            self._engine = RuleParserEngine()
+        return self._engine
+
+    def parser(
+        self,
+        script_text: Any,
+        script_format: ScriptType,
+        repair_params: Optional[QualityRepairParams],
+        historical_context: Optional[Dict[str, Any]],
+    ) -> Optional[ParsedScript]:
         """
         规则解析器 - 当 LLM 不可用或失败时的备用方案
 
@@ -52,23 +78,24 @@ class RuleScriptParser(BaseScriptParser):
             ParsedScript 对象或 None
         """
         try:
-            debug(f"开始规则解析，格式: {script_format.value if script_format else 'unknown'}")
+            debug(
+                f"开始规则解析，格式: {script_format.value if script_format else 'unknown'}"
+            )
 
-            from penshot.neopen.tools.script_parser_tool import ScriptParserTool
+            parsed_script = self._get_engine().parse(script_text)
 
-            tool = ScriptParserTool()
-            parsed_script = tool.parse(script_text)
-
-            if not parsed_script or not parsed_script.scenes:
+            if parsed_script.metadata.get("failed"):
                 warning("规则解析未识别到任何场景")
-                return self._create_empty_parsed_script()
+                return parsed_script
 
             # 应用修复参数（如果有）
             if repair_params and repair_params.fix_needed:
                 parsed_script = self._apply_repair(parsed_script, repair_params)
                 info(f"规则解析完成，已应用修复参数: {repair_params.issue_types}")
             else:
-                info(f"规则解析完成: {len(parsed_script.scenes)}个场景, {len(parsed_script.characters)}个角色")
+                info(
+                    f"规则解析完成: {len(parsed_script.scenes)}个场景, {len(parsed_script.characters)}个角色"
+                )
 
             # 后处理（更新统计信息）
             parsed_script = self.post_process(parsed_script)
@@ -83,7 +110,9 @@ class RuleScriptParser(BaseScriptParser):
             error(f"规则解析失败: {e}")
             return self._create_empty_parsed_script()
 
-    def _apply_repair(self, parsed_script: ParsedScript, repair_params: QualityRepairParams) -> ParsedScript:
+    def _apply_repair(
+        self, parsed_script: ParsedScript, repair_params: QualityRepairParams
+    ) -> ParsedScript:
         """
         应用修复参数
 
@@ -106,7 +135,9 @@ class RuleScriptParser(BaseScriptParser):
         if "scene_insufficient" in issue_types or "scene_missing" in issue_types:
             if len(parsed_script.scenes) < 2:
                 # 尝试从原始文本中提取更多场景
-                repair_actions.append("场景数不足，请在剧本中添加场景标题（如 INT. 地点 - 时间）")
+                repair_actions.append(
+                    "场景数不足，请在剧本中添加场景标题（如 INT. 地点 - 时间）"
+                )
 
             # 为缺少描述的场景添加默认描述
             for scene in parsed_script.scenes:
@@ -120,7 +151,9 @@ class RuleScriptParser(BaseScriptParser):
             undefined_chars = set()
             for scene in parsed_script.scenes:
                 for elem in scene.elements:
-                    if elem.character and elem.character not in [c.name for c in parsed_script.characters]:
+                    if elem.character and elem.character not in [
+                        c.name for c in parsed_script.characters
+                    ]:
                         undefined_chars.add(elem.character)
 
             # 为未定义角色创建默认信息
@@ -132,7 +165,7 @@ class RuleScriptParser(BaseScriptParser):
                     role="supporting",
                     type=CharacterType.DEFAULT,
                     description=f"角色: {char_name}",
-                    key_traits=[]
+                    key_traits=[],
                 )
                 parsed_script.characters.append(new_char)
                 repair_actions.append(f"创建未定义角色: {char_name}")
@@ -152,7 +185,9 @@ class RuleScriptParser(BaseScriptParser):
                             inferred_emotion = self._infer_emotion(elem.content)
                             if inferred_emotion != EmotionType.NEUTRAL.value:
                                 elem.emotion = inferred_emotion
-                                repair_actions.append(f"为对话 {elem.id} 推断情感: {inferred_emotion}")
+                                repair_actions.append(
+                                    f"为对话 {elem.id} 推断情感: {inferred_emotion}"
+                                )
 
         # 4. 动作问题修复
         if "action_insufficient" in issue_types:
@@ -169,7 +204,9 @@ class RuleScriptParser(BaseScriptParser):
                             new_intensity = self._infer_intensity(elem.content)
                             if new_intensity != 0.5:
                                 elem.intensity = new_intensity
-                                repair_actions.append(f"调整动作强度: {elem.id} -> {new_intensity}")
+                                repair_actions.append(
+                                    f"调整动作强度: {elem.id} -> {new_intensity}"
+                                )
 
         # 5. 时长问题修复
         if "duration_invalid" in issue_types:
@@ -179,12 +216,16 @@ class RuleScriptParser(BaseScriptParser):
                     if elem.duration < 1.0:
                         old_duration = elem.duration
                         elem.duration = 2.0
-                        repair_actions.append(f"调整过短时长: {elem.id} {old_duration}s -> 2.0s")
+                        repair_actions.append(
+                            f"调整过短时长: {elem.id} {old_duration}s -> 2.0s"
+                        )
                     # 调整过长时长
                     elif elem.duration > 10.0:
                         old_duration = elem.duration
                         elem.duration = 5.0
-                        repair_actions.append(f"调整过长时长: {elem.id} {old_duration}s -> 5.0s")
+                        repair_actions.append(
+                            f"调整过长时长: {elem.id} {old_duration}s -> 5.0s"
+                        )
 
         # 6. 顺序问题修复
         if "element_sequence_wrong" in issue_types:
@@ -206,16 +247,7 @@ class RuleScriptParser(BaseScriptParser):
 
     def _infer_gender(self, character_name: str) -> str:
         """根据角色名推断性别"""
-        male_keywords = ["先生", "男士", "哥", "弟", "叔", "伯", "公", "爷", "爸", "爹"]
-        female_keywords = ["小姐", "女士", "姐", "妹", "姨", "姑", "妈", "娘"]
-
-        for kw in male_keywords:
-            if kw in character_name:
-                return "male"
-        for kw in female_keywords:
-            if kw in character_name:
-                return "female"
-        return "unknown"
+        return infer_gender(character_name)
 
     def _infer_emotion(self, content: str) -> str:
         """根据对话内容推断情感"""
@@ -252,25 +284,7 @@ class RuleScriptParser(BaseScriptParser):
 
     def _create_empty_parsed_script(self) -> ParsedScript:
         """创建空的 ParsedScript（解析失败时的回退）"""
-        return ParsedScript(
-            title="未知",
-            characters=[],
-            scenes=[],
-            global_metadata=GlobalMetadata(),
-            stats={
-                "total_elements": 0,
-                "total_duration": 0,
-                "dialogue_count": 0,
-                "action_count": 0,
-                "completeness_score": 0,
-                "scene_count": 0,
-                "character_count": 0
-            },
-            metadata={
-                "parser_type": "RuleScriptParser",
-                "failed": True
-            }
-        )
+        return self._builder.build_fallback()
 
     def _get_script_format_description(self, script_format: ScriptType) -> str:
         """获取剧本格式描述（用于调试）"""
