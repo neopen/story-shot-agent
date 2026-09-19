@@ -18,8 +18,9 @@ jobs:
       - name: Run Release Please
         uses: googleapis/release-please-action@v4
         with:
+          # 头像 → Settings → Developer settings → Personal access tokens → Fine-grained personal access token
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           # 自定义 Release Please 配置文件
           config-file: .github/release-please-config.json
-
           # 版本清单文件
           manifest-file: .github/.release-please-manifest.json
