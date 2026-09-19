@@ -2,7 +2,17 @@ name: Upload Python Package  # 工作流名称：打包并发布 Python 包至 P
 
 on:
   release:
-    types: [published]  # 仅当在 GitHub 上发布新的 Release 时触发
+    types: [published]  # GitHub Release 正式发布时自动触发
+
+  # 允许手动发布指定版本
+  # Actions → Upload Python Package → Run workflow
+  # 填写 tag，例如：v0.3.7
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.3.7"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,8 +27,10 @@ jobs:
 
     steps:
       # 1. 检出 Release 对应的源码
-      - name: Checkout repository
+      - name: Checkout release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
       # 2. 配置 Python 环境
       - name: Set up Python
