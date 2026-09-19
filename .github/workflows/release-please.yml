@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Run Release Please
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           # 头像 → Settings → Developer settings → Personal access tokens → Fine-grained personal access token
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
