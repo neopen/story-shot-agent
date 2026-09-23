@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 重排序：装配逻辑、哑参数与默认关闭的接线真相 · PenShot 文档</title>
+  <meta name="description" content="PenShot 重排序：解析 CrossEncoder 精排的真实装配逻辑、BGE-reranker 模型链路与 top_n 截断细节，逐条揭示 use_rerank 哑参数、配置默认关闭与路由未接线三条静默失效证据链，辨析模型谱系选型误传，并附固定召回集的评测方法论、模型路径排查与配置启用清单。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/rerank.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 重排序：装配逻辑、哑参数与默认关闭的接线真相">
+  <meta property="og:description" content="PenShot 重排序：解析 CrossEncoder 精排的真实装配逻辑、BGE-reranker 模型链路与 top_n 截断细节，逐条揭示 use_rerank 哑参数、配置默认关闭与路由未接线三条静默失效证据链，辨析模型谱系选型误传，并附固定召回集的评测方法论、模型路径排查与配置启用清单。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/rerank.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html" class="active">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-14</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>核心价值：召回系统里的&quot;决选裁判&quot;</h2>
+<p>在多路召回系统中，我们通常会在第一阶段通过多种策略召回大量候选结果——关键词匹配、向量检索、知识图谱遍历等。这一阶段的目标是&quot;尽可能不漏掉相关结果&quot;，因此召回数量往往远超过最终需要返回的数量。</p>
+<p>然而，召回的候选集是&quot;杂乱的&quot;。不同召回源产生的分数不可比，向量相似度不等于真实相关性，排在前面的结果可能并非用户最需要的。这就需要一个&quot;裁判&quot;来对候选集进行统一的、精细化的重新评估和排序——这就是重排序（Reranking）的职责。</p>
+<blockquote>
+<p>如果把多路召回比作&quot;海选&quot;，那么重排序就是&quot;决选&quot;。没有重排序的多路召回，就像没有评委的海选——报名的人很多，但谁能真正脱颖而出，无从判断。</p>
+</blockquote>
+<p>本文将以 PenShot 剧本分镜智能体为背景，先讲清重排序的通用原理与适用场景，再以源码为准绳考证重排序的真实接线状态：一段已实现却无人调用的装配逻辑、三处看似启用却被静默忽略的调用参数，以及一个容易踩坑的本地模型路径默认值。</p>
+<hr>
+<h2>关键要点拆解（一）：为什么需要重排序</h2>
+<h3>多路召回的困境</h3>
+<p>在一个典型的多路召回系统中，我们会并行执行多种检索策略：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">召回源</th>
+<th style="text-align:left">策略</th>
+<th style="text-align:left">分数特征</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">精确匹配</td>
+<td style="text-align:left">Hash索引</td>
+<td style="text-align:left">只有0或1，没有梯度</td>
+</tr>
+<tr>
+<td style="text-align:left">BM25</td>
+<td style="text-align:left">稀疏检索</td>
+<td style="text-align:left">基于词频统计，范围不固定</td>
+</tr>
+<tr>
+<td style="text-align:left">向量检索</td>
+<td style="text-align:left">稠密检索</td>
+<td style="text-align:left">余弦相似度，范围0-1</td>
+</tr>
+<tr>
+<td style="text-align:left">知识图谱</td>
+<td style="text-align:left">图遍历</td>
+<td style="text-align:left">路径权重，计算方式独立</td>
+</tr>
+</tbody>
+</table>
+<p>问题在于：这些分数来自不同的计算体系，<strong>彼此之间不可比</strong>。一个BM25得分0.8的文档，真的比一个向量相似度0.7的文档更相关吗？答案是否定的——两种分数的含义完全不同。</p>
+<blockquote>
+<p>排坑说明：多路召回直接按原始分数混合排序是不可行的，因为量纲各异（如 BM25 可超过 10、向量相似度在 0-1、Hash 只有 0/1）。业界常见的处理手段是使用 RRF（倒数排序融合）——它只依赖各源内部的排序位置 rank 而不是分值，从而天然绕开&quot;量纲不可比&quot;的问题。需要说明的是，PenShot 源码中并没有多路召回与 RRF 融合的实现，这里作为重排序的通用背景来介绍；PenShot 的真实检索形态是单路检索加可选后处理，详见后文接线考证。</p>
+</blockquote>
+<pre class="mermaid">flowchart LR
+    subgraph Recall[&quot;多路召回&quot;]
+        A[精确匹配&lt;br/&gt;score: 1.0]
+        B[BM25&lt;br/&gt;score: 8.5]
+        C[向量检索&lt;br/&gt;score: 0.72]
+        D[知识图谱&lt;br/&gt;score: 0.63]
+    end
+    
+    subgraph Problem[&quot;困境&quot;]
+        P1[分数尺度不同]
+        P2[无法直接比较]
+        P3[排序结果不可靠]
+    end
+    
+    Recall --&gt; Problem
+</pre>
+<h3>向量检索的局限</h3>
+<p>很多人认为向量检索已经足够强大，不需要重排序。但实际上，向量检索存在一个根本性的局限：<strong>它衡量的是语义相似度，而非真实相关性</strong>。</p>
+<p>语义相似度关注的是&quot;两段文本在语义空间中的距离&quot;，而相关性关注的是&quot;这段文本是否真正回答了用户的查询&quot;。这两者并非总是一致。</p>
+<p>举例说明：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">查询</th>
+<th style="text-align:left">向量检索返回</th>
+<th style="text-align:left">问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">“林小雨的情绪变化”</td>
+<td style="text-align:left">“林小雨蹲在长椅旁擦拭湿漉漉的书”</td>
+<td style="text-align:left">语义相近，但并未回答情绪变化</td>
+</tr>
+<tr>
+<td style="text-align:left">“陈阳道歉的片段”</td>
+<td style="text-align:left">“陈阳急刹车，书掉进水洼”</td>
+<td style="text-align:left">描述了动作，但道歉的核心信息缺失</td>
+</tr>
+</tbody>
+</table>
+<p>向量检索可以找到&quot;长得像&quot;的文本，但难以判断&quot;是否真的回答了对面的问题&quot;。这正是重排序发挥价值的地方。</p>
+<h3>用户只关心Top-K</h3>
+<p>无论候选集有多大，最终呈现给用户的通常只有前K个结果（K通常为3、5或10）。因此，召回系统的核心目标不是&quot;让所有相关结果都排在前面&quot;，而是&quot;让最相关的结果排在Top-K内&quot;。</p>
+<p>重排序通过对候选集进行精细化重新评估，将最相关的结果提升到前列，将不相关的结果推后甚至剔除。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Before[&quot;重排序前&quot;]
+        direction TB
+        B1[结果A: 相关度 中]
+        B2[结果B: 相关度 高]
+        B3[结果C: 相关度 低]
+        B4[结果D: 相关度 高]
+        B5[结果E: 相关度 中]
+        B1 --&gt; B2 --&gt; B3 --&gt; B4 --&gt; B5
+    end
+    
+    subgraph After[&quot;重排序后&quot;]
+        direction TB
+        A1[结果B: 相关度 高]
+        A2[结果D: 相关度 高]
+        A3[结果A: 相关度 中]
+        A4[结果E: 相关度 中]
+        A5[结果C: 相关度 低]
+        A1 --&gt; A2 --&gt; A3 --&gt; A4 --&gt; A5
+    end
+    
+    Before --&gt;|重排序| After
+</pre>
+<hr>
+<h2>关键要点拆解（二）：重排序的核心原理</h2>
+<h3>BiEncoder &amp; CrossEncoder</h3>
+<p>要理解重排序，首先需要理解两种不同的编码架构：BiEncoder和CrossEncoder。</p>
+<p><strong>BiEncoder（双编码器）</strong></p>
+<p>向量检索采用的是BiEncoder架构：查询和文档分别通过各自的编码器独立编码，然后计算余弦相似度。这种架构的优势是速度快——文档向量可以预先计算并索引，查询时只需编码查询即可。</p>
+<p>但代价是：查询和文档之间没有交互，相关性判断仅依赖于两个独立向量的相似度，丢失了细粒度的匹配信号。</p>
+<p><strong>CrossEncoder（交叉编码器）</strong></p>
+<p>重排序采用的是CrossEncoder架构：查询和文档拼接在一起，通过同一个编码器进行联合编码。在编码过程中，查询和文档的每个token都可以通过注意力机制相互&quot;看到&quot;对方。</p>
+<p>这种架构的优势是精度高——模型可以捕捉查询和文档之间的细粒度交互信号，例如&quot;查询中的某个词对应文档中的哪个短语&quot;。但代价是速度慢——每次推理都需要重新编码查询+文档对，无法预先计算。</p>
+<pre class="mermaid">flowchart TB
+    subgraph BiEncoder[&quot;BiEncoder 架构&quot;]
+        Q1[查询] --&gt; E1[编码器]
+        D1[文档] --&gt; E2[编码器]
+        E1 --&gt; V1[查询向量]
+        E2 --&gt; V2[文档向量]
+        V1 --&gt; S[余弦相似度]
+        V2 --&gt; S
+    end
+    
+    subgraph CrossEncoder[&quot;CrossEncoder 架构&quot;]
+        Q2[查询] --&gt; C[拼接]
+        D2[文档] --&gt; C
+        C --&gt; E3[联合编码器]
+        E3 --&gt; Score[相关性分数]
+    end
+</pre>
+<h3>交互式注意力机制</h3>
+<p>CrossEncoder之所以精度更高，核心在于Transformer的注意力机制。当查询和文档被拼接后输入模型，多头注意力层可以让查询中的每个词关注到文档中的每个词，反之亦然。</p>
+<p>这种&quot;双向交互&quot;使得模型能够识别复杂的关系模式，例如：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">匹配类型</th>
+<th style="text-align:left">示例</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">精确匹配</td>
+<td style="text-align:left">查询&quot;陈阳&quot;匹配文档中的&quot;陈阳&quot;</td>
+<td style="text-align:left">最简单的情况</td>
+</tr>
+<tr>
+<td style="text-align:left">同义匹配</td>
+<td style="text-align:left">查询&quot;道歉&quot;匹配文档中的&quot;对不起&quot;</td>
+<td style="text-align:left">需要语义理解</td>
+</tr>
+<tr>
+<td style="text-align:left">指代匹配</td>
+<td style="text-align:left">查询&quot;他&quot;匹配文档中的&quot;陈阳&quot;</td>
+<td style="text-align:left">需要上下文推理</td>
+</tr>
+<tr>
+<td style="text-align:left">逻辑匹配</td>
+<td style="text-align:left">查询&quot;导致书掉落&quot;匹配文档中的&quot;急刹车→书落水&quot;</td>
+<td style="text-align:left">需要因果关系理解</td>
+</tr>
+</tbody>
+</table>
+<p>BiEncoder很难捕捉后两种复杂匹配，而CrossEncoder通过注意力机制天然具备这种能力。</p>
+<h3>计算复杂度与精度权衡</h3>
+<p>重排序不是免费的。CrossEncoder的计算复杂度远高于BiEncoder：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">维度</th>
+<th style="text-align:left">BiEncoder</th>
+<th style="text-align:left">CrossEncoder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">编码方式</td>
+<td style="text-align:left">查询编码一次，文档预编码</td>
+<td style="text-align:left">每对(查询,文档)都需要编码</td>
+</tr>
+<tr>
+<td style="text-align:left">复杂度</td>
+<td style="text-align:left">O(N)</td>
+<td style="text-align:left">O(N×M)，M为文档长度</td>
+</tr>
+<tr>
+<td style="text-align:left">1000个候选的耗时</td>
+<td style="text-align:left">~10ms</td>
+<td style="text-align:left">~500-1000ms</td>
+</tr>
+<tr>
+<td style="text-align:left">精度</td>
+<td style="text-align:left">中</td>
+<td style="text-align:left">高</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>表中耗时是量级示意（依赖硬件与模型规模，CPU 与 GPU 差异可达一个数量级以上），不是基准数据；能确定的是两者在候选数增大时的增长量级差异。</p>
+</blockquote>
+<p>因此，重排序的标准实践是：</p>
+<blockquote>
+<ol>
+<li class="lvl-3">
+<p><strong>第一阶段（召回）</strong>：使用BiEncoder快速召回Top-N个候选（N通常为100-200）</p>
+</li>
+<li class="lvl-3">
+<p><strong>第二阶段（重排序）</strong>：使用CrossEncoder对Top-N候选进行精细打分，输出Top-K（K通常为5-10）</p>
+</li>
+</ol>
+</blockquote>
+<p>这种&quot;粗排+精排&quot;的级联架构，兼顾了效率和精度。需要对照的是：PenShot 的真实参数比这套标准小一个量级——入口召回只有 k=5，精排后保留 <code>min(3, k)</code> 条。在小候选集下，级联的收益与代价都被压缩了，这也是它默认关闭具有一定合理性的原因（详见后文接线考证）。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Coarse[&quot;粗排阶段 (BiEncoder)&quot;]
+        C1[全量索引] --&gt; C2[快速检索]
+        C2 --&gt; C3[召回Top-100]
+    end
+    
+    subgraph Fine[&quot;精排阶段 (CrossEncoder)&quot;]
+        F1[Top-100候选] --&gt; F2[逐对重排序]
+        F2 --&gt; F3[输出Top-10]
+    end
+    
+    Coarse --&gt; Fine
+</pre>
+<hr>
+<h2>关键要点拆解（三）：重排序的使用场景</h2>
+<h3>什么时候值得引入重排序</h3>
+<p>以下场景最值得为重排序付出额外的计算开销——这里讨论的是通用工程判断，PenShot 的落地现状见后文考证：</p>
+<p><strong>场景一：多路召回融合</strong>——当存在多个召回源时（关键词、向量、图谱等），它们的分数不可比。重排序提供了一个统一的打分标准，使得不同来源的结果可以在同一尺度上进行比较和排序。</p>
+<p><strong>场景二：用户意图模糊</strong>——当用户查询较为模糊时，向量检索可能召回大量&quot;语义相近但意图不符&quot;的结果。重排序可以通过精细的交互判断，筛选出真正符合用户意图的内容。</p>
+<p><strong>场景三：需要复杂逻辑判断</strong>——例如查询&quot;林小雨情绪从焦虑转为释然的片段&quot;，这需要模型理解&quot;焦虑&quot;和&quot;释然&quot;两种情绪，并判断它们在文本中的时序关系。向量检索难以胜任，而重排序可以。</p>
+<p><strong>场景四：结果质量要求高</strong>——在生产环境中，用户只关心前几个结果的质量。重排序虽然增加了计算开销，但能直接改善 Top-K 的质量。</p>
+<p>但需要坦白的是：PenShot 当前的检索链路还没走到&quot;必须重排序&quot;的规模——单剧本索引通常只有十几个节点（实测样本为 12 个，4 个场景文档加 8 个角色文档），手写余弦全量扫描在毫秒级完成，候选集小、分数口径单一，重排序的边际收益有限。这或许是它默认关闭、且至今未接线的工程背景——后文将以源码为准绳，把这一现状完整展开。</p>
+<h3>什么时候可以跳过重排序</h3>
+<p>重排序并非万能，以下场景可以考虑跳过：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>候选集很小（少于20个），直接排序成本不高</p>
+</li>
+<li class="lvl-2">
+<p>对延迟要求极高（&lt;50ms），无法承受重排序开销</p>
+</li>
+<li class="lvl-2">
+<p>查询明确且精确匹配充分，向量检索结果已足够好</p>
+</li>
+</ul>
+<h3>PenShot 的真实接线：三条静默失效路径</h3>
+<p>先给出结论：<strong>PenShot 的重排序处于&quot;已实现未接线&quot;状态</strong>——装配代码完整存在于 <code>create_retriever_for_script</code>，BGE-reranker-large 的模型文件也确实下载到过本地（<code>data/models/bge-reranker-large/</code> 目录完整可用），但配置默认关闭（<code>rerank_enabled=False</code>），且唯一会装配它的调用方 <code>KnowledgeRouter</code> 全仓库无人调用。更隐蔽的是，主链路上还有三处&quot;看起来启用了重排序&quot;的调用，实际上都被静默忽略了。</p>
+<h4>证据一：use_rerank 哑参数——传了，但代码从不读取</h4>
+<p><code>ScriptKnowledgeBase.query()</code> 的签名里保留了重排序相关参数：</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">query</span>(<span class="hljs-params">self, query_text: <span class="hljs-built_in">str</span>, script_id: <span class="hljs-built_in">str</span>,
+          search_type: <span class="hljs-built_in">str</span> = <span class="hljs-literal">None</span>, similarity_top_k: <span class="hljs-built_in">int</span> = <span class="hljs-literal">None</span>,
+          use_rerank: <span class="hljs-built_in">bool</span> = <span class="hljs-literal">False</span>, rerank_model: <span class="hljs-built_in">str</span> = <span class="hljs-literal">None</span></span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]:
+    <span class="hljs-string">&quot;&quot;&quot;查询知识库 - 使用手动余弦相似度计算&quot;&quot;&quot;</span>
+</code></pre>
+<p>但方法体内部<strong>从未读取</strong> <code>use_rerank</code> / <code>rerank_model</code> / <code>search_type</code> 这三个参数——它只做一件事：用 <code>embed_query</code> 编码查询向量，然后手写余弦全量扫描，最后截断取 Top-K。传 <code>use_rerank=True</code> 不会报错，也不会有任何重排序发生。</p>
+<p>而主链路上恰好有三处调用都传了它：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>KnowledgeManager.query_script</code>——知识管理器查询剧本（knowledge_manager.py）；</p>
+</li>
+<li class="lvl-2">
+<p><code>PromptTemplateManager.search_similar_scene</code>——连续性检查节点检索相似场景（prompt_template_manager.py，真实生产路径）；</p>
+</li>
+<li class="lvl-2">
+<p><code>tests/knowledge/test_rerank.py</code> 测试脚本——本意是验证重排序效果，实际测出的是无重排序的基线。</p>
+</li>
+</ul>
+<pre class="hljs"><code><span class="hljs-comment"># prompt_template_manager.py：连续性检查的真实调用（仅截取关键段落）</span>
+result = <span class="hljs-variable language_">self</span>.script_kb.query(
+    query_text=query_text,
+    script_id=script_id,
+    search_type=<span class="hljs-string">&quot;similarity&quot;</span>,   <span class="hljs-comment"># 哑参数：被静默忽略</span>
+    similarity_top_k=top_k,
+    use_rerank=<span class="hljs-literal">True</span>             <span class="hljs-comment"># 哑参数：被静默忽略</span>
+)
+</code></pre>
+<p>这是最典型的一类坑：<strong>参数名传达了意图，实现从未兑现</strong>。调用方以为开启了重排序，实际得到的是纯余弦排序的结果。</p>
+<h4>证据二：装配入口存在，但唯一调用方未接线</h4>
+<p>全仓库唯一会真正装配重排序的方法，是 <code>ScriptKnowledgeBase.create_retriever_for_script()</code>（源码简化摘录）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 重排序仅在非离线模式时启用   ← 注释与代码实际行为不符，见下文</span>
+retriever_config = settings.get_retriever_config()
+<span class="hljs-keyword">if</span> use_rerank <span class="hljs-keyword">or</span> retriever_config.rerank_enabled:
+    <span class="hljs-comment"># 模型链：本地路径存在则用本地，否则回退到配置名/内置默认名</span>
+    ...
+    <span class="hljs-keyword">from</span> llama_index.core.postprocessor <span class="hljs-keyword">import</span> SentenceTransformerRerank
+    rerank = SentenceTransformerRerank(
+        model=model_to_use,
+        top_n=<span class="hljs-built_in">min</span>(<span class="hljs-number">3</span>, similarity_top_k)      <span class="hljs-comment"># 重排序后最多保留 3 条</span>
+    )
+    retriever = index.as_retriever(
+        similarity_top_k=similarity_top_k,
+        node_postprocessors=[rerank]        <span class="hljs-comment"># 重排序以节点后处理器方式挂载</span>
+    )
+</code></pre>
+<p>这段代码有四个值得注意的细节：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>触发条件是&quot;或&quot;关系</strong>：<code>use_rerank or config.rerank_enabled</code>，任一为真即启用；</p>
+</li>
+<li class="lvl-3">
+<p><strong><code>top_n=min(3, similarity_top_k)</code></strong>：默认 k=5 时，重排序只保留前 3 条——比业界&quot;精排后保留 5-10 条&quot;的常见做法更激进；</p>
+</li>
+<li class="lvl-3">
+<p><strong>重排序生效时会重建 retriever</strong>：重建时不携带 <code>vector_store_query_mode</code>，如果之前是 mmr 模式，会被静默覆盖回 similarity 模式；</p>
+</li>
+<li class="lvl-3">
+<p><strong>注释与代码不符</strong>：<code># 重排序仅在非离线模式时启用</code> 之下检查的其实是 <code>rerank_enabled</code> 配置项，与离线模式无关。</p>
+</li>
+</ol>
+<p>而唯一的调用方是 <code>KnowledgeRouter._vector_search()</code>（调用 <code>create_retriever_for_script(..., use_rerank=True)</code>）。对 <code>KnowledgeRouter</code> 做全仓库引用扫描：所有引用都落在 <code>llama_index_router.py</code> 自身（类定义与模块内辅助函数的类型注解），没有任何生产代码实例化或调用它。装配链路完整存在，但从未被点亮。</p>
+<h4>证据三：配置默认关闭，且默认路径有&quot;存在性通过但加载失败&quot;的陷阱</h4>
+<p><code>RetrieverConfig</code> 的真实默认值如下——注意前两行的默认关闭与路径值：</p>
+<pre class="hljs"><code><span class="hljs-comment">########################## 检索器配置（真实默认值） #########################</span>
+<span class="hljs-comment"># 是否启用重排序 —— 默认关闭</span>
+<span class="hljs-attr">PENSHOT_RETRIEVER__RERANK_ENABLED</span>=<span class="hljs-string">false</span>
+<span class="hljs-comment"># 重排序模型名称（本地路径不可用时的回退）</span>
+<span class="hljs-attr">PENSHOT_RETRIEVER__RERANK_MODEL_NAME</span>=<span class="hljs-string">BAAI/bge-reranker-large</span>
+<span class="hljs-comment"># 本地模型路径（真实默认指向父目录，见下文分析）</span>
+<span class="hljs-attr">PENSHOT_RETRIEVER__RERANK_MODEL_LOCAL_PATH</span>=<span class="hljs-string">data/models</span>
+<span class="hljs-comment"># 搜索类型 (similarity/mmr)</span>
+<span class="hljs-attr">PENSHOT_RETRIEVER__SEARCH_TYPE</span>=<span class="hljs-string">similarity</span>
+<span class="hljs-comment"># 检索文档数量</span>
+<span class="hljs-attr">PENSHOT_RETRIEVER__SIMILARITY_TOP_K</span>=<span class="hljs-string">5</span>
+</code></pre>
+<p>路径陷阱藏在模型解析逻辑里：代码把 <code>rerank_model_local_path</code> 转为绝对路径后，先用 <code>os.path.exists()</code> 检查——<code>data/models</code> 目录本身是存在的（其下放着 <code>bge-reranker-large/</code> 子目录，模型权重实测约 2.1GB），检查通过，于是 <code>model_to_use</code> 被赋值为 <strong><code>data/models</code> 这一级父目录</strong>，而不是真正含模型文件的 <code>data/models/bge-reranker-large</code>。随后 <code>SentenceTransformerRerank</code> 尝试从该目录加载模型时会因缺少模型文件而失败——异常被外层 <code>except</code> 捕获后仅打印一条 warning，retriever 静默退化为无重排序版本。</p>
+<p>需要补充一个关键的真机事实：上面这个&quot;父目录陷阱&quot;针对的是<strong>代码默认值</strong>；真机 <code>.env</code> 中该项已被手动修正为完整子目录——<code>PENSHOT_RETRIEVER__RERANK_MODEL_LOCAL_PATH=data/models/bge-reranker-large</code>。也就是说，在真机配置下，&quot;存在性检查&quot;与&quot;模型加载&quot;这对条件实际同时成立，路径陷阱在真机上已被绕开——它拦的是&quot;照默认值部署&quot;的人，而不是这个仓库当前的环境。</p>
+<p>换句话说：<strong>即使把 RERANK_ENABLED 打开，在默认路径下重排序也依然不会真正生效</strong>。要让本地模型被正确加载，<code>rerank_model_local_path</code> 应指向模型目录本身——仓库下载脚本 <code>scripts/download_reranker.py</code> 的目标路径正是 <code>data/models/bge-reranker-large</code>，与配置默认值并不一致。</p>
+<h4>证据补记：日志里的两次&quot;重排序已启用&quot;</h4>
+<p>有一类反证必须如实交代：全量考古 <code>logs/</code> 下的 13 份运行日志（2026-05-04 至 09-06）后可以发现，&quot;重排序已启用&quot;确实出现过——2026-05-21 下午两次，但全部来自当天的调试脚本（索引重建与诊断系列），生产运行日志中一次都没有：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>16:12 的第一次装配先失败：日志打出&quot;本地模型路径不存在&quot;警告——相对路径被拼接到了 <code>src/</code> 目录之下；</p>
+</li>
+<li class="lvl-2">
+<p>16:14 与 16:17 两次成功：“重排序已启用，模型: …data/models/bge-reranker-large”。这证明&quot;修正后的路径 + 装配函数被调用&quot;两个前提同时成立时，模型可以真实加载——<strong>不是装不上，而是没人调</strong>；</p>
+</li>
+<li class="lvl-2">
+<p>配套时间线：当天 17:14 有一次&quot;修复知识库的向量相似度检索和重排序问题&quot;的提交，正是这一轮调试的现场记录。</p>
+</li>
+</ul>
+<p>对&quot;未接线&quot;结论而言，这条补记是补强而非推翻：如果生产链路真的在调用装配逻辑，这些日志应当贯穿日常运行，而不是集中出现在一个调试日的下午。</p>
+<p>把三条证据串起来，真实的接线全景如下：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Truth[&quot;PenShot 重排序真实接线&quot;]
+        C1[&quot;配置层&lt;br/&gt;rerank_enabled 默认 false&quot;]
+        C2[&quot;装配层&lt;br/&gt;create_retriever_for_script&lt;br/&gt;top_n = min(3, k)&quot;]
+        C3[&quot;调用层&lt;br/&gt;唯一调用方 KnowledgeRouter&lt;br/&gt;全仓库未接线&quot;]
+        C4[&quot;生产路径&lt;br/&gt;query() 哑参数&lt;br/&gt;use_rerank 被静默忽略&quot;]
+        C4 --&gt;|&quot;实际生效的排序&quot;| R[&quot;手写余弦 Top-K&quot;]
+        C1 -.-&gt;|&quot;默认关闭&quot;| C2
+        C3 -.-&gt;|&quot;唯一引用者，但自身未接线&quot;| C2
+        DBG[&quot;调试脚本（2026-05-21 一次性）&lt;br/&gt;曾成功装配并打出启用日志&quot;] -.-&gt;|&quot;非生产路径&quot;| C2
+    end
+</pre>
+<p>如果你确实想在 PenShot 中启用重排序，需要三件事同时成立：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>配置开启</strong>：<code>rerank_enabled=true</code>（或调用方显式传 <code>use_rerank=True</code>，且必须走 <code>create_retriever_for_script</code> 装配路径而非 <code>query()</code>）；</p>
+</li>
+<li class="lvl-3">
+<p><strong>修正路径</strong>：把 <code>rerank_model_local_path</code> 指向含模型文件的目录（如 <code>data/models/bge-reranker-large</code>），使&quot;存在性检查&quot;与&quot;模型加载&quot;同时成立；</p>
+</li>
+<li class="lvl-3">
+<p><strong>接通路由</strong>：把 <code>KnowledgeRouter</code> 接入工作流——<code>query()</code> 哑参数这条路无论如何都不会触发重排序。</p>
+</li>
+</ol>
+<hr>
+<h2>关键要点拆解（四）：重排序的技术实现</h2>
+<h3>模型选型</h3>
+<p>业界主流的重排序模型有以下几个选择：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模型</th>
+<th style="text-align:left">特点</th>
+<th style="text-align:left">推荐场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">BGE-reranker-base</td>
+<td style="text-align:left">中英文支持好，开源免费</td>
+<td style="text-align:left">入门与轻量场景</td>
+</tr>
+<tr>
+<td style="text-align:left">Cohere Rerank</td>
+<td style="text-align:left">API服务，无需部署</td>
+<td style="text-align:left">快速验证，不考虑成本</td>
+</tr>
+<tr>
+<td style="text-align:left">Sentence-Transformers CrossEncoder</td>
+<td style="text-align:left">生态完善，易于集成</td>
+<td style="text-align:left">通用场景</td>
+</tr>
+<tr>
+<td style="text-align:left">BAAI/bge-reranker-large</td>
+<td style="text-align:left">中文精排效果强，模型较大</td>
+<td style="text-align:left">中文场景的常见选择</td>
+</tr>
+<tr>
+<td style="text-align:left">BAAI/bge-reranker-v2-m3</td>
+<td style="text-align:left">多语言，性能更强</td>
+<td style="text-align:left">对精度要求高的场景</td>
+</tr>
+</tbody>
+</table>
+<p>PenShot 源码中的真实选择是 <strong><code>BAAI/bge-reranker-large</code></strong>，可以从三个地方交叉验证：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>RetrieverConfig.rerank_model_name</code> 的默认值就是 <code>BAAI/bge-reranker-large</code>；</p>
+</li>
+<li class="lvl-2">
+<p>仓库中有专门的下载脚本 <code>scripts/download_reranker.py</code>，其目标模型与本地路径均为 <code>bge-reranker-large</code>；</p>
+</li>
+<li class="lvl-2">
+<p>本地数据目录 <code>data/models/bge-reranker-large/</code> 中模型文件完整（模型权重实测约 2.1GB，另有 tokenizer、sentencepiece 词表等）。</p>
+</li>
+</ul>
+<p><strong>为什么是 large？</strong> 从工程视角可以读出两个理由：其一，PenShot 的检索是&quot;小候选集精排&quot;——实测索引只有 12 个节点、默认 k=5、精排后保留 3 条，单次推理的负担极低，延迟不是瓶颈；其二，剧本场景对中文语义的细粒度判断要求高，large 相比 base 的中文精排质量更强，在&quot;负担得起&quot;的前提下优先选质量。这与&quot;大候选集 + 高并发&quot;场景的选型逻辑恰好相反。</p>
+<blockquote>
+<p>排坑说明：注意谱系差异——<code>bge-reranker-base</code> / <code>bge-reranker-large</code> / <code>bge-reranker-v2-m3</code> 都是交叉编码器的重排序模型，仅规模与质量不同，不能与 <code>bge-small-en</code> 这类双编码器的 embedding 模型混用。另需注意：配置里的模型名称只是&quot;回退项&quot;，模型链的优先顺序是本地路径 → 配置名 → 内置默认名；若本地路径不够精确（见前文路径陷阱），最容易出现的问题就是&quot;配置写了模型名，实际根本没加载&quot;。</p>
+</blockquote>
+<h3>推理优化</h3>
+<p>CrossEncoder 的重排序计算量较大，业界常见的优化策略有三类：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>批处理</strong>：将多个(查询, 文档)对打包成批次，一次性送入模型推理。GPU 可以并行处理，大幅降低平均延迟。</p>
+</li>
+<li class="lvl-2">
+<p><strong>缓存机制</strong>：相同的(查询, 文档)对不重复计算。在实际系统中，相同的查询可能会反复出现（如分页请求），缓存可以避免重复计算。</p>
+</li>
+<li class="lvl-2">
+<p><strong>候选集剪枝</strong>：在进入重排序之前，先用轻量级方法（如向量相似度）过滤掉明显不相关的候选，只对 Top-N 进行重排序。</p>
+</li>
+</ul>
+<p>PenShot 的做法更接近&quot;最小可用&quot;：<code>SentenceTransformerRerank</code> 在装配阶段构造、以节点后处理器方式挂载，一次 retrieve 内对全部候选（默认 k=5）统一重排——<strong>并没有实现上述缓存与显式剪枝</strong>。前者是因为 k=5 的候选规模下缓存收益有限，后者是因为入口本身就是 Top-K 检索，候选集天然被 k 限制。如果未来候选集扩大，query 级缓存会是性价比最高的第一项优化。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 示例代码（非项目源码）：带缓存与批处理的重排器</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Reranker</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, model_name=<span class="hljs-string">&quot;BAAI/bge-reranker-large&quot;</span></span>):
+        <span class="hljs-variable language_">self</span>.model = CrossEncoder(model_name)
+        <span class="hljs-variable language_">self</span>.cache = {}
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">rerank</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span>, candidates: <span class="hljs-type">List</span>[<span class="hljs-type">Dict</span>], top_k: <span class="hljs-built_in">int</span> = <span class="hljs-number">10</span></span>) -&gt; <span class="hljs-type">List</span>[<span class="hljs-type">Dict</span>]:
+        <span class="hljs-comment"># 1. 检查缓存，过滤已计算过的候选</span>
+        to_compute = []
+        <span class="hljs-keyword">for</span> cand <span class="hljs-keyword">in</span> candidates:
+            cache_key = <span class="hljs-string">f&quot;<span class="hljs-subst">{query}</span>_<span class="hljs-subst">{cand[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>
+            <span class="hljs-keyword">if</span> cache_key <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.cache:
+                cand[<span class="hljs-string">&#x27;rerank_score&#x27;</span>] = <span class="hljs-variable language_">self</span>.cache[cache_key]
+            <span class="hljs-keyword">else</span>:
+                to_compute.append(cand)
+        
+        <span class="hljs-comment"># 2. 批处理计算未缓存的候选</span>
+        <span class="hljs-keyword">if</span> to_compute:
+            pairs = [(query, cand[<span class="hljs-string">&#x27;content&#x27;</span>]) <span class="hljs-keyword">for</span> cand <span class="hljs-keyword">in</span> to_compute]
+            scores = <span class="hljs-variable language_">self</span>.model.predict(pairs, batch_size=<span class="hljs-number">32</span>)
+            
+            <span class="hljs-keyword">for</span> cand, score <span class="hljs-keyword">in</span> <span class="hljs-built_in">zip</span>(to_compute, scores):
+                cand[<span class="hljs-string">&#x27;rerank_score&#x27;</span>] = <span class="hljs-built_in">float</span>(score)
+                <span class="hljs-variable language_">self</span>.cache[<span class="hljs-string">f&quot;<span class="hljs-subst">{query}</span>_<span class="hljs-subst">{cand[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>] = <span class="hljs-built_in">float</span>(score)
+        
+        <span class="hljs-comment"># 3. 按重排序分数排序并返回Top-K</span>
+        sorted_candidates = <span class="hljs-built_in">sorted</span>(candidates, 
+                                   key=<span class="hljs-keyword">lambda</span> x: -x.get(<span class="hljs-string">&#x27;rerank_score&#x27;</span>, <span class="hljs-number">0</span>))
+        <span class="hljs-keyword">return</span> sorted_candidates[:top_k]
+</code></pre>
+<h3>质量评估：方法比数字更重要</h3>
+<p>重排序效果可以从以下几个维度评估：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">指标</th>
+<th style="text-align:left">定义</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">NDCG@K</td>
+<td style="text-align:left">归一化折损累积增益</td>
+<td style="text-align:left">衡量排序质量，考虑结果位置</td>
+</tr>
+<tr>
+<td style="text-align:left">MRR</td>
+<td style="text-align:left">平均倒数排名</td>
+<td style="text-align:left">第一个相关结果的位置</td>
+</tr>
+<tr>
+<td style="text-align:left">Recall@K</td>
+<td style="text-align:left">Top-K中相关结果的比例</td>
+<td style="text-align:left">衡量召回能力（重排序不应改变它）</td>
+</tr>
+<tr>
+<td style="text-align:left">平均延迟</td>
+<td style="text-align:left">每次重排序的平均耗时</td>
+<td style="text-align:left">衡量性能</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>排坑说明：NDCG@K 与 MRR 都同时受&quot;召回命中&quot;与&quot;排序位置&quot;影响，因此评测重排序时建议固定第一阶段召回结果，只比较重排序前后的排列差异；否则召回集不同，指标无法归因到重排序本身。也正因如此，<strong>固定召回集时 Recall@K 不应发生变化</strong>——如果你的评测里 Recall@K 出现了大幅变化，说明变化的其实是召回或截断策略，而不是重排序。</p>
+</blockquote>
+<p>关于&quot;重排序能带来多少提升&quot;，这里需要一份诚实的说明：<strong>PenShot 目前没有重排序的实测评测数据</strong>——重排序尚未接线（见前文三条失效路径），任何&quot;某指标提升百分之多少&quot;的数字都无从测得。公开基准中（如 BGE-reranker 模型卡在检索数据集上的评测），交叉编码器精排确实能稳定提升排序指标，但提升幅度依赖数据与任务，不能简单照搬到剧本分镜场景。</p>
+<p>如果你要为 PenShot 建立重排序评测，建议按下面的方法做：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>构造评测集</strong>：从真实剧本中抽取查询与相关片段的标注对（哪怕 50-100 条也比没有强）；</p>
+</li>
+<li class="lvl-3">
+<p><strong>固定召回集</strong>：先用同一批召回结果做基线，确保重排序前后比较的是同一批候选；</p>
+</li>
+<li class="lvl-3">
+<p><strong>对比排序指标</strong>：重点看 NDCG@5 与 MRR 的变化，同时记录单次重排序的延迟增量；</p>
+</li>
+<li class="lvl-3">
+<p><strong>独立归因</strong>：如果 Recall@K 发生变化，先排查召回逻辑是否被动过，别把召回的变化算到重排序头上。</p>
+</li>
+</ol>
+<hr>
+<h2>关键要点拆解（五）：重排序的局限与未来</h2>
+<h3>当前局限</h3>
+<p>重排序并非银弹，从通用视角看，它存在以下局限：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>计算开销</strong>：CrossEncoder 的推理成本显著高于 BiEncoder，在高并发场景下可能成为瓶颈。</p>
+</li>
+<li class="lvl-2">
+<p><strong>上下文长度限制</strong>：大多数 CrossEncoder 模型（如 bge-reranker-base/large）的最大输入长度为 512 个 token；对于长文档（如完整的剧本片段），需要截断或滑动窗口处理，可能丢失信息。</p>
+</li>
+<li class="lvl-2">
+<p><strong>领域适应</strong>：预训练的重排序模型在通用语料上训练，在特定领域（如剧本分镜）可能效果不佳，需要微调。</p>
+</li>
+</ul>
+<blockquote>
+<p>排坑提示：若你的文档经常超过 512 token，应在&quot;进入重排序前&quot;先行截断或抽取关键片段；否则超长输入会被模型强制截断，导致判断失真。同时，领域数据充分后建议用自建标注样本对重排序模型做轻量微调，能显著改善剧本这类垂直语料上的效果。</p>
+</blockquote>
+<p>除上述通用局限外，PenShot 的实现还有两个特有的工程风险值得记录：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>静默失败</strong>：重排序初始化的异常被 <code>except</code> 捕获后只打印 warning，不中断检索——路径错误、模型缺失等问题都表现为&quot;悄然退化为无重排序&quot;，如果没有日志监控很难发现（前文路径陷阱正是此类）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>分数口径混用</strong>：重排序输出的是 CrossEncoder 的相关性分数，与向量余弦分数不是同一口径。若未来接线后沿用现有基于余弦阈值的后置过滤（如相似度阈值），需要重新校准阈值，否则会误伤或误放结果。</p>
+</li>
+</ul>
+<h3>未来趋势</h3>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>端到端排序</strong>：未来的检索系统可能会将重排序能力融入检索模型本身，实现真正的端到端排序。</p>
+</li>
+<li class="lvl-2">
+<p><strong>轻量级 CrossEncoder</strong>：通过模型蒸馏和量化技术，轻量级 CrossEncoder 正在接近 BiEncoder 的速度，同时保持较高的精度。</p>
+</li>
+<li class="lvl-2">
+<p><strong>个性化重排序</strong>：重排序模型将能够利用用户的历史行为和偏好，实现个性化的结果排序。</p>
+</li>
+</ul>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p>重排序是两阶段检索系统中精排阶段的核心手段，承担着&quot;临门一脚&quot;的职责。它通过 CrossEncoder 架构实现查询与文档的细粒度交互，弥补了向量检索在相关性判断上的不足。</p>
+<p>以源码为准绳复盘 PenShot 的接线状态，可以用&quot;三口径&quot;总结：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>已接线的</strong>：不存在——生产链路上没有任何一处真正执行了重排序；</p>
+</li>
+<li class="lvl-2">
+<p><strong>已实现未接线的</strong>：<code>create_retriever_for_script</code> 中的 BGE-reranker-large 装配逻辑（含 <code>top_n=min(3, k)</code> 截断与模型回退链），唯一调用方 <code>KnowledgeRouter</code> 全仓库无人调用；配套的模型文件已实际下载（约 2.1GB）并完整保留在 <code>data/models/bge-reranker-large/</code>；</p>
+</li>
+<li class="lvl-2">
+<p><strong>需要警惕的哑参数</strong>：<code>query()</code> 上的 <code>use_rerank</code> / <code>search_type</code> / <code>rerank_model</code> 三个参数从未被实现读取，而主链路上有三处调用传了它们（含连续性检查的真实生产路径）。</p>
+</li>
+</ul>
+<p>重排序不是免费的——它带来了额外的计算开销，需要在精度和效率之间做出权衡。对于候选集大、查询复杂、质量要求高的生产系统，这个代价通常是值得的；但对于 PenShot 这种&quot;十几个节点、k=5&quot;的小规模检索，它目前的默认关闭状态也有其工程合理性。</p>
+<p>对于实践者的核心建议：把&quot;粗排（BiEncoder/向量召回）→ 精排（CrossEncoder 重排序）&quot;当作默认管线，但落地前先想清楚三件事——候选规模撑不撑得起级联的复杂度、本地模型的路径配置是否精确指向模型目录、以及调用链路上是否存在&quot;传了参数却没生效&quot;的哑参数；多路召回场景可优先用 RRF 绕开分数缩放差异；并为重排序建立独立评测集（固定召回集、对比排序指标与延迟），持续校准模型选型与缓存策略。</p>
+<p>理解重排序的原理和接线现状，不仅有助于正确评估它在一个真实系统里的位置，也为后续真正启用它准备好了判断依据。</p>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 快速开始：从环境安装到首个分镜任务的完整实操 · PenShot 文档</title>
+  <meta name="description" content="PenShot 快速入门实操：从 pip 安装、.env 配置到异步 API 调用，完整跑通《雨中的约定》剧本分镜任务。基于仓库真实运行样例，拆解 12 个元素到 13 个片段的六阶段处理链路、质量审计 5 项检查 1 项失败的双口径细节与三层记忆实现，附数据口径说明、复现方法与常见问题排查。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/quick-start.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 快速开始：从环境安装到首个分镜任务的完整实操">
+  <meta property="og:description" content="PenShot 快速入门实操：从 pip 安装、.env 配置到异步 API 调用，完整跑通《雨中的约定》剧本分镜任务。基于仓库真实运行样例，拆解 12 个元素到 13 个片段的六阶段处理链路、质量审计 5 项检查 1 项失败的双口径细节与三层记忆实现，附数据口径说明、复现方法与常见问题排查。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/quick-start.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html" class="active">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-14</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 快速开始</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇面向实际使用者的入门文档。重点是把项目从“知道是什么”推进到“能够跑起来”，因此优先给出前置条件、最小可运行路径、输入输出和常见失败点，而不是重复项目宣传信息。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>本文是一份可以跟着做的实操：从安装 PenShot、配置 .env，到用异步 API 跑通《雨中的约定》剧本，拿到一份可直接投喂给 Runway / Pika / Sora 等模型的提示词列表。文中所有运行数据都取自仓库自带的真实样例文件（examples/data/results/ 下的六个 JSON），并标注生成时间与口径来源——包括一次质量审计 6 项检查通过 5 项、失败 1 项的真实结果。遇到与直觉不符的地方，本文会指出项目当前的实现行为，而不是理想化的描述。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>完成安装与最小运行，并知道哪些配置是必需的。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>一、整体流程概览</h2>
+<p>在动手之前，先建立整体认知。PenShot 将原始剧本转换为结构化的视频提示词，核心处理链路如下：</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input[&quot;输入层&quot;]
+        A[原始剧本&lt;br/&gt;自然语言 / 标准剧本]
+    end
+    
+    subgraph Core[&quot;核心处理链（六个节点）&quot;]
+        B[剧本解析&lt;br/&gt;parse_script]
+        C[分镜拆分&lt;br/&gt;segment_shot]
+        D[片段分割&lt;br/&gt;split_video]
+        E[提示词转换&lt;br/&gt;convert_prompt]
+    end
+    
+    subgraph Control[&quot;质量与控制层&quot;]
+        F[质量审查&lt;br/&gt;audit_quality]
+        G[连续性检查&lt;br/&gt;continuity_check]
+    end
+    
+    subgraph Output[&quot;输出层&quot;]
+        H[分镜序列 + 双语提示词&lt;br/&gt;+ 音频提示词]
+    end
+    
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H
+    F --&gt;|发现问题| I[生成修复参数&lt;br/&gt;打回上游重跑]
+    F --&gt;|严重问题| J[人工干预 / 错误处理]
+</pre>
+<p><strong>整体思路</strong>：这条链路由 6 个核心节点组成（对应 PipelineNode 枚举的六个值，另有输出/修复/人工干预等辅助节点），对使用者来说是一条自动流水线——放入结构化的剧本，拿回分镜序列、视觉提示词与音频提示词。质量审查发现问题会生成修复参数并打回上游重跑；严重问题转入人工干预或错误处理。</p>
+<p><strong>真实运行示例</strong>：输入《雨中的约定》（12 个剧本元素），得到 12 个镜头、13 个片段、总时长 48.0 秒，每个片段都带双语视觉提示词与音频提示词；最终质量审查 6 项检查通过 5 项，LLM 连贯性检查发现 5 个问题。</p>
+<blockquote>
+<p><strong>数据口径说明</strong>：同一剧本在不同时间运行，LLM 的输出会波动——仓库 docs/testing 下的 v0.3 评测报告（2026-05-05 的另一次运行）给出的是 11 个元素、10 个镜头、平均 3.38 秒、6 个问题。本文选用 examples/data/results 下的样例链，因为它有六个环节的完整落盘文件可以逐项对照；引用评测报告的地方会单独标注。</p>
+</blockquote>
+<hr>
+<h2>二、准备工作</h2>
+<p>在安装与配置前，先确认运行环境满足要求。</p>
+<p><strong>系统要求</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">版本要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Python</td>
+<td style="text-align:left">3.10 及以上</td>
+</tr>
+<tr>
+<td style="text-align:left">Redis</td>
+<td style="text-align:left">可选（6.0+，多进程部署与记忆持久化时建议）</td>
+</tr>
+<tr>
+<td style="text-align:left">内存</td>
+<td style="text-align:left">建议 8GB 以上</td>
+</tr>
+<tr>
+<td style="text-align:left">存储</td>
+<td style="text-align:left">建议 2GB 以上</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>说明</strong>：Python 要求 3.10+，与仓库 <code>pyproject.toml</code> 中的 <code>requires-python = &quot;&gt;=3.10&quot;</code> 以及 PyPI 包声明保持一致。Redis 是可选组件，承担两个角色：短期记忆的会话存储（不可用时自动降级为文件持久化，不会因此启动失败）与多进程模式下的任务记录共享（多 worker 部署时若不配置会看到启动警告，提交与查询可能落在不同进程）。单进程 SDK 场景完全可以不装 Redis。</p>
+</blockquote>
+<p><strong>安装步骤</strong></p>
+<ol>
+<li class="lvl-3">
+<p>安装主包</p>
+</li>
+</ol>
+<pre class="hljs"><code>pip install penshot
+</code></pre>
+<p><code>penshot</code> 已发布到 PyPI（截至写作时从 0.2.1 迭代到 0.3.7），并提供官方 Docker 镜像 neotems/penshot，不是只存在于 GitHub 的源码包。</p>
+<blockquote>
+<p><strong>关于 LLM 依赖</strong>（对照 <code>pyproject.toml</code>）：核心依赖里自带 <code>langchain-ollama</code>，不额外安装即可连接本地 Ollama；使用 OpenAI/DeepSeek 需要 <code>langchain-openai</code>/<code>langchain-deepseek</code>，使用通义千问需要 <code>dashscope</code>——这三项都在 <code>llm-providers</code> 可选组里，一条命令装齐：<code>pip install &quot;penshot[llm-providers]&quot;</code>。缺失厂商 SDK 时请求会直接失败并报错，而不是静默切换模型。</p>
+</blockquote>
+<ol start="2">
+<li class="lvl-3">
+<p>配置环境变量</p>
+</li>
+</ol>
+<p>创建 <code>.env</code> 文件：</p>
+<pre class="hljs"><code><span class="hljs-comment">########################## LLM 模型配置 #########################</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__BASE_URL</span>=<span class="hljs-string">https://dashscope-intl.aliyuncs.com/api/v1</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__API_KEY</span>=<span class="hljs-string">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__MODEL_NAME</span>=<span class="hljs-string">qwen-plus</span>
+<span class="hljs-comment">
+########################## 嵌入模型配置 #########################</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__BASE_URL</span>=<span class="hljs-string">https://dashscope-intl.aliyuncs.com/api/v1</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__API_KEY</span>=<span class="hljs-string">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__MODEL_NAME</span>=<span class="hljs-string">text-embedding-v4</span>
+<span class="hljs-comment">
+########################## Redis 配置 ##########################</span>
+<span class="hljs-attr">PENSHOT_REDIS_URL</span>=<span class="hljs-string">redis://:123456@localhost:6379/0</span>
+</code></pre>
+<blockquote>
+<p><strong>注</strong>：以上为示例厂商（灵积 DashScope 的 <code>qwen-plus</code> + <code>text-embedding-v4</code>）。请把 <code>API_KEY</code> 替换为你自己的真实密钥。完整键位参考仓库 <code>.env.example</code>——它还包含 <code>FALLBACK</code> 备用厂商、<code>PENSHOT_RETRIEVER__*</code> 检索器、Redis 连接池等配置。Redis 支持单键 URL 写法（上面这种，源码中优先读取）与 <code>.env.example</code> 里的分键写法两种。</p>
+</blockquote>
+<p><strong>环境自检</strong>：<code>.env</code> 不需要手动加载——<code>penshot.config</code> 被导入时会通过 DotEnvLoader 自动搜索并加载（优先级依次为：当前工作目录、上两级父目录、用户配置目录、包安装目录、开发模式项目根目录）。需要覆盖已有变量时，也可以显式调用 <code>from penshot.config import load_dotenv; load_dotenv(override=True)</code>。使用 Redis 时先确认连通（<code>redis-cli ping</code> 返回 <code>PONG</code>）；不装 Redis 则跳过，短期记忆会自动降级为文件持久化。</p>
+<hr>
+<h2>三、快速运行示例</h2>
+<p>以下示例展示如何使用 PenShot 处理一个简短的剧本。</p>
+<p><strong>输入剧本</strong>：以下是一个完整的测试剧本《雨中的约定》：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;script&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;剧本标题：《雨中的约定》\n时长：约30秒\n场景：城市街角咖啡店外，雨天\n角色：\n- 林小雨（女，20岁，学生，抱着一本湿漉漉的书）\n- 陈阳（男，22岁，兼职外卖员，穿着黄色雨衣）\n\n[开场]\n（雨声淅沥，镜头从灰蒙蒙的天空下摇，聚焦在咖啡店外的长椅上。林小雨蹲在长椅旁，用手帕擦拭一本被雨水浸湿的诗集，神情焦急。）\n林小雨（自言自语，带着哭腔）：\n\&quot;明明说好今天还书的……这雨下得，他会不会不来了？\&quot;\n\n[镜头切换]\n（陈阳骑着电动车冲进雨幕，后座外卖箱里露出一角蓝色封面的书。他刹车太急，差点撞上长椅，林小雨的书掉进水洼。）\n陈阳（手忙脚乱捡书，抬头）：\n\&quot;对不起！这书……是你的？\&quot;\n\n[特写]\n（两本书并排躺在水洼里——林小雨的《飞鸟集》，陈阳外卖箱里的同款书，封面上贴着\&quot;借阅卡：陈阳→林小雨\&quot;。）\n林小雨（愣住，突然笑了）：\n\&quot;你迟到十分钟，但……书没湿透。\&quot;\n\n陈阳（挠头，从雨衣里掏出干毛巾裹住书）：\n\&quot;我跑了两条街找防水袋……诗里说&#x27;雨是云的眼泪&#x27;，可我不想让你哭。\&quot;\n\n[结尾]\n（雨渐小，阳光穿透云层。林小雨翻开书，里面夹着一张电影票根，日期是下周三。陈阳脱下雨衣罩在她头上，两人并肩跑向屋檐，笑声渐远。）\n画外音（林小雨的旁白）：\n\&quot;有些约定，会迟到，但永远不会缺席。\&quot;\n\n[黑屏，字幕浮现]\n\&quot;雨会停，而故事才刚刚开始。\&quot;\n\n风格：清新治愈，带点幽默，适合短视频平台传播。\n核心冲突：用\&quot;湿书\&quot;和\&quot;迟到\&quot;制造小误会，通过\&quot;同款书\&quot;和\&quot;电影票\&quot;暗示双向暗恋，雨天象征情感转折。&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><strong>运行代码</strong>（异步用法，适合长剧本）：</p>
+<pre class="hljs"><code><span class="hljs-keyword">import</span> asyncio
+
+<span class="hljs-keyword">from</span> penshot <span class="hljs-keyword">import</span> ShotLanguage
+<span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> PenshotFunction
+
+<span class="hljs-comment"># 此处放入上面的《雨中的约定》剧本字符串</span>
+SCRIPT = <span class="hljs-string">&quot;&quot;&quot;...&quot;&quot;&quot;</span>
+
+
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">async_usage</span>(<span class="hljs-params">script: <span class="hljs-built_in">str</span></span>):
+    <span class="hljs-string">&quot;&quot;&quot;异步用法：提交后轮询状态，等待完成后取回结果。&quot;&quot;&quot;</span>
+    <span class="hljs-comment"># 并发与排队上限在构造时确定（默认 max_concurrent=10、queue_size=1000）</span>
+    agent = PenshotFunction(language=ShotLanguage.ZH, max_concurrent=<span class="hljs-number">5</span>)
+    <span class="hljs-keyword">try</span>:
+        <span class="hljs-comment"># 1. 异步提交：立即返回 task_id，任务完成时触发回调</span>
+        task_id = agent.breakdown_script_async(
+            script,
+            callback=<span class="hljs-keyword">lambda</span> r: <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;回调: 任务 <span class="hljs-subst">{r.task_id}</span> 完成&quot;</span>),
+        )
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;任务已提交: <span class="hljs-subst">{task_id}</span>&quot;</span>)
+
+        <span class="hljs-comment"># 2. 查询状态：返回 dict，含 status / stage / progress 等字段</span>
+        status = agent.get_task_status(task_id)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;初始状态: <span class="hljs-subst">{status.get(<span class="hljs-string">&#x27;status&#x27;</span>)}</span>&quot;</span>)
+
+        <span class="hljs-comment"># 3. 等待结果：协程，必须在事件循环内 await；</span>
+        <span class="hljs-comment">#    如果在普通脚本里，改用同步版 wait_for_result(task_id)</span>
+        result = <span class="hljs-keyword">await</span> agent.wait_for_result_async(task_id)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;最终结果: 成功=<span class="hljs-subst">{result.success}</span>, 状态=<span class="hljs-subst">{result.status.value}</span>&quot;</span>)
+        <span class="hljs-keyword">return</span> result
+    <span class="hljs-keyword">finally</span>:
+        agent.shutdown()  <span class="hljs-comment"># 释放后台事件循环与线程</span>
+
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    result = asyncio.run(async_usage(SCRIPT))
+    <span class="hljs-built_in">print</span>(result.data[<span class="hljs-string">&quot;instructions&quot;</span>][<span class="hljs-string">&quot;project_info&quot;</span>])
+</code></pre>
+<blockquote>
+<p><strong>两个容易踩的坑</strong>：其一，<code>breakdown_script_async</code> 是普通函数（投递任务后立即返回 task_id），不要加 <code>await</code>；只有 <code>wait_for_result_async</code> 是协程需要 await。其二，必须调用 <code>agent.shutdown()</code> 释放后台事件循环与线程，否则进程可能不退出，用 <code>try/finally</code> 包裹最稳妥。</p>
+</blockquote>
+<p><strong>输出示例</strong>：以下节选自 examples/data/results/prompt_converter_result.json（2026-03-06 17:28 保存，13 个片段，总时长 48.0 秒）的前 3 个片段，完整双语提示词在该文件中：</p>
+<p><strong>片段 1（wide_shot 全景，4.0 秒）</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Cinematic wide shot: overcast sky with low, heavy gray clouds; cold fine rain falling diagonally, soaking the urban street; wet bluish-gray brick pavement reflecting faint ambient light; green matte-metal bench with light-gray cushion at street corner, facing red-and-white coffee shop sign; deep brown wooden eaves with silent copper wind chime; shallow puddles ripple gently; soft natural lighting, realistic texture, shallow depth of field, Fujifilm Superia film grain, 35mm cinematic color grading....(长双语提示词，此处节选)&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cartoon, anime, 3D render, text, logo, watermark, deformed hands, extra limbs, blurry face, low resolution, oversaturated, artificial lighting, studio set, people in frame&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cinematic realism, Fujifilm Superia aesthetic, atmospheric rain mood, subtle film grain, shallow depth of field&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;audio_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_001&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Natural rainfall as base layer - soft, steady drizzle with gentle spatial stereo spread; occasional subtle water drip from eaves...&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AudioLDM_3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;voice_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;narration&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;duration_seconds&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sound_attributes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;intensity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.8</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;reverb&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.3</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;format&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;wav&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sample_rate&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">24000</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;seed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42719</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;scene_context&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Urban street corner outside a coffee shop, afternoon rain, quiet contemplative atmosphere, cinematic realism&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;previous_audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><strong>片段 2（medium_shot 中景，3.0 秒，含台词）</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;medium shot, cinematic lighting, soft rain falling, Lin Xiaoyu squatting beside a matte green metal bench, wearing a cream-colored long dress with damp hem..., anxious expression softening into gentle smile, cobalt-blue hardcover &#x27;Gitanjali&#x27; poetry book with gold-embossed English title..., white library card taped at bottom right corner with handwritten &#x27;Chen Yang -&gt; Lin Xiaoyu&#x27; in ink...(长双语提示词，此处节选)&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blurry, deformed hands, extra limbs, text errors, distorted face, low resolution, cartoonish, anime style...&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;audio_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_002&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Natural rain ambiance with gentle water drip and faint distant footsteps; ... Lin Xiaoyu&#x27;s line: &#x27;明明说好今天还书的……这雨下得，他会不会不来了？&#x27; - tender, slightly breathy, youthful female voice...&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XTTSv2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;voice_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;character_dialogue&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;voice_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Lin Xiaoyu&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;tender&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;duration_seconds&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;seed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42719</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;previous_audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_001&quot;</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><strong>片段 3（medium_shot 中景偏近，5.2 秒）</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_003&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;medium shot, slightly close with shallow depth of field: Lin Xiaoyu crouches beside a matte green metal bench, left hand gently cradling the cobalt-blue hardcover &#x27;Gitanjali&#x27;..., white library card affixed to lower right corner with handwritten &#x27;Chen Yang -&gt; Lin Xiaoyu&#x27;..., indigo movie ticket stub for &#x27;Little Forest: Summer&#x27;...(长双语提示词，此处节选)&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5.2</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;audio_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_003&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;gentle rain ambience layered with subtle water drip and distant muffled footsteps; ... no dialogue, only atmospheric diegetic sound matching scene continuity...&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AudioLDM_3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;voice_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;narration&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;tender&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;duration_seconds&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5.2</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;seed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42719</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;previous_audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_002&quot;</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>三点观察</strong>：其一，<code>prompt</code> 是英中双语长句（中文是英文的回译对照），同一实体的措辞在片段间刻意复用（绿色金属长椅、钴蓝封面、借阅卡）——这是视觉一致性的关键手法；其二，音频提示词用 <code>voice_type</code> 区分旁白与角色台词，台词片段带 <code>voice_character</code> 与情绪标签，环境音用 AudioLDM_3、人声用 XTTSv2；其三，音频连贯性靠 <code>previous_audio_id</code> 链式传递（frag_013 指向 audio_012），而各片段 <code>seed</code> 独立取值（frag_001 为 42719、frag_009 为 892473，也有重复的），并不共享同一种子。</p>
+<p><strong>键名口径提醒</strong>：样例是历史版本落盘，音频字段名是 <code>audio_prompt</code>；当前源码中 <code>AIVideoPrompt</code> 的字段名是 <code>audio</code>，写解析代码以模型字段为准（见 <code>examples/sdk/06_parse_result.py</code>）。</p>
+</blockquote>
+<hr>
+<h2>四、运行结果与统计</h2>
+<h3>4.1 运行统计</h3>
+<p>以下数据来自仓库 <code>examples/data/results/</code> 目录中一次真实运行的落盘文件（uuid <code>HL202603061716542571</code>，2026-03-06）。六个 JSON 分别对应六个处理阶段，同一指标可以跨文件交叉验证：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">统计项</th>
+<th style="text-align:left">数值</th>
+<th style="text-align:left">出处</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">原始元素数</td>
+<td style="text-align:left">12 个（4 场景 + 5 对话 + 3 动作）</td>
+<td style="text-align:left">script_parser_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">生成镜头数</td>
+<td style="text-align:left">12 个</td>
+<td style="text-align:left">shot_segmenter_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">生成片段数</td>
+<td style="text-align:left">13 个</td>
+<td style="text-align:left">video_splitter_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">总时长</td>
+<td style="text-align:left">48.0 秒</td>
+<td style="text-align:left">shot_segmenter / video_splitter</td>
+</tr>
+<tr>
+<td style="text-align:left">平均片段时长</td>
+<td style="text-align:left">3.69 秒</td>
+<td style="text-align:left">video_splitter_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">场景数</td>
+<td style="text-align:left">4 个</td>
+<td style="text-align:left">script_parser_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">角色数</td>
+<td style="text-align:left">2 个（林小雨、陈阳）</td>
+<td style="text-align:left">script_parser_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">解析完整度</td>
+<td style="text-align:left">0.8</td>
+<td style="text-align:left">script_parser_result.json</td>
+</tr>
+<tr>
+<td style="text-align:left">解析置信度</td>
+<td style="text-align:left">1.0（场景/角色/对话/动作四项均为 1.0）</td>
+<td style="text-align:left">script_parser_result.json</td>
+</tr>
+</tbody>
+</table>
+<p><strong>镜头类型分布</strong>（<code>shot_segmenter_result.json</code> 的 stats 字段）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">镜头类型</th>
+<th style="text-align:left">数量</th>
+<th style="text-align:left">本次时长区间</th>
+<th style="text-align:left">承载内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">wide_shot</td>
+<td style="text-align:left">4 个</td>
+<td style="text-align:left">3.5-4.0 秒</td>
+<td style="text-align:left">环境交代、空镜</td>
+</tr>
+<tr>
+<td style="text-align:left">medium_shot</td>
+<td style="text-align:left">8 个</td>
+<td style="text-align:left">2.8-6.0 秒</td>
+<td style="text-align:left">对话、动作与情绪</td>
+</tr>
+<tr>
+<td style="text-align:left">close_up</td>
+<td style="text-align:left">0 个</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">本次运行未产出特写</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>12 个镜头全部由 LLM 分镜器（<code>LLMShotSegmenter</code>）生成。没有 close_up 是本次运行的特点：景别由 LLM 逐镜头标注，统计时只按标注结果归类（<code>base_shot_segmenter</code> 的后处理将非 close/wide 的镜头全部计入 medium），所以 medium_shot 占比高不能直接读成取景单调。</p>
+</blockquote>
+<p><strong>各阶段耗时</strong>（按各文件落盘时间戳推算）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">阶段</th>
+<th style="text-align:left">完成时间</th>
+<th style="text-align:left">距上一阶段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本解析</td>
+<td style="text-align:left">17:22:48</td>
+<td style="text-align:left">-</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头分割</td>
+<td style="text-align:left">17:23:56</td>
+<td style="text-align:left">约 68 秒</td>
+</tr>
+<tr>
+<td style="text-align:left">视频分割</td>
+<td style="text-align:left">17:24:26</td>
+<td style="text-align:left">约 30 秒</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词转换</td>
+<td style="text-align:left">17:28:57</td>
+<td style="text-align:left">约 271 秒</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审计</td>
+<td style="text-align:left">17:29:44</td>
+<td style="text-align:left">约 47 秒</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>解读：这是典型的 LLM 密集调用特征——提示词转换要为 13 个片段各生成视频与音频提示词，耗时接近全链路的一半；剧本解析近乎瞬时。注意这是单次运行快照而非性能基准，<code>docs/testing/</code> 下另一份评测报告（2026-05-05 运行）的耗时分布就与本次明显不同。</p>
+</blockquote>
+<h3>4.2 输入输出详解</h3>
+<p><strong>输入：剧本结构</strong></p>
+<p>PenShot 接受的剧本格式灵活，但建议按以下结构组织以获得最佳效果：</p>
+<pre class="mermaid">flowchart TB
+    subgraph ScriptStructure[&quot;推荐剧本结构&quot;]
+        S1[场景描述&lt;br/&gt;地点/时间/天气]
+        S2[角色动作&lt;br/&gt;角色+动作描述]
+        S3[角色对话&lt;br/&gt;角色：对话内容]
+        S4[情绪标注&lt;br/&gt;可选，提升质量]
+    end
+    
+    S1 --&gt; S2 --&gt; S3 --&gt; S4
+</pre>
+<p><strong>示例格式</strong>：</p>
+<pre class="hljs"><code>场景：[地点]，[时间]，[天气]
+
+[角色][动作描述]，[情绪状态]。
+
+[角色]（[情绪]）：&quot;[对话内容]&quot;
+</code></pre>
+<p><strong>输出：完整结果结构</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;generated_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-03-06T17:28:57.958958&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;video_model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;audio_model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XTTSv2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_prompts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">13</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;converter_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;LLMPromptConverter&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;project_info&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AI视频项目&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">13</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">48.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;source_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;...&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;frag_013&quot;</span><span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Cinematic wide shot: ...（英文描述）\n\n全景镜头：...（中文回译对照）&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cartoon, anime, 3D render, ...&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cinematic realism, Fujifilm Superia aesthetic, ...&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;audio_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_001&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AudioLDM_3&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;voice_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;narration&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;seed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42719</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;previous_audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;medium shot, cinematic lighting, ...\n\n中景：林小雨蹲在绿色金属长椅旁，...&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blurry, deformed hands, ...&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;audio_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_002&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XTTSv2&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;voice_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;character_dialogue&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;voice_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Lin Xiaoyu&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;seed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42719</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;previous_audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_001&quot;</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;global_settings&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;style_consistency&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;use_common_negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;execution_suggestions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;按顺序生成片段&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;保持相同种子值以获得一致性&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;生成后检查片段衔接&quot;</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p>结构上有两点值得注意：其一，每个片段自带 <code>model</code>/<code>style</code>/<code>audio_prompt</code>，可直接投喂下游生成服务；其二，<code>audio_prompt.previous_audio_id</code> 把整条音频串成链（frag_002 指向上一条 audio_001），而 <code>execution_suggestions</code> 中的 <code>保持相同种子值以获得一致性</code> 只是通用建议文本——实际落盘中各片段 <code>seed</code> 独立取值，并未统一。</p>
+</blockquote>
+<hr>
+<h2>五、工作流程详解</h2>
+<p>下面按工作流的六个核心节点逐个拆解本次运行，所有数据与 4.1 节同源，便于你在排查问题、调参时定位到正确的环节。</p>
+<h3>阶段一：剧本解析</h3>
+<p>将原始文本转换为结构化的剧本元素：</p>
+<pre class="mermaid">flowchart LR
+    A[原始剧本] --&gt; B[角色提取]
+    A --&gt; C[场景分割]
+    A --&gt; D[对话识别]
+    A --&gt; E[动作描述]
+    
+    B --&gt; F[角色设定]
+    C --&gt; G[场景上下文]
+    D --&gt; H[台词内容]
+    E --&gt; I[动作序列]
+    
+    F --&gt; J[结构化剧本]
+    G --&gt; J
+    H --&gt; J
+    I --&gt; J
+</pre>
+<p><strong>本次解析结果</strong>（<code>script_parser_result.json</code>）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">元素类型</th>
+<th style="text-align:left">数量</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">场景</td>
+<td style="text-align:left">4 个</td>
+<td style="text-align:left">scene_001~004</td>
+</tr>
+<tr>
+<td style="text-align:left">角色</td>
+<td style="text-align:left">2 个</td>
+<td style="text-align:left">林小雨（女）、陈阳（男）</td>
+</tr>
+<tr>
+<td style="text-align:left">对话</td>
+<td style="text-align:left">5 段</td>
+<td style="text-align:left">包含关键台词</td>
+</tr>
+<tr>
+<td style="text-align:left">动作</td>
+<td style="text-align:left">3 个</td>
+<td style="text-align:left">动作序列</td>
+</tr>
+<tr>
+<td style="text-align:left">总时长</td>
+<td style="text-align:left">47.0 秒</td>
+<td style="text-align:left">基于内容估算（镜头阶段扩为 48.0 秒）</td>
+</tr>
+<tr>
+<td style="text-align:left">解析置信度</td>
+<td style="text-align:left">1.0</td>
+<td style="text-align:left">场景/角色/对话/动作四项均为 1.0</td>
+</tr>
+<tr>
+<td style="text-align:left">解析完整度</td>
+<td style="text-align:left">0.8</td>
+<td style="text-align:left">completeness_score</td>
+</tr>
+</tbody>
+</table>
+<h3>阶段二：镜头分割（segment_shot）</h3>
+<p>LLM 分镜器（<code>LLMShotSegmenter</code>）把剧本元素转换为视觉镜头，每个镜头带景别、时长、主角色与置信度（本次 12 个镜头的置信度在 0.97-1.0 之间）。</p>
+<p><strong>本次镜头序列</strong>（12 个镜头，来自 <code>shot_segmenter_result.json</code>）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">镜头</th>
+<th style="text-align:left">景别</th>
+<th style="text-align:left">时长</th>
+<th style="text-align:left">内容摘要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">shot_001</td>
+<td style="text-align:left">wide</td>
+<td style="text-align:left">4.0 秒</td>
+<td style="text-align:left">雨街空镜，长椅静置</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_002</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">3.0 秒</td>
+<td style="text-align:left">林小雨擦拭《飞鸟集》</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_003</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">5.2 秒</td>
+<td style="text-align:left">自语：明明说好今天还书的……</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_004</td>
+<td style="text-align:left">wide</td>
+<td style="text-align:left">3.5 秒</td>
+<td style="text-align:left">陈阳骑车入画，书落水洼</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_005</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">2.8 秒</td>
+<td style="text-align:left">从水洼中捞起《飞鸟集》</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_006</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">3.0 秒</td>
+<td style="text-align:left">台词：对不起！这书……是你的？</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_007</td>
+<td style="text-align:left">wide</td>
+<td style="text-align:left">4.0 秒</td>
+<td style="text-align:left">两本书并排静卧水洼倒影</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_008</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">4.5 秒</td>
+<td style="text-align:left">台词：你迟到十分钟，但……书没湿透。</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_009</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">6.0 秒</td>
+<td style="text-align:left">台词：我跑了两条街找防水袋……（超阈值）</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_010</td>
+<td style="text-align:left">wide</td>
+<td style="text-align:left">4.0 秒</td>
+<td style="text-align:left">翻开扉页，发现电影票根</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_011</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">3.2 秒</td>
+<td style="text-align:left">雨衣兜帽罩头，并肩而立</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_012</td>
+<td style="text-align:left">medium</td>
+<td style="text-align:left">4.8 秒</td>
+<td style="text-align:left">并肩奔跑，收尾台词</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>12 个镜头里时长的两极是 shot_005（2.8 秒）与 shot_009（6.0 秒），平均 4.0 秒。shot_009 超过 5.5 秒的分割阈值，会在下一阶段被一分为二——它也是本次运行里唯一触发 LLM 分割的镜头。</p>
+</blockquote>
+<h3>阶段三：视频分割（split_video）</h3>
+<p>把镜头切分为适合 AI 视频生成的片段。这里存在两套分割器：规则分割器 <code>RuleVideoSplitter</code> 与 LLM 分割器 <code>LLMVideoSplitter</code>，规则侧的核心逻辑（节选自 <code>rule_video_splitter.py</code>）是：</p>
+<pre class="hljs"><code><span class="hljs-comment"># rule_video_splitter.py（节选）</span>
+<span class="hljs-variable language_">self</span>.split_threshold = <span class="hljs-built_in">getattr</span>(config, <span class="hljs-string">&quot;duration_split_threshold&quot;</span>, <span class="hljs-number">5.5</span>)  <span class="hljs-comment"># 默认 5.5 秒</span>
+
+<span class="hljs-comment"># 时长不超过阈值的镜头不分割，直接成为片段；</span>
+<span class="hljs-comment"># 超过阈值的镜头，规则路径会按 min(3, int(duration / 2.5) + 1) 等分（2-3 段）</span>
+</code></pre>
+<p>实际走哪条路径由 <code>_should_use_llm_split()</code> 判定：时长超过阈值的镜头会被交给 LLM 分割器。本次运行的 <code>video_splitter_result.json</code> 给出了路径分布——<code>cutter_type</code> 为 <code>LLMVideoSplitter</code>、<code>ai_split_count</code> 为 2、<code>rule_split_count</code> 为 11：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>11 个时长 2.8-5.2 秒的镜头走规则路径，1:1 映射为片段；</p>
+</li>
+<li class="lvl-2">
+<p>唯一超过 5.5 秒的 shot_009（6.0 秒）触发 LLM 智能分割，被切成 2 段：frag_009（3.2 秒）+ frag_010（2.8 秒）。</p>
+</li>
+</ul>
+<p>注意 LLM 切出的段数不是公式算出来的：按规则公式这类 6.0 秒镜头会等分 3 段，而 LLM 结合镜头内容判断切 2 段更合理。它的决策过程完整落盘在 <code>ai_decision</code> 字段，节选如下：</p>
+<blockquote>
+<p>镜头时长为6.0秒，超过分割阈值5.5秒，且包含多层动态信息：1）陈阳身体动作（直起身）；2）道具状态变化（拎空袋→托书）；3）视线与情感递进……台词为完整单句但语义有明显节奏停顿点……适合在省略号处自然分割以匹配呼吸与情绪节奏。</p>
+</blockquote>
+<p>拆分出的两个片段还各带 <code>key_frames</code>（关键帧描述）与 <code>continuity_plan</code>（角色一致性/场景一致性/转场建议），frag_010 额外标记 <code>requires_special_attention: true</code>——分割不只是在时间轴上切开，还要把连续性约束下传给后续环节。</p>
+<p><strong>本次映射结果</strong>：12 个镜头 → 13 个片段，13 个片段中 12 个小于 5 秒（唯一例外是 frag_003 的 5.2 秒）。</p>
+<h3>阶段四：提示词转换（convert_prompt）</h3>
+<p>这一步由 LLM 驱动的 <code>LLMPromptConverter</code> 完成：把 13 个片段的描述逐个转换为视频提示词、负向提示词与音频提示词三件套。它不是字符串模板拼接——每个片段都单独调用 LLM，由模型根据内容自由组织措辞。以 frag_001 的真实提示词开头为例：</p>
+<pre class="hljs"><code>Cinematic wide shot: overcast sky with low, heavy gray clouds; cold fine rain falling
+diagonally, soaking the urban street; wet bluish-gray brick pavement reflecting faint
+ambient light; green matte-metal bench with light-gray cushion at street corner, ...
+Fujifilm Superia film grain, 35mm cinematic color grading.
+
+全景镜头：灰蒙蒙低云压境，细密斜织的冷雨笼罩街道；青砖地面积水泛微光；街角
+绿色哑光金属长椅配浅灰坐垫，……电影级调色。
+</code></pre>
+<p><strong>提示词的组成结构</strong>（以 frag_001/frag_002 为例）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组成部分</th>
+<th style="text-align:left">真实示例</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">景别前缀</td>
+<td style="text-align:left">Cinematic wide shot / medium shot, cinematic lighting</td>
+<td style="text-align:left">LLM 自行组织，形式不固定</td>
+</tr>
+<tr>
+<td style="text-align:left">场景环境</td>
+<td style="text-align:left">overcast sky / wet pavement / coffee shop sign</td>
+<td style="text-align:left">环境锚点，跨片段重复</td>
+</tr>
+<tr>
+<td style="text-align:left">角色服装</td>
+<td style="text-align:left">Lin Xiaoyu … cream-colored long dress</td>
+<td style="text-align:left">同一实体的措辞刻意复用</td>
+</tr>
+<tr>
+<td style="text-align:left">关键道具</td>
+<td style="text-align:left">cobalt-blue hardcover ‘Gitanjali’ … water stain</td>
+<td style="text-align:left">道具连续性描述</td>
+</tr>
+<tr>
+<td style="text-align:left">摄影风格</td>
+<td style="text-align:left">Fujifilm Superia film grain, 35mm …</td>
+<td style="text-align:left">统一调色方向</td>
+</tr>
+<tr>
+<td style="text-align:left">中文回译</td>
+<td style="text-align:left">全景镜头：灰蒙蒙低云压境……</td>
+<td style="text-align:left">与英文一一对应，便于核对</td>
+</tr>
+<tr>
+<td style="text-align:left">负向提示词</td>
+<td style="text-align:left">cartoon, anime, 3D render, …</td>
+<td style="text-align:left">抑制常见瑕疵</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>为什么不用固定模板？固定模板会把素材差异抹平，也无法按片段内容做取舍。但 LLM 自由生成也有代价——本次审计发现的 <code>米white</code>（英文描述里混入中文汉字米）、<code>陈阳</code>未罗马化、frag_009 中 <code>matte</code> 与 <code>reflective</code> 的措辞矛盾，都是措辞漂移的实例。这说明一致性主要靠提示词约束加审计兜底，而不是靠模板保证。</p>
+</blockquote>
+<p><strong>音频提示词</strong>：每个片段同时生成 <code>audio_prompt</code>——环境音与人声的混合描述，<code>model_type</code> 在 AudioLDM_3（纯环境音）与 XTTSv2（人声台词）之间按内容选择；<code>previous_audio_id</code> 逐段串联（frag_002 指向上一条 audio_001），为下游音频生成保留上下文链。</p>
+<h3>阶段五：质量审计（audit_quality）</h3>
+<p>审计节点做 6 项检查：5 项基础检查（片段时长限制、提示词内容、提示词长度、片段数量、模型支持）加 1 项 LLM 连贯性检查。本次运行的 <code>quality_auditor_result.json</code> 显示：5 项通过、LLM 连贯性检查未通过，共落盘 5 条 violations：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">严重程度</th>
+<th style="text-align:left">数量</th>
+<th style="text-align:left">涉及片段</th>
+<th style="text-align:left">内容摘要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">critical</td>
+<td style="text-align:left">1 条</td>
+<td style="text-align:left">frag_013</td>
+<td style="text-align:left">非英文色名 <code>米white</code> 混入、<code>陈阳</code>未罗马化、提示词被截断（省略号残留）</td>
+</tr>
+<tr>
+<td style="text-align:left">major</td>
+<td style="text-align:left">2 条</td>
+<td style="text-align:left">frag_013 / frag_009</td>
+<td style="text-align:left">气象逻辑矛盾（<code>golden-hour sunlight</code> 与连绵阴雨矛盾）；服装与动作不连续（雨衣 <code>matte</code> 与 <code>reflective</code> 矛盾、图书交接缺镜）</td>
+</tr>
+<tr>
+<td style="text-align:left">moderate</td>
+<td style="text-align:left">2 条</td>
+<td style="text-align:left">frag_011 / frag_003</td>
+<td style="text-align:left">场景锚点漂移（招牌文案在 frag_011 才首次出现）；frag_003 时长 5.2 秒超出建议上限</td>
+</tr>
+</tbody>
+</table>
+<p><strong>两个分数要区分</strong>：这份 JSON 的 <code>stats.quality_score</code> 是 0.0，顶层 <code>score</code> 却是 100.0。两者口径不同——<code>stats.quality_score</code> 按权重逐条扣分（critical 40、major 25、moderate 10、warning 5、info 0，从 100 分基分扣除），本次 5 条违规合计扣 110 分、被收敛到 0；顶层 <code>score</code> 是历史版本未同步的默认字段。判断运行是否通过应看 <code>status</code>（本次 <code>critical_issues</code>）、<code>needs_human_review</code>（true）与 <code>stats</code> 明细，而不是顶层 <code>score</code>。</p>
+<p><strong>本次结论</strong>：<code>conclusion</code> 字段为发现 1 个严重问题、需要人工干预；<code>timeline_impact</code> 评估修复需 1-2 小时、不建议直接进入生产（<code>can_proceed: false</code>）。13 个片段中 4 个片段涉及问题，高风险片段是 frag_013 与 frag_009。</p>
+<h3>阶段六：连续性检查（continuity_check）</h3>
+<p>工作流的六个核心节点里，最后一个不是输出而是守护——<code>continuity_check_node</code>（<code>workflow_nodes.py</code>）。它汇总各阶段产物做视觉、角色、场景、动作四类连续性校验，识别问题来自哪个上游阶段，并生成针对性修复参数路由回去重跑（<code>_route_to_fix_stage</code>），同时受节点循环上限约束（<code>CONTINUITY_CHECK</code> 最多 5 次循环、2 次重试，来自 <code>workflow_state_types.py</code>）。</p>
+<p>本次落盘结果里能看到这一机制的两类痕迹：每个片段字段 <code>continuity_notes.continuity_check</code> 均为 <code>passed</code>（分割器侧写入的逐片段校验结论）；被 LLM 拆分出的 frag_010 带 <code>requires_special_attention: true</code>，提示下游重点检查它与 frag_009 的衔接（台词在省略号处被切开）。</p>
+<blockquote>
+<p>设计意图：质量审计关注单个片段是否达标，连续性检查关注片段之间是否连贯。两者都可能把问题打回上游，但修复路径不同——审计侧重重新生成或修复提示词，连续性检查则按问题来源阶段路由，避免整条链路重跑。</p>
+</blockquote>
+<hr>
+<h2>六、配置说明</h2>
+<p><strong>ShotConfig 主要字段</strong>（<code>shot_config.py</code>，默认值即源码默认）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">参数</th>
+<th style="text-align:left">类型</th>
+<th style="text-align:left">默认值</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>enable_llm</code></td>
+<td style="text-align:left">bool</td>
+<td style="text-align:left">True</td>
+<td style="text-align:left">开启 LLM 解析/分镜/审查，关闭则退回规则实现</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>duration_split_threshold</code></td>
+<td style="text-align:left">float</td>
+<td style="text-align:left">5.5</td>
+<td style="text-align:left">触发分割（且交给 LLM 分割器）的时长阈值</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>max_fragment_duration</code></td>
+<td style="text-align:left">float</td>
+<td style="text-align:left">5.0</td>
+<td style="text-align:left">单个片段最大时长（秒）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>min_fragment_duration</code></td>
+<td style="text-align:left">float</td>
+<td style="text-align:left">1.0</td>
+<td style="text-align:left">单个片段最小时长（秒）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>max_shot_duration</code></td>
+<td style="text-align:left">float</td>
+<td style="text-align:left">60.0</td>
+<td style="text-align:left">单个镜头最大时长（秒）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ai_splitter_enabled</code></td>
+<td style="text-align:left">bool</td>
+<td style="text-align:left">True</td>
+<td style="text-align:left">是否启用 LLM 智能分割</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>max_prompt_length</code></td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">200</td>
+<td style="text-align:left">提示词长度上限（按单词数约束）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>min_prompt_length</code></td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">20</td>
+<td style="text-align:left">提示词长度下限</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>video_model</code></td>
+<td style="text-align:left">str</td>
+<td style="text-align:left">runway_gen2</td>
+<td style="text-align:left">提示词面向的视频模型</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>audio_model</code></td>
+<td style="text-align:left">str</td>
+<td style="text-align:left">XTTSv2</td>
+<td style="text-align:left">提示词面向的音频模型</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>max_total_loops</code></td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">20</td>
+<td style="text-align:left">工作流最大循环次数</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>workflow_timeout</code></td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">1800</td>
+<td style="text-align:left">工作流超时（秒）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>提醒：旧文档里常见的 <code>llm_model</code>、<code>enable_memory</code>、<code>enable_quality_audit</code>、<code>max_repair_attempts</code> 并不在 <code>ShotConfig</code> 中（质量审查相关字段在源码里被注释保留）。LLM 采样参数位于嵌套的 <code>config.llm</code>（<code>LLMBaseConfig</code>）上，记忆容量参数位于记忆模块的 <code>MemoryConfig</code> 上，各归各的配置域。</p>
+</blockquote>
+<p><strong>代码方式配置</strong></p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot <span class="hljs-keyword">import</span> ShotConfig
+
+config = ShotConfig(
+    <span class="hljs-comment"># 分割参数（ShotConfig 直接字段）</span>
+    duration_split_threshold=<span class="hljs-number">5.5</span>,
+    max_fragment_duration=<span class="hljs-number">5.0</span>,
+    min_fragment_duration=<span class="hljs-number">1.0</span>,
+    ai_splitter_enabled=<span class="hljs-literal">True</span>,
+    <span class="hljs-comment"># 目标生成模型</span>
+    video_model=<span class="hljs-string">&quot;runway_gen2&quot;</span>,
+    audio_model=<span class="hljs-string">&quot;XTTSv2&quot;</span>,
+    <span class="hljs-comment"># 流程控制</span>
+    max_total_loops=<span class="hljs-number">20</span>,
+    workflow_timeout=<span class="hljs-number">1800</span>,
+)
+
+<span class="hljs-comment"># LLM 采样参数在嵌套的 config.llm 上调整（对应 .env 里的 PENSHOT_LLM__DEFAULT__* 键）</span>
+config.llm.temperature = <span class="hljs-number">0.2</span>   <span class="hljs-comment"># 默认 0.1</span>
+config.llm.max_tokens = <span class="hljs-number">4096</span>   <span class="hljs-comment"># 源码默认 2000（.env 示例值为 8192）</span>
+config.llm.timeout = <span class="hljs-number">90</span>        <span class="hljs-comment"># 默认 60</span>
+</code></pre>
+<blockquote>
+<p>绝大多数场景不需要写代码：<code>.env</code> 中的 <code>PENSHOT_LLM__DEFAULT__TEMPERATURE</code> 等键会在导入时自动加载（见第二章）。代码方式适合在调用时做单次覆盖。</p>
+</blockquote>
+<p><strong>阈值调整建议</strong>（依据内容节奏因地制宜）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">推荐阈值</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">快节奏动作片</td>
+<td style="text-align:left">3.0-4.0秒</td>
+<td style="text-align:left">更多短片段，节奏更快</td>
+</tr>
+<tr>
+<td style="text-align:left">文艺剧情片</td>
+<td style="text-align:left">4.0-5.5秒</td>
+<td style="text-align:left">保留长镜头，氛围感</td>
+</tr>
+<tr>
+<td style="text-align:left">对话密集场景</td>
+<td style="text-align:left">5.0-6.0秒</td>
+<td style="text-align:left">保持对话完整</td>
+</tr>
+<tr>
+<td style="text-align:left">风景/环境</td>
+<td style="text-align:left">5.0-8.0秒</td>
+<td style="text-align:left">保留画面美感</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>调参的核心矛盾是叙事完整性 vs 模型输入限制：阈值越小片段越碎、节奏越快但易切割台词；阈值越大越能保持镜头完整但可能超过模型时长上限。参考 v0.3 评测报告的另一次运行：那次没有镜头越过 5.5 秒阈值，AI 分割器整场未触发——阈值是否生效高度依赖输入内容的节奏，调参前建议先看一遍分镜结果的时长分布。</p>
+</blockquote>
+<hr>
+<h2>七、数据口径与复现方法</h2>
+<p><strong>这批样例数据的性质</strong>：<code>examples/data/results/</code> 下的六个 JSON 是一次历史真实运行的阶段产物，仓库里的演示脚本 <code>examples/workflow/02_pipeline_stages_demo.py</code> 会读取它们讲解流程阶段；脚本注释明确说明这批文件不承诺与最新 schema 逐字段一致。因此它们适合用来理解数据链路与字段结构，但不适合当作实时结果或性能基准：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>字段名可能滞后（如 <code>audio_prompt</code> 与当前模型字段 <code>audio</code> 的差异）；</p>
+</li>
+<li class="lvl-2">
+<p>数值只代表当时那次运行（输入、模型、温度都会影响结果）。</p>
+</li>
+</ul>
+<p><strong>第二次运行的对照数据</strong>：<code>docs/testing/v0.3 功能完成度评测报告.md</code> 记录了 2026-05-05 的另一次评测运行，给出完全不同的数值——11 个元素 → 10 个镜头（平均 3.38 秒）→ 10 个片段，审计发现 6 个问题（Major 1、Moderate 2、Warning 2、Info 1），工作流六阶段完整执行。两次数据说明：流程结构稳定，但具体数值会随输入与模型显著波动。</p>
+<p><strong>复现方法</strong>：在自己的环境里跑一遍，最快的方式是第二章的示例代码（或 <code>examples/sdk/01_sync_breakdown.py</code>）——前提是 <code>.env</code> 中的 LLM Key 已配置；跑完后把各阶段结果落盘，就能用与本文相同的视角对照自己的数据。注意：没有 LLM 配置时流程不会长时间空转，<code>01_sync_breakdown.py</code> 会直接提示配置缺失并退出。</p>
+<hr>
+<h2>八、质量保障机制</h2>
+<p><strong>两层审计</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层</th>
+<th style="text-align:left">内容</th>
+<th style="text-align:left">特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">规则检查</td>
+<td style="text-align:left">5 项基础检查（片段时长限制/提示词内容/提示词长度/片段数量/模型支持）</td>
+<td style="text-align:left">纯代码逻辑，瞬时完成</td>
+</tr>
+<tr>
+<td style="text-align:left">LLM 连贯性</td>
+<td style="text-align:left">把全部片段的正反向提示词整体交给 LLM 审阅</td>
+<td style="text-align:left">耗时数十秒，能发现语义矛盾</td>
+</tr>
+</tbody>
+</table>
+<p>LLM 连贯性检查的问题按维度分类，从 violations 的 description 前缀可以直观看到：<code>[气象]</code>、<code>[角色]</code>、<code>[场景]</code>、<code>[提示词]</code>、<code>[时长]</code>——分别对应环境连续性、角色一致性、场景锚点、提示词质量与节奏问题。</p>
+<p><strong>修复闭环的真实状态</strong></p>
+<pre class="mermaid">flowchart TB
+    A[各阶段产物] --&gt; B[5 项规则检查]
+    B --&gt; C[LLM 连贯性检查]
+    C --&gt; D{存在 critical 问题?}
+    D --&gt;|是| E[needs_human_review&lt;br/&gt;需人工审核]
+    D --&gt;|否| F[recommended_actions&lt;br/&gt;修复建议落盘]
+    E --&gt; F
+    F --&gt; G[连续性检查节点&lt;br/&gt;可路由回上游重试]
+</pre>
+<blockquote>
+<p>需要如实说明当前实现的边界：审计报告会给出 <code>recommended_actions</code>（本次 5 条，逐条对应 violations 的修复建议）并置位 <code>needs_human_review</code>，但 <code>docs/testing/</code> 的 v0.3 评测报告记录 <code>repair_applied: false</code>——修复参数虽已生成，并未触发自动重跑，该缺口被列为 P0 问题。相比之下，连续性检查节点内置了按阶段路由与最多 2 次重试的闭环，两者能力并不对等。审计报告的 <code>timeline_impact</code> 把修复估算为 1-2 小时，正是因为当前修复主要靠人工。</p>
+</blockquote>
+<p><strong>判定规则</strong>（<code>quality_auditor_models.py</code>）：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>加权扣分：critical 40 分、major 25 分、moderate 10 分、warning 5 分、info 0 分，从 100 分基分逐条扣除并收敛到 0-100 区间；</p>
+</li>
+<li class="lvl-2">
+<p>状态分档：90 分以上 PASSED、75 分以上 MINOR、60 分以上 MODERATE、40 分以上 MAJOR、20 分以上 CRITICAL，更低为 FAILED；</p>
+</li>
+<li class="lvl-2">
+<p><code>needs_human_review</code>：存在 critical，或 major 超过 2 条时置位。</p>
+</li>
+</ul>
+<hr>
+<h2>九、记忆系统</h2>
+<p>PenShot 的记忆模块（<code>knowledge/memory/</code>）把记忆分为四级枚举（<code>MemoryLevel</code>：EPHEMERAL、SHORT_TERM、MEDIUM_TERM、LONG_TERM），组织上归为三层：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Short[&quot;短期记忆（会话窗口）&quot;]
+        S1[消息缓冲 deque&lt;br/&gt;maxlen=short_term_size]
+        S2[RedisChatMessageHistory&lt;br/&gt;可选持久化]
+    end
+    subgraph Medium[&quot;中期记忆（阶段摘要）&quot;]
+        M1[阶段产出摘要&lt;br/&gt;受 max_tokens 约束]
+    end
+    subgraph Long[&quot;长期记忆（向量检索）&quot;]
+        L1[VectorStoreRetrieverMemory]
+        L2[top_k=3&lt;br/&gt;score_threshold=0.7]
+    end
+    Input[各阶段写入] --&gt; Short
+    Short --&gt; Medium
+    Medium --&gt; Long
+    Long -.-&gt;|语义检索| Output[后续阶段读取]
+    Medium -.-&gt;|阶段摘要| Output
+    Short -.-&gt;|即时上下文| Output
+</pre>
+<p><strong>三层各自是什么</strong>（<code>memory_models.MemoryConfig</code> 默认值）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层</th>
+<th style="text-align:left">载体</th>
+<th style="text-align:left">关键参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">短期</td>
+<td style="text-align:left">消息缓冲 + Redis 会话（<code>RedisChatMessageHistory</code>）</td>
+<td style="text-align:left"><code>short_term_size=20</code>、<code>short_term_ttl=3600</code></td>
+</tr>
+<tr>
+<td style="text-align:left">中期</td>
+<td style="text-align:left">阶段摘要（受 token 上限约束）</td>
+<td style="text-align:left"><code>medium_term_max_tokens=500</code></td>
+</tr>
+<tr>
+<td style="text-align:left">长期</td>
+<td style="text-align:left">向量库检索（LangChain 记忆工具）</td>
+<td style="text-align:left"><code>long_term_k=3</code>、<code>long_term_score_threshold=0.7</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Redis 是可选依赖</strong>：短期记忆初始化时先探活 Redis，可用时把会话写入 Redis（key 形如 <code>penshot:memory:{script_id}:{session_type}</code>），不可用时降级为本地文件（<code>data/memory/{script_id}/short_term.json</code>）——所以本地跑没有 Redis 也能完成全流程，不会阻塞任务。</p>
+<p><strong>一点纠偏</strong>：角色服装、道具状态能跨片段衔接，主要靠各阶段携带的连续性信息——分镜产出带 <code>element_ids</code> 与时间轴的镜头序列、LLM 分割写入 <code>continuity_plan</code>、提示词刻意复用措辞——记忆系统提供的是增强。v0.3 评测报告显示：记忆系统当时处于部分实现状态（短期会话为空、长期向量库 78 条文档），任务依然走完六阶段。把长剧本一致性的根本原因全归于记忆系统，并不符合当前实现。</p>
+<hr>
+<h2>十、常见问题与检验方法</h2>
+<p><strong>Q1：处理一个剧本需要多长时间？</strong></p>
+<p>没有固定答案。以 4.1 节样例为例：从解析产物落盘（17:22:48）到审计报告落盘（17:29:44）就用了约 7 分钟，其中提示词转换环节占了 4 分半（13 个片段各自生成视频与音频提示词）。耗时的决定性因素是 LLM 调用次数与模型响应速度，而不是剧本字数本身，不同服务商之间的差异可能达到数倍。建议先用短剧本估时，再评估长剧本。</p>
+<p><strong>Q2：支持哪些 LLM？</strong></p>
+<p>官方支持四类厂商：OpenAI、通义千问（DashScope）、DeepSeek、Ollama（见 <code>.env.example</code> 注释）。默认配置在 <code>PENSHOT_LLM__DEFAULT__*</code>，默认模型不可用时可配置 <code>PENSHOT_LLM__FALLBACK__*</code> 备用（示例值指向 deepseek-chat）。依赖侧对应可选安装组 <code>llm-providers</code>（含 langchain-openai / langchain-deepseek / dashscope）。</p>
+<p><strong>Q3：如何提高生成质量？</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>剧本描述尽量具体（服装颜色、道具特征、天气），含糊描述在提示词生成时会被放大为不一致；</p>
+</li>
+<li class="lvl-2">
+<p>保持低 <code>temperature</code>（默认 0.1），减少措辞漂移；</p>
+</li>
+<li class="lvl-2">
+<p>拿到审计报告后按 <code>recommended_actions</code> 逐条修正——当前版本自动修复尚未闭环，人工介入是主要手段；</p>
+</li>
+<li class="lvl-2">
+<p>长剧本拆段处理，降低单次调用的上下文压力。</p>
+</li>
+</ul>
+<p><strong>Q4：生成的提示词支持哪些视频生成模型？</strong></p>
+<p><code>VideoModelType</code> 枚举定义了 8 种：RUNWAY_GEN2、RUNWAY、SORA、VEO、Pika、MIDJOURNEY、STABLE、DALLE；音频侧 <code>AudioModelType</code> 定义了 6 种：XTTSv2、AUDIOLDM_3、BARK、ELEVENLABS、AZURE_TTS、OPENAI_TTS。样例运行使用 runway_gen2 + XTTSv2。注意枚举中并没有 Kling（尽管项目描述里提到过它），需要用的话要自行扩展。</p>
+<p><strong>Q5：质量报告的分数为 0 怎么办？</strong></p>
+<p>先确认看到的是哪个字段（第五章解释过双口径）：<code>stats.quality_score</code> 归零意味着加权扣分已把 100 分扣满。处理路径是逐条核对 <code>violations</code>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">问题类型</th>
+<th style="text-align:left">解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">提示词截断</td>
+<td style="text-align:left">检查提示词长度约束（<code>max_prompt_length</code>）与输出 token 上限</td>
+</tr>
+<tr>
+<td style="text-align:left">角色描述不一致</td>
+<td style="text-align:left">在剧本中统一角色外貌和服装描述，减少自由发挥空间</td>
+</tr>
+<tr>
+<td style="text-align:left">动作逻辑缺失</td>
+<td style="text-align:left">补充动作过渡描述（如道具交接的动作镜头）</td>
+</tr>
+<tr>
+<td style="text-align:left">风格/锚点漂移</td>
+<td style="text-align:left">在剧本或全局配置中固定场景锚点措辞</td>
+</tr>
+</tbody>
+</table>
+<p><strong>几项快速自检</strong>：① 结果为空 → 检查剧本格式是否为推荐结构，并确认 <code>.env</code> 的 LLM Key 已配置；② 长时间停留在同一阶段 → 多为 LLM 调用超时或网络问题，查看终端日志中的重试信息（Redis 不可用时记忆会降级为文件，不会阻塞任务）；③ 片段时长超限 → 核对 <code>max_fragment_duration</code> 与 <code>duration_split_threshold</code>。</p>
+<h2>下一步</h2>
+<p>完成快速开始后，建议继续阅读以下文档：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>技术架构与设计 - 了解整体设计</p>
+</li>
+<li class="lvl-2">
+<p>召回策略方案 - 深入理解检索机制</p>
+</li>
+<li class="lvl-2">
+<p>集成使用指南 - API 和 MCP 集成</p>
+</li>
+<li class="lvl-2">
+<p>核心实现详解 - 代码级实现解析</p>
+</li>
+</ul>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

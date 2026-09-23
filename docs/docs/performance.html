@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解 · PenShot 文档</title>
+  <meta name="description" content="基于本地真实运行产物的 PenShot 性能评测：用产物时间戳还原两次同剧本任务的阶段耗时画像，定位 LLM 阶段瓶颈，对照解析置信度分布与质量分权重核算，盘点记忆与存储资源开销，所有数字均可在落盘文件中复核，并修正 Redis 依赖边界等常见误读。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/performance.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解">
+  <meta property="og:description" content="基于本地真实运行产物的 PenShot 性能评测：用产物时间戳还原两次同剧本任务的阶段耗时画像，定位 LLM 阶段瓶颈，对照解析置信度分布与质量分权重核算，盘点记忆与存储资源开销，所有数字均可在落盘文件中复核，并修正 Redis 依赖边界等常见误读。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/performance.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html" class="active">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-09-14</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇评测文档。重点是说明测试条件、指标定义、脚本口径和结果限制；性能数字只有在相同环境与版本下才具有可比性。<br>
+<strong>事实边界</strong>：评测文档：数据仅适用于文中记录的环境、版本与测试脚本，不能直接外推到其他环境。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够复现实验口径，并正确解释指标、样本和环境对结果的影响。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>评测基线</strong>：PenShot v0.3.x（当前发布线）。本文引用的所有数字均来自项目真实运行产物与系列文章中已披露的实测记录，未做估算、模拟压测或人为美化。</p>
+</blockquote>
+<h2>一、评测概述与数据来源</h2>
+<h3>1.1 为什么要单独做一次性能评测</h3>
+<p>PenShot 的主链路是一条六段式流水线：</p>
+<p><strong>剧本解析 → 镜头拆分 → 视频分段 → 指令转换 → 质量审查 → 连续性守护</strong></p>
+<p>它与普通后端服务最大的不同在于：链路中<strong>规则处理与 LLM 调用混合</strong>。视频分段是确定性规则算法，耗时稳定且极短；而解析、拆分、指令转换都依赖 LLM 调用，耗时具有明显的弹性——同一个剧本运行两次，耗时也可能因模型响应速度、重试与修复回环而产生差异。</p>
+<p>因此，性能评测要回答的核心问题不是快与不快，而是：<strong>时间都花在了哪里，哪些环节可以通过工程手段优化。</strong></p>
+<h3>1.2 数据来源</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">数据组</th>
+<th style="text-align:left">来源</th>
+<th style="text-align:left">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">A 组</td>
+<td style="text-align:left">项目本地运行产物（数据目录 <code>data/output/{script_id}/{task_id}/</code>）</td>
+<td style="text-align:left">同一剧本的两次真实任务记录：TSK17807426061109503223（2026-06-11）与 TSK17807426072316085190（2026-07-23），含各阶段产物的落盘时间戳与阶段级时间戳链</td>
+</tr>
+<tr>
+<td style="text-align:left">C 组</td>
+<td style="text-align:left">仓库 <code>docs/README.md</code> 与系列文章（总览 / 集成使用）的输出示例</td>
+<td style="text-align:left">两个 13 片段、总时长 48 秒示例的端到端耗时记录（≈89s 与 ≈519s）</td>
+</tr>
+<tr>
+<td style="text-align:left">D 组</td>
+<td style="text-align:left">系列文章《召回评测》</td>
+<td style="text-align:left">向量检索与重排序的测试环境与效果数据</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>说明：A 组运行产物位于本地数据目录（该目录不随源码发布），其中包含执行摘要、质量报告、记忆报告与阶段统计等完整快照，各文件 metadata 中的 saved_at / audited_at 等时间戳字段构成本文的阶段耗时明细，与《实战案例》共用同一数据源；C、D 两组可在对应文章与仓库文档中直接查证。</p>
+</blockquote>
+<h2>二、关键要点拆解</h2>
+<h3>2.1 端到端耗时画像：瓶颈集中在 LLM 阶段</h3>
+<p>先看两次真实运行的阶段耗时结构。A 组的每个阶段产物都会记录落盘时间戳（<code>metadata.saved_at</code> 等字段），相邻两次落盘的时刻差，就是该阶段处理与保存所占用的区间：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">区间（相邻产物的落盘时刻差）</th>
+<th style="text-align:right">运行 1</th>
+<th style="text-align:right">运行 2</th>
+<th style="text-align:left">处理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">解析产物 → 镜头产物</td>
+<td style="text-align:right">13.3s</td>
+<td style="text-align:right">11.0s</td>
+<td style="text-align:left">镜头拆分（LLM）</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头产物 → 分段产物</td>
+<td style="text-align:right">5.5s</td>
+<td style="text-align:right">4.8s</td>
+<td style="text-align:left">视频分段（规则直通，无 LLM 调用）</td>
+</tr>
+<tr>
+<td style="text-align:left">分段产物 → 转换产物</td>
+<td style="text-align:right">39.0s</td>
+<td style="text-align:right">36.4s</td>
+<td style="text-align:left">指令转换（逐片段 LLM 调用）</td>
+</tr>
+<tr>
+<td style="text-align:left">转换产物 → 审计产物</td>
+<td style="text-align:right">41.3s</td>
+<td style="text-align:right">37.8s</td>
+<td style="text-align:left">质量审查（规则 + LLM 合并审查）</td>
+</tr>
+<tr>
+<td style="text-align:left">审计产物 → 连续性产物</td>
+<td style="text-align:right">6.5s</td>
+<td style="text-align:right">11.6s</td>
+<td style="text-align:left">连续性守护</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>端到端（解析落盘 → 连续性落盘）</strong></td>
+<td style="text-align:right"><strong>≈106s</strong></td>
+<td style="text-align:right"><strong>≈102s</strong></td>
+<td style="text-align:left">—</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>口径说明：解析阶段自身的耗时无法从产物时间戳中直接得出（它之前没有可参照的落盘记录），上表覆盖的是解析之后的五个阶段；区间耗时包含阶段处理与产物序列化保存的开销，不进一步拆分。</p>
+</blockquote>
+<pre class="mermaid">pie title 运行 1 相邻产物的区间耗时占比（合计 ≈ 105.6s）
+    &quot;质量审查（规则+LLM）&quot; : 41.3
+    &quot;指令转换（LLM）&quot; : 39.0
+    &quot;镜头拆分（LLM）&quot; : 13.3
+    &quot;连续性守护&quot; : 6.5
+    &quot;视频分段（规则）&quot; : 5.5
+</pre>
+<p>整个链路的耗时结构可以用一个简单的分解式表达：</p>
+<p>$$T_{total} \approx T_{parse} + T_{shots} + T_{split} + \sum_{i=1}^{n} T_{convert}^{(i)} + T_{audit} + T_{continuity}$$</p>
+<p>其中 $n$ 为片段数（本剧本 $n=7$），$T_{convert}^{(i)}$ 为第 $i$ 个片段的指令转换耗时，$T_{audit}$ 为质量审查环节的耗时，$T_{continuity}$ 为连续性守护的耗时。</p>
+<p><strong>核心解读</strong>：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>LLM 密集区段吃掉八成以上的时间</strong>。运行 1 中镜头拆分、指令转换、质量审查三段合计 93.6s，占端到端 105.6s 的 88.7%；运行 2 为 85.3s / 101.7s ≈ 83.9%。唯一不含 LLM 调用的视频分段，两次运行都是最轻的一环。</p>
+</li>
+<li class="lvl-3">
+<p><strong>质量审查与指令转换是并列大头，审查甚至略高</strong>：41.3s 对 39.0s（运行 2 为 37.8s 对 36.4s）。审查阶段同样包含逐片段的内容复核与 LLM 检查，这段开销在只盯着生成阶段时最容易被忽略。</p>
+</li>
+<li class="lvl-3">
+<p><strong>指令转换按片段线性扩展</strong>：39.0s / 7 片段 ≈ 5.6s 每片段（运行 2 为 36.4 / 7 ≈ 5.2s）。每个片段要生成视觉与音频两组提示词内容，这个单片段耗时基本就是一次 LLM 往返的实测量级。</p>
+</li>
+</ol>
+<p>需要特别指出的是：<strong>端到端耗时不可按片段数线性推算</strong>。仓库文档记录的一个 13 片段示例耗时约 89 秒，而系列文章中另一个同为 13 片段、总时长 48 秒的记录耗时约 519 秒（8.7 分钟），相差近 6 倍。耗时波动主要来自 LLM 调用的响应差异与修复回环次数——这也是后文超时余量排坑提示的直接依据。</p>
+<p><strong>适用场景与优化方向</strong>：如果要在生产环境压缩耗时，优先级是——质量审查与指令转换 &gt; 镜头拆分。可行手段包括：为这两个 LLM 密集阶段选择响应更快的模型、控制参与转换的上下文长度、减少修复回环（审查问题越少，重试轮次越少），以及依托任务级并发配置（<code>max_concurrent</code>）提升多任务场景下的整体吞吐。需要注意，PenShot 支持 ollama 本地推理与 OpenAI/通义千问等云 API 两类 LLM 接入，本地推理的延迟特性与云 API 差异明显，选型时应以实测为准。</p>
+<h3>2.2 解析质量与置信度画像</h3>
+<p>性能之外，解析输出的质量同样需要量化。A 组两次运行对同一剧本的解析结果高度一致：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>解析出 7 个元素（3 段对话、3 个动作），剧本总时长 19.0 秒，涉及 1 个场景、2 个角色；</p>
+</li>
+<li class="lvl-2">
+<p>完整度评分 0.87，整体解析置信度 0.76；</p>
+</li>
+<li class="lvl-2">
+<p>解析一次成功（<code>parse_attempts = 1</code>），两次运行的 stats 字段逐项一致。</p>
+</li>
+</ul>
+<p>把置信度按维度拆开看，信息量更大：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">维度</th>
+<th style="text-align:left">置信度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">动作</td>
+<td style="text-align:left">1.0</td>
+</tr>
+<tr>
+<td style="text-align:left">角色</td>
+<td style="text-align:left">0.75</td>
+</tr>
+<tr>
+<td style="text-align:left">对话</td>
+<td style="text-align:left">0.67</td>
+</tr>
+<tr>
+<td style="text-align:left">场景</td>
+<td style="text-align:left">0.6</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心解读</strong>：动作、角色这类显式且结构化的信息最容易提取，置信度最高；而场景置信度仅 0.6——场景往往包含隐式信息（时间、光线、氛围、空间关系），需要模型推断，天然更容易出现偏差。这意味着<strong>对场景要求高的剧本（如多场景切换的群像剧），应把人工复核的重点放在场景标注上</strong>。</p>
+<p>另外还有一个值得注意的反馈机制：<code>base_repairable_agent.py</code> 会把历史解析质量分级——平均完整度低于 0.6 标记为 poor，低于 0.8 标记为 medium；等级为 poor 时，镜头拆分与视频分段环节会启用增强验证模式，执行更严格的额外校验。这说明解析质量不是一次性输出，而是可以在后续运行中被反馈修正的。本次剧本完整度 0.87，未触发该模式。</p>
+<h3>2.3 质量得分：从 major_issues 到 minor_issues</h3>
+<p>A 组两次运行的终审结果对比：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">指标</th>
+<th style="text-align:left">2026-06-11 运行</th>
+<th style="text-align:left">2026-07-23 运行</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">片段数</td>
+<td style="text-align:left">7</td>
+<td style="text-align:left">7</td>
+</tr>
+<tr>
+<td style="text-align:left">总时长</td>
+<td style="text-align:left">21.89s</td>
+<td style="text-align:left">23.91s</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头数 / 场景数 / 角色数</td>
+<td style="text-align:left">7 / 1 / 2</td>
+<td style="text-align:left">7 / 1 / 2</td>
+</tr>
+<tr>
+<td style="text-align:left">审查状态</td>
+<td style="text-align:left">major_issues</td>
+<td style="text-align:left">minor_issues</td>
+</tr>
+<tr>
+<td style="text-align:left">质量得分</td>
+<td style="text-align:left">5.0</td>
+<td style="text-align:left">90.0</td>
+</tr>
+<tr>
+<td style="text-align:left">违规项数量</td>
+<td style="text-align:left">8</td>
+<td style="text-align:left">4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心解读</strong>：两次运行的生成规模几乎一致（同为 7 片段、1 场景、2 角色，解析完整度同为 0.87），但终审状态与得分差异显著。这说明质量得分更多取决于<strong>审查与修复链路对具体违规项的处理过程</strong>，而不是生成规模的差异。</p>
+<p>再看分数是怎么算出来的——源码 <code>quality_auditor_agent.py</code> 中的 <code>_calculate_weighted_score()</code> 从 100 分起扣，各严重级别的扣分权重为 info 0 / warning 5 / moderate 10 / major 25 / critical 40（另有 error 60），下限截断在 0 分。用这套权重反向核算两次运行：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>运行 1：2 条 major + 3 条 moderate + 3 条 warning → 100 − (2×25 + 3×10 + 3×5) = 5.0，与产物 score 完全吻合；</p>
+</li>
+<li class="lvl-2">
+<p>运行 2：2 条 warning + 2 条 info → 100 − (2×5 + 2×0) = 90.0，同样吻合。</p>
+</li>
+</ul>
+<p>同时这也提示了一个使用要点：质量得分是一个终审快照。当得分偏低时，应当结合运行产物中的审查明细（逐项违规记录与修复历史）定位问题，而不是只看总分。PenShot 的质量审查采用规则 + LLM 双重审查并支持自动修复——理解这条链路的存在，才能正确解读分数。</p>
+<h3>2.4 资源与存储开销</h3>
+<p>除了计算耗时，部署 PenShot 还需要关注存储与依赖组件。A 组运行记录（7 月运行）中的记忆报告如实反映了各层级的资源参数：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">记忆层级</th>
+<th style="text-align:left">存储介质</th>
+<th style="text-align:left">关键参数</th>
+<th style="text-align:left">本次运行状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">短期记忆</td>
+<td style="text-align:left">Redis（localhost:6379/1）</td>
+<td style="text-align:left">max_size=20 条、TTL=3600s</td>
+<td style="text-align:left">已启用</td>
+</tr>
+<tr>
+<td style="text-align:left">中期记忆</td>
+<td style="text-align:left">本地摘要持久化</td>
+<td style="text-align:left">max_tokens=500</td>
+<td style="text-align:left">已持久化至 <code>data/memory/{script_id}</code></td>
+</tr>
+<tr>
+<td style="text-align:left">长期记忆</td>
+<td style="text-align:left">Chroma 向量库</td>
+<td style="text-align:left">检索 k=3</td>
+<td style="text-align:left">未启用</td>
+</tr>
+</tbody>
+</table>
+<p><strong>其它可量化的开销</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>端到端时间成本</strong>：同为 13 片段、总时长 48 秒的示例，仓库文档记录的耗时为 88,988ms（约 89 秒），而系列文章中另一次记录的耗时为 519,072ms（约 8.7 分钟）；A 组 7 片段小剧本两次运行约 102~106 秒。中等规模剧本的端到端耗时落在 1 分钟到 10 分钟量级，且波动较大（详见 2.1 节）。</p>
+</li>
+<li class="lvl-2">
+<p><strong>向量检索成本</strong>：根据 D 组《召回评测》的披露，检索链路采用 BGE-small-en 嵌入模型（768 维），测试环境为 16GB 内存；引入重排序后，top-1 命中率从 68% 提升至 86%。检索质量提升的同时，会额外引入一次重排序模型推理的开销。</p>
+</li>
+<li class="lvl-2">
+<p><strong>工作流持久化</strong>：检查点采用 SqliteSaver，按 <code>script_id</code> / <code>task_id</code> 隔离存储，用于中断恢复。</p>
+</li>
+</ul>
+<p><strong>核心解读</strong>：PenShot 的依赖组件是可裁剪的——长期记忆、Redis 与记忆整体都是可选项，不会成为启动或运行的硬门槛。需要修正一个常见误读：启用记忆功能（<code>enable_memory=True</code>）并不等于 Redis 变成强制依赖——源码 <code>short_term_memory.py</code> 的 <code>_check_redis_availability()</code> 在未配置 Redis URL 或连接失败时都会降级为内存存储加文件持久化，不阻断任务（详见排坑第 2 条）。资源规划时应当按 LLM 调用（主要成本）+ Redis / 向量库（可选）+ 本地数据目录（必需）三块分别评估。</p>
+<h2>三、注意事项与排坑提示</h2>
+<p>结合上述真实数据，整理三条最容易踩坑的实践提示：</p>
+<p><strong>1. 耗时是分钟级，别让同步调用撞上超时墙</strong></p>
+<p>单次中等规模剧本的处理耗时实测在 89 秒到 8.7 分钟之间波动（A 组 7 片段小剧本两次运行约 106s 与 102s；13 片段示例为 ≈89s 与 ≈519s），长剧本还会进一步放大。如果用同步 HTTP 客户端（常见默认超时 30 秒）直接等待结果，极易误判为失败。实践建议：生产环境使用异步任务接口提交，通过任务轮询或回调获取结果；同时把超时阈值设置在实测耗时的 2~3 倍以上。</p>
+<p><strong>2. Redis 是可选依赖，连接失败会静默降级</strong></p>
+<p>短期记忆在有 Redis 时写入 Redis（本次实测连接 <code>redis://localhost:6379/1</code>，max_size=20、TTL=3600s），但源码中的可用性探测决定了它并非硬依赖：未配置 URL 时直接使用内存存储，连接失败时打印告警并降级为内存存储，同时把短期记忆落盘到 <code>data/memory/{script_id}/short_term.json</code> 以便重启恢复，任务不会因此失败。坑点在于：运行看似一切正常，实际已经退化为单进程内存态——多实例部署时各实例的记忆互不可见。排查时不要只看 <code>enable_memory=True</code>，而要核对记忆报告中的 <code>redis_enabled</code> 字段与实际连接地址是否与预期一致。</p>
+<p><strong>3. 数据目录不随源码发布，迁移前记得单独备份</strong></p>
+<p>运行产物（任务输出、记忆文件、检查点）统一落在数据目录下，该目录不进入版本库。这意味着：更换机器或用容器重新部署时，历史任务、记忆与检查点都需要<strong>单独备份与迁移</strong>，否则中断恢复能力会静默丢失。同时，产物按 <code>script_id</code> / <code>task_id</code> 分层存储，长期运行后应关注磁盘占用的持续增长。</p>
+<h2>四、总结与建议</h2>
+<p><strong>耗时结构一句话</strong>：LLM 密集区段（镜头拆分、指令转换、质量审查）合计占端到端耗时的 84%~89%，其中质量审查与指令转换贡献最大；中等规模剧本端到端耗时 1~10 分钟且波动明显——优化性能，本质上就是优化这几段 LLM 调用。</p>
+<p><strong>质量画像一句话</strong>：解析完整度 0.87、置信度 0.76，其中场景维度（0.6）是最薄弱的环节；终审质量得分按违规权重从 100 分起扣，同一剧本两次运行可以拉开 18 倍，解读时必须结合审查明细。</p>
+<p><strong>给生产实践的三条建议</strong>：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>异步优先</strong>：以异步任务模式接入，为 LLM 长耗时链路预留足够的超时余量；</p>
+</li>
+<li class="lvl-3">
+<p><strong>按需启用记忆</strong>：评估 Redis 与向量库的部署收益，无记忆需求时明确关闭，减少依赖面；</p>
+</li>
+<li class="lvl-3">
+<p><strong>备份数据目录</strong>：把数据目录纳入备份策略，避免任务历史与检查点丢失。</p>
+</li>
+</ol>
+<blockquote>
+<p><strong>版本基线说明</strong>：本文实测数据覆盖 2026-06 至 2026-07 的运行记录与当前发布的 v0.3.x 版本线。后续版本（v0.4 及以上的规划项）可能改变耗时结构与资源参数，升级后建议重新实测。</p>
+</blockquote>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+  <script>
+    MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$']] }, svg: { fontCache: 'global' } };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</body>
+</html>

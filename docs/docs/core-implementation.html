@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解 · PenShot 文档</title>
+  <meta name="description" content="深入 PenShot v0.3.x 源码：拆解多厂商 LLM 客户端封装与三级降级链、YAML 提示词工程与懒加载机制、一致性锚点约束、三级循环控制与三层记忆系统的真实实现；全文区分真实源码与简化示意，逐模块标注源码文件与关键函数，并如实标出已知代码缺陷、工程边界与待验证疑点。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/core-implementation.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解">
+  <meta property="og:description" content="深入 PenShot v0.3.x 源码：拆解多厂商 LLM 客户端封装与三级降级链、YAML 提示词工程与懒加载机制、一致性锚点约束、三级循环控制与三层记忆系统的真实实现；全文区分真实源码与简化示意，逐模块标注源码文件与关键函数，并如实标出已知代码缺陷、工程边界与待验证疑点。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/core-implementation.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html" class="active">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-02-12</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a>  · <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>本文从源码层面拆解 PenShot 的关键实现。文中代码标注两类来源：<strong>真实源码</strong>（节选自 <a href="https://github.com/neopen/story-shot-agent">story-shot-agent</a> 公开仓库 v0.3.x，仅省略 import 与版权头）与<strong>简化示意</strong>（用于说明设计意图的伪代码）。第六至八节的记忆系统以真实实现为准，并明确标注当前版本的工程边界——写清楚&quot;实现了什么&quot;与&quot;还没实现什么&quot;。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>一、LLM 客户端：多厂商可插拔封装</h2>
+<p><strong>背景</strong>：PenShot 需要调用大语言模型做解析、拆分、转换，而不同厂商（OpenAI、本地 Ollama、通义千问）的 API 与 Embedding 接口差异较大，需要统一的封装层。配置分两级：<strong>配置文件/环境变量提供默认值，代码参数实时覆盖（优先级更高）</strong>，厂商类型由 <code>base_url</code> 自动探测。</p>
+<h3>OpenAI</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（openai_client.py）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">OpenAIClient</span>(<span class="hljs-title class_ inherited__">BaseClient</span>):
+    <span class="hljs-string">&quot;&quot;&quot;OpenAI 客户端实现&quot;&quot;&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, config: AIConfig</span>):
+        <span class="hljs-built_in">super</span>().__init__(config)
+        <span class="hljs-variable language_">self</span>.base_url = <span class="hljs-variable language_">self</span>.llm_config.base_url <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;https://api.openai.com/v1&quot;</span>
+        os.environ[<span class="hljs-string">&quot;OPENAI_API_KEY&quot;</span>] = <span class="hljs-variable language_">self</span>.llm_config.api_key.get_secret_value()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">llm_model</span>(<span class="hljs-params">self</span>) -&gt; BaseLanguageModel:
+        <span class="hljs-keyword">return</span> ChatOpenAI(
+            model=<span class="hljs-variable language_">self</span>.llm_config.model_name,
+            temperature=<span class="hljs-variable language_">self</span>.llm_config.temperature,
+            api_key=<span class="hljs-variable language_">self</span>.llm_config.api_key,
+            base_url=<span class="hljs-variable language_">self</span>.base_url,
+            timeout=<span class="hljs-variable language_">self</span>.llm_config.timeout,          <span class="hljs-comment"># 默认 60 秒</span>
+            max_retries=<span class="hljs-variable language_">self</span>.llm_config.max_retries,  <span class="hljs-comment"># 默认 3</span>
+            max_tokens=<span class="hljs-variable language_">self</span>.llm_config.max_tokens,
+        )
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">llm_embed</span>(<span class="hljs-params">self</span>) -&gt; Embeddings:
+        <span class="hljs-keyword">return</span> OpenAIEmbeddings(
+            model=<span class="hljs-variable language_">self</span>.embed_config.model_name,       <span class="hljs-comment"># 默认 text-embedding-3-small</span>
+            api_key=<span class="hljs-variable language_">self</span>.embed_config.api_key,
+            base_url=<span class="hljs-variable language_">self</span>.embed_config.base_url <span class="hljs-keyword">or</span> <span class="hljs-variable language_">self</span>.base_url,
+            dimensions=<span class="hljs-variable language_">self</span>.embed_config.dimensions,  <span class="hljs-comment"># 默认 1536 维</span>
+            timeout=<span class="hljs-variable language_">self</span>.embed_config.timeout,
+            max_retries=<span class="hljs-variable language_">self</span>.embed_config.max_retries,
+        )
+</code></pre>
+<h3>Ollama</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（ollama_client.py）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">OllamaClient</span>(<span class="hljs-title class_ inherited__">BaseClient</span>):
+    <span class="hljs-string">&quot;&quot;&quot;Ollama 客户端实现&quot;&quot;&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, config: AIConfig</span>):
+        <span class="hljs-built_in">super</span>().__init__(config)
+        <span class="hljs-variable language_">self</span>.base_url = <span class="hljs-variable language_">self</span>.llm_config.base_url <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;http://localhost:11434&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">llm_model</span>(<span class="hljs-params">self</span>) -&gt; BaseLanguageModel:
+        <span class="hljs-keyword">return</span> ChatOllama(
+            base_url=<span class="hljs-variable language_">self</span>.base_url,
+            model=<span class="hljs-variable language_">self</span>.llm_config.model_name,
+            temperature=<span class="hljs-variable language_">self</span>.llm_config.temperature,
+            num_predict=<span class="hljs-variable language_">self</span>.llm_config.max_tokens * <span class="hljs-number">4</span>,  <span class="hljs-comment"># 生成上限，按 token 计</span>
+            keep_alive=<span class="hljs-variable language_">self</span>.llm_config.timeout * <span class="hljs-number">5</span>,      <span class="hljs-comment"># 模型驻留内存时长</span>
+            seed=<span class="hljs-variable language_">self</span>.llm_config.seed,                   <span class="hljs-comment"># 显式传随机种子</span>
+            num_thread=<span class="hljs-number">8</span>,
+            client_kwargs=<span class="hljs-variable language_">self</span>._get_model_kwargs(),
+        )
+</code></pre>
+<h3>QWen</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（qwen_client.py）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">QwenClient</span>(<span class="hljs-title class_ inherited__">BaseClient</span>):
+    <span class="hljs-string">&quot;&quot;&quot;Qwen LLM 客户端实现&quot;&quot;&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, config: AIConfig</span>):
+        <span class="hljs-built_in">super</span>().__init__(config)
+        <span class="hljs-variable language_">self</span>.base_url = <span class="hljs-string">&quot;https://dashscope.aliyuncs.com/compatible-mode/v1&quot;</span>
+        os.environ[<span class="hljs-string">&quot;DASHSCOPE_API_KEY&quot;</span>] = <span class="hljs-variable language_">self</span>.llm_config.api_key.get_secret_value()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">llm_model</span>(<span class="hljs-params">self</span>) -&gt; BaseLanguageModel:
+        <span class="hljs-keyword">return</span> ChatTongyi(
+            model=<span class="hljs-variable language_">self</span>.llm_config.model_name,
+            model_kwargs=<span class="hljs-variable language_">self</span>._get_model_kwargs(),
+            api_key=<span class="hljs-variable language_">self</span>.llm_config.api_key,
+            max_retries=<span class="hljs-variable language_">self</span>.llm_config.max_retries,
+            streaming=<span class="hljs-literal">False</span>,  <span class="hljs-comment"># 结构化输出场景关闭流式</span>
+        )
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_get_model_kwargs</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-string">&quot;&quot;&quot;ChatTongyi 未直接暴露的采样参数经 model_kwargs 透传&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">return</span> {
+            <span class="hljs-string">&quot;temperature&quot;</span>: <span class="hljs-variable language_">self</span>.llm_config.temperature,
+            <span class="hljs-string">&quot;timeout&quot;</span>: <span class="hljs-variable language_">self</span>.llm_config.timeout,
+            <span class="hljs-string">&quot;max_tokens&quot;</span>: <span class="hljs-variable language_">self</span>.llm_config.max_tokens,
+        }
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（为什么这么设计）</strong>：</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>统一抽象，差异下沉</strong>：所有客户端继承 <code>BaseClient</code> 并只实现 <code>llm_model()</code> 与 <code>llm_embed()</code> 两个方法，上层智能体只依赖 LangChain 的 <code>BaseLanguageModel</code> / <code>Embeddings</code> 抽象，不感知厂商差异；新增厂商只需注册到 <code>CLIENT_REGISTRY</code>。</li>
+<li class="lvl-2"><strong>厂商自动探测</strong>：工厂函数 <code>detect_ai_provider_by_url()</code> 根据 <code>base_url</code> 域名路由客户端（<code>openai.com</code> → OpenAI、<code>aliyuncs.com</code> → Qwen、<code>deepseek.com</code> → DeepSeek，其余兜底 Ollama）。配置里只需填 <code>base_url</code>，减少一个必填字段、少一处出错点。</li>
+<li class="lvl-2"><strong>参数语义对齐是真实坑点</strong>：同样叫&quot;max tokens&quot;，Ollama 的 <code>num_predict</code> 按生成 token 计数，代码显式乘 4 留出余量；Qwen 的 <code>temperature/timeout</code> 只能经 <code>model_kwargs</code> 透传。切换厂商时这些隐性差异必须逐项确认，否则会出现&quot;配置没变、行为变了&quot;的排查难题。</li>
+<li class="lvl-2"><strong>环境变量是已知副作用</strong>：OpenAI/Qwen 客户端在构造时写入 <code>os.environ</code>（部分 LangChain 组件依赖环境变量读取密钥）。这是实现便利与副作用之间的取舍——同进程多客户端实例共存时环境变量会互相覆盖，属于当前实现的边界。</li>
+</ul>
+</blockquote>
+<h3>客户端工厂与降级链</h3>
+<p>配置初始化之外，真正决定&quot;AI 服务挂了系统还能不能跑&quot;的是工厂层的降级设计：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（client_factory.py，节选）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_default_llm</span>(<span class="hljs-params">**kwargs</span>) -&gt; <span class="hljs-type">Optional</span>[BaseLanguageModel]:
+    <span class="hljs-keyword">try</span>:
+        <span class="hljs-keyword">return</span> _get_default_llm(settings.get_llm_config())                <span class="hljs-comment"># ① 默认配置</span>
+    <span class="hljs-keyword">except</span> Exception:
+        warning(<span class="hljs-string">&quot;默认LLM模型初始化失败，尝试使用备用配置&quot;</span>)
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-keyword">return</span> _get_default_llm(settings.get_llm_config(<span class="hljs-string">&quot;fallback&quot;</span>))  <span class="hljs-comment"># ② 备用配置</span>
+        <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+            error(<span class="hljs-string">f&quot;LLM模型初始化失败（错误: <span class="hljs-subst">{<span class="hljs-built_in">str</span>(e)}</span>），系统将自动使用规则引擎模式继续工作&quot;</span>)
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>                                                   <span class="hljs-comment"># ③ 降级标记</span>
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：LLM 在 PenShot 中是&quot;增强项&quot;而非&quot;必需项&quot;。初始化链路为 默认配置 → fallback 备用配置 → 返回 <code>None</code> 并打日志，共三级。上层拿到 <code>None</code> 后转入纯规则路径（例如视频切分自动降级为规则切分），任务不会因 AI 服务不可用而整体失败——这是&quot;AI 辅助 + 规则兜底&quot;架构在客户端层的落点。代价是降级后的输出质量只能靠规则保证，且降级发生时只有一条日志，调用方需要自行监控。</p>
+</blockquote>
+<hr>
+<h2>二、提示词管理：YAML + 版本化 + 缓存</h2>
+<p><strong>背景</strong>：分镜质量高度依赖提示词质量。PenShot 对提示词做&quot;版本化、分语言、分智能体维护&quot;，避免散落在代码里难以迭代。每个智能体在 <code>prompts/{version}/{language}/</code> 下拥有独立 YAML，以**镜头拆分智能体（shot_segmenter）**的模板为例（以下为真实 YAML 节选，<code>version: 1.3</code>）。</p>
+<h3>提示词模板</h3>
+<pre class="hljs"><code><span class="hljs-attr">version:</span> <span class="hljs-string">&quot;1.3&quot;</span>
+<span class="hljs-attr">changelog:</span> <span class="hljs-string">|
+  - 2026-03-18: 规范化提示词，添加错误处理、镜头类型、完整示例和相关规则
+  - 2026-03-27: 添加修复参数，通过修复建议和问题修复问题
+  - 2026-03-30: 添加 history_hint 参数，支持记忆功能的 历史上下文提示
+</span>
+
+<span class="hljs-attr">shot_segmenter_system:</span>
+  <span class="hljs-attr">name:</span> <span class="hljs-string">&quot;shot_segmenter_system&quot;</span>
+  <span class="hljs-attr">description:</span> <span class="hljs-string">&quot;系统提示：将结构化剧本拆分为多个镜头序列节点&quot;</span>
+  <span class="hljs-attr">template:</span> <span class="hljs-string">|
+    你是一个专业的影视分镜师，负责将剧本场景转换为具体的镜头序列。
+</span>    
+    <span class="hljs-string">你的任务是根据提供的场景信息，生成合适的镜头序列，包括镜头类型、时长、构图和情感表达。</span>
+    
+    <span class="hljs-string">【规则约束】</span>
+      <span class="hljs-number">1</span><span class="hljs-string">.</span> <span class="hljs-string">生动描述:</span> <span class="hljs-string">画面描述要具体、生动，包含视觉细节、光影、氛围、角色状态和情感变化</span>
+      <span class="hljs-number">2</span><span class="hljs-string">.</span> <span class="hljs-string">连续性保证:</span> <span class="hljs-string">严格遵循连续性约束，确保角色外观、位置和状态的一致性</span>
+      <span class="hljs-number">3</span><span class="hljs-string">.</span> <span class="hljs-string">时长估算:</span> <span class="hljs-string">根据元素内容和类型合理估算每个镜头的时长，确保节奏感</span>
+      <span class="hljs-number">4</span><span class="hljs-string">.</span> <span class="hljs-string">镜头描述:</span> <span class="hljs-string">每个镜头的描述要简洁明了，突出视觉元素和情感氛围</span>
+      <span class="hljs-number">5</span><span class="hljs-string">.</span> <span class="hljs-string">角色聚焦:</span> <span class="hljs-string">镜头应突出主要角色，确保角色在镜头中的位置和状态一致</span>
+      <span class="hljs-number">6</span><span class="hljs-string">.</span> <span class="hljs-string">场景一致性:</span> <span class="hljs-string">确保同一场景内的镜头保持相同的视觉风格和环境元素</span>
+      <span class="hljs-number">7</span><span class="hljs-string">.</span> <span class="hljs-string">转场建议:</span> <span class="hljs-string">根据内容和节奏提供合理的转场建议，如切换、淡入淡出等</span>
+      <span class="hljs-number">8</span><span class="hljs-string">.</span> <span class="hljs-string">避免过度分割，保持镜头的视觉和叙事连贯性</span>
+      <span class="hljs-number">9</span><span class="hljs-string">.</span> <span class="hljs-string">片段时长控制:</span> <span class="hljs-string">根据内容类型和情感重量调整镜头时长，遵循以下建议：</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">快节奏动作/突发事件：1.5-2.5秒（如急刹、奔跑、意外发生）</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">对话/表情反应：2.5-4秒（根据台词长度和情感深度调整）</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">风景/环境建立：3-5秒（让观众有时间沉浸）</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">情感高潮/重要台词：4-6秒（给足情感发酵空间）</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">特写细节/道具揭示：2-3秒（确保观众看清关键信息）</span>
+    
+    <span class="hljs-string">【拆分规则】</span>
+      <span class="hljs-number">1</span><span class="hljs-string">.</span> <span class="hljs-string">对话元素通常用特写镜头（close_up）或中景（medium_shot），时长根据台词长度和情感重量估算：</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">简短台词（2-3秒）：2.5-3.5秒</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">中等长度台词（4-6秒）：3.5-5秒</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">长段情感台词（6-8秒）：5-7秒</span>
+      <span class="hljs-number">2</span><span class="hljs-string">.</span> <span class="hljs-string">重要：对话元素必须在镜头描述中完整逐字呈现，不可省略、概括或使用&quot;他说……&quot;代替。必须确保台词原文完整出现在描述中</span>
+      <span class="hljs-number">3</span><span class="hljs-string">.</span> <span class="hljs-string">动作元素通常用中景镜头（medium_shot），时长根据动作复杂度：</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">简单单一动作：1.5-2.5秒</span>
+         <span class="hljs-bullet">-</span> <span class="hljs-string">复合动作序列：2.5-4秒</span>
+      <span class="hljs-number">4</span><span class="hljs-string">.</span> <span class="hljs-string">场景描述用全景镜头（wide_shot），时长3-5秒</span>
+      <span class="hljs-number">5</span><span class="hljs-string">.</span> <span class="hljs-string">连续相关元素可以合并到一个镜头，避免过度分割</span>
+      <span class="hljs-number">6</span><span class="hljs-string">.</span> <span class="hljs-string">道具一致性：必须严格遵循【全剧上下文】中列出的关键道具描述，同一物品在不同镜头中的名称、外观、颜色、文字必须完全相同。</span>
+      <span class="hljs-number">7</span><span class="hljs-string">.</span> <span class="hljs-string">角色服装分配：必须严格遵循【全剧上下文】中列出的角色服装要求，不可混淆不同角色的服装特征</span>
+      <span class="hljs-number">8</span><span class="hljs-string">.</span> <span class="hljs-string">台词必须在相应镜头中完整出现</span>
+      <span class="hljs-number">9</span><span class="hljs-string">.</span> <span class="hljs-string">避免将单一元素/台词分割到多个镜头中，除非原始时长确实过长（超过7-8秒）</span>
+      <span class="hljs-number">10</span><span class="hljs-string">.</span> <span class="hljs-string">如果元素时长较短（&lt;3秒），通常用一个镜头完整呈现，不要分割</span>
+      <span class="hljs-number">11</span><span class="hljs-string">.</span> <span class="hljs-string">如果元素时长中等（3-6秒），评估内部是否有自然的视觉停顿点，否则保持单一镜头</span>
+      <span class="hljs-number">12</span><span class="hljs-string">.</span> <span class="hljs-string">如果元素确实需要分割（&gt;7秒），确保分割后的每个片段都有独立的视觉焦点或情感递进</span>
+    
+    <span class="hljs-string">【镜头衔接规则】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">wide_shot</span> <span class="hljs-string">→</span> <span class="hljs-string">medium_shot：空间定位</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">medium_shot</span> <span class="hljs-string">→</span> <span class="hljs-string">close_up：情感聚焦</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">close_up</span> <span class="hljs-string">→</span> <span class="hljs-string">close_up：视线匹配</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">避免同一镜头类型连续超过3次</span>
+    
+    <span class="hljs-string">【转场建议规则】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">场景变化：淡入淡出</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">情感高潮：直接切换</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">时间跳跃：叠化</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">视角转换：跟拍/摇移</span>
+    
+    <span class="hljs-string">【镜头选择规则】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">wide_shot:</span> <span class="hljs-string">远景/广角镜头，展现场景全貌和环境氛围</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">long_shot:</span> <span class="hljs-string">长焦镜头，压缩空间感，突出人物与背景关系</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">medium_shot:</span> <span class="hljs-string">中景镜头，展现人物上半身和动作，最常用的镜头类型</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">close_up:</span> <span class="hljs-string">特写镜头，聚焦面部表情或重要细节</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">extreme_close_up:</span> <span class="hljs-string">极特写，强调极端情绪或关键细节</span>
+    
+    
+    <span class="hljs-string">【元素分配规则】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">elem_001（开场）→</span> <span class="hljs-string">shot_001</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">elem_002（发展）→</span> <span class="hljs-string">shot_002-003</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">elem_003（高潮）→</span> <span class="hljs-string">shot_004</span>
+      
+    <span class="hljs-string">【关键要求】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">台词完整性：所有对话元素必须在相应镜头描述中完整逐字呈现，不可省略、概括或仅用&quot;说台词&quot;代替</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">道具一致性：同一物品在所有镜头中的名称、外观、颜色、文字内容必须完全一致</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">文字准确性：任何出现在物品上的文字必须在所有相关镜头中保持完全相同的表述</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">角色视觉标识：每个角色的服装颜色、配饰等视觉特征必须严格遵循剧本设定，在所有镜头中保持一致</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">角色服装分配：严格区分每个角色的专属服装特征，不可将A角色的服装特征错误分配给B角色</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">元素追踪：每个镜头的描述必须明确包含其对应的元素ID所代表的所有关键信息</span>
+
+    <span class="hljs-string">【错误处理】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">如果无法解析，返回空数组</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">如果置信度过低，标记为NEEDS_REVIEW</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">如果有矛盾信息，优先采用高置信度</span>
+        
+    <span class="hljs-string">【性能优化】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">缓存常用结果</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">并行处理独立片段</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">增量更新（只处理变化部分）</span>
+
+
+<span class="hljs-attr">shot_segmenter_user:</span>
+  <span class="hljs-attr">name:</span> <span class="hljs-string">&quot;shot_segmenter_user&quot;</span>
+  <span class="hljs-attr">description:</span> <span class="hljs-string">&quot;用户提示：提供剧本场景信息和元素列表，要求拆分为镜头序列&quot;</span>
+  <span class="hljs-attr">template:</span> <span class="hljs-string">|
+    请将以下剧本场景拆分为镜头序列。
+</span>    
+    <span class="hljs-string">【场景信息】</span>
+      <span class="hljs-string">地点：{location}</span>
+      <span class="hljs-string">时间：{time_of_day}</span>
+      <span class="hljs-string">天气：{weather}</span>
+      <span class="hljs-string">描述：{description}</span>
+    
+    <span class="hljs-string">【元素列表】</span>
+      {<span class="hljs-string">elements_list</span>}
+    
+    <span class="hljs-string">【全剧上下文】</span>
+      {<span class="hljs-string">global_context</span>}
+    
+    {<span class="hljs-string">repair_hint</span>}
+    
+    {<span class="hljs-string">history_hint</span>}
+    
+    <span class="hljs-string">【置信度评估】</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">0.9-1.0:</span> <span class="hljs-string">明确对应元素，拆分决策清晰</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">0.7-0.8:</span> <span class="hljs-string">基本合理，但有轻微不确定性</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">0.5-0.6:</span> <span class="hljs-string">推断成分较多，需人工复核</span>
+      
+    <span class="hljs-string">【输出格式】</span>
+      [
+        {{
+          <span class="hljs-attr">&quot;id&quot;:</span> <span class="hljs-string">&quot;shot_001&quot;</span>,
+          <span class="hljs-attr">&quot;description&quot;:</span> <span class="hljs-string">&quot;详细的镜头描述（必须包含完整台词）&quot;</span>,
+          <span class="hljs-attr">&quot;duration&quot;:</span> <span class="hljs-string">镜头的预估时长（秒），最短不要低于1秒，</span>
+          <span class="hljs-attr">&quot;shot_type&quot;:</span> <span class="hljs-string">&quot;wide_shot/long_shot/medium_shot/close_up/extreme_close_up&quot;</span>,
+          <span class="hljs-attr">&quot;main_character&quot;:</span> <span class="hljs-string">&quot;主要角色（如果有）&quot;</span>,
+          <span class="hljs-attr">&quot;emotion&quot;:</span> <span class="hljs-string">&quot;neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/heavy/other&quot;</span>,
+          <span class="hljs-attr">&quot;confidence&quot;:</span> <span class="hljs-string">置信度评分（0.0-1.0，表示分镜决策置信度）</span>,
+          <span class="hljs-attr">&quot;element_ids&quot;:</span> [<span class="hljs-string">&quot;元素列表中对应的元素ID，如：elem_001，elem_002&quot;</span>]
+        }}
+      ]
+    
+    <span class="hljs-string">【完整示例：场景拆分为镜头】</span>
+      <span class="hljs-string">输入：</span>
+        <span class="hljs-string">场景信息：咖啡店外长椅</span> <span class="hljs-string">|</span> <span class="hljs-string">下午</span> <span class="hljs-string">|</span> <span class="hljs-string">雨天</span> <span class="hljs-string">|</span> <span class="hljs-string">灰蒙蒙雨天，林小雨蹲在长椅旁擦书，神情焦急</span>
+        <span class="hljs-string">元素列表：</span>
+          <span class="hljs-number">1</span><span class="hljs-string">.</span> [<span class="hljs-string">scene</span>] <span class="hljs-string">雨声淅沥，镜头下摇，聚焦长椅。林小雨蹲在长椅旁擦书，神情焦急。</span> <span class="hljs-string">(4.0秒)</span>
+          <span class="hljs-number">2</span><span class="hljs-string">.</span> [<span class="hljs-string">dialogue</span>] <span class="hljs-string">林小雨：明明说好今天还书的……这雨下得，他会不会不来了？</span> <span class="hljs-string">(3.5秒)</span>
+        <span class="hljs-string">全剧上下文：</span>
+          <span class="hljs-string">【角色服装】林小雨：米白长裙配浅灰开衫</span>
+          <span class="hljs-string">【关键道具】《飞鸟集》：钴蓝色硬壳</span>
+      
+      <span class="hljs-string">输出：</span>
+        [
+          {{
+            <span class="hljs-attr">&quot;id&quot;:</span> <span class="hljs-string">&quot;shot_001&quot;</span>,
+            <span class="hljs-attr">&quot;description&quot;:</span> <span class="hljs-string">&quot;全景镜头：灰蒙蒙天空下，雨丝斜织，青砖地面泛光，绿色铁艺长椅静置红底白字招牌下；林小雨蹲在长椅右侧，米白长裙下摆微湿，浅灰开衫肩头洇水，双手捧着钴蓝色《飞鸟集》，神情焦虑。&quot;</span>,
+            <span class="hljs-attr">&quot;duration&quot;:</span> <span class="hljs-number">4.0</span>,
+            <span class="hljs-attr">&quot;shot_type&quot;:</span> <span class="hljs-string">&quot;wide_shot&quot;</span>,
+            <span class="hljs-attr">&quot;main_character&quot;:</span> <span class="hljs-string">&quot;林小雨&quot;</span>,
+            <span class="hljs-attr">&quot;emotion&quot;:</span> <span class="hljs-string">&quot;anxious&quot;</span>,
+            <span class="hljs-attr">&quot;confidence&quot;:</span> <span class="hljs-number">8.8</span>,
+            <span class="hljs-attr">&quot;element_ids&quot;:</span> [<span class="hljs-string">&quot;elem_001&quot;</span>]
+          }},
+          {{
+            <span class="hljs-attr">&quot;id&quot;:</span> <span class="hljs-string">&quot;shot_002&quot;</span>,
+            <span class="hljs-attr">&quot;description&quot;:</span> <span class="hljs-string">&quot;特写镜头：林小雨侧脸微抬，雨水沿发梢滑落，睫毛轻颤，声音轻颤：&#x27;明明说好今天还书的……这雨下得，他会不会不来了？&#x27;&quot;</span>,
+            <span class="hljs-attr">&quot;duration&quot;:</span> <span class="hljs-number">3.5</span>,
+            <span class="hljs-attr">&quot;shot_type&quot;:</span> <span class="hljs-string">&quot;close_up&quot;</span>,
+            <span class="hljs-attr">&quot;main_character&quot;:</span> <span class="hljs-string">&quot;林小雨&quot;</span>,
+            <span class="hljs-attr">&quot;emotion&quot;:</span> <span class="hljs-string">&quot;sad&quot;</span>,
+            <span class="hljs-attr">&quot;confidence&quot;:</span> <span class="hljs-number">8.5</span>,
+            <span class="hljs-attr">&quot;element_ids&quot;:</span> [<span class="hljs-string">&quot;elem_002&quot;</span>]
+          }}
+        ]
+    
+    <span class="hljs-string">直接返回合法的JSON结构，不要添加其他任何解释性文字和特殊符号。</span>
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（提示词工程）</strong>：</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>结构化约束驱动</strong>：给出&quot;规则 / 拆分 / 衔接 / 转场 / 镜头 / 元素分配&quot;六类规则，把分镜师的专业经验工程化为可执行约束。</li>
+<li class="lvl-2"><strong>One-shot 示例（few-shot）</strong>：提供输入→输出的完整示例，并要求&quot;直接返回合法的 JSON 结构&quot;，提升结构化输出稳定性。</li>
+<li class="lvl-2"><strong>占位回调</strong>：<code>{repair_hint}</code>（修复建议）与 <code>{history_hint}</code>（历史上下文）承接&quot;质量修复&quot;与&quot;记忆系统&quot;，让同一条模板在不同运行态下复用。</li>
+<li class="lvl-2"><strong>注意事项</strong>：切勿让 LLM 省略台词——&quot;台词完整性&quot;被反复强调，因为后台词缺失会直接破坏叙事。</li>
+</ul>
+</blockquote>
+<h3>提示词管理器</h3>
+<p>与 YAML 模板配套的是加载器 <code>PromptManager</code>（源码文件 <code>prompt_load_manager.py</code>，注意与做&quot;向量化模板复用&quot;的 <code>PromptTemplateManager</code> 是两个不同的类）。以下为真实源码节选：</p>
+<pre class="hljs"><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">PromptManager</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, version: <span class="hljs-built_in">str</span> = <span class="hljs-string">&quot;v1.x&quot;</span>, language: Language = Language.ZH</span>):
+        <span class="hljs-comment"># 默认使用当前文件的父目录</span>
+        <span class="hljs-variable language_">self</span>.prompt_dir = Path(__file__).parent / version / language.value
+        <span class="hljs-comment"># 缓存已加载的提示词模板 - 最大缓存1024个提示词</span>
+        <span class="hljs-variable language_">self</span>._prompt_cache: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]] = {}
+        <span class="hljs-variable language_">self</span>._all_prompts_loaded = <span class="hljs-literal">False</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_version</span>(<span class="hljs-params">self, name: <span class="hljs-built_in">str</span></span>) -&gt; <span class="hljs-built_in">str</span>:
+        <span class="hljs-string">&quot;&quot;&quot;获取指定名称提示词的版本
+
+        Args:
+            name: 提示词名称或标识符
+
+        Returns:
+            提示词版本字符串
+        &quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 检查缓存</span>
+        <span class="hljs-keyword">if</span> name <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>._prompt_cache:
+            <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>._prompt_cache[name].get(<span class="hljs-string">&quot;version&quot;</span>, <span class="hljs-string">&quot;unknown&quot;</span>)
+
+        <span class="hljs-comment"># 如果不在缓存中，先加载提示词</span>
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-variable language_">self</span>.get_prompt(name)  <span class="hljs-comment"># 这会更新缓存</span>
+            <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>._prompt_cache[name].get(<span class="hljs-string">&quot;version&quot;</span>, <span class="hljs-string">&quot;unknown&quot;</span>)
+        <span class="hljs-keyword">except</span> KeyError:
+            <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;unknown&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_all_prompts</span>(<span class="hljs-params">self</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]]:
+        <span class="hljs-string">&quot;&quot;&quot;获取所有可用的提示词模板
+
+        Returns:
+            所有提示词模板的字典，键为提示词名称，值为提示词配置
+        &quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 使用标志位避免重复加载所有提示词</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable language_">self</span>._all_prompts_loaded:
+            <span class="hljs-keyword">for</span> yaml_file <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.prompt_dir.glob(<span class="hljs-string">&quot;*.yaml&quot;</span>):
+                <span class="hljs-keyword">try</span>:
+                    <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(yaml_file, <span class="hljs-string">&quot;r&quot;</span>, encoding=<span class="hljs-string">&quot;utf-8&quot;</span>) <span class="hljs-keyword">as</span> f:
+                        data = yaml.safe_load(f)
+
+                        <span class="hljs-comment"># 处理嵌套结构</span>
+                        <span class="hljs-keyword">if</span> <span class="hljs-built_in">isinstance</span>(data, <span class="hljs-built_in">dict</span>):
+                            <span class="hljs-keyword">for</span> prompt_key, prompt_data <span class="hljs-keyword">in</span> data.items():
+                                <span class="hljs-keyword">if</span> <span class="hljs-built_in">isinstance</span>(prompt_data, <span class="hljs-built_in">dict</span>):
+                                    <span class="hljs-comment"># 使用name字段或键名作为缓存键</span>
+                                    <span class="hljs-comment"># cache_key = prompt_data.get(&quot;name&quot;, prompt_key)</span>
+                                    <span class="hljs-variable language_">self</span>._prompt_cache[prompt_key] = prompt_data
+                        <span class="hljs-comment"># 处理旧格式（注：此分支不可达——</span>
+                        <span class="hljs-comment"># 上面的 if isinstance(data, dict) 已捕获所有 dict 情况）</span>
+                        <span class="hljs-keyword">elif</span> <span class="hljs-built_in">isinstance</span>(data, <span class="hljs-built_in">dict</span>) <span class="hljs-keyword">and</span> <span class="hljs-string">&quot;name&quot;</span> <span class="hljs-keyword">in</span> data:
+                            <span class="hljs-variable language_">self</span>._prompt_cache[data[<span class="hljs-string">&quot;name&quot;</span>]] = data
+                <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+                    error(<span class="hljs-string">f&quot;加载提示词文件 <span class="hljs-subst">{yaml_file}</span> 时出错: <span class="hljs-subst">{<span class="hljs-built_in">str</span>(e)}</span>&quot;</span>)
+                    print_log_exception()
+                    <span class="hljs-keyword">continue</span>
+
+            <span class="hljs-comment"># 标记所有提示词已加载</span>
+            <span class="hljs-variable language_">self</span>._all_prompts_loaded = <span class="hljs-literal">True</span>
+
+            <span class="hljs-comment"># 限制缓存大小为1024个提示词</span>
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(<span class="hljs-variable language_">self</span>._prompt_cache) &gt; <span class="hljs-number">1024</span>:
+                <span class="hljs-comment"># 只保留最新的1024个提示词</span>
+                <span class="hljs-variable language_">self</span>._prompt_cache = <span class="hljs-built_in">dict</span>(<span class="hljs-built_in">list</span>(<span class="hljs-variable language_">self</span>._prompt_cache.items())[-<span class="hljs-number">1024</span>:])
+
+        <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>._prompt_cache.copy()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_prompt</span>(<span class="hljs-params">self, name: <span class="hljs-built_in">str</span>, file_name: <span class="hljs-built_in">str</span> = <span class="hljs-literal">None</span></span>) -&gt; <span class="hljs-built_in">str</span>:
+        <span class="hljs-string">&quot;&quot;&quot;获取指定名称的提示词模板
+        
+        Args:
+            name: 提示词名称或标识符
+            
+        Returns:
+            提示词模板字符串
+        
+        匹配策略（按优先级）：
+        1. 首先检查缓存
+        2. 对于嵌套格式，优先通过键名(prompt_key)匹配
+        3. 对于嵌套格式，其次通过name字段匹配
+        4. 对于简单格式，通过name字段匹配
+        5. 尝试移除_prompt后缀进行匹配（兼容重命名后的文件）
+        &quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 检查缓存</span>
+        <span class="hljs-keyword">if</span> name <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>._prompt_cache:
+            <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>._prompt_cache[name].get(<span class="hljs-string">&quot;template&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+
+        <span class="hljs-comment"># 尝试多种匹配方式</span>
+        match_methods = [
+            <span class="hljs-comment"># 原始名称匹配</span>
+            name,
+            <span class="hljs-comment"># 尝试移除_prompt后缀匹配（兼容文件重命名）</span>
+            name.replace(<span class="hljs-string">&quot;_prompt&quot;</span>, <span class="hljs-string">&quot;&quot;</span>) <span class="hljs-keyword">if</span> name.endswith(<span class="hljs-string">&quot;_prompt&quot;</span>) <span class="hljs-keyword">else</span> <span class="hljs-literal">None</span>
+        ]
+
+        <span class="hljs-comment"># 移除None值</span>
+        match_methods = [m <span class="hljs-keyword">for</span> m <span class="hljs-keyword">in</span> match_methods <span class="hljs-keyword">if</span> m]
+
+        data = <span class="hljs-variable language_">self</span>.get_all_prompts()  <span class="hljs-comment"># 确保所有提示词已加载</span>
+
+        <span class="hljs-comment"># 查找所有YAML文件</span>
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-keyword">for</span> prompt_key, prompt_data <span class="hljs-keyword">in</span> data.items():
+                <span class="hljs-comment"># 对每种匹配方式尝试键名和name字段匹配</span>
+                <span class="hljs-keyword">for</span> match_name <span class="hljs-keyword">in</span> match_methods:
+                    <span class="hljs-comment"># 优先通过键名匹配</span>
+                    <span class="hljs-keyword">if</span> prompt_key == match_name:
+                        <span class="hljs-keyword">return</span> prompt_data.get(<span class="hljs-string">&quot;template&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+                    <span class="hljs-comment"># 其次通过name字段匹配</span>
+                    <span class="hljs-keyword">if</span> prompt_data.get(<span class="hljs-string">&quot;name&quot;</span>) == match_name:
+                        <span class="hljs-keyword">return</span> prompt_data.get(<span class="hljs-string">&quot;template&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+        <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+            <span class="hljs-comment"># 记录错误但继续尝试其他文件</span>
+            error(<span class="hljs-string">f&quot;加载提示词文件 <span class="hljs-subst">{match_methods}</span> 时出错: <span class="hljs-subst">{<span class="hljs-built_in">str</span>(e)}</span>&quot;</span>)
+
+        <span class="hljs-comment"># 如果找不到指定名称的提示词，抛出异常</span>
+        <span class="hljs-keyword">raise</span> KeyError(<span class="hljs-string">f&quot;提示词模板 &#x27;<span class="hljs-subst">{name}</span>&#x27; 不存在&quot;</span>)
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_name_prompt</span>(<span class="hljs-params">self, name</span>) -&gt; <span class="hljs-built_in">str</span>:
+        <span class="hljs-string">&quot;&quot;&quot;获取剧本解析提示词模板&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>.get_prompt(name)
+
+
+prompt_manager = PromptManager(version=prompts.__version__, language=get_language())
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>懒加载 + 标志位</strong>：用 <code>_all_prompts_loaded</code> 保证所有 YAML 只全量加载一次，避免反复 IO。</li>
+<li class="lvl-2"><strong>多策略匹配 &amp; 容量上限</strong>：<code>get_prompt()</code> 按&quot;缓存 → 键名 → name 字段 → 去 <code>_prompt</code> 后缀&quot;逐级匹配；缓存超过 1024 条时只保留最新 1024 条，防内存膨胀。</li>
+<li class="lvl-2"><strong>注意事项</strong>：模板以 <code>version + language</code> 目录隔离，切换语言/版本即切换目录，便于 A/B 调试。</li>
+<li class="lvl-2"><strong>已知代码缺陷（如实记录）</strong>：<code>get_all_prompts()</code> 中&quot;处理旧格式&quot;的 <code>elif isinstance(data, dict) and &quot;name&quot; in data</code> 分支永远不可达——上面的 <code>if isinstance(data, dict)</code> 已捕获全部 dict 情形，这是历史重构的残留；另外 <code>get_prompt()</code> 的 docstring 列出了 5 条匹配策略，实现层实际只落地了其中 2 条。这类&quot;文档与实现漂移&quot;不影响主流程，但会误导二次开发者，属于可以顺手清理的技术债。</li>
+</ul>
+</blockquote>
+<h3>提示词组装（带重试的 LLM 调用）</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（base_llm_agent.py）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_call_llm_chat_with_retry</span>(<span class="hljs-params">self, system_prompt: <span class="hljs-built_in">str</span>, user_prompt, max_retries: <span class="hljs-built_in">int</span> = <span class="hljs-number">2</span></span>) -&gt; <span class="hljs-type">Optional</span>[<span class="hljs-built_in">str</span>]:
+    <span class="hljs-string">&quot;&quot;&quot;
+        调用LLM，直接返回json字符串（支持重试）
+    &quot;&quot;&quot;</span>
+    messages = [
+        {<span class="hljs-string">&quot;role&quot;</span>: <span class="hljs-string">&quot;system&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: system_prompt},
+        {<span class="hljs-string">&quot;role&quot;</span>: <span class="hljs-string">&quot;user&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: user_prompt}
+    ]
+
+    <span class="hljs-keyword">for</span> attempt <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(max_retries):
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-keyword">return</span> llm_chat_complete(<span class="hljs-variable language_">self</span>.llm, messages)  <span class="hljs-comment"># 直接使用实例持有的 self.llm</span>
+
+        <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+            <span class="hljs-keyword">if</span> attempt == max_retries - <span class="hljs-number">1</span>:
+                <span class="hljs-keyword">raise</span> Exception(<span class="hljs-string">f&quot;LLM调用失败: <span class="hljs-subst">{e}</span>&quot;</span>)
+            time.sleep(<span class="hljs-number">1</span>)
+
+<span class="hljs-comment"># 真实源码（client_factory.py）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">llm_chat_complete</span>(<span class="hljs-params">llm: BaseLanguageModel, messages: <span class="hljs-type">List</span>[<span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-built_in">str</span>]], **kwargs</span>) -&gt; <span class="hljs-built_in">str</span>:
+    <span class="hljs-string">&quot;&quot;&quot; LLM 聊天接口封装 &quot;&quot;&quot;</span>
+    response = llm.invoke(_convert_messages(messages), **kwargs)
+    <span class="hljs-keyword">return</span> response.content
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：超时/网络抖动导致调用异常时，先 <code>sleep(1)</code> 再重试（默认 <code>max_retries=2</code>）；最后一次仍失败则显式上抛，交由工作流节点层的异常处理与三级循环控制接管（见第四节）。</p>
+<p><strong>注意事项（如实记录）</strong>：重试间隔是写死的 <code>time.sleep(1)</code>，并未使用 <code>LLMBaseConfig.retry_delay</code> 配置项；也没有区分&quot;可重试错误/不可重试错误&quot;——参数类的 4xx 错误同样会重试 2 次再上抛。这是用增加延迟换取实现简单，属于当前版本可优化的边界。</p>
+</blockquote>
+<hr>
+<h2>三、全局一致性保证</h2>
+<p><strong>背景</strong>：拼接视频的致命伤是角色/道具/场景在不同片段间&quot;变样&quot;。PenShot 从源码层面用三种手段保证一致性。</p>
+<h3>连续性锚点传递</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（continuity_guardian_models.py）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ContinuityAnchor</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    <span class="hljs-string">&quot;&quot;&quot;连续性锚点 - 用于约束生成&quot;&quot;&quot;</span>
+
+    anchor_id: <span class="hljs-built_in">str</span>                     <span class="hljs-comment"># 锚点唯一标识</span>
+    anchor_type: <span class="hljs-built_in">str</span>                   <span class="hljs-comment"># 锚点类型: character, scene, prop, style</span>
+
+    <span class="hljs-comment"># 锚点内容</span>
+    name: <span class="hljs-built_in">str</span>                          <span class="hljs-comment"># 锚点名称</span>
+    value: <span class="hljs-type">Any</span>                         <span class="hljs-comment"># 锚点值</span>
+
+    <span class="hljs-comment"># 约束范围</span>
+    start_time: <span class="hljs-built_in">float</span> = <span class="hljs-number">0.0</span>            <span class="hljs-comment"># 生效开始时间</span>
+    end_time: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">float</span>] = <span class="hljs-literal">None</span>   <span class="hljs-comment"># 生效结束时间</span>
+    fragment_range: <span class="hljs-type">Optional</span>[<span class="hljs-type">List</span>[<span class="hljs-built_in">int</span>]] = <span class="hljs-literal">None</span>  <span class="hljs-comment"># 生效片段范围</span>
+
+    <span class="hljs-comment"># 优先级与元数据</span>
+    priority: <span class="hljs-built_in">int</span> = <span class="hljs-number">1</span>                  <span class="hljs-comment"># 优先级（越高越重要）</span>
+    metadata: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>] = {}
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">is_active_at</span>(<span class="hljs-params">self, time: <span class="hljs-built_in">float</span></span>) -&gt; <span class="hljs-built_in">bool</span>:
+        <span class="hljs-string">&quot;&quot;&quot;检查锚点是否在指定时间生效&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">if</span> time &lt; <span class="hljs-variable language_">self</span>.start_time:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.end_time <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">and</span> time &gt; <span class="hljs-variable language_">self</span>.end_time:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+
+<span class="hljs-comment"># 片段间传递的连续性备注（简化示意）</span>
+fragment.continuity_notes = {
+    <span class="hljs-string">&quot;main_character&quot;</span>: <span class="hljs-string">&quot;林小雨&quot;</span>,
+    <span class="hljs-string">&quot;location&quot;</span>: <span class="hljs-string">&quot;咖啡店门口&quot;</span>,
+    <span class="hljs-string">&quot;props&quot;</span>: [<span class="hljs-string">&quot;《飞鸟集》&quot;</span>],
+    <span class="hljs-string">&quot;character_consistency&quot;</span>: <span class="hljs-string">&quot;米白长裙+浅灰开衫&quot;</span>
+}
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：锚点不是简单几个字段，而是带&quot;生效范围&quot;的约束对象——<code>start_time</code>/<code>end_time</code>/<code>fragment_range</code> 限定它只在某个时间区间或片段区间内有效（例如&quot;雨伞&quot;道具从第 3 个片段才出现），<code>priority</code> 用于多条约束冲突时的取舍，<code>is_active_at()</code> 供下游按时间轴查询&quot;此刻哪些约束生效&quot;。设计动因很直接：把一致性从&quot;每处手写描述&quot;升级为&quot;结构化、可查询、有作用域&quot;的约束数据，避免前一个片段还穿米白裙、后一个片段就换了外套。</p>
+</blockquote>
+<h3>修复参数反馈</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（quality_auditor_models.py，节选）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">QualityRepairParams</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    fix_needed: <span class="hljs-built_in">bool</span> = <span class="hljs-literal">False</span>                   <span class="hljs-comment"># 是否需要修复</span>
+    issue_count: <span class="hljs-built_in">int</span> = <span class="hljs-number">0</span>                       <span class="hljs-comment"># 问题数量</span>
+    issue_types: <span class="hljs-type">List</span>[<span class="hljs-built_in">str</span>] = []                <span class="hljs-comment"># 修复类型（如 &quot;character_inconsistent&quot;）</span>
+    issues: <span class="hljs-type">List</span>[<span class="hljs-type">Any</span>] = []                     <span class="hljs-comment"># 完整问题列表</span>
+    fragments: <span class="hljs-type">List</span>[<span class="hljs-built_in">str</span>] = []                  <span class="hljs-comment"># 对应片段 ID 集合</span>
+    suggestions: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">List</span>[<span class="hljs-built_in">str</span>]] = <span class="hljs-literal">None</span>   <span class="hljs-comment"># 修复建议</span>
+    severity_summary: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-built_in">int</span>] = <span class="hljs-literal">None</span>    <span class="hljs-comment"># 严重程度摘要</span>
+
+<span class="hljs-comment"># 真实源码（base_repairable_agent.py）：节点执行前注入修复参数</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">apply_repair_params</span>(<span class="hljs-params">self, node: PipelineNode, repair_params: QualityRepairParams</span>) -&gt; <span class="hljs-literal">None</span>:
+    <span class="hljs-string">&quot;&quot;&quot;应用修复参数（在下次执行时生效）&quot;&quot;&quot;</span>
+    <span class="hljs-variable language_">self</span>.current_repair_params = repair_params
+    info(<span class="hljs-string">f&quot;<span class="hljs-subst">{node.value}</span>节点收到修复参数，问题类型: <span class="hljs-subst">{repair_params.issue_types}</span>&quot;</span>)
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：质量审计发现问题后，把&quot;问题类型 + 涉及片段 + 严重程度 + 修复建议&quot;封装成参数，由工作流在节点下一次执行前调用 <code>apply_repair_params()</code> 注入；智能体随后在组装提示词时生成 <code>{repair_hint}</code> 段（呼应第二节 YAML 中的占位符），实现&quot;定向修复&quot;而非盲目重跑。注意语义：修复参数是&quot;下次执行生效&quot;，且 <code>suggestions</code> 由审计阶段生成——这意味着审计若漏检，修复就无从谈起，质量修复能力上限取决于审计规则的覆盖度。</p>
+</blockquote>
+<h3>全局设置（真实实现）</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（prompt_converter_models.py）：指令包的全局设置默认值</span>
+global_settings: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>] = Field(
+    default_factory=<span class="hljs-keyword">lambda</span>: {
+        <span class="hljs-string">&quot;style_consistency&quot;</span>: <span class="hljs-literal">True</span>,
+        <span class="hljs-string">&quot;use_common_negative_prompt&quot;</span>: <span class="hljs-literal">True</span>
+    }
+)
+
+<span class="hljs-comment"># 真实源码（prompt_converter_models.py）：音频提示词的片段级 seed</span>
+seed: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">int</span>] = Field(
+    default=<span class="hljs-literal">None</span>,
+    description=<span class="hljs-string">&quot;随机种子。用于重现相同结果&quot;</span>
+)
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：真实实现里并没有&quot;全片段写死同一个魔数种子&quot;的做法。PenShot 的一致性走两条路径：① 指令包携带 <code>style_consistency</code>、<code>use_common_negative_prompt</code> 全局开关，并把每个片段的风格收敛到统一的 <code>default_style</code>（默认 <code>cinematic</code>）与公共负面提示词；② 随机种子分两层——LLM 层的 <code>LLMBaseConfig.seed</code>（默认随机生成，仅 Ollama 客户端向下传递，影响文本生成的可复现性）与音频提示词层的 <code>AudioPrompt.seed</code>（默认 <code>None</code>，由 LLM 生成音频参数时可选填充）。</p>
+<p><strong>注意事项（如实记录）</strong>：<code>LLMBaseConfig.seed</code> 在 OpenAI/Qwen 客户端并未向下传递；视频画面的采样种子最终由下游视频模型决定，PenShot 输出的是提示词包，并不直接控制生成模型的随机性。把&quot;固定种子&quot;说成 PenShot 保证画面风格一致的核心手段并不准确——它保证的是&quot;指令一致性&quot;，画面一致性需要生成侧配合。</p>
+</blockquote>
+<hr>
+<h2>四、重试与无限循环控制</h2>
+<p><strong>背景</strong>：多智能体、多阶段工作流极易在某节点卡死或无限自旋。PenShot 用&quot;硬限制 + 软限制 + 全局后备&quot;三套计数器兜底。</p>
+<pre class="mermaid">graph TB
+    subgraph &quot;重试控制流程&quot;
+        A[节点开始] --&gt; B{硬限制检查&lt;br/&gt;_check_and_increment_node_loop}
+        B --&gt;|超限| C[返回 FAILED/NEEDS_HUMAN]
+        B --&gt;|通过| D[执行节点逻辑]
+        
+        D --&gt; E{执行成功?}
+        E --&gt;|异常| F[进入 Error Handler]
+        E --&gt;|成功| G[调用决策函数]
+        
+        G --&gt; H{决策结果}
+        H --&gt;|SUCCESS/VALID| I[重置软限制计数]
+        I --&gt; J[继续下一节点]
+        
+        H --&gt;|NEEDS_RETRY| K{软限制检查&lt;br/&gt;_can_retry_stage}
+        K --&gt;|未超限| L[重试计数+1]
+        L --&gt; A
+        
+        K --&gt;|已超限| M[降级为 NEEDS_REPAIR]
+        M --&gt; N[应用修复参数]
+        N --&gt; A
+    end
+    
+    subgraph &quot;计数器说明&quot;
+        O[&quot;硬限制计数器 (node_current_loops)&lt;br/&gt;• 每次进入 +1&lt;br/&gt;• 永不重置&lt;br/&gt;• 防止死循环&quot;]
+        P[&quot;软限制计数器 (stage_current_retries)&lt;br/&gt;• 仅 NEEDS_RETRY 时 +1&lt;br/&gt;• 成功时重置&lt;br/&gt;• 控制质量重试&quot;]
+        Q[&quot;全局计数器 (global_current_loops)&lt;br/&gt;• 每次节点进入 +1&lt;br/&gt;• 所有节点共享&lt;br/&gt;• 最后防线&quot;]
+    end
+    
+    style B fill:#FF5722,color:white
+    style K fill:#FF9800,color:black
+    style H fill:#FFEB3B,color:black
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">机制</th>
+<th style="text-align:left">计数器</th>
+<th style="text-align:left">触发条件</th>
+<th style="text-align:left">重置条件</th>
+<th style="text-align:left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>硬限制</strong></td>
+<td style="text-align:left"><code>node_current_loops</code></td>
+<td style="text-align:left">每次进入节点</td>
+<td style="text-align:left">永不重置</td>
+<td style="text-align:left">防止死循环</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>软限制</strong></td>
+<td style="text-align:left"><code>stage_current_retries</code></td>
+<td style="text-align:left">决策返回 <code>NEEDS_RETRY</code></td>
+<td style="text-align:left">成功时重置为0</td>
+<td style="text-align:left">控制质量重试</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>全局后备</strong></td>
+<td style="text-align:left"><code>global_current_loops</code></td>
+<td style="text-align:left">每次进入节点</td>
+<td style="text-align:left">永不重置</td>
+<td style="text-align:left">最后防线</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>关键设计原则</strong>：</p>
+<ol>
+<li class="lvl-3">软限制失败后降级为 <code>NEEDS_REPAIR</code>，不是直接失败</li>
+<li class="lvl-3">修复参数会随 <code>NEEDS_REPAIR</code> 传递，指导节点如何修复</li>
+<li class="lvl-3">全局限制作为兜底，防止极端情况下的无限循环</li>
+</ol>
+<p><strong>全局 80% 预警（真实源码 workflow_decision.py）</strong>：全局循环用到 80% 时发出一次 <code>warning</code> 日志——条件为 <code>global_current_loops &gt;= global_max_loops * 0.8 and not loop_warning_issued</code>，由 <code>loop_warning_issued</code> 标志位保证只发一次。这是典型的&quot;软着陆&quot;设计：等到 100% 直接 <code>FAILED</code> 时往往来不及排查，80% 预警给了运维介入的窗口。</p>
+<p><strong>默认参数参考（真实源码 workflow_state_types.py）</strong>：节点硬限制按节点差异化配置（<code>PARSE_SCRIPT: 3</code>、<code>SEGMENT_SHOT: 5</code>、<code>SPLIT_VIDEO: 5</code>、<code>AUDIT_QUALITY: 3</code>、<code>HUMAN_INTERVENTION: 1</code>）；阶段软限制多为 3（<code>AUDIT_QUALITY</code>、<code>CONTINUITY_CHECK</code> 为 2）；全局上限默认 <code>global_max_loops = 30</code>，工作流启动时按&quot;所有节点最大循环次数之和 × 2&quot;推导（<code>workflow_pipeline.py</code> 的 2 倍安全系数）。</p>
+</blockquote>
+<h3>双重保护机制</h3>
+<pre class="mermaid">graph TB
+    subgraph &quot;进入节点&quot;
+        A[节点执行] --&gt; B[_check_and_increment_node_loop&lt;br/&gt;硬限制检查]
+    end
+    
+    subgraph &quot;硬限制 (Node Loop Control)&quot;
+        B --&gt; C{节点循环次数&lt;br/&gt;≥ node_max_loops?}
+        C --&gt;|是| D[FAILED / NEEDS_HUMAN]
+        C --&gt;|否| E[继续执行节点逻辑]
+    end
+    
+    subgraph &quot;节点执行&quot;
+        E --&gt; F[节点业务逻辑]
+        F --&gt; G{执行成功?}
+        G --&gt;|异常| H[进入错误处理]
+        G --&gt;|成功| I[决策函数]
+    end
+    
+    subgraph &quot;软限制 (Stage Retry Control)&quot;
+        I --&gt; J{质量问题?}
+        J --&gt;|需要重试| K{stage_current_retries&lt;br/&gt;&gt;= stage_max_retries?}
+        K --&gt;|否| L[NEEDS_RETRY + 重试计数+1&lt;br/&gt;重新执行节点]
+        K --&gt;|是| M[NEEDS_REPAIR / NEEDS_HUMAN]
+        J --&gt;|成功| N[重置重试计数=0&lt;br/&gt;继续下一节点]
+    end
+    
+    subgraph &quot;全局后备&quot;
+        O[全局循环检查] --&gt; P{global_current_loops&lt;br/&gt;&gt;= global_max_loops?}
+        P --&gt;|是| Q[强制失败]
+    end
+    
+    style C fill:#FF5722,color:white
+    style K fill:#FF9800,color:black
+    style P fill:#F44336,color:white
+</pre>
+<h3>计数变化时序图</h3>
+<pre class="mermaid">sequenceDiagram
+    participant Node as 节点
+    participant Hard as 硬限制计数器
+    participant Soft as 软限制计数器
+    
+    Note over Node,Soft: 第一次执行
+    Node-&gt;&gt;Hard: +1 (0→1)
+    Node-&gt;&gt;Soft: 0 (初始)
+    Node-&gt;&gt;Node: 执行失败，需要重试
+    Node-&gt;&gt;Soft: +1 (0→1)
+    Node--&gt;&gt;Node: 返回 NEEDS_RETRY
+    
+    Note over Node,Soft: 重试执行
+    Node-&gt;&gt;Hard: +1 (1→2)
+    Node-&gt;&gt;Soft: 1 (不变)
+    Node-&gt;&gt;Node: 执行成功
+    Node-&gt;&gt;Soft: 重置 (1→0)
+    Node--&gt;&gt;Node: 继续下一节点
+    
+    Note over Node,Soft: 后续因修复再次进入
+    Node-&gt;&gt;Hard: +1 (2→3)
+    Node-&gt;&gt;Soft: 0→1 (新周期)
+    Node-&gt;&gt;Node: 成功
+    Node-&gt;&gt;Soft: 重置 (1→0)
+    
+    Note over Hard: 硬限制持续累积&lt;br/&gt;软限制周期性重置
+</pre>
+<h3>决策状态流转图</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 节点执行
+    
+    节点执行 --&gt; 成功: 业务逻辑成功
+    节点执行 --&gt; 异常: 抛出异常
+    
+    成功 --&gt; 决策函数
+    异常 --&gt; 错误处理
+    
+    决策函数 --&gt; SUCCESS: 无质量问题
+    决策函数 --&gt; VALID: 轻微问题，可接受
+    决策函数 --&gt; NEEDS_RETRY: 有问题，可重试
+    决策函数 --&gt; NEEDS_REPAIR: 需修复后重试
+    决策函数 --&gt; NEEDS_HUMAN: 需人工干预
+    决策函数 --&gt; FAILED: 严重失败
+    
+    NEEDS_RETRY --&gt; 检查软限制
+    
+    检查软限制 --&gt; 节点执行: 未超限 (current &lt; max)
+    检查软限制 --&gt; NEEDS_REPAIR: 已超限
+    
+    NEEDS_REPAIR --&gt; 节点执行: 应用修复参数后重试
+    
+    SUCCESS --&gt; [*]: 重置软限制，继续流程
+    VALID --&gt; [*]: 重置软限制，继续流程
+    NEEDS_HUMAN --&gt; [*]: 等待人工决策
+    FAILED --&gt; [*]: 进入错误处理
+    
+    错误处理 --&gt; 节点执行: 可恢复错误，重新开始
+    错误处理 --&gt; NEEDS_HUMAN: 不可恢复
+    错误处理 --&gt; [*]: 中止流程
+</pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：状态机把&quot;执行结果&quot;和&quot;质量评估&quot;解耦——业务逻辑成功 ≠ 质量合格，是否重试由决策函数 + 软限制共同决定；无法恢复的错误才走到 <code>NEEDS_HUMAN</code> 或 <code>FAILED</code>。</p>
+<p><strong>注意事项</strong>：硬/全局计数器&quot;永不重置&quot;，是进程级防失控的最终闸门；因此排查瓶颈时应优先看软限制（质量重试）而不是硬限制。</p>
+</blockquote>
+<hr>
+<h2>五、任务池管理</h2>
+<p>Penshot 采用基于 <strong>TaskFactory</strong> 的任务池管理架构，支持高并发任务处理、队列管理和状态持久化。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Client[客户端层]
+        A1[API请求]
+        A2[MCP调用]
+        A3[Python库]
+    end
+
+    subgraph TaskPool[任务池层]
+        B1[TaskFactory&lt;br/&gt;任务工厂]
+        B2[有序任务队列&lt;br/&gt;按优先级插入的列表]
+        B3[AsyncTaskProcessor&lt;br/&gt;异步处理器]
+        B4[TaskManager&lt;br/&gt;状态持久化]
+    end
+
+    subgraph Storage[存储层]
+        C1[Redis&lt;br/&gt;任务状态]
+        C2[内存缓存&lt;br/&gt;工作流实例]
+    end
+
+    subgraph Executor[执行层]
+        D1[Worker Pool&lt;br/&gt;工作线程池]
+        D2[MultiAgentPipeline&lt;br/&gt;智能体流程]
+    end
+
+    A1 --&gt; B1
+    A2 --&gt; B1
+    A3 --&gt; B1
+    B1 --&gt;|创建并登记任务| B4
+    B1 --&gt;|按优先级入队| B2
+    B2 --&gt;|出队| B3
+    B3 --&gt; D1
+    D1 --&gt; D2
+    B4 --&gt; C1
+    B4 --&gt; C2
+</pre>
+<h3>核心组件</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">职责</th>
+<th style="text-align:left">真实实现特性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>TaskFactory</strong></td>
+<td style="text-align:left">任务提交与管理</td>
+<td style="text-align:left">同步/异步模式、回调支持、批量提交</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>有序任务队列</strong></td>
+<td style="text-align:left">优先级排序</td>
+<td style="text-align:left">4 级优先级、有序插入、队列满拒绝（上限 1000）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>AsyncTaskProcessor</strong></td>
+<td style="text-align:left">异步任务处理</td>
+<td style="text-align:left">并发控制（默认 10）、队列状态统计、待恢复任务重启</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>TaskManager</strong></td>
+<td style="text-align:left">状态持久化</td>
+<td style="text-align:left">Redis/内存双后端、TTL 过期</td>
+</tr>
+</tbody>
+</table>
+<h3>优先级管理</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（task_models.py）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">TaskPriority</span>(<span class="hljs-built_in">int</span>, Enum):
+    <span class="hljs-string">&quot;&quot;&quot;任务优先级&quot;&quot;&quot;</span>
+    LOW = <span class="hljs-number">1</span>
+    NORMAL = <span class="hljs-number">2</span>
+    HIGH = <span class="hljs-number">3</span>
+    CRITICAL = <span class="hljs-number">4</span>
+
+<span class="hljs-comment"># 真实源码（task_processor.py）：出队顺序映射（排序键越小越先出队）</span>
+<span class="hljs-variable language_">self</span>._priority_order = {
+    TaskPriority.CRITICAL: <span class="hljs-number">0</span>,
+    TaskPriority.HIGH: <span class="hljs-number">1</span>,
+    TaskPriority.NORMAL: <span class="hljs-number">2</span>,
+    TaskPriority.LOW: <span class="hljs-number">3</span>,
+}
+
+<span class="hljs-comment"># 入队：从头找到第一个排序键更大的任务，插入其前</span>
+<span class="hljs-keyword">for</span> i, existing <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(<span class="hljs-variable language_">self</span>._queue):
+    <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>._priority_order[queued_task.priority] &lt; <span class="hljs-variable language_">self</span>._priority_order[existing.priority]:
+        <span class="hljs-variable language_">self</span>._queue.insert(i, queued_task)
+        <span class="hljs-keyword">break</span>
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（为什么不用 heapq）</strong>：<code>heapq</code> 能做到 O(log n) 入队，但 PenShot 选择 <code>list.insert</code> 有序插入（最坏 O(n)）。原因在于队列还要支持按 <code>task_id</code> 遍历与移除——<code>cancel_task()</code> 的实现就是 <code>for i, queued in enumerate(self._queue)</code> 找到后 <code>del</code>；用堆实现这种操作反而更绕且需要延迟删除。队列上限 1000 的量级也不构成性能瓶颈。这是&quot;数据结构选型服从业务操作集合&quot;的典型例子；若队列规模升到数万级，才值得考虑堆 + 懒删除方案。</p>
+</blockquote>
+<h3>任务状态流转</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: 创建任务
+    PENDING --&gt; PROCESSING: 开始处理
+    PROCESSING --&gt; SUCCESS: 处理成功
+    PROCESSING --&gt; FAILED: 处理失败
+    PROCESSING --&gt; CANCELLED: 用户取消
+    PENDING --&gt; CANCELLED: 用户取消
+    SUCCESS --&gt; [*]
+    FAILED --&gt; [*]
+    CANCELLED --&gt; [*]
+</pre>
+<h3>使用示例</h3>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> create_penshot_agent
+
+<span class="hljs-comment"># 创建任务池（签名与默认值来自真实源码 function_calls.py）</span>
+agent = create_penshot_agent(
+    max_concurrent=<span class="hljs-number">10</span>,   <span class="hljs-comment"># 默认 10</span>
+    queue_size=<span class="hljs-number">1000</span>      <span class="hljs-comment"># 默认 1000</span>
+)
+
+<span class="hljs-comment"># 异步提交（立即返回 task_id）</span>
+task_id = agent.breakdown_script_async(script_text)
+
+<span class="hljs-comment"># 查询队列状态（字段来自真实源码 task_processor.py）</span>
+queue_status = agent.get_queue_status()
+<span class="hljs-comment"># {&quot;queue_length&quot;: 3, &quot;queue_waiting&quot;: 3, &quot;active_tasks&quot;: 2,</span>
+<span class="hljs-comment">#  &quot;max_concurrent&quot;: 10, &quot;queue_max_size&quot;: 1000, &quot;queue_usage_percent&quot;: 0.3}</span>
+
+<span class="hljs-comment"># 获取统计信息（在 _stats 基础上附带队列状态与活跃任务明细）</span>
+stats = agent.get_stats()
+<span class="hljs-comment"># {&quot;total_submitted&quot;, &quot;total_completed&quot;, &quot;total_failed&quot;, &quot;total_cancelled&quot;,</span>
+<span class="hljs-comment">#  &quot;peak_queue_size&quot;, &quot;avg_wait_time_ms&quot;, &quot;queue_status&quot;, &quot;active_tasks_detail&quot;}</span>
+
+<span class="hljs-comment"># 取消任务（底层区分&quot;执行中取消&quot;与&quot;队列中移除&quot;两条路径）</span>
+agent.cancel_task(task_id)
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：接入层（API/MCP/Python 库）统一走 <code>TaskFactory</code> 进入队列，<code>AsyncTaskProcessor</code> 按并发从 Worker Pool 调度执行；任务状态由 <code>TaskManager</code> 写 Redis 或内存，因此同一 <code>task_id</code> 可被不同回调随时查询。</p>
+<p><strong>故障恢复设计</strong>：<code>recover_pending_tasks(max_age_hours=2)</code> 会在进程重启后把两小时内状态仍未完成的任务重新放回队列——这是任务层面对&quot;Worker 宕机 / 进程崩溃&quot;的恢复手段。边界也很明显：恢复后一律以 <code>NORMAL</code> 优先级重新入队（原优先级丢失），且超过 2 小时的任务不会自动恢复，需要人工介入。</p>
+</blockquote>
+<hr>
+<h2>六、记忆管理</h2>
+<p>本节以真实源码为准。不少二创文章把 PenShot 的记忆描述为&quot;直接用 LangChain 的 ConversationBufferMemory / ConversationSummaryMemory / VectorStoreRetrieverMemory 三件套&quot;，这与 v0.3.x 的实际实现有出入：PenShot 在 <code>knowledge/memory/</code> 下自建了 <code>ScriptMemory</code> 门面与三层记忆实现（<code>ShortTermMemory</code> / <code>MediumTermMemory</code> / <code>LongTermMemory</code>），只在内部借用 LangChain 的存储组件（<code>RedisChatMessageHistory</code>、<code>RunnableWithMessageHistory</code>、<code>langchain_chroma.Chroma</code>）。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Memory[记忆系统 knowledge/memory/]
+        direction TB
+        M0[ScriptMemory&lt;br/&gt;三层组合门面]
+        M1[ShortTermMemory&lt;br/&gt;deque 滑动窗口 + Redis/文件]
+        M2[MediumTermMemory&lt;br/&gt;LLM 摘要融合 + 文件持久化]
+        M3[LongTermMemory&lt;br/&gt;Chroma 向量检索]
+        M0 --&gt; M1 &amp; M2 &amp; M3
+    end
+
+    subgraph Storage[存储介质]
+        S1[Redis&lt;br/&gt;penshot:memory:* TTL 1h]
+        S2[本地文件&lt;br/&gt;data/memory/script_id/]
+        S3[Chroma&lt;br/&gt;script_scriptid_memory collection]
+    end
+
+    M1 --&gt; S1
+    M1 -.降级.-&gt; S2
+    M2 --&gt; S2
+    M3 --&gt; S3
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">记忆层</th>
+<th style="text-align:left">存储介质</th>
+<th style="text-align:left">生命周期</th>
+<th style="text-align:left">关键配置（MemoryConfig）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>短期记忆</strong></td>
+<td style="text-align:left">Redis（TTL 1 小时），不可用时降级内存 deque + 文件</td>
+<td style="text-align:left">单次任务</td>
+<td style="text-align:left"><code>short_term_size=20</code>、<code>short_term_ttl=3600</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>中期记忆</strong></td>
+<td style="text-align:left">本地文件（JSON，按小时归档）</td>
+<td style="text-align:left">任务生命周期</td>
+<td style="text-align:left"><code>medium_term_max_tokens=500</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>长期记忆</strong></td>
+<td style="text-align:left">Chroma 向量库（本地持久化）</td>
+<td style="text-align:left">长期持久</td>
+<td style="text-align:left"><code>long_term_k=3</code>、<code>long_term_score_threshold=0.7</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>四层记忆级别（MemoryLevel）</strong>：源码枚举定义了 <code>EPHEMERAL</code>（瞬时）/ <code>SHORT_TERM</code> / <code>MEDIUM_TERM</code> / <code>LONG_TERM</code> 四层，但<strong>当前实际落地的是后三层</strong>——<code>ScriptMemory</code> 只初始化了 short/medium/long 三个实例，<code>EPHEMERAL</code> 没有对应实现（属预留层次）。如实记录这一点，比宣称&quot;四层记忆已实现&quot;更接近事实。</p>
+<p><strong>数据隔离</strong>：每个剧本独立一套记忆——<code>MemoryManager</code> 持有 <code>Dict[str, ScriptMemory]</code>，短期记忆的 Redis key 形如 <code>penshot:memory:short_term_*</code>，Chroma collection 为 <code>script_{script_id}_memory</code>，文件落在 <code>data/memory/{script_id}/</code>，同一进程内不同剧本的记忆互不可见。</p>
+<p>三层记忆之间不是简单堆叠，而是通过&quot;自动流转 + 按层召回&quot;形成闭环：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Write[写入链路]
+        I[add input/output] --&gt; ST[短期记忆&lt;br/&gt;deque + Redis]
+        ST --&gt;|metadata.important| MT[中期记忆&lt;br/&gt;LLM 摘要融合]
+        ST --&gt;|窗口用量≥ 80%&lt;br/&gt;最近 5 条打成摘要| MT
+        I --&gt;|level=LONG_TERM| LT[长期记忆&lt;br/&gt;Chroma]
+    end
+
+    subgraph Read[召回链路]
+        Q[recall query, level, k] --&gt; R1[get_recent k]
+        Q --&gt; R2[get_summary]
+        Q --&gt; R3[search query, k]
+        R1 &amp; R2 &amp; R3 --&gt; MC[MemoryContext 按层组装]
+    end
+</pre>
+<h3>记忆分层架构</h3>
+<pre class="mermaid">flowchart TB
+    subgraph 智能体
+        Agent[分镜智能体]
+    end
+
+    subgraph 记忆检索流程[&quot;recall(query, level, k)&quot;]
+        Agent --&gt; Q{查询记忆}
+        
+        Q --&gt;|level=None 含短期| S[短期记忆&lt;br/&gt;get_recent k]
+        S --&gt;|命中| R1[最近交互]
+        
+        Q --&gt; M[中期记忆&lt;br/&gt;get_summary]
+        M --&gt;|命中| R2[整体摘要]
+        
+        Q --&gt; L[长期记忆&lt;br/&gt;search query, k]
+        L --&gt;|命中| R3[相关历史片段]
+        
+        R1 &amp; R2 &amp; R3 --&gt; F[MemoryContext&lt;br/&gt;按层组装]
+        F --&gt; Agent
+    end
+</pre>
+<h3>1. 短期记忆：滑动窗口 + Redis 双通道</h3>
+<p>真实实现不是 <code>ConversationBufferMemory</code>，而是&quot;<strong>自维护 deque 滑动窗口 + LangChain 会话历史</strong>&quot;的双通道结构：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（short_term_memory.py，节选）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ShortTermMemory</span>:
+    <span class="hljs-string">&quot;&quot;&quot;
+    数据隔离策略：
+    - 每个剧本有独立的 session_id
+    - Redis key 格式: penshot:memory:{session_type}_{script_hash}
+    &quot;&quot;&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, config: MemoryConfig, script_id: <span class="hljs-built_in">str</span></span>):
+        <span class="hljs-variable language_">self</span>.max_size = config.short_term_size          <span class="hljs-comment"># 默认 20 条</span>
+
+        <span class="hljs-comment"># 为当前剧本生成唯一 session_id</span>
+        <span class="hljs-variable language_">self</span>._session_id = <span class="hljs-string">f&quot;short_term_<span class="hljs-subst">{script_id[<span class="hljs-number">2</span>:]}</span>&quot;</span>
+
+        <span class="hljs-comment"># 手动维护滑动窗口（内存缓冲区）：deque 自动丢弃最旧条目</span>
+        <span class="hljs-variable language_">self</span>._message_buffer = deque(maxlen=config.short_term_size)
+
+        <span class="hljs-comment"># Redis 可用性探测：连接 + ping，失败则降级</span>
+        <span class="hljs-variable language_">self</span>._redis_available = <span class="hljs-literal">False</span>
+        <span class="hljs-variable language_">self</span>._check_redis_availability()                <span class="hljs-comment"># socket_connect_timeout=3 + ping()</span>
+
+        <span class="hljs-comment"># 文件持久化路径（Redis 不可用时兜底）</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable language_">self</span>._redis_available <span class="hljs-keyword">and</span> config.term_persist_path:
+            <span class="hljs-variable language_">self</span>._persist_path = Path(config.term_persist_path) / script_id / <span class="hljs-string">&quot;short_term.json&quot;</span>
+            <span class="hljs-variable language_">self</span>._load_from_file()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_get_session_history</span>(<span class="hljs-params">self, session_id: <span class="hljs-built_in">str</span></span>) -&gt; BaseChatMessageHistory:
+        <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>._redis_available <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.config.short_term_redis_url:
+            redis_key = <span class="hljs-string">f&quot;penshot:memory:<span class="hljs-subst">{session_id}</span>&quot;</span>
+            <span class="hljs-keyword">return</span> RedisChatMessageHistory(
+                session_id=redis_key,
+                url=<span class="hljs-variable language_">self</span>.config.short_term_redis_url,
+                ttl=<span class="hljs-variable language_">self</span>.config.short_term_ttl          <span class="hljs-comment"># 默认 3600 秒</span>
+            )
+        <span class="hljs-keyword">return</span> InMemoryChatMessageHistory()             <span class="hljs-comment"># 降级：内存</span>
+</code></pre>
+<pre class="mermaid">flowchart LR
+    subgraph 输入流
+        I1[交互1] --&gt; I2[交互2] --&gt; I3[...] --&gt; I4[交互19] --&gt; I5[交互20] --&gt; I6[交互21]
+    end
+
+    subgraph 滑动窗口[deque maxlen 20]
+        W1[交互19] --&gt; W2[交互20] --&gt; W3[交互21]
+    end
+
+    I1 -.-&gt;|超出自动丢弃| W1
+    I4 &amp; I5 &amp; I6 --&gt; W1 &amp; W2 &amp; W3
+    W1 &amp; W2 &amp; W3 --&gt; O[get_recent 当前上下文]
+</pre>
+<blockquote>
+<p><strong>核心逻辑解释（三条通道各司其职）</strong>：</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>deque 滑动窗口</strong>：<code>deque(maxlen=20)</code> 在添加时自动丢弃最旧条目，O(1) 且不可能溢出——比&quot;判断超限再裁剪 list&quot;的写法更难出错。<code>get_recent(n)</code> 优先读内存 deque（快），为空时回查 Redis（进程重启后的恢复路径）。</li>
+<li class="lvl-2"><strong>Redis 会话历史</strong>：跨请求可见，<code>ttl=3600</code> 让单次任务周期内的记忆自动过期，不需要额外清理任务。</li>
+<li class="lvl-2"><strong>文件降级</strong>：Redis 不可用时每次 <code>add()</code> 同步写 <code>short_term.json</code>，重启后 <code>_load_from_file()</code> 恢复窗口。</li>
+</ul>
+<p><strong>故障实战（Redis 挂掉会发生什么）</strong>：降级决策发生在<strong>实例构造时</strong>——<code>_check_redis_availability()</code> 用 3 秒超时连接并 <code>ping()</code>，失败则整体切换到&quot;内存 + 文件&quot;模式并打 <code>warning</code> 日志，这是设计好的路径。运行中途 Redis 才挂的情况更微妙：<code>add()</code> 会走异常分支（<code>error</code> 日志），且由于缓冲区追加与 Redis 写入在同一 <code>try</code> 块内，<strong>本次交互既写不进 Redis 也不会进入内存窗口</strong>；后续 <code>add()</code> 持续失败，直到 Redis 恢复。也就是说，当前版本没有运行期重连与补偿机制，中途故障不会自动切通道。影响面可控的原因在于：单次记忆丢失不会中断主流程，且工作流有质量审计与检查点兜底；想彻底解决需引入重连探活与本地补偿队列，属于 Roadmap 级别的工作。</p>
+</blockquote>
+<h3>2. 中期记忆：LLM 摘要融合 + 双重截断保护</h3>
+<p>真实实现用 <code>RunnableWithMessageHistory</code> 包装自定义摘要函数（也不是 <code>ConversationSummaryMemory</code>），默认摘要是&quot;逐步融合式&quot;的滚动摘要（rolling summary）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（medium_term_memory.py，节选）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">MediumTermMemory</span>:
+    <span class="hljs-string">&quot;&quot;&quot;中期记忆 - 基于LangChain的摘要记忆，支持文件持久化&quot;&quot;&quot;</span>
+
+    DEFAULT_SUMMARY_PROMPT = PromptTemplate(
+        input_variables=[<span class="hljs-string">&quot;summary&quot;</span>, <span class="hljs-string">&quot;new_lines&quot;</span>],
+        template=<span class="hljs-string">&quot;&quot;&quot;逐步总结对话内容，将之前的总结与新的对话内容融合。
+
+            当前总结:
+            {summary}
+
+            新的对话内容:
+            {new_lines}
+
+            请生成更新后的总结（保持简洁，突出重点）:&quot;&quot;&quot;</span>
+    )
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_create_summary_chain</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-keyword">def</span> <span class="hljs-title function_">summarize</span>(<span class="hljs-params">input_dict</span>):
+            summary = input_dict.get(<span class="hljs-string">&quot;summary&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+            new_lines = input_dict.get(<span class="hljs-string">&quot;new_lines&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+
+            <span class="hljs-comment"># 截断保护：新内容不超过 max_token_limit*4 字符</span>
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(new_lines) &gt; <span class="hljs-variable language_">self</span>.max_token_limit * <span class="hljs-number">4</span>:
+                new_lines = new_lines[:<span class="hljs-variable language_">self</span>.max_token_limit * <span class="hljs-number">4</span>]
+
+            prompt = <span class="hljs-variable language_">self</span>.config.medium_term_summary_prompt <span class="hljs-keyword">or</span> <span class="hljs-variable language_">self</span>.DEFAULT_SUMMARY_PROMPT.template
+            response = <span class="hljs-variable language_">self</span>.llm.invoke(prompt.<span class="hljs-built_in">format</span>(summary=summary, new_lines=new_lines))
+            new_summary = response.content
+
+            <span class="hljs-comment"># 输出保护：摘要本身不超过 max_token_limit*2 字符</span>
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(new_summary) &gt; <span class="hljs-variable language_">self</span>.max_token_limit * <span class="hljs-number">2</span>:
+                new_summary = new_summary[:<span class="hljs-variable language_">self</span>.max_token_limit * <span class="hljs-number">2</span>] + <span class="hljs-string">&quot;...&quot;</span>
+            <span class="hljs-keyword">return</span> new_summary
+
+        <span class="hljs-keyword">return</span> RunnableLambda(summarize)
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（为什么是&quot;融合式&quot;而不是&quot;重新总结&quot;）</strong>：每次摘要把&quot;已有摘要 + 新内容&quot;一起交给 LLM 做增量融合，而不是把全部历史重读一遍——摘要成本与内容总量呈线性关系，而不是随历史长度平方级增长。两处硬截断（输入 ≤ <code>max_token_limit*4</code> 字符、输出 ≤ <code>max_token_limit*2</code> 字符）是防&quot;摘要越滚越大&quot;的保险丝；代价是超长内容会被静默砍掉尾部（没有告警日志），排查&quot;摘要信息缺失&quot;类问题时要意识到这一点。</p>
+<p><strong>持久化与恢复</strong>：中期记忆写入 <code>data/memory/{script_id}/</code> 下的 JSON（按小时归档），实例化时 <code>_load_from_file()</code> 恢复 <code>_stage_summaries</code>（阶段摘要字典）。注意滚动摘要本体不在恢复范围内，进程重启后需要从新的交互重新积累——这是当前实现的边界之一。</p>
+</blockquote>
+<h3>3. 长期记忆：Chroma 向量检索 + 阈值过滤</h3>
+<pre class="mermaid">flowchart TB
+    subgraph 存储
+        T[记忆条目 + tags/category] --&gt; E[共享 Embedding 模型&lt;br/&gt;默认 OpenAI 1536 维]
+        E --&gt; V[(Chroma 向量库&lt;br/&gt;每剧本一个 collection)]
+    end
+
+    subgraph 检索
+        Q[查询: 林小雨的服装] --&gt; E2[Embedding 模型]
+        E2 --&gt; S[similarity_search_with_score&lt;br/&gt;k=3]
+        V --&gt; S
+        S --&gt; R[按 score_threshold 0.7 过滤]
+    end
+</pre>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（long_term_memory.py，节选）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">LongTermMemory</span>:
+    <span class="hljs-string">&quot;&quot;&quot;长期记忆 - 基于向量检索的记忆&quot;&quot;&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, config: MemoryConfig, script_id: <span class="hljs-built_in">str</span></span>):
+        <span class="hljs-variable language_">self</span>.store_path = <span class="hljs-string">f&quot;<span class="hljs-subst">{config.term_persist_path}</span>/<span class="hljs-subst">{script_id}</span>&quot;</span>
+
+        <span class="hljs-comment"># 每个剧本一个独立 collection</span>
+        <span class="hljs-variable language_">self</span>.vectorstore = Chroma(
+            collection_name=<span class="hljs-string">f&quot;script_<span class="hljs-subst">{script_id}</span>_memory&quot;</span>,
+            embedding_function=config.embeddings,
+            persist_directory=<span class="hljs-variable language_">self</span>.store_path
+        )
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">add</span>(<span class="hljs-params">self, text: <span class="hljs-built_in">str</span>, metadata: <span class="hljs-type">Optional</span>[<span class="hljs-type">Dict</span>] = <span class="hljs-literal">None</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;tags/category 拼进文本后再入库，让元数据参与语义召回&quot;&quot;&quot;</span>
+        enhanced_text = text
+        <span class="hljs-keyword">if</span> metadata:
+            enhanced_text = <span class="hljs-string">f&quot;<span class="hljs-subst">{text}</span>\n&quot;</span>
+            <span class="hljs-keyword">if</span> metadata.get(<span class="hljs-string">&quot;tags&quot;</span>):
+                enhanced_text += <span class="hljs-string">f&quot;标签: <span class="hljs-subst">{<span class="hljs-string">&#x27;, &#x27;</span>.join(metadata[<span class="hljs-string">&#x27;tags&#x27;</span>])}</span>\n&quot;</span>
+            <span class="hljs-keyword">if</span> metadata.get(<span class="hljs-string">&quot;category&quot;</span>):
+                enhanced_text += <span class="hljs-string">f&quot;类别: <span class="hljs-subst">{metadata[<span class="hljs-string">&#x27;category&#x27;</span>]}</span>\n&quot;</span>
+        <span class="hljs-variable language_">self</span>.vectorstore.add_texts(texts=[enhanced_text], metadatas=[{...}])
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">search</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span>, k: <span class="hljs-built_in">int</span> = <span class="hljs-literal">None</span></span>) -&gt; <span class="hljs-type">List</span>[<span class="hljs-type">Dict</span>]:
+        results = <span class="hljs-variable language_">self</span>.vectorstore.similarity_search_with_score(query, k=k)
+        <span class="hljs-keyword">return</span> [
+            {<span class="hljs-string">&quot;content&quot;</span>: doc.page_content, <span class="hljs-string">&quot;score&quot;</span>: score, <span class="hljs-string">&quot;metadata&quot;</span>: doc.metadata}
+            <span class="hljs-keyword">for</span> doc, score <span class="hljs-keyword">in</span> results
+            <span class="hljs-keyword">if</span> score &gt;= <span class="hljs-variable language_">self</span>.config.long_term_score_threshold   <span class="hljs-comment"># 默认 0.7</span>
+        ]
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：每个剧本一个 collection（<code>script_{id}_memory</code>）落盘到 <code>data/memory/{script_id}/</code>；<code>add()</code> 时把 <code>tags</code>/<code>category</code> 拼进正文再入库，让元数据也参与语义召回——这是轻量的&quot;信息增强检索&quot;手法，代价是命中的文本里混有元数据行。<code>ScriptMemory.__init__</code> 里还有一个细节：即使配置 <code>long_term_enabled=False</code>，也会探测一次已有数据，若发现历史条目则自动启用长期记忆并回写配置——避免&quot;配置改错导致历史记忆静默失效&quot;。</p>
+<p><strong>需要验证的疑点（如实记录）</strong>：<code>similarity_search_with_score()</code> 在 Chroma 默认 L2 距离度量下返回的是<strong>距离</strong>（越小越相似），而过滤条件是 <code>score &gt;= threshold</code>（0.7）——方向与&quot;保留更相似结果&quot;的直觉相反，疑似&quot;按余弦相似度习惯写过滤条件&quot;的遗留。这里不下结论，建议使用方打印分数分布验证：如果命中的都是距离偏大的条目，应改为 <code>score &lt;= threshold</code>。</p>
+</blockquote>
+<p>三层记忆解决的是<strong>运行时交互记忆</strong>；PenShot 还有另一条与工作流深度耦合的记忆链路——<code>workflow_memory.py</code> 按阶段（stage）持久化质量数据，并在下一轮执行时反向注入提示词：</p>
+<pre class="mermaid">sequenceDiagram
+    participant N as 工作流节点 (workflow_nodes.py)
+    participant A as 智能体 (base_repairable_agent.py)
+    participant L as LLM
+
+    N-&gt;&gt;N: 构建 historical_context&lt;br/&gt;(historical_stats / common_issues / patterns)
+    N-&gt;&gt;A: apply_historical_context(historical_context)
+    A-&gt;&gt;A: _analyze_common_issues()&lt;br/&gt;_analyze_historical_stats()&lt;br/&gt;_analyze_recent_strategy()
+    N-&gt;&gt;N: 节点执行完成后&lt;br/&gt;store_*_memory(stage_key, stats)
+    Note over N: 短期: Redis 优先/内存(TTL 1h)&lt;br/&gt;中期: 磁盘 JSON 统计&lt;br/&gt;长期: 向量存储成功案例
+    N-&gt;&gt;A: apply_repair_params(node, repair_params)
+    A-&gt;&gt;L: 提示词携带【历史参考信息】+ {repair_hint}
+    L--&gt;&gt;A: 输出（规避历史问题）
+    N-&gt;&gt;A: 节点成功后 clear_historical_context()
+</pre>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（base_repairable_agent.py，节选）：历史上下文 → 提示词片段</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">build_history_hint</span>(<span class="hljs-params">self</span>) -&gt; <span class="hljs-built_in">str</span>:
+    hints = []
+    <span class="hljs-comment"># 常见问题提示（按出现次数排序的高频问题）</span>
+    high_freq_issues = <span class="hljs-variable language_">self</span>._historical_insights.get(<span class="hljs-string">&quot;high_freq_issues&quot;</span>, {})
+    <span class="hljs-keyword">if</span> high_freq_issues:
+        issue_desc = <span class="hljs-string">&quot;, &quot;</span>.join([<span class="hljs-string">f&quot;<span class="hljs-subst">{t}</span>(<span class="hljs-subst">{c}</span>次)&quot;</span> <span class="hljs-keyword">for</span> t, c <span class="hljs-keyword">in</span> high_freq_issues.items()])
+        hints.append(<span class="hljs-string">f&quot;历史常见问题: <span class="hljs-subst">{issue_desc}</span>，请特别注意避免这些问题。&quot;</span>)
+
+    <span class="hljs-comment"># 质量等级提示（由历史 completeness_score 分档）</span>
+    quality_level = <span class="hljs-variable language_">self</span>.get_quality_level()      <span class="hljs-comment"># poor / medium / good</span>
+    <span class="hljs-keyword">if</span> quality_level == <span class="hljs-string">&quot;poor&quot;</span>:
+        hints.append(<span class="hljs-string">&quot;历史解析质量较低，请提高解析质量，确保输出结构的完整性和准确性。&quot;</span>)
+
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> hints:
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;&quot;</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;\n&quot;</span>.join([<span class="hljs-string">&quot;&quot;</span>, <span class="hljs-string">&quot;【历史参考信息】&quot;</span>, *[<span class="hljs-string">f&quot;  - <span class="hljs-subst">{h}</span>&quot;</span> <span class="hljs-keyword">for</span> h <span class="hljs-keyword">in</span> hints], <span class="hljs-string">&quot;&quot;</span>])
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（记忆如何真正影响输出）</strong>：闭环为&quot;阶段统计 → 高频问题提取 → 提示词注入 → 输出改善&quot;。节点执行前的调用顺序（workflow_nodes.py）是先 <code>apply_historical_context()</code> 再 <code>apply_repair_params()</code>：历史上下文负责&quot;长期经验&quot;，修复参数负责&quot;上一轮的具体问题&quot;，两者共同渲染进用户提示词。历史问题类型（如 <code>prompt_truncated</code>、<code>style_inconsistent</code>）还会触发智能体内部的增强开关（如 <code>_focus_on_style_consistency</code>）。</p>
+<p><strong>故障实战（历史上下文没清干净会怎样）</strong>：<code>clear_historical_context()</code> 约定在&quot;节点成功完成后&quot;调用。若某条成功路径忘记调用（或新增节点未接入），历史问题会持续影响后续提示词——表现为&quot;已经修好的问题，LLM 仍在小心翼翼地规避&quot;，输出越来越保守。排查方法是看提示词日志里【历史参考信息】是否含过时条目；这也是为什么基类把它设计成显式的一对方法（apply / clear），而不是隐式状态。</p>
+</blockquote>
+<h3>使用场景示例（基于真实 API 的示例代码）</h3>
+<p>以下示例基于 <code>LongTermMemory</code> 的真实方法签名编写，属<strong>示例代码</strong>（非源码节选），数据为示例数据：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>场景1：角色一致性维护</p>
+<pre class="hljs"><code><span class="hljs-comment"># 第一次遇到角色：写入长期记忆（自动落盘 Chroma）</span>
+long_term.add(
+    <span class="hljs-string">&quot;林小雨：20岁，学生，齐肩黑发，戴细框眼镜，米白长裙&quot;</span>,
+    {<span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;character&quot;</span>], <span class="hljs-string">&quot;category&quot;</span>: <span class="hljs-string">&quot;role&quot;</span>}
+)
+
+<span class="hljs-comment"># 后续处理新片段时：语义检索（默认 k=3、阈值 0.7）</span>
+results = long_term.search(<span class="hljs-string">&quot;林小雨的外貌特征&quot;</span>, k=<span class="hljs-number">3</span>)
+<span class="hljs-comment"># results[0][&quot;content&quot;] 即角色描述（示例数据）</span>
+
+<span class="hljs-comment"># 生成的 Prompt 拼入召回结果</span>
+prompt = <span class="hljs-string">f&quot;保持角色一致性: <span class="hljs-subst">{results[<span class="hljs-number">0</span>][<span class="hljs-string">&#x27;content&#x27;</span>]}</span>\n当前动作: 林小雨蹲在长椅旁&quot;</span>
+</code></pre>
+</li>
+<li class="lvl-2">
+<p>场景2：道具状态追踪</p>
+<pre class="hljs"><code><span class="hljs-comment"># 记录道具初始状态与状态变化（分两次入库，检索时按相似度取回）</span>
+long_term.add(<span class="hljs-string">&quot;《飞鸟集》：钴蓝色硬壳精装，封面有水渍晕染&quot;</span>,
+              {<span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;prop&quot;</span>], <span class="hljs-string">&quot;category&quot;</span>: <span class="hljs-string">&quot;prop_state&quot;</span>})
+long_term.add(<span class="hljs-string">&quot;《飞鸟集》：书页微湿，水渍扩大&quot;</span>,
+              {<span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;prop&quot;</span>], <span class="hljs-string">&quot;category&quot;</span>: <span class="hljs-string">&quot;prop_state&quot;</span>})
+
+<span class="hljs-comment"># 检索当前状态（同名道具的多条状态按相似度返回，需调用方自行按时间取舍）</span>
+results = long_term.search(<span class="hljs-string">&quot;《飞鸟集》当前状态&quot;</span>)
+</code></pre>
+</li>
+<li class="lvl-2">
+<p>场景3：场景氛围延续</p>
+<pre class="hljs"><code><span class="hljs-comment"># 场景信息写入长期记忆，后续片段生成前按语义召回</span>
+long_term.add(<span class="hljs-string">&quot;咖啡店外：雨天，灰蒙蒙天空，绿色金属长椅，红底白字招牌&quot;</span>,
+              {<span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;scene&quot;</span>], <span class="hljs-string">&quot;category&quot;</span>: <span class="hljs-string">&quot;scene&quot;</span>})
+scene_context = long_term.search(<span class="hljs-string">&quot;咖啡店外场景&quot;</span>)
+</code></pre>
+</li>
+</ul>
+<h3>统一门面：ScriptMemory 的&quot;自动流转&quot;与按层组装</h3>
+<p>三层记忆不是并列被调用的，而是由 <code>ScriptMemory</code> 统一组合。它有一个值得注意的设计——<strong>add 时的自动流转规则</strong>：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（script_memory.py，节选）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">add</span>(<span class="hljs-params">self, input_text: <span class="hljs-built_in">str</span>, output_text: <span class="hljs-built_in">str</span>, level: MemoryLevel = MemoryLevel.SHORT_TERM,
+        metadata: <span class="hljs-type">Optional</span>[<span class="hljs-type">Dict</span>] = <span class="hljs-literal">None</span></span>):
+    <span class="hljs-string">&quot;&quot;&quot;添加记忆&quot;&quot;&quot;</span>
+
+    <span class="hljs-comment"># 1. 始终写入短期记忆</span>
+    <span class="hljs-variable language_">self</span>.short_term.add(input_text, output_text, metadata)
+
+    <span class="hljs-comment"># 2. 根据级别或重要性决定是否流转到中期/长期</span>
+    <span class="hljs-keyword">if</span> level == MemoryLevel.MEDIUM_TERM:
+        <span class="hljs-variable language_">self</span>.medium_term.add(input_text, output_text, metadata)
+    <span class="hljs-keyword">elif</span> level == MemoryLevel.LONG_TERM <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.long_term:
+        combined = <span class="hljs-string">f&quot;问题: <span class="hljs-subst">{input_text}</span>\n回答: <span class="hljs-subst">{output_text}</span>&quot;</span>
+        <span class="hljs-variable language_">self</span>.long_term.add(combined, metadata)
+    <span class="hljs-keyword">else</span>:
+        <span class="hljs-comment"># 自动流转：标记 important 的短期记忆提升到中期</span>
+        <span class="hljs-keyword">if</span> metadata <span class="hljs-keyword">and</span> metadata.get(<span class="hljs-string">&quot;important&quot;</span>, <span class="hljs-literal">False</span>):
+            <span class="hljs-variable language_">self</span>.medium_term.add(input_text, output_text, metadata)
+
+        <span class="hljs-comment"># 短期用到 80% 容量时，把最近 5 条打成摘要注给中期</span>
+        short_term_stats = <span class="hljs-variable language_">self</span>.short_term.get_stats()
+        <span class="hljs-keyword">if</span> short_term_stats.get(<span class="hljs-string">&quot;message_count&quot;</span>, <span class="hljs-number">0</span>) &gt;= <span class="hljs-variable language_">self</span>.short_term.max_size * <span class="hljs-number">0.8</span>:
+            recent = <span class="hljs-variable language_">self</span>.short_term.get_recent(<span class="hljs-number">5</span>)
+            summary_content = <span class="hljs-string">&quot;\n&quot;</span>.join([<span class="hljs-string">f&quot;Q: <span class="hljs-subst">{m[<span class="hljs-string">&#x27;content&#x27;</span>]}</span>\nA: <span class="hljs-subst">{m.get(<span class="hljs-string">&#x27;output&#x27;</span>, <span class="hljs-string">&#x27;&#x27;</span>)}</span>&quot;</span> <span class="hljs-keyword">for</span> m <span class="hljs-keyword">in</span> recent])
+            <span class="hljs-variable language_">self</span>.medium_term.add(<span class="hljs-string">&quot;short_term_summary&quot;</span>, summary_content, {<span class="hljs-string">&quot;auto_summary&quot;</span>: <span class="hljs-literal">True</span>})
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">recall</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span>, level: <span class="hljs-type">Optional</span>[MemoryLevel] = <span class="hljs-literal">None</span>,
+           k: <span class="hljs-built_in">int</span> = <span class="hljs-number">3</span></span>) -&gt; MemoryContext:
+    <span class="hljs-string">&quot;&quot;&quot;回忆记忆，返回融合上下文&quot;&quot;&quot;</span>
+    context = MemoryContext()
+    <span class="hljs-keyword">if</span> level <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">or</span> level == MemoryLevel.SHORT_TERM:
+        context.short_term = <span class="hljs-variable language_">self</span>.short_term.get_recent(k)
+    <span class="hljs-keyword">if</span> level <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">or</span> level == MemoryLevel.MEDIUM_TERM:
+        context.medium_term = <span class="hljs-variable language_">self</span>.medium_term.get_summary()
+    <span class="hljs-keyword">if</span> (level <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">or</span> level == MemoryLevel.LONG_TERM) <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.long_term:
+        context.long_term = <span class="hljs-variable language_">self</span>.long_term.search(query, k)
+    <span class="hljs-keyword">return</span> context
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（这里的&quot;融合&quot;是组装，不是加权）</strong>：<code>recall()</code> 的真实语义是&quot;按层查询、原样组装进 <code>MemoryContext</code>&quot;，<strong>没有 0.6/0.3/0.1 之类的加权融合，也不存在 <code>MemoryFusion</code> 类</strong>——网上把&quot;设计意图&quot;当成了实现。三层信息的取舍发生在两个地方：<code>MemoryContext.to_prompt()</code> 的格式化（短期最多 10 条、长期最多 5 条、逐条截断）和调用方传入的 level 参数（指定只查某一层）。</p>
+<p><strong>一个值得讨论的设计点</strong>：触发&quot;短期→中期&quot;流转的人数阈值判断发生在每次 <code>add()</code> 末尾，且<strong>没有水位线/已压缩标记</strong>——窗口达到 80% 后每次 add 都会再触发一次摘要融合（多一次 LLM 调用），直到窗口被清空才会停。由于 deque <code>maxlen=20</code>、阈值为 16，窗口饱满后这条路径几乎每轮都执行；且在近满载时每次摘取的&quot;最近 5 条&quot;高度重叠。要修的话加一个 <code>last_summarized_count</code> 水位线即可——这属于读源码才能发现的优化点。</p>
+</blockquote>
+<h3>记忆生命周期（真实语义）</h3>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 短期: add() 默认写入 deque + Redis
+    短期 --&gt; 中期: metadata.important 标记
+    短期 --&gt; 中期: 窗口用量 ≥ 80% 自动压缩最近5条
+    短期 --&gt; 过期: deque 超出 maxlen=20 自动丢弃
+    短期 --&gt; 过期: Redis TTL 3600 秒到期
+    中期 --&gt; 长期: 显式 level=LONG_TERM（ScriptMemory.add）
+    长期 --&gt; 过期: 手动 delete_by_filter / clear
+</pre>
+<blockquote>
+<p><strong>核心逻辑解释</strong>：真实生命周期以&quot;自动流转 + 时间/容量兜底&quot;为特征——短期靠 TTL 与 deque 容量自然衰减；中期靠重要标记与 80% 水位触发晋升；长期永不自动过期（Chroma 持久化落盘），只能显式清理。</p>
+<p><strong>注意事项（如实记录）</strong>：当前代码<strong>没有&quot;中期→长期&quot;的自动晋升</strong>——那一步必须调用方显式指定 <code>level=LONG_TERM</code>；也没有基于重要度评分的自动分层。把&quot;重要度评估自动进长期&quot;当成本项目现成能力是过度解读。</p>
+</blockquote>
+<hr>
+<h2>七、文本压缩：真实机制与边界</h2>
+<p>针对长剧本场景，PenShot 的&quot;压缩&quot;分散在三个层次，而不是一个独立的摘要模块。这里如实拆解每一层实际做了什么、没做什么。</p>
+<h3>真实存在的压缩机制</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层次</th>
+<th style="text-align:left">机制</th>
+<th style="text-align:left">压缩对象</th>
+<th style="text-align:left">真实参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>记忆层</strong></td>
+<td style="text-align:left"><code>MediumTermMemory</code> 的 LLM 滚动摘要</td>
+<td style="text-align:left">阶段交互内容</td>
+<td style="text-align:left">输入 ≤ <code>max_tokens*4</code>、输出 ≤ <code>max_tokens*2</code> 字符</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>记忆层</strong></td>
+<td style="text-align:left"><code>ScriptMemory</code> 80% 水位自动摘要</td>
+<td style="text-align:left">短期窗口最近 5 条</td>
+<td style="text-align:left"><code>short_term_size=20</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>提示词层</strong></td>
+<td style="text-align:left"><code>MemoryContext.to_prompt()</code> 截断</td>
+<td style="text-align:left">组装后的记忆上下文</td>
+<td style="text-align:left">短期限 10 条/条 500 字符；长期限 5 条/条 800 字符</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>提示词层</strong></td>
+<td style="text-align:left">指令长度约束</td>
+<td style="text-align:left">生成的视频提示词</td>
+<td style="text-align:left"><code>max_prompt_length=200</code>（单词），警告阈值 +20</td>
+</tr>
+</tbody>
+</table>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（memory_context.py，节选）：提示词组装与截断</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">to_prompt</span>(<span class="hljs-params">self, max_tokens: <span class="hljs-built_in">int</span> = <span class="hljs-number">2000</span></span>) -&gt; <span class="hljs-built_in">str</span>:
+    parts = []
+    <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.short_term:
+        parts.append(<span class="hljs-string">&quot;=== 最近对话 ===\n&quot;</span> + <span class="hljs-variable language_">self</span>._format_short_term())
+    <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.medium_term:
+        parts.append(<span class="hljs-string">&quot;=== 历史摘要 ===\n&quot;</span> + <span class="hljs-variable language_">self</span>.medium_term)
+    <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.long_term:
+        parts.append(<span class="hljs-string">&quot;=== 相关经验 ===\n&quot;</span> + <span class="hljs-variable language_">self</span>._format_long_term())
+
+    context = <span class="hljs-string">&quot;\n\n&quot;</span>.join(parts)
+    <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>._truncate(context, max_tokens)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_format_short_term</span>(<span class="hljs-params">self</span>) -&gt; <span class="hljs-built_in">str</span>:
+    formatted = []
+    <span class="hljs-keyword">for</span> msg <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.short_term[-<span class="hljs-number">10</span>:]:           <span class="hljs-comment"># 限制最多10条</span>
+        content = msg.get(<span class="hljs-string">&quot;content&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+        <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(content) &gt; <span class="hljs-number">500</span>:                  <span class="hljs-comment"># 单条超长也截断</span>
+            content = content[:<span class="hljs-number">497</span>] + <span class="hljs-string">&quot;...&quot;</span>
+        formatted.append(<span class="hljs-string">f&quot;<span class="hljs-subst">{role}</span>: <span class="hljs-subst">{content}</span>&quot;</span>)
+    <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;\n&quot;</span>.join(formatted)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_truncate</span>(<span class="hljs-params">self, text: <span class="hljs-built_in">str</span>, max_tokens: <span class="hljs-built_in">int</span></span>) -&gt; <span class="hljs-built_in">str</span>:
+    <span class="hljs-string">&quot;&quot;&quot;截断文本：1 token ≈ 2 字符（保守估算）&quot;&quot;&quot;</span>
+    estimated_tokens = <span class="hljs-built_in">len</span>(text) // <span class="hljs-number">2</span>
+    <span class="hljs-keyword">if</span> estimated_tokens &lt;= max_tokens:
+        <span class="hljs-keyword">return</span> text
+
+    max_chars = max_tokens * <span class="hljs-number">2</span>
+    truncated = text[:max_chars]
+
+    <span class="hljs-comment"># 尝试在完整句子处截断</span>
+    last_period = truncated.rfind(<span class="hljs-string">&#x27;。&#x27;</span>)
+    last_newline = truncated.rfind(<span class="hljs-string">&#x27;\n&#x27;</span>)
+    cut_pos = <span class="hljs-built_in">max</span>(last_period, last_newline)
+
+    <span class="hljs-keyword">if</span> cut_pos &gt; max_chars * <span class="hljs-number">0.7</span>:               <span class="hljs-comment"># 截断点落在后70%才采用</span>
+        truncated = truncated[:cut_pos + <span class="hljs-number">1</span>]
+
+    <span class="hljs-keyword">return</span> truncated + <span class="hljs-string">&quot;\n[上下文已截断]&quot;</span>
+</code></pre>
+<blockquote>
+<p><strong>核心逻辑解释（为什么用&quot;字符估算&quot;而不是精确分词）</strong>：<code>_truncate</code> 用&quot;1 token ≈ 2 字符&quot;的保守估算。为什么不上 tiktoken 等精确分词器？因为这里只需要一个&quot;不超窗&quot;的安全上界，而非精确计费——引入分词器会给每次提示词组装增加计算与依赖成本，而截断点本身已有冗余。这是一次典型的&quot;精度换简洁&quot;取舍；未来若做精确 token 计费或硬限流，才需要替换。</p>
+<p><strong>边界与不足（重要）</strong>：当前版本<strong>没有一个独立的&quot;长剧本分块摘要器&quot;类</strong>。网上流传的 <code>ScriptSummarizer</code>、按场景/对话/动作三级摘要以及 70%/80%/60%/50% 压缩比在源码中均不存在，属拟造内容。实际的长文本处理是&quot;分而治之&quot;：<code>shot_segmenter</code> 按场景（scene）逐个处理、<code>video_splitter</code> 按镜头（shot）逐个处理，每个单元的提示词只携带本场景信息 + 元素列表 + <code>global_context</code>（角色服装/关键道具等跨场景一致性汇总）。也就是说，<strong>长剧本的&quot;分块&quot;发生在场景/镜头拆分阶段，而非文本摘要阶段</strong>；真正的&quot;全剧摘要压缩&quot;属于 Roadmap 方向。</p>
+</blockquote>
+<hr>
+<h2>八、上下文窗口管理的真实边界</h2>
+<p>&quot;上下文窗口管理&quot;很容易被写成一套漂亮的分层机制，但真实源码里能落地的是四条朴素规则：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">规则</th>
+<th style="text-align:left">位置</th>
+<th style="text-align:left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>滑动窗口</strong></td>
+<td style="text-align:left"><code>ShortTermMemory</code>：<code>deque(maxlen=20)</code></td>
+<td style="text-align:left">短期交互只保留最近 20 条，自动丢弃最旧</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>过期回收</strong></td>
+<td style="text-align:left">Redis <code>ttl=3600</code></td>
+<td style="text-align:left">一小时内的旧记忆自动过期，不需额外清理任务</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>组装截断</strong></td>
+<td style="text-align:left"><code>MemoryContext.to_prompt(max_tokens=2000)</code></td>
+<td style="text-align:left">提示词组装后按&quot;1 token ≈ 2 字符&quot;截断并标记</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>长度约束</strong></td>
+<td style="text-align:left"><code>ShotConfig</code>：<code>max_prompt_length=200</code> 单词</td>
+<td style="text-align:left">质量审计按 <code>PROMPT_TOO_LONG</code> 规则校验生成的视频提示词</td>
+</tr>
+</tbody>
+</table>
+<pre class="hljs"><code><span class="hljs-comment"># 真实源码（shot_config.py，节选）：提示词长度约束</span>
+max_prompt_length: <span class="hljs-built_in">int</span> = <span class="hljs-number">200</span>    <span class="hljs-comment"># 提示词最大长度（单词数）</span>
+min_prompt_length: <span class="hljs-built_in">int</span> = <span class="hljs-number">20</span>
+prompt_length_max_threshold: <span class="hljs-built_in">int</span> = max_prompt_length + <span class="hljs-number">20</span>   <span class="hljs-comment"># 警告阈值</span>
+prompt_length_min_threshold: <span class="hljs-built_in">int</span> = min_prompt_length - <span class="hljs-number">10</span>
+
+<span class="hljs-comment"># 真实源码（rule_quality_auditor.py，节选）：超长提示词判定</span>
+<span class="hljs-keyword">if</span> prompt_length &gt; <span class="hljs-variable language_">self</span>.config.prompt_length_max_threshold:
+    issues.append(BasicViolation(
+        rule_type=RuleType.PROMPT_TOO_LONG,
+        suggestion=<span class="hljs-string">f&quot;将提示词缩短到<span class="hljs-subst">{self.config.max_prompt_length}</span> 个单词以内&quot;</span>
+    ))
+</code></pre>
+<pre class="mermaid">flowchart TB
+    subgraph 短期记忆层
+        C1[全量交互] --&gt; W[deque maxlen=20&lt;br/&gt;滑动窗口]
+        W --&gt; T[Redis TTL 3600s&lt;br/&gt;过期回收]
+    end
+
+    subgraph 提示词层
+        W --&gt; P[MemoryContext.to_prompt&lt;br/&gt;分层组装]
+        P --&gt; TR[_truncate&lt;br/&gt;1 token ≈ 2 字符&lt;br/&gt;+ 句边界回退]
+        TR --&gt; F[最终上下文&lt;br/&gt; ≤2000 tokens]
+    end
+
+    subgraph 质量层
+        G[生成的视频提示词] --&gt; R{长度检查&lt;br/&gt;200单词±阈值}
+        R --&gt;|超长| FIX[PROMPT_TOO_LONG&lt;br/&gt;触发修复循环]
+        R --&gt;|正常| PASS[通过审计]
+    end
+</pre>
+<blockquote>
+<p><strong>核心逻辑解释（为什么锁定&quot;窗口 + 约束&quot;，不做&quot;动态重要性淘汰&quot;）</strong>：真实的取舍是把有限的工程预算放在&quot;确定性&quot;上——滑动窗口与 TTL 的行为可预测、调试成本低；而&quot;按重要度动态淘汰&quot;需要引入评分模型，且可能淘汰掉关键约束，反而增加不可控性。对应的质量兜底交给审计规则：提示词过长/过短都会被标记并进入修复循环，而不是在窗口层做文章。</p>
+<p><strong>当前实现边界（如实记录）</strong>：不存在 <code>ContextWindowManager</code> 类的&quot;动态窗口 / 重要度评分 / 相似度去重&quot;机制（源码中无对应类）。跨场景一致性信息通过 <code>shot_segmenter</code> 提示词的 <code>global_context</code> 占位符注入每次镜头拆分调用；把完整剧本一次性塞进单次提示词的做法只在短视频剧本下可接受，超长剧本的分块与逐块上下文重构属于 Roadmap 规划，不当作现状。</p>
+</blockquote>
+<hr>
+<h2>九、实现要点小结</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>多 LLM 可插拔 + 三级降级</strong>：OpenAI / Ollama / Qwen 统一封装与厂商自动探测；默认配置失败退备用配置，再失败返回 <code>None</code> 走规则引擎模式。</p>
+</li>
+<li class="lvl-2">
+<p><strong>提示词工程是质量瓶颈</strong>：规则化约束 + one-shot 示例 + 版本化 YAML + <code>{repair_hint}</code>/<code>{history_hint}</code> 占位回传；加载器中存在不可达分支与文档漂移（已在第二节标注）。</p>
+</li>
+<li class="lvl-2">
+<p><strong>一致性保障</strong>：连续性锚点（带生效范围的结构化约束）、修复参数反馈（审计 → 注入 → 定向重试）、全局风格开关（<code>style_consistency</code> / <code>use_common_negative_prompt</code>）——而非&quot;固定种子&quot;这类被误传的说法。</p>
+</li>
+<li class="lvl-2">
+<p><strong>防御性循环控制</strong>：硬限制 / 软限制 / 全局后备三级计数器 + 80% 预警，节点级参数差异化配置，2 倍安全系数推导全局上限。</p>
+</li>
+<li class="lvl-2">
+<p><strong>三层记忆 + 分层存储</strong>：deque/Redis（短期）、LLM 滚动摘要/文件（中期）、Chroma（长期），<code>recall()</code> 按层组装而非加权融合；<code>workflow_memory</code> 的&quot;历史参考信息&quot;闭环让记忆真正影响下一轮输出。</p>
+</li>
+<li class="lvl-2">
+<p><strong>工程边界（如实记录）</strong>：无独立长剧本摘要器、无运行期 Redis 重连、长期记忆阈值过滤方向存疑、<code>LLMBaseConfig.seed</code> 仅 Ollama 透传——这些都在正文标注，供读者评估与向社区反馈。</p>
+</li>
+</ul>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

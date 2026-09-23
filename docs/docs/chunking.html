@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 分块策略：双阈值切分、重叠真相与接线现状 · PenShot 文档</title>
+  <meta name="description" content="PenShot 的超长剧本分块能力：还原 LongScriptChunker 的 30 场景与 180 秒双阈值切分、3 场景重叠与时长估算机制，澄清四种分块策略、并行处理、增量检查的误传，厘清分块器、跨块验证器与连续性检查器的接线现状，并给出接入生产前的关键设计缺口与工程建议。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/chunking.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 分块策略：双阈值切分、重叠真相与接线现状">
+  <meta property="og:description" content="PenShot 的超长剧本分块能力：还原 LongScriptChunker 的 30 场景与 180 秒双阈值切分、3 场景重叠与时长估算机制，澄清四种分块策略、并行处理、增量检查的误传，厘清分块器、跨块验证器与连续性检查器的接线现状，并给出接入生产前的关键设计缺口与工程建议。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/chunking.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html" class="active">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-04-28</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>PenShot 的核心目标之一是把任意剧本（包括小说、电影级超长剧本）自动拆分为 AI 视频模型可处理的片段序列。而<strong>超长剧本</strong>（场景动辄上百个、文本远超模型上下文窗口）无法一次性喂给 LLM，因此分块（Chunking）是这类型剧本落地的前置工程问题。但本文要回答的不止&quot;怎么拆&quot;——还有一个更基础的问题：<strong>分块能力在 PenShot 里到底上线了没有？</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<blockquote>
+<p>源码给出的答案很明确：<code>LongScriptChunker</code>（110 行）实现了 30 场景与 180 秒双阈值切分、3 场景重叠两块真实机制，但<strong>全仓库没有任何生产调用方</strong>；README 的开发路线图至今仍把&quot;超长剧本分块处理 + 向量数据库上下文记忆&quot;列在<strong>中期规划</strong>。本文以源码为准绳，逐行还原分块器的真实逻辑，撤回系列早期版本中&quot;四种分块策略、并行处理、增量检查&quot;等误传，并厘清&quot;未接线原型&quot;与&quot;已接线连续性防线&quot;两套体系的真实边界——以及想把分块器接入生产前，必须先补上的设计缺口。</p>
+</blockquote>
+<hr>
+<h2>一、概述：分块在 PenShot 中的真实位置</h2>
+<h3>1. 版本与路线图：两个反证</h3>
+<p>系列早期文章曾把&quot;超长剧本处理&quot;描述为 PenShot v0.7 的能力阶段。核对源码会发现两个反证：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>pyproject.toml</code> 中项目版本号是 <strong>0.3.8</strong>，全仓库不存在 v0.7 这一版本标识；</p>
+</li>
+<li class="lvl-2">
+<p><code>README.md</code> 的&quot;开发路线图 → 中期规划&quot;一节里，至今仍写着&quot;<strong>超长剧本分块处理 + 向量数据库上下文记忆</strong>&quot;——在项目自己的官方口径里，分块处理仍属于<strong>规划中</strong>能力。</p>
+</li>
+</ul>
+<p>源码里的 <code>LongScriptChunker</code> 从哪来？git log 显示它出自提交 <code>6494cd1</code>（2026-04-28），提交说明为&quot;新增 剧本分块处理和检查，提示词风格守护&quot;——恰好是本文原版的创建日期。这是一次&quot;先行写出原型&quot;的提交：分块器、跨块验证器、提示词风格守卫三个组件同日落库，但此后再未接入工作流，至今全仓库零调用方。</p>
+<h3>2. README 里更诚实的表述</h3>
+<p>README&quot;系统说明与注意事项&quot;表格中还有一句直白的说明：</p>
+<blockquote>
+<p>长文本处理 | 超长剧本建议分段输入，系统已内置上下文记忆与 RAG 机制</p>
+</blockquote>
+<p>注意措辞——<strong>建议分段输入</strong>：当前产品形态是让用户手动切分超长剧本，系统为每个输入片段提供记忆与检索支持；自动分块属于尚未兑现的路线图承诺。这也解释了为什么分块器原型存在却不接线：它是一次对&quot;中期规划&quot;的提前探索，只是还没到收口的阶段。</p>
+<h3>3. 分块要解决的三个核心矛盾</h3>
+<p>把视野拉回工程本身。无论哪个系统处理超长剧本，分块都要回答三个问题：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>上下文窗口限制</strong>：LLM 输入长度有限，超长剧本无法一次性解析，必然要拆。</p>
+</li>
+<li class="lvl-2">
+<p><strong>Token 峰值控制</strong>：整本送入会造成极高的单次 Token 峰值与成本，拆小后单次请求的规模更可控。</p>
+</li>
+<li class="lvl-2">
+<p><strong>语义与连续性</strong>：分块不能把叙事切碎——若在关键语义节点处硬切，角色状态、场景连续、动作递进都会被破坏，因此理想的分块应当是<strong>语义感知</strong>的。当然，&quot;理想&quot;与&quot;已实现&quot;之间的距离，正是本文后文要逐段丈量的对象。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>补充原理</strong>：分块的本质是在&quot;块内语义自洽&quot;与&quot;块间可衔接&quot;之间找平衡。块太小会频繁要求 LLM 重新理解上下文（产生补全描述成本），块太大又逼近甚至超出窗口限制。引入<strong>重叠</strong>（overlap）正是为了在块边界附近保留上下文冗余，确保前后块的连续信息不断裂——这一点在 PenShot 的真实实现里同样成立，只是参数与宣传不同（见第二章）。</p>
+</blockquote>
+<h3>4. 本文的考证口径</h3>
+<p>延续本系列的&quot;三口径&quot;方法，全文对每个组件都会标注它的真实状态：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">口径</th>
+<th style="text-align:left">含义</th>
+<th style="text-align:left">本文涉及</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>已接线</strong></td>
+<td style="text-align:left">被生产代码真实调用</td>
+<td style="text-align:left">连续性检查器、修复生成器、重试机制</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>已实现未接线</strong></td>
+<td style="text-align:left">代码完整但全仓库无调用方</td>
+<td style="text-align:left">分块器、跨块验证器、提示词风格守卫</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>规划中</strong></td>
+<td style="text-align:left">仅存在于路线图或设计文档</td>
+<td style="text-align:left">自动分块处理、向量数据库跨块上下文记忆</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>二、LongScriptChunker 源码解构：30 场景、180 秒与 3 场景重叠</h2>
+<h3>1. 组件全貌：110 行的真实代码</h3>
+<p>分块器的全部实现集中在 <code>continuity_guardian/long_script_chunker.py</code> 一个文件里，共 110 行，只有两个构件：<code>ScriptChunk</code> 数据类与 <code>LongScriptChunker</code> 分块器本体。</p>
+<pre class="hljs"><code><span class="hljs-comment"># long_script_chunker.py L16-30（真实源码）</span>
+<span class="hljs-meta">@dataclass</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ScriptChunk</span>:
+    <span class="hljs-string">&quot;&quot;&quot;剧本块&quot;&quot;&quot;</span>
+    chunk_id: <span class="hljs-built_in">int</span>
+    start_scene: <span class="hljs-built_in">int</span>
+    end_scene: <span class="hljs-built_in">int</span>
+    scenes: <span class="hljs-type">List</span>[<span class="hljs-type">Any</span>]  <span class="hljs-comment"># SceneInfo 对象列表</span>
+    estimated_duration: <span class="hljs-built_in">float</span> = <span class="hljs-number">0.0</span>
+
+    <span class="hljs-comment"># 块间状态传递</span>
+    entry_character_states: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Dict</span>] = field(default_factory=<span class="hljs-built_in">dict</span>)
+    exit_character_states: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Dict</span>] = field(default_factory=<span class="hljs-built_in">dict</span>)
+
+    <span class="hljs-comment"># 连续性锚点</span>
+    continuity_anchors: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>] = field(default_factory=<span class="hljs-built_in">dict</span>)
+</code></pre>
+<pre class="hljs"><code><span class="hljs-comment"># long_script_chunker.py L33-41（真实源码）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">LongScriptChunker</span>:
+    <span class="hljs-string">&quot;&quot;&quot;超长剧本分块器&quot;&quot;&quot;</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, max_scenes_per_chunk: <span class="hljs-built_in">int</span> = <span class="hljs-number">30</span>,
+                 max_duration_per_chunk: <span class="hljs-built_in">float</span> = <span class="hljs-number">180.0</span>,  <span class="hljs-comment"># 3分钟</span>
+                 overlap_scenes: <span class="hljs-built_in">int</span> = <span class="hljs-number">3</span></span>):
+        <span class="hljs-variable language_">self</span>.max_scenes_per_chunk = max_scenes_per_chunk
+        <span class="hljs-variable language_">self</span>.max_duration_per_chunk = max_duration_per_chunk
+        <span class="hljs-variable language_">self</span>.overlap_scenes = overlap_scenes
+</code></pre>
+<p>先记住三个真实参数：<strong>每块上限 30 个场景、预估时长上限 180 秒、块间重叠 3 个场景</strong>。其中&quot;重叠 3 个&quot;与系列早期文章宣传的&quot;重叠 5 个&quot;不一致，后文用同一套代码逐一核对。分块主流程如下：</p>
+<pre class="mermaid">graph TB
+    subgraph File[&quot;long_script_chunker.py（110 行）&quot;]
+        SC[&quot;ScriptChunk 数据类&lt;br/&gt;5 个有效字段 + 3 个占位字段&quot;]
+        LS[&quot;LongScriptChunker&lt;br/&gt;场景上限 30 / 时长上限 180 秒 / 重叠 3&quot;]
+        SC -.-&gt;|被构造| LS
+    end
+
+    subgraph Flow[&quot;chunk_script 主流程&quot;]
+        A[&quot;遍历场景序列&quot;] --&gt; B{&quot;块内场景数 ≥ 30&lt;br/&gt;或 预备时长 &gt; 180 秒？&quot;}
+        B --&gt;|否| C[&quot;本场景入块&lt;br/&gt;累加预估时长&quot;]
+        B --&gt;|是| D[&quot;结算旧块&lt;br/&gt;_create_chunk&quot;]
+        D --&gt; E[&quot;保留末尾 3 场景&lt;br/&gt;重算时长预算&quot;]
+        E --&gt; C
+        C --&gt; F[&quot;遍历结束&quot;]
+        F --&gt; G[&quot;结算末块&quot;]
+    end
+
+    LS -.-&gt;|&quot;未接线 · 零调用方&quot;| X[&quot;生产工作流&lt;br/&gt;（无接入点）&quot;]
+</pre>
+<h3>2. 双阈值切分：场景数与时长的或逻辑</h3>
+<p><code>chunk_script</code> 是分块器唯一的主方法，核心是一个&quot;或&quot;条件：</p>
+<pre class="hljs"><code><span class="hljs-comment"># long_script_chunker.py L62-81（真实源码）</span>
+<span class="hljs-keyword">for</span> i, scene <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(scenes):
+    scene_duration = <span class="hljs-variable language_">self</span>._estimate_scene_duration(scene)
+
+    <span class="hljs-comment"># 检查是否需要开始新块</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">len</span>(chunk_scenes) &gt;= <span class="hljs-variable language_">self</span>.max_scenes_per_chunk <span class="hljs-keyword">or</span>
+            current_duration + scene_duration &gt; <span class="hljs-variable language_">self</span>.max_duration_per_chunk):
+        <span class="hljs-keyword">if</span> chunk_scenes:
+            chunks.append(<span class="hljs-variable language_">self</span>._create_chunk(
+                <span class="hljs-built_in">len</span>(chunks),
+                chunk_scenes,
+                chunk_scenes[<span class="hljs-number">0</span>].number - <span class="hljs-number">1</span>,
+                chunk_scenes[-<span class="hljs-number">1</span>].number - <span class="hljs-number">1</span>
+            ))
+            <span class="hljs-comment"># 保留重叠场景</span>
+            overlap = chunk_scenes[-<span class="hljs-variable language_">self</span>.overlap_scenes:] <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.overlap_scenes &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">else</span> []
+            chunk_scenes = overlap
+            current_duration = <span class="hljs-built_in">sum</span>(<span class="hljs-variable language_">self</span>._estimate_scene_duration(s) <span class="hljs-keyword">for</span> s <span class="hljs-keyword">in</span> chunk_scenes)
+
+    chunk_scenes.append(scene)
+    current_duration += scene_duration
+</code></pre>
+<p>机制拆解：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>两个独立触发条件</strong>：当前块场景数达到 30，或者&quot;再放入一个新场景后预估总时长会超过 180 秒&quot;，任一满足即封块；</p>
+</li>
+<li class="lvl-3">
+<p><strong>封块先于入块</strong>：判断发生在 <code>chunk_scenes.append(scene)</code> 之前——触发时先结算旧块，再把当前场景放入新块。因此<strong>场景永远不会被切开</strong>，这正是方法注释中&quot;保持场景边界（不断开场景内部）&quot;的落地方式。它也意味着单个超长场景会成为新块的起点，即便其预估时长超过 180 秒；</p>
+</li>
+<li class="lvl-3">
+<p><strong>新块从重叠场景起跑</strong>：封块后执行 <code>chunk_scenes = overlap</code>（上一块末尾 3 个场景），并重算 <code>current_duration</code>。</p>
+</li>
+</ol>
+<p><strong>为什么是双阈值？</strong> 两个参数各自对应一类约束：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>场景数（30）是复杂度约束</strong>：块内场景越多，需要维护与校验的角色/场景/道具状态越多，下游检查的开销随块内元素规模上升；</p>
+</li>
+<li class="lvl-2">
+<p><strong>时长（180 秒）是成本约束</strong>：源码注释写明 180.0 秒即&quot;3分钟&quot;——这是对 AI 视频生成环节的考量，单块对应成片越短，生成失败后重做的代价越小。</p>
+</li>
+</ul>
+<p>只保留单一阈值都不可靠：只看场景数，30 个对白密集的场景预估时长可能突破 600 秒；只看时长，一个不足 10 秒却包含几十个微动作的块同样难处理。双阈值&quot;先到先封&quot;是两条线同时设限的保守选择。</p>
+<h3>3. 时长估算：max(10.0, 元素数 × 4.0) 的近似</h3>
+<p><code>_estimate_scene_duration</code> 是分块器里唯一的&quot;业务算法&quot;：</p>
+<pre class="hljs"><code><span class="hljs-comment"># long_script_chunker.py L94-98（真实源码）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_estimate_scene_duration</span>(<span class="hljs-params">self, scene</span>) -&gt; <span class="hljs-built_in">float</span>:
+    <span class="hljs-string">&quot;&quot;&quot;估算场景时长（秒）&quot;&quot;&quot;</span>
+    <span class="hljs-comment"># 基于元素数量估算</span>
+    element_count = <span class="hljs-built_in">len</span>(<span class="hljs-built_in">getattr</span>(scene, <span class="hljs-string">&#x27;elements&#x27;</span>, []))
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">max</span>(<span class="hljs-number">10.0</span>, element_count * <span class="hljs-number">4.0</span>)  <span class="hljs-comment"># 每个元素约4秒</span>
+</code></pre>
+<p>对每个场景取&quot;元素个数 × 4 秒&quot;，并设 10 秒下限。这是一个<strong>粗粒度估算</strong>，精度有限，但设计意图清晰：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>不依赖模型调用</strong>：若为了算准时长而调 LLM 逐场景预估，分块本身就成了新的成本大头——分块只是前置工程，不该引入昂贵的附加调用；</p>
+</li>
+<li class="lvl-2">
+<p><strong>下限保护</strong>：空白或极简场景至少按 10 秒计，避免 0 秒场景让块无限膨胀；</p>
+</li>
+<li class="lvl-2">
+<p><strong>已知失真点</strong>：4 秒/元素的系数不区分元素类型——一句动作描述与一段 5 轮对白的镜头在这里等价。这是原型阶段的合理妥协；如果接入生产，最直接的改进是按元素类型（对白/动作/场景描述）分档加权重。</p>
+</li>
+</ul>
+<h3>4. 未填充的状态字段：设计意图与实现缺位</h3>
+<p>所有块的唯一构造入口是 <code>_create_chunk</code>：</p>
+<pre class="hljs"><code><span class="hljs-comment"># long_script_chunker.py L100-109（真实源码）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_create_chunk</span>(<span class="hljs-params">self, chunk_id: <span class="hljs-built_in">int</span>, scenes: <span class="hljs-type">List</span>,
+                  start_scene: <span class="hljs-built_in">int</span>, end_scene: <span class="hljs-built_in">int</span></span>) -&gt; ScriptChunk:
+    <span class="hljs-string">&quot;&quot;&quot;创建剧本块&quot;&quot;&quot;</span>
+    <span class="hljs-keyword">return</span> ScriptChunk(
+        chunk_id=chunk_id,
+        start_scene=start_scene,
+        end_scene=end_scene,
+        scenes=scenes,
+        estimated_duration=<span class="hljs-built_in">sum</span>(<span class="hljs-variable language_">self</span>._estimate_scene_duration(s) <span class="hljs-keyword">for</span> s <span class="hljs-keyword">in</span> scenes)
+    )
+</code></pre>
+<p>注意：<code>entry_character_states</code>、<code>exit_character_states</code>、<code>continuity_anchors</code> 三个字段<strong>只在数据类里声明了默认空字典，构建块时从未被赋值</strong>。也就是说，&quot;块间状态传递&quot;目前只是一组占位字段——分块器切出了块，但没有填充任何块的入口/出口角色状态，也没有连续性锚点。</p>
+<p>它说明&quot;跨块状态传递&quot;在分块层尚未实现，而不是像早期文章示例那样&quot;块1结束状态自动变成块2开始状态&quot;。该能力若要落地，最自然的接入点正是这三个字段（第四章再展开接线缺口）。</p>
+<h3>5. 重叠真相：3 个场景，不是 5 个</h3>
+<p>早期文章演示过&quot;100 场景剧本、每 30 场景一块、重叠 5 个场景&quot;。用真实源码重算同一剧本，重叠参数应为 <code>overlap_scenes=3</code>：</p>
+<pre class="hljs"><code>剧本：100个场景的电影剧本
+分块策略：按场景分块，每30个场景一块（max_scenes_per_chunk=30）
+重叠场景：3个（overlap_scenes=3，场景号按 1-based 叙述）
+
+块1：场景1-30（满30场景封块）
+块2：场景28-57（从块1末尾3个场景起跑，含重叠28-30，再追加27个新场景后封块）
+块3：场景55-84（同样从上一块末尾3个场景起跑）
+块4：场景82-100（剩余场景，末块）
+</code></pre>
+<blockquote>
+<p>上例按&quot;场景数阈值先触发&quot;推演。真实轮次中两种阈值哪个先到哪个封块，块边界可能比纯计数更碎一些。</p>
+</blockquote>
+<p><strong>为什么重叠 3 个？</strong> 从代码看，重叠的作用是让新块的起点带上上一块的&quot;尾部状态&quot;，用 3 个场景做状态过渡：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>重叠过少（如 1 个）：新块只能看到上一块的最后一个场景，角色在更早场景里的服装、道具状态无从继承；</p>
+</li>
+<li class="lvl-2">
+<p>重叠过多（如 10 个）：Token 浪费明显，且重叠场景可能在下游产出中重复生成；</p>
+</li>
+<li class="lvl-2">
+<p>3 个场景大致覆盖&quot;过渡-变化-稳定&quot;的最小叙事单元，是原型阶段的经验值，<strong>不是经过评测调优的结论参数</strong>。</p>
+</li>
+</ul>
+<p>还有一个容易忽略的细节：封块那一轮 <code>current_duration</code> 会按重叠场景重算，即<strong>重叠场景的预估时长会占用新块的时长预算</strong>。这是正确的会计处理——新块确实要重新处理这 3 个场景，预算不能白送。</p>
+<hr>
+<h2>三、被撤回的宣传：四种策略、并行处理与增量检查</h2>
+<h3>1. 四种分块策略：源码里只有一种</h3>
+<p>早期文章列出过四种分块策略——按场景、按角色弧、按情绪波、平衡分块。对照 110 行源码就会发现，实际实现的只有<strong>一种</strong>：按场景数分块（外加时长阈值兜底）。“角色弧”“情绪波”&quot;平衡分块&quot;三种说法在全仓库没有任何对应实现——没有弧线检测、没有情绪曲线分析、也没有多维度混合评分。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">宣传的策略</th>
+<th style="text-align:left">源码对应</th>
+<th style="text-align:left">真实状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">按场景分块</td>
+<td style="text-align:left"><code>LongScriptChunker.chunk_script</code>（场景数 + 时长双阈值）</td>
+<td style="text-align:left">已实现，未接线</td>
+</tr>
+<tr>
+<td style="text-align:left">按角色弧分块</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">不存在，无对应代码</td>
+</tr>
+<tr>
+<td style="text-align:left">按情绪波分块</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">不存在，无对应代码</td>
+</tr>
+<tr>
+<td style="text-align:left">平衡分块</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">不存在，无对应代码</td>
+</tr>
+</tbody>
+</table>
+<p>为什么只实现&quot;按场景&quot;？这是工程上最保守的选择，而不是偷懒：<strong>场景是剧本里唯一自带结构化边界的单元</strong>。<code>LongScriptChunker</code> 的入参是上游剧本解析阶段产出的 <code>parsed_script</code>，其 <code>scenes</code> 列表编号连续、边界明确，按场景切分天然满足&quot;不断开场景内部&quot;的硬约束。而&quot;角色弧&quot;&quot;情绪波&quot;要求先对全剧本做叙事结构分析（谁在哪个区间成长、情绪曲线如何起伏），这类分析本身就要把完整剧本送进 LLM——<strong>为了分块而先做一次全量理解，在成本上与&quot;不分块&quot;的初衷相矛盾</strong>。先切后验、把语义一致性问题交给下游检查兜底，是多数长文本系统更现实的路径。</p>
+<h3>2. 并行处理：并不存在</h3>
+<p>早期文章的&quot;并行处理&quot;流程图描述过多 Worker 架构：块1-块4 分别交给 Worker 1-4 并发处理，再做状态传递与结果融合。这个架构在源码中不存在：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>LongScriptChunker</code> 只做切分，输出 <code>List[ScriptChunk]</code>，没有任何并发调度代码；</p>
+</li>
+<li class="lvl-2">
+<p>全仓库的 <code>ThreadPoolExecutor</code> 只出现在 <code>llama_index_router.py</code> 的 <code>KnowledgeRouter</code> 里，且 <code>KnowledgeRouter</code> 本身也是未接线组件；</p>
+</li>
+<li class="lvl-2">
+<p>工作流本体基于 LangGraph 节点串行推进（<code>workflow_nodes.py</code>），不存在&quot;分块后并发处理再合并&quot;的模块。</p>
+</li>
+</ul>
+<p>需要区分的是：<strong>并行是&quot;分块后的自然诉求&quot;，不是&quot;已实现的机制&quot;</strong>。一旦分块器接线，如何处理各块确实要面对这个选择——串行逐块处理实现最简单且天然保持顺序；并行处理省时，但引入状态融合与顺序保证的复杂度。当前代码还处在&quot;连串行路径都没有&quot;的阶段，谈并行属于超前。</p>
+<h3>3. 增量检查：不存在</h3>
+<p>早期文章还描述过&quot;增量一致性检查&quot;的四项优化：只检查变化部分、受影响场景扩散、增量修复建议、检查缓存。这些同样没有实现——全仓库检索不到任何增量检查、影响范围计算或检查缓存的代码。已接线的 <code>ContinuityGuardianChecker</code> 每次检查都是<strong>全量</strong>的：<code>check_all_continuity</code> 收到剧本、镜头序列、片段序列等完整上下文，六类检查逐项跑满。</p>
+<blockquote>
+<p>把三组&quot;撤回&quot;放在一起，规律很清楚：<strong>越靠近分块器周边的能力，越容易被想象出来</strong>——因为它们在逻辑上&quot;应该有&quot;。源码考证的价值恰恰是把&quot;逻辑上应该有&quot;和&quot;代码里真的有&quot;分开：分块器本体的双阈值与重叠是真的；围绕它的策略体系、并行架构、增量优化则没有对应实现。</p>
+</blockquote>
+<hr>
+<h2>四、跨块一致性校验：未接线原型与已接线防线</h2>
+<p>分块器不接线，是否意味着 PenShot 完全没有连续性保障？并非如此。源码里存在<strong>两套</strong>与&quot;连续性&quot;相关的体系，命运截然不同：一套是围绕跨块检查设计的原型组件（未接线），另一套是真正在生产链路里运行的检查-修复闭环（已接线）。本章逐一对照。</p>
+<h3>1. CrossChunkValidator：未接线的跨块检查原型</h3>
+<p>与分块器同批落库的 <code>cross_chunk_validator.py</code>（102 行）定义了 <code>CrossChunkValidator</code>，负责&quot;跨块过渡检查&quot;。它的核心方法 <code>validate_chunk_transition(prev_result, curr_result)</code> 只做两件事：</p>
+<pre class="hljs"><code><span class="hljs-comment"># cross_chunk_validator.py L27-51（真实源码，节选）</span>
+<span class="hljs-comment"># 1. 验证角色连续性</span>
+prev_chars = <span class="hljs-built_in">set</span>(prev_result.get(<span class="hljs-string">&#x27;characters_in_chunk&#x27;</span>, []))
+curr_chars = <span class="hljs-built_in">set</span>(curr_result.get(<span class="hljs-string">&#x27;characters_in_chunk&#x27;</span>, []))
+
+<span class="hljs-comment"># 角色突然消失</span>
+missing_chars = prev_chars - curr_chars
+<span class="hljs-keyword">for</span> char <span class="hljs-keyword">in</span> missing_chars:
+    issues.append({
+        <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;character_disappears&quot;</span>,
+        <span class="hljs-string">&quot;character&quot;</span>: char,
+        <span class="hljs-string">&quot;severity&quot;</span>: <span class="hljs-string">&quot;high&quot;</span>,
+        <span class="hljs-string">&quot;suggestion&quot;</span>: <span class="hljs-string">f&quot;角色<span class="hljs-subst">{char}</span>在块间突然消失，检查是否有过渡&quot;</span>
+    })
+
+<span class="hljs-comment"># 角色突然出现</span>
+new_chars = curr_chars - prev_chars
+<span class="hljs-keyword">for</span> char <span class="hljs-keyword">in</span> new_chars:
+    <span class="hljs-comment"># 检查是否是主要角色</span>
+    <span class="hljs-keyword">if</span> char <span class="hljs-keyword">in</span> prev_result.get(<span class="hljs-string">&#x27;main_characters&#x27;</span>, []):
+        issues.append({
+            <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;character_appears_suddenly&quot;</span>,
+            <span class="hljs-string">&quot;character&quot;</span>: char,
+            <span class="hljs-string">&quot;severity&quot;</span>: <span class="hljs-string">&quot;medium&quot;</span>,
+            <span class="hljs-string">&quot;suggestion&quot;</span>: <span class="hljs-string">f&quot;主要角色<span class="hljs-subst">{char}</span>突然出现，需要铺垫&quot;</span>
+        })
+</code></pre>
+<pre class="hljs"><code><span class="hljs-comment"># cross_chunk_validator.py L53-70（真实源码，节选）</span>
+<span class="hljs-comment"># 2. 验证场景连续性</span>
+prev_location = prev_result.get(<span class="hljs-string">&#x27;last_location&#x27;</span>)
+curr_location = curr_result.get(<span class="hljs-string">&#x27;first_location&#x27;</span>)
+
+<span class="hljs-keyword">if</span> prev_location <span class="hljs-keyword">and</span> curr_location <span class="hljs-keyword">and</span> prev_location != curr_location:
+    <span class="hljs-comment"># 场景切换，检查是否有角色跟随</span>
+    common_chars = prev_chars &amp; curr_chars
+    <span class="hljs-keyword">if</span> common_chars:
+        issues.append({
+            <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;scene_transition&quot;</span>,
+            <span class="hljs-string">&quot;from_location&quot;</span>: prev_location,
+            <span class="hljs-string">&quot;to_location&quot;</span>: curr_location,
+            <span class="hljs-string">&quot;characters&quot;</span>: <span class="hljs-built_in">list</span>(common_chars),
+            <span class="hljs-string">&quot;severity&quot;</span>: <span class="hljs-string">&quot;low&quot;</span>,
+            <span class="hljs-string">&quot;suggestion&quot;</span>: <span class="hljs-string">f&quot;场景从<span class="hljs-subst">{prev_location}</span>切换到<span class="hljs-subst">{curr_location}</span>，角色<span class="hljs-subst">{<span class="hljs-built_in">list</span>(common_chars)}</span>跟随&quot;</span>
+        })
+</code></pre>
+<p>对照早期文章宣传的&quot;四维校验&quot;（角色/场景/道具/风格），真实实现只有<strong>两维</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">宣传的校验项</th>
+<th style="text-align:left">真实实现</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色跨块一致</td>
+<td style="text-align:left">有</td>
+<td style="text-align:left">角色消失（high）+ 主角突现（medium）</td>
+</tr>
+<tr>
+<td style="text-align:left">场景跨块一致</td>
+<td style="text-align:left">有</td>
+<td style="text-align:left">场景切换跟随检查（low）</td>
+</tr>
+<tr>
+<td style="text-align:left">道具跨块一致</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">无对应检查代码</td>
+</tr>
+<tr>
+<td style="text-align:left">风格跨块一致</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">无对应检查代码</td>
+</tr>
+</tbody>
+</table>
+<p>另外两个细节值得注意：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>输入契约没有生产者</strong>：<code>validate_chunk_transition</code> 期望的 <code>prev_result</code> / <code>curr_result</code> 字典需要携带 <code>characters_in_chunk</code>、<code>main_characters</code>、<code>last_location</code>、<code>first_location</code> 等字段。这类字典没有任何生产代码构造——既没有调用方，也没有将 <code>ScriptChunk</code> 转成该字典的转换函数。整个方法像是一份&quot;接口草稿&quot;；</p>
+</li>
+<li class="lvl-2">
+<p><strong><code>merge_chunk_contracts</code> 有一个隐蔽的副作用</strong>：它取 <code>merged = chunks_contracts[0]</code> 后直接原地修改（<code>merged.characters[name] = char</code>、<code>appearance_scenes.extend(...)</code>），属于对调用方传入对象的就地变更而非拷贝合并。如果接入生产并多次调用（例如重试场景），第一个契约对象的 <code>appearance_scenes</code> 会被重复追加。这类缺陷在原型阶段无伤大雅，接线时却必须处理——也侧面印证了&quot;未经过生产调用&quot;的事实。</p>
+</li>
+</ul>
+<h3>2. &quot;跨块状态传递&quot;示例的真相</h3>
+<p>早期文章里有一段&quot;块1结束状态（张三在医院，穿病号服）→ 块2开始状态（继承医院，切到病房）&quot;的示例。回到第二章已考证的事实：<code>ScriptChunk.entry_character_states</code> / <code>exit_character_states</code> / <code>continuity_anchors</code> 三个字段<strong>从未被填充</strong>，校验器也没有消费它们的代码。所以这段演示描述的是<strong>设计意图</strong>，不是系统行为——在当前代码里，“块1的结束态&quot;不会自动变成&quot;块2的起始态”，这个继承链条整条都缺失。</p>
+<p>它对应的正是接线分块器时最关键的待补工作：谁来填充每个块的入口/出口角色状态（服装、位置、情绪）？以什么粒度（角色全集还是主要角色）？填充数据从哪来（分块器自己解析场景，还是复用剧本解析阶段已产出的角色信息）？这些问题在现有原型里都没有答案。</p>
+<h3>3. 已接线的防线：六类检查 + 修复重试闭环</h3>
+<p>与未接线的跨块原型相对，真正在生产链路里运行的是另一套组件——<code>ContinuityGuardianChecker</code>（557 行）与 <code>ContinuityRepairGenerator</code>。它们不做&quot;跨块&quot;检查，而是做**跨阶段（段落/镜头/片段级）**检查，接线点在工作流的连续性守护节点：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py L115-117（真实源码）：实例化</span>
+<span class="hljs-comment"># 初始化连续性守护组件</span>
+<span class="hljs-variable language_">self</span>.generator = ContinuityRepairGenerator()
+<span class="hljs-variable language_">self</span>.checker = ContinuityGuardianChecker()
+</code></pre>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py L932-938（真实源码）：构建检查上下文</span>
+continuity_context = {
+    <span class="hljs-string">&quot;parsed_script&quot;</span>: state.domain.parsed_script,
+    <span class="hljs-string">&quot;shot_sequence&quot;</span>: state.domain.shot_sequence,
+    <span class="hljs-string">&quot;fragment_sequence&quot;</span>: state.domain.fragment_sequence,
+    <span class="hljs-string">&quot;instructions&quot;</span>: state.domain.instructions,
+    <span class="hljs-string">&quot;historical_context&quot;</span>: historical_context
+}
+</code></pre>
+<p><code>check_all_continuity</code> 依次执行六类检查：</p>
+<pre class="hljs"><code><span class="hljs-comment"># continuity_guardian_checker.py L44-62（真实源码，节选）</span>
+result = ContinuityCheckResult()
+
+<span class="hljs-comment"># 1. 角色连续性检查</span>
+<span class="hljs-variable language_">self</span>.check_character_continuity(context, result)
+
+<span class="hljs-comment"># 2. 场景连续性检查</span>
+<span class="hljs-variable language_">self</span>.check_scene_continuity(context, result)
+
+<span class="hljs-comment"># 3. 动作连续性检查</span>
+<span class="hljs-variable language_">self</span>.check_action_continuity(context, result)
+
+<span class="hljs-comment"># 4. 视觉风格连续性检查</span>
+<span class="hljs-variable language_">self</span>.check_style_continuity(context, result)
+
+<span class="hljs-comment"># 5. 时间连续性检查</span>
+<span class="hljs-variable language_">self</span>.check_time_continuity(context, result)
+
+<span class="hljs-comment"># 6. 道具连续性检查</span>
+<span class="hljs-variable language_">self</span>.check_prop_continuity(context, result)
+</code></pre>
+<p>检查发现问题后的处理链路（<code>continuity_check_node</code>，workflow_nodes.py）：</p>
+<pre class="mermaid">flowchart TB
+    A[&quot;continuity_check_node&lt;br/&gt;构建 continuity_context&quot;] --&gt; B[&quot;_check_continuity&lt;br/&gt;checker.check_all_continuity（六类检查）&quot;]
+    B --&gt; C{&quot;有连续性问题？&quot;}
+    C --&gt;|无问题| D[&quot;continuity_passed = True&lt;br/&gt;进入下一阶段&quot;]
+    C --&gt;|有问题| E[&quot;知识库检索历史解决方案&lt;br/&gt;search_similar_scene（top_k=2）&quot;]
+    E --&gt; F[&quot;_analyze_continuity_issues&lt;br/&gt;定位问题来源阶段&quot;]
+    F --&gt; G{&quot;重试次数 &lt; 3？&quot;}
+    G --&gt;|是| H[&quot;生成修复参数&lt;br/&gt;_route_to_fix_stage 回退源头阶段重试&quot;]
+    G --&gt;|否| I[&quot;needs_human_review = True&lt;br/&gt;转人工审核&quot;]
+</pre>
+<p>这条链路的关键设计点：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>问题溯源到阶段</strong>：<code>_analyze_continuity_issues</code> 不是笼统报错，而是把每个问题归因到产出它的工作流阶段，<code>_route_to_fix_stage</code> 直接把流程回退到对应源头重试——修复发生在问题产生的地方，而不是在检查节点打补丁；</p>
+</li>
+<li class="lvl-3">
+<p><strong>历史方案注入</strong>：检索历史相似问题的修复方案（<code>search_similar_scene</code>，top_k=2）挂到问题上供修复参考——这就是《召回评测》一文中考证过的&quot;连续性检查的历史方案检索&quot;接线点；</p>
+</li>
+<li class="lvl-3">
+<p><strong>重试有硬上限</strong>：<code>max_continuity_retries=3</code>（<code>state.domain</code> 上的默认值），超限不再自动修复而是 <code>needs_human_review=True</code> 转人工——避免无限重试烧 Token，也把&quot;自动修复不了&quot;的场景显式暴露给人；</p>
+</li>
+<li class="lvl-3">
+<p><strong>去重缓存</strong>：<code>checker</code> 内部维护 <code>_seen_issues</code> / <code>_processed_shots</code> / <code>_processed_fragments</code> 三个集合，每次 <code>check_all_continuity</code> 开始先清空——同一批输出里重复的问题不会反复上报。</p>
+</li>
+</ol>
+<p>修复参数的生成本身也是一层转发：<code>continuity_check_node</code> 调用 <code>_create_continuity_repair_params</code>（L1617），后者再委托 <code>self.generator.generate_repair_params</code>（L1629）——<code>ContinuityRepairGenerator</code> 才是实际的修复参数生成器。</p>
+<p>所以，PenShot 的连续性保障现状可以概括为：<strong>块级（跨块）防线是未接线原型，阶段级（跨段落/镜头/片段）防线是已接线的生产机制</strong>。早期文章把两者混为一谈，用后者的存在感给前者的&quot;完备性&quot;背书，这是需要纠正的叙述。本章涉及的连续性组件接线状态汇总如下：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">文件</th>
+<th style="text-align:left">状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>LongScriptChunker</code></td>
+<td style="text-align:left">long_script_chunker.py（110 行）</td>
+<td style="text-align:left">已实现未接线</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>CrossChunkValidator</code></td>
+<td style="text-align:left">cross_chunk_validator.py（102 行）</td>
+<td style="text-align:left">已实现未接线</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>PromptStyleGuardian</code></td>
+<td style="text-align:left">prompt_style_guardian.py</td>
+<td style="text-align:left">已实现未接线</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ContinuityGuardianChecker</code></td>
+<td style="text-align:left">continuity_guardian_checker.py（557 行）</td>
+<td style="text-align:left">已接线（六类检查）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ContinuityRepairGenerator</code></td>
+<td style="text-align:left">continuity_repair_generator.py</td>
+<td style="text-align:left">已接线（修复参数生成）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>五、向量上下文记忆的真实映射</h2>
+<p>早期文章宣称向量上下文记忆提供四类能力：跨块状态传递、语义记忆检索、上下文压缩、记忆衰减。把这张表放到真实源码里逐项映射，结论是&quot;两个不存在、两个换了形态&quot;：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">宣称的能力</th>
+<th style="text-align:left">系统里的真实形态</th>
+<th style="text-align:left">对分块场景的可用性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>跨块状态传递</strong></td>
+<td style="text-align:left"><code>ScriptChunk</code> 入口/出口状态字段占位，无实现</td>
+<td style="text-align:left">不可用</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>语义记忆检索</strong></td>
+<td style="text-align:left">长期记忆（Chroma 成功案例库）+ 连续性修复的历史方案检索（<code>search_similar_scene</code>）</td>
+<td style="text-align:left">目标不同，需改造</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>上下文压缩</strong></td>
+<td style="text-align:left">中期记忆摘要链（LangChain 摘要），已接线</td>
+<td style="text-align:left">机制类似，可借鉴</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>记忆衰减</strong></td>
+<td style="text-align:left">无任何实现</td>
+<td style="text-align:left">不存在</td>
+</tr>
+</tbody>
+</table>
+<p>三处关键落差值得说清楚：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>三层记忆服务的是&quot;跨任务经验复用&quot;，不是&quot;块间状态传递&quot;</strong>。短期、中期、长期记忆（详见《召回评测》一文）都以会话/剧本为粒度：短期记忆的键是 <code>penshot:memory:{session_id}</code>，长期记忆按 <code>script_id</code> 过滤相似成功案例。而跨块状态传递要求的是&quot;块 A 的出口状态原样注入块 B 的入口&quot;——这是一条确定性的数据流，不是相似性检索能替代的；</p>
+</li>
+<li class="lvl-3">
+<p><strong>语义记忆检索对分块的价值有限</strong>：长期记忆入库门槛是 <code>completeness &gt;= 0.8</code> 的成功案例，当前真机三剧本实为 0 文档；历史方案检索（top_k=2）只服务连续性修复场景。两者都不是&quot;按块召回远端上下文&quot;的通道；</p>
+</li>
+<li class="lvl-3">
+<p><strong>记忆衰减没有实现，也不建议照搬</strong>：&quot;远距离记忆权重自动衰减&quot;在分块场景里甚至是危险设计——块间状态传递要求确定性继承（服装、道具必须以字面值传递），任何&quot;权重衰减&quot;都会引入状态漂移。</p>
+</li>
+</ol>
+<p>README 路线图里&quot;超长剧本分块处理 + 向量数据库上下文记忆&quot;的表述，指向的正是这个缺口：用向量库做跨块上下文记忆是规划中的方向，而不是已交付的能力。若要落地，现有长期记忆（Chroma + script_id 过滤）是最接近的基座，但它的入库门槛与查询语义都要重新设计——这也是&quot;接线分块器&quot;课题的一部分。</p>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p><strong>按&quot;三口径&quot;盘点分块相关的全部能力</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">口径</th>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">已接线</td>
+<td style="text-align:left">六类连续性检查 + 修复重试闭环</td>
+<td style="text-align:left"><code>continuity_check_node</code> 内运行，重试上限 3 次后转人工</td>
+</tr>
+<tr>
+<td style="text-align:left">已接线</td>
+<td style="text-align:left">历史方案检索</td>
+<td style="text-align:left"><code>search_similar_scene</code>（top_k=2）为修复注入历史经验</td>
+</tr>
+<tr>
+<td style="text-align:left">已实现未接线</td>
+<td style="text-align:left">双阈值分块 + 3 场景重叠</td>
+<td style="text-align:left"><code>LongScriptChunker</code>（110 行）完整实现，零调用方</td>
+</tr>
+<tr>
+<td style="text-align:left">已实现未接线</td>
+<td style="text-align:left">跨块过渡检查</td>
+<td style="text-align:left"><code>CrossChunkValidator</code> 角色/场景两维检查，输入契约无生产者</td>
+</tr>
+<tr>
+<td style="text-align:left">已实现未接线</td>
+<td style="text-align:left">提示词风格守护</td>
+<td style="text-align:left"><code>PromptStyleGuardian</code>，零调用方</td>
+</tr>
+<tr>
+<td style="text-align:left">规划中</td>
+<td style="text-align:left">自动分块处理 + 向量数据库跨块上下文记忆</td>
+<td style="text-align:left">README 开发路线图·中期规划</td>
+</tr>
+</tbody>
+</table>
+<p><strong>想接线分块器的话，按什么顺序做什么</strong>：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>先补状态字段</strong>：让 <code>_create_chunk</code> 真正填充 <code>entry_character_states</code> / <code>exit_character_states</code>——这是跨块一致性的数据前提，没有它，校验器再完备也无米下锅；</p>
+</li>
+<li class="lvl-3">
+<p><strong>再设计块级执行的串行路径</strong>：分块→逐块处理→合并，先把串行走通，再评估并行是否值得（并行会引入顺序保证与状态融合成本）；</p>
+</li>
+<li class="lvl-3">
+<p><strong>最后才谈策略升级</strong>：在双阈值+重叠的机械切分上线验证之前，&quot;角色弧/情绪波分块&quot;没有落地必要——它们解决的是&quot;边界更优美&quot;的问题，而当前系统连边界处的状态传递都没打通；</p>
+</li>
+<li class="lvl-3">
+<p><strong>保留人工兜底</strong>：连续性修复重试 3 次即转人工的设计已被生产验证——分块接入后，&quot;块级问题无法自动修复&quot;的场景同样应转人工而不是无限重试。</p>
+</li>
+</ol>
+<p><strong>实践建议</strong>：对正在使用 PenShot 的用户，超长剧本当前的正解仍是 README 给出的方案——<strong>分段输入</strong>。把剧本按叙事段落手动切分，逐段调用工作流，利用系统已接线的记忆与连续性机制保证段内质量；自动分块是路线图上的事情，不是今天的按钮。对二次开发者，<code>LongScriptChunker</code> 的 110 行代码是一份清晰的接线起点：数据结构已备好、参数有据可依、缺口被本文逐一定位——差的只是把它接进工作流的那几根线。</p>
+<blockquote>
+<p><strong>收个尾</strong>：本文从&quot;分块能力在 PenShot 里上线了没有&quot;这个朴素问题出发，逐行读了 110 行的分块器、102 行的跨块验证器，又对照了真正在生产里运行、557 行的连续性检查器。结论并不复杂：<strong>真实的代码比宣传的小，但也比宣传的更诚实</strong>——双阈值、重叠 3 场景、10 秒下限这些不起眼的常数背后，是&quot;先切后验、状态优先&quot;的工程判断。把这些常数的来龙去脉讲清楚，比罗列四种不存在的分块策略更有价值。</p>
+</blockquote>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot RAG 知识库：模板增强已接线，路由与重排序为何停在图纸上？ · PenShot 文档</title>
+  <meta name="description" content="PenShot RAG 知识库：剧本向量库实为手动余弦全量扫描，提示词模板增强与成功模板留存已真实接线，知识路由器与重排序仍停在图纸上；短期滑动窗口、中期 LLM 摘要、长期 Chroma 三层记忆逐一亮明实现，并附嵌入模型失配等故障排坑清单。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/rag-knowledge-base.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot RAG 知识库：模板增强已接线，路由与重排序为何停在图纸上？">
+  <meta property="og:description" content="PenShot RAG 知识库：剧本向量库实为手动余弦全量扫描，提示词模板增强与成功模板留存已真实接线，知识路由器与重排序仍停在图纸上；短期滑动窗口、中期 LLM 摘要、长期 Chroma 三层记忆逐一亮明实现，并附嵌入模型失配等故障排坑清单。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/rag-knowledge-base.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html" class="active">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-04-23</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot RAG：模板增强已接线，路由与重排序为何停在图纸上？</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="consistency.html">一致性策略</a> · <a href="dev-guide.html">开发指南</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<hr>
+<h2>核心价值与整体架构</h2>
+<h3>什么是 RAG 知识库，为什么需要它</h3>
+<p>剧本分镜智能体是一个基于多智能体协作的视频分镜生成系统。它将原始剧本作为输入，通过一系列智能体协作，输出可供 AI 视频生成模型使用的提示词序列。在这个过程中，LLM 单独推理往往无法&quot;记住&quot;历史成功经验、相似场景与既有设定，导致输出不稳定、前后不一致。</p>
+<p>RAG（检索增强生成，Retrieval-Augmented Generation）知识库正是为此而生——它在模型生成前先从外部存储中检索相关上下文，再注入提示词参与生成。它扮演着系统的<strong>核心记忆与检索角色</strong>，为各个智能体提供历史经验、相似场景和成功模板的参考，从而把&quot;一次性生成&quot;升级为&quot;经验驱动的生成&quot;。</p>
+<p>需要说明的是，RAG 与单纯的关键词检索有本质区别：关键词检索依赖字面命中，无法处理同义词、改写与语义相近但文字不同的表达；而 RAG 通过将文本映射为高维向量，在&quot;语义空间&quot;中计算相似度，因此能够理解&quot;林然裹着旧羊毛毯&quot;与&quot;年轻女性裹着羊毛毯&quot;这类语义等价的关系。这也是后续所有检索环节得以成立的基础。</p>
+<p>下文将以&quot;三口径&quot;逐层考证 PenShot 中 RAG 知识库的真实形态：<strong>已接线的提示词模板增强与三层记忆、以简化实现落地的剧本向量库、以及已实现但未接线的知识路由器</strong>。</p>
+<blockquote>
+<p><strong>核订说明</strong>：本文所称&quot;已接线&quot;，指组件确实被工作流节点或其他生产代码调用；&quot;已实现未接线&quot;指代码完整存在、但全仓库找不到调用方；&quot;规划中&quot;指只存在于设计文档或概念描述中。所有类名、方法签名与参数取值均取自仓库当前源码，读者可对照复验。</p>
+</blockquote>
+<h3>整体架构：四层分层设计</h3>
+<p>整个知识系统的真实架构分层如下，图中已标注每个组件的接线状态：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Workflow_Layer [工作流节点层 - 真实调用方]
+        W1[剧本解析节点]
+        W4[提示词转换节点]
+        W5[质量审计节点]
+        W6[连续性守护节点]
+    end
+
+    subgraph Manager_Layer [知识中枢 - 已接线]
+        R1[PromptTemplateManager&lt;br/&gt;模板库 + 剧本知识库双索引]
+    end
+
+    subgraph Storage_Layer [知识存储层]
+        subgraph Vector [向量索引 - LlamaIndex]
+            V1[模板向量索引&lt;br/&gt;按剧本隔离]
+            V2[剧本内容索引&lt;br/&gt;ScriptKnowledgeBase]
+        end
+        
+        subgraph Memory [三层记忆 - 已接线]
+            M1[短期记忆&lt;br/&gt;deque 滑动窗口]
+            M2[中期记忆&lt;br/&gt;LLM 摘要]
+            M3[长期记忆&lt;br/&gt;Chroma 向量库]
+        end
+    end
+
+    subgraph Persistence_Layer [持久化层]
+        P1[(templates_cache.json&lt;br/&gt;+ index_store/)]
+        P2[(default__vector_store.json&lt;br/&gt;docstore.json)]
+        P3[(parsed_results/&lt;br/&gt;剧本解析 JSON)]
+        P4[(Chroma&lt;br/&gt;script_xxx_memory)]
+    end
+
+    subgraph Idle_Layer [已实现未接线]
+        K1[KnowledgeRouter&lt;br/&gt;四源路由 + 混合检索]
+    end
+
+    W1 --&gt;|add_parsed_script| R1
+    W4 --&gt;|enhance_prompt| R1
+    W5 --&gt;|save_successful_prompt| R1
+    W6 --&gt;|search_similar_scene| R1
+    
+    R1 --&gt; V1
+    R1 --&gt; V2
+    R1 --&gt; M1
+    R1 --&gt; M2
+    R1 --&gt; M3
+    
+    V1 --&gt; P1
+    V2 --&gt; P2
+    V2 --&gt; P3
+    M3 --&gt; P4
+    
+    K1 -.-&gt;|悬空引用| V2
+    K1 -.-&gt;|悬空引用| M3
+</pre>
+<p><strong>工作流节点层</strong>是知识的使用者，也是判断&quot;接线状态&quot;的关键——只有被这一层真实调用的组件才算&quot;已接线&quot;。剧本解析节点把解析结果写入知识库（<code>add_parsed_script</code>），提示词转换节点检索成功模板增强提示词（<code>enhance_prompt</code>），质量审计节点在审查通过后沉淀成功模板（<code>save_successful_prompt</code>），连续性守护节点用问题描述检索相似场景（<code>search_similar_scene</code>）。这四个调用点都能在 <code>workflow_nodes.py</code> 中找到对应代码。</p>
+<p><strong>知识中枢层</strong>的真实入口是 <code>PromptTemplateManager</code>（位于 <code>prompts/prompt_template_manager.py</code>），它同时持有两套向量索引——按剧本隔离的<strong>模板索引</strong>，以及内嵌的 <code>ScriptKnowledgeBase</code> 剧本内容索引——并挂接统一的三层记忆管理器。工作流节点并不直接接触向量库，所有知识读写都经由这个中枢转发。</p>
+<p><strong>知识存储层</strong>包含两套 LlamaIndex 向量索引与三层记忆：模板索引与剧本索引都由 <code>SimpleVectorStore</code> 承载；记忆则分别由滑动窗口（短期）、LLM 摘要链（中期）、Chroma 向量库（长期）实现。需要注意的是，设计图上常见的&quot;结构化存储&quot;并不是独立组件，它的实体是 <code>ScriptKnowledgeBase</code> 内部的 <code>parsed_results</code> 缓存与磁盘 JSON 文件。</p>
+<p><strong>持久化层</strong>的真实文件包括：模板缓存与索引目录（<code>templates_cache.json</code> + <code>index_store/</code>）、剧本向量存储（<code>default__vector_store.json</code> 与 <code>docstore.json</code>）、剧本解析结果（<code>parsed_results/</code> 下的 JSON），以及长期记忆的 Chroma 集合。</p>
+<p>图底部还有一个<strong>已实现未接线</strong>的组件：<code>KnowledgeRouter</code>（知识路由器）。它支持四种检索源与混合检索融合，代码完整、可独立实例化，但全仓库找不到任何调用方——它与存储层之间是&quot;悬空引用&quot;。这个组件的真实形态会在拆解三中单独考证。</p>
+<hr>
+<h2>关键要点拆解（一）：LlamaIndex 向量知识库</h2>
+<h3>LlamaIndex 是什么</h3>
+<p>LlamaIndex 是一个专为 LLM 应用设计的索引框架，它提供了文档加载、索引构建、检索查询等一系列工具。在 PenShot 中，LlamaIndex 主要用于构建剧本的向量索引，实现语义级别的相似度检索。</p>
+<p><code>ScriptKnowledgeBase</code> 类是剧本向量知识库的核心实现（<code>knowledge/llamaIndex/llama_index_knowledge.py</code>，约 960 行）。它的构造参数为 <code>(embeddings, script_id, storage_dir=None, chunk_size=512, chunk_overlap=20)</code>——第二个参数 <code>script_id</code> 是必需的，类内部用四组字典（<code>_indices</code> / <code>_vector_stores</code> / <code>_storage_contexts</code> / <code>_retrievers</code>）按剧本 ID 隔离全部数据。调用 <code>add_parsed_script</code> / <code>add_script_text</code> 入库时，系统先把剧本转成场景、角色文档，再按分块参数切分、向量化，写入 <code>SimpleVectorStore</code>，并立即持久化到磁盘。</p>
+<p>分块解析器的选择有一个真实的条件分支：<code>chunk_size &gt; 1000</code> 时使用 <code>SentenceWindowNodeParser</code>（窗口大小 3），否则使用 <code>SentenceSplitter</code>。默认 <code>chunk_size=512</code>，因此默认路径走的是 <code>SentenceSplitter</code>；窗口解析器只在显式调大分块时才启用，而不是两个解析器二选一由调用方随意指定。</p>
+<p>这里有两个值得注意的工程细节：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>文本分块（chunking）</strong>：<code>chunk_size</code> 与 <code>chunk_overlap</code> 直接影响检索质量。分块过小会丢失上下文语义，分块过大又会引入噪声、稀释相似度。重叠区（overlap）用于缓解切分把一句话从中间截断的问题，是 RAG 中常见的调参重点。本项目的默认取值（512/20）属&quot;块偏小、重叠保守&quot;的配置。</p>
+</li>
+<li class="lvl-2">
+<p><strong>嵌入维度与模型</strong>：嵌入模型将文本映射为固定维度的向量（业界常见取值有 768/1024/1536 维等），维度越高编码信息越丰富，但索引体积与检索耗时也随之上升，需要按精度与成本权衡。本项目具体加载哪种嵌入模型由外部配置注入，代码本身不绑定某一维度。</p>
+</li>
+</ul>
+<p>这里必须区分两条检索路径，它们的成熟度完全不同：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong><code>query()</code> 方法</strong>（真实主线）：方法体注释直言&quot;使用手动余弦相似度计算&quot;——它直接遍历向量存储中的全部向量，逐个计算余弦相似度后排序取前 <code>top_k</code>（默认 5）。签名中的 <code>search_type</code>、<code>use_rerank</code>、<code>rerank_model</code> 三个参数接收后从不使用，是典型的&quot;占位参数&quot;。</p>
+</li>
+<li class="lvl-2">
+<p><strong><code>create_retriever_for_script()</code> 方法</strong>（候选路径）：这里才有完整装配——支持 <code>similarity</code>/<code>mmr</code> 两种模式（MMR 的 <code>mmr_threshold=0.6</code>）、可选 <code>SentenceTransformerRerank</code> 重排序（模型选择链为本地路径 → 配置名 → 默认 <code>BAAI/bge-reranker-large</code>，<code>top_n=min(3, similarity_top_k)</code>）。值得注意的实现细节：rerank 生效时会用 <code>index.as_retriever</code> 重建检索器，mmr 模式因此被覆盖——两者不能叠加使用。这条路径当前仅被未接线的 <code>KnowledgeRouter</code> 引用。</p>
+</li>
+</ul>
+<p>关于 MMR：当多个候选在语义上高度相似（如同属同一情感场景）时，仅按相似度排序会得到一堆&quot;雷同&quot;结果。MMR 在排序目标中加入了一项目标集合内部多样性的惩罚项，用 $\lambda$ 在&quot;与查询更相关&quot;和&quot;与已选集合更多样&quot;之间做权衡，适合需要一份覆盖多种类型的候选清单的场景。</p>
+<h3>核心架构</h3>
+<pre class="mermaid">flowchart LR
+    subgraph Input [输入]
+        I1[原始剧本]
+        I2[查询文本]
+    end
+
+    subgraph Processing [处理层]
+        P1[ScriptParserTool&lt;br/&gt;剧本解析器]
+        P2[节点解析器&lt;br/&gt;chunk_size&gt;1000 用 Window&lt;br/&gt;否则 SentenceSplitter]
+        P3[EmbeddingModel&lt;br/&gt;嵌入模型]
+    end
+
+    subgraph Index [索引层]
+        I3[Document&lt;br/&gt;场景/角色文档]
+        I4[TextNode&lt;br/&gt;文本节点]
+        I5[VectorStoreIndex&lt;br/&gt;向量索引]
+        I6[SimpleVectorStore&lt;br/&gt;向量存储]
+    end
+
+    subgraph Retrieval [检索层 - 真实主线]
+        R1[query 手动余弦扫描&lt;br/&gt;遍历 embedding_dict]
+        R2[排序并截断 top_k=5]
+    end
+
+    subgraph Candidate [候选路径 - 仅被未接线路由引用]
+        C1[create_retriever_for_script&lt;br/&gt;similarity / mmr]
+        C2[SentenceTransformerRerank&lt;br/&gt;可选]
+    end
+
+    subgraph Output [输出]
+        O1[检索结果 + 元数据]
+    end
+
+    I1 --&gt; P1
+    P1 --&gt; I3
+    I3 --&gt; P2
+    P2 --&gt; I4
+    I4 --&gt; P3
+    P3 --&gt; I5
+    I5 --&gt; I6
+
+    I2 --&gt; R1
+    I6 --&gt; R1
+    R1 --&gt; R2
+    R2 --&gt; O1
+
+    I2 -.-&gt; C1
+    I6 -.-&gt; C1
+    C1 -.-&gt; C2
+</pre>
+<h3>ScriptKnowledgeBase 核心类设计</h3>
+<pre class="mermaid">classDiagram
+    class ScriptKnowledgeBase {
+        -embeddings: BaseEmbedding
+        -storage_dir: Path
+        -chunk_size: int
+        -chunk_overlap: int
+        -_indices: Dict~script_id, VectorStoreIndex~
+        -_vector_stores: Dict~script_id, SimpleVectorStore~
+        -_storage_contexts: Dict~script_id, StorageContext~
+        -_retrievers: Dict~script_id, BaseRetriever~
+        -parsed_results: Dict
+        -document_cache: Dict
+        
+        +add_parsed_script(parsed_script, script_id) Dict
+        +add_script_text(script_text, script_id) Dict
+        +add_script_file(file_path, script_id) Dict
+        +remove_script(script_id) bool
+        +set_current_script(script_id)
+        +create_retriever(script_id, search_type, top_k, use_rerank) BaseRetriever
+        +create_retriever_for_script(script_id, search_type, use_rerank, rerank_model)
+        +get_retriever(script_id) BaseRetriever
+        +query(query_text, script_id, top_k) Dict
+        +query_scene(scene_id, script_id) Dict
+        +query_character(character_name, script_id) Dict
+        +query_structured(query_type, query_value, script_id) Dict
+        +get_statistics(script_id) Dict
+        +clear()
+        -_ensure_script_index(script_id)
+        -_add_documents_to_index(documents, script_id)
+        -_save_storage(script_id)
+        -_save_parsed_result(script_id, result)
+        -_recreate_vector_store(script_id)
+    }
+
+    class Document {
+        +text: str
+        +metadata: Dict
+        +id_: str
+    }
+
+    class VectorStoreIndex {
+        +from_documents(documents, embed_model)
+        +from_vector_store(vector_store, embed_model)
+        +as_retriever(similarity_top_k)
+        +insert_nodes(nodes)
+    }
+
+    class SimpleVectorStore {
+        +add(nodes)
+        +query(query_embedding, similarity_top_k)
+        +persist(persist_path)
+        +from_persist_path(persist_path)
+    }
+
+    ScriptKnowledgeBase --&gt; Document : creates
+    ScriptKnowledgeBase --&gt; VectorStoreIndex : manages
+    VectorStoreIndex --&gt; SimpleVectorStore : uses
+</pre>
+<p>两点核订说明：图中的 <code>_indices</code> 等四个字段都是<strong>按 <code>script_id</code> 键控的字典</strong>，而不是单实例——这是数据隔离的实现载体；另外 <code>_recreate_vector_store</code> 是一个故障自愈方法：当向量存储损坏时，它先把损坏文件备份为 <code>*_corrupted_{时间戳}</code>，再清理 <code>docstore.json</code>、<code>index_store.json</code> 并重建空存储，让知识库能从损坏中恢复而不是直接崩溃。</p>
+<h3>文档解析与索引流程</h3>
+<p>向量知识库的数据流向如下：原始剧本首先通过 <code>ScriptParserTool</code> 转换为场景文档和角色文档——场景文档的元数据为 <code>type=scene, scene_id, location, time_of_day, element_count</code>，角色文档为 <code>type=character, character_name, gender, role</code>。这些文档在进入 <code>VectorStoreIndex</code> 前会按条件选择节点解析器切分，再逐块向量化写入 <code>SimpleVectorStore</code>，随后立即持久化——<code>_save_storage</code> 会同时保存向量存储、docstore 与索引文件，并校验向量文件与 docstore 是否都已写盘成功。</p>
+<pre class="mermaid">flowchart TD
+    subgraph Parse [剧本解析]
+        A1[原始剧本或 ParsedScript] --&gt; A2[ScriptParserTool.parse]
+        A2 --&gt; A3[场景识别]
+        A3 --&gt; A4[角色提取]
+        A4 --&gt; A5[元素序列化]
+        A5 --&gt; A6[ParsedScript 对象]
+    end
+
+    subgraph Document [文档创建]
+        B1[遍历场景列表] --&gt; B2[创建场景文档]
+        B2 --&gt; B3[元数据: type=scene&lt;br/&gt;scene_id/location/time_of_day]
+        B1 --&gt; B4[遍历角色列表]
+        B4 --&gt; B5[创建角色文档]
+        B5 --&gt; B6[元数据: type=character&lt;br/&gt;character_name/gender/role]
+    end
+
+    subgraph Index [索引构建]
+        C1[Document 列表] --&gt; C2{chunk_size &gt; 1000 ?}
+        C2 --&gt;|是| C2A[SentenceWindowNodeParser&lt;br/&gt;window_size=3]
+        C2 --&gt;|否| C2B[SentenceSplitter&lt;br/&gt;512/20]
+        C2A --&gt; C3[TextNode 列表]
+        C2B --&gt; C3
+        C3 --&gt; C4[Embedding 向量化]
+        C4 --&gt; C5[VectorStoreIndex]
+        C5 --&gt; C6[持久化: default__vector_store.json&lt;br/&gt;docstore.json / index_store.json]
+    end
+
+    A6 --&gt; B1
+    B2 --&gt; C1
+    B5 --&gt; C1
+</pre>
+<h3>检索查询流程</h3>
+<p>真实主线（<code>query()</code> 方法）的检索流程如下——没有检索器对象、没有阈值过滤、也没有重排序环节：</p>
+<pre class="mermaid">flowchart TD
+    Q[查询文本] --&gt; E[embeddings.embed_query&lt;br/&gt;转查询向量]
+    E --&gt; S[遍历 embedding_dict&lt;br/&gt;逐条手动余弦相似度]
+    S --&gt; D[按相似度降序排序]
+    D --&gt; K[截断 top_k&lt;br/&gt;默认 5]
+    K --&gt; M[从 docstore 取文本与元数据]
+    M --&gt; F[组装 results 列表返回]
+</pre>
+<p>整个扫描过程的复杂度是 O(N)（N 为向量总数），每次查询都要把全部向量的余弦相似度算一遍。对单剧本知识库（几十到几百个文本块）而言这个开销可以接受，但它不具备向量数据库的近似索引（如 HNSW）能力；一旦向量规模上万，这种做法的查询延迟会线性上升。<code>create_retriever_for_script</code> 里的检索器装配（相似度/MMR/重排序）是现成的升级备选，但因为唯一的引用方 <code>KnowledgeRouter</code> 未接线，目前没有走到生产路径上。</p>
+<hr>
+<h2>关键要点拆解（二）：多层级记忆管理器</h2>
+<p>记忆层是这个知识体系里<strong>真实接线深度最高</strong>的部分——它是工作流四个阶段节点共同的读写枢纽。需要先理清一个结构事实：<code>MemoryManager</code> 本身是<strong>多剧本容器</strong>（内部是 <code>_script_memories: Dict[str, ScriptMemory]</code>），真正持有三层记忆的是每个剧本对应的 <code>ScriptMemory</code>；<code>MemoryManager</code> 的职责是按 <code>script_id</code> 路由到对应容器，并统一做序列化与反序列化。</p>
+<p>配置值来自 <code>WorkflowNodes</code> 构造时的注入（<code>MemoryConfig</code>）：短期 20 条 / TTL 3600 秒、中期 500 tokens 上限、长期启用且召回 <code>k=3</code>。三个层级的真实机制各有不同：</p>
+<p><strong>短期记忆</strong>的底层是 LangChain 的 <code>ChatMessageHistory</code>，容量控制用 <code>deque(maxlen=20)</code> 实现——是<strong>滑动窗口（FIFO）</strong>，超出容量的最旧消息被自动挤出，而不是按访问频率淘汰的 LRU。TTL 由 Redis 会话历史继承（<code>RedisChatMessageHistory</code> 的 <code>ttl</code> 参数），键为 <code>penshot:memory:{session_id}</code>；Redis 不可用时降级为内存存储，若配置了持久化目录还会把消息归档到 <code>short_term.json</code>。</p>
+<p><strong>中期记忆</strong>常被误读为&quot;统计仓库&quot;，真实实现是<strong>基于 LLM 的摘要链</strong>：每次写入（<code>add(stage_name, content)</code>）都会调用一次 LLM，把新内容&quot;逐步总结&quot;融合进旧摘要；超出 <code>500*4</code> 字符的输入先截断，生成后超过 <code>500*2</code> 字符的摘要也会被截断——容量限制实际体现在字符截断上。</p>
+<p><strong>长期记忆</strong>的底层是 Chroma 向量库（<code>langchain_chroma</code>），集合命名为 <code>script_{script_id}_memory</code>，写入时拼接标签等信息增强文本，检索走 <code>similarity_search_with_score</code> 并按分数阈值过滤。它是三层中唯一具备语义检索能力的层级。</p>
+<p>三层之间存在<strong>有条件的自动流转</strong>：写入时若条目标记 <code>important</code>，会从短期提升到中期；短期使用量达到容量 80% 时，系统取最近 5 条生成摘要自动压缩进中期；<code>add_stage</code> 写入的重要阶段内容还会同步写入长期。不过这是&quot;阈值触发&quot;而非&quot;持续学习式的自动升华&quot;——写什么、何时写，主要仍由调用方显式决定，行为可预测、可调试。</p>
+<h3>记忆层级架构</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Memory_Arch [三层记忆真实机制]
+        direction TB
+        
+        subgraph Short [短期记忆层 ShortTerm]
+            S1[容量: 20条&lt;br/&gt;deque 滑动窗口 FIFO]
+            S2[TTL: 3600秒&lt;br/&gt;由 Redis 会话历史承载]
+            S3[降级链: Redis&lt;br/&gt;→ 内存 → short_term.json]
+        end
+
+        subgraph Medium [中期记忆层 MediumTerm]
+            M1[上限: 500 tokens&lt;br/&gt;按字符截断保障]
+            M2[机制: LLM 摘要链&lt;br/&gt;逐步总结融合]
+        end
+
+        subgraph Long [长期记忆层 LongTerm]
+            L1[底层: Chroma 向量库&lt;br/&gt;集合 script_xxx_memory]
+            L2[写入: 增强文本&lt;br/&gt;检索: 相似度分数过滤]
+        end
+    end
+
+    subgraph DataFlow [数据流动]
+        D1[工作流阶段节点] --&gt;|写入交互| S1
+        D1 --&gt;|add_stage 摘要| M1
+        D1 --&gt;|成功模式写入| L1
+        S1 --&gt;|80% 容量触发压缩| M1
+        S1 --&gt;|important 标记提升| M1
+        L1 --&gt;|语义检索 k=3| D1
+    end
+</pre>
+<h3>MemoryManager 类设计</h3>
+<pre class="mermaid">classDiagram
+    class MemoryManager {
+        -llm: BaseLanguageModel
+        -config: MemoryConfig
+        -_script_memories: Dict~script_id, ScriptMemory~
+        -_current_script_id: str
+        
+        +set_script(script_id)
+        +get_script(script_id) ScriptMemory
+        +add(input_text, output_text, level, metadata, script_id)
+        +add_raw(input_text, output_text, level, metadata, script_id)
+        +add_stage(stage_name, content, metadata, script_id)
+        +recall(query, level, k, script_id) MemoryContext
+        +get(key, level, default, script_id)
+        +get_list(key, level, script_id)
+        +get_latest_deserialized(key, level, script_id)
+        +search(query, k, level, script_id)
+        +get_context_for_llm(query, max_tokens, script_id)
+        +get_stats(script_id) Dict
+        +clear_script(script_id)
+        -_deserialize(value, metadata)
+        -_to_str(value)
+    }
+
+    class ScriptMemory {
+        +short_term: ShortTermMemory
+        +medium_term: MediumTermMemory
+        +long_term: LongTermMemory
+        +add(input_text, output_text, level, metadata)
+        +add_stage(stage_name, content, metadata)
+        +recall(query, level, k) MemoryContext
+        +search(query, k, level)
+        +get_stats() Dict
+    }
+
+    class MemoryContext {
+        +short_term: List
+        +medium_term: str
+        +long_term: List
+        +to_prompt(max_tokens) str
+    }
+
+    class MemoryConfig {
+        +short_term_size: int
+        +short_term_ttl: int
+        +medium_term_max_tokens: int
+        +long_term_enabled: bool
+        +long_term_k: int
+        +embeddings: BaseEmbedding
+    }
+
+    class MemoryLevel {
+        SHORT_TERM
+        MEDIUM_TERM
+        LONG_TERM
+    }
+
+    MemoryManager &quot;1&quot; --&gt; &quot;*&quot; ScriptMemory : 按 script_id 隔离
+    ScriptMemory --&gt; MemoryContext : recall 产出
+    MemoryManager --&gt; MemoryConfig
+    MemoryManager --&gt; MemoryLevel
+</pre>
+<p>这里有三个容易搞错的细节：其一，<code>add()</code> 的语义是&quot;输入文本 + 输出内容&quot;这对交互，而不是简单的键值写入——写长期时会被拼接为 <code>问题: xxx\n回答: xxx</code>；其二，<code>recall()</code> 返回的 <code>MemoryContext</code> 是三段融合结构（短期列表 + 中期摘要字符串 + 长期条目列表），可用 <code>to_prompt(max_tokens)</code> 直接格式化为 LLM 上下文（内部按 1 token ≈ 2 字符保守估算截断）；其三，<code>get(key, ...)</code> 系列便捷接口底层都走 <code>recall()</code>——按 key 匹配最近一条，取短期时返回最后一条的 <code>output</code>，取长期时返回最后一条的 <code>content</code>。</p>
+<h3>记忆读写流程</h3>
+<p>真实读写流程（以 <code>ScriptMemory</code> 为执行主体）：</p>
+<pre class="mermaid">flowchart LR
+    subgraph Write [写入流程 add]
+        W1[调用 add] --&gt; W2[序列化 output 为 JSON 字符串]
+        W2 --&gt; W3[始终写入短期记忆]
+        W3 --&gt; W4{显式 level}
+        W4 --&gt;|MEDIUM_TERM| W5[LLM 摘要链融合]
+        W4 --&gt;|LONG_TERM| W6[Chroma 增强文本写入]
+        W4 --&gt;|未指定| W7{important 或 容量达 80% ?}
+        W7 --&gt;|是| W5
+        W7 --&gt;|否| W8[仅保留在短期]
+    end
+
+    subgraph Read [读取流程 recall]
+        R1[调用 recall] --&gt; R2[短期: 最近 k 条]
+        R1 --&gt; R3[中期: 整体摘要文本]
+        R1 --&gt; R4[长期: Chroma 语义检索 k 条]
+        R2 --&gt; R5[反序列化 JSON]
+        R4 --&gt; R5
+        R5 --&gt; R6[组装 MemoryContext]
+        R6 --&gt; R7[to_prompt 格式化并截断]
+    end
+</pre>
+<p>对照这幅图可以回答一个常见疑问：为什么中期的 <code>get_summary()</code> 不重不漏地代表&quot;全部历史&quot;？因为它是<strong>压缩摘要</strong>而不是逐条记录——每次 <code>add</code> 都会用 LLM 把旧摘要和新内容重新融合，信息在不断损失细节的同时保留趋势。这也是 LLM 摘要式记忆的固有取舍：很省 token、能表达&quot;倾向&quot;，但不适合存需要精确回放的原始数据。</p>
+<hr>
+<h2>关键要点拆解（三）：知识路由器</h2>
+<p>先说结论：<code>KnowledgeRouter</code>（<code>knowledge/llama_index_router.py</code>，约 550 行）是一个<strong>已实现但未接线</strong>的组件。它确实封装了四类检索源的统一入口、带有完整的查询对象与结果对象定义，但全仓库找不到任何实例化它的生产代码——工作流节点用的一直是 <code>PromptTemplateManager</code> 这条线。因此下文描述的是&quot;设计与实现&quot;，而不是&quot;线上行为&quot;。</p>
+<p><strong>向量检索</strong>（<code>VECTOR_INDEX</code>）转发到 <code>ScriptKnowledgeBase.query</code> 或经过缓存的检索器；<strong>记忆检索</strong>（<code>SEMANTIC_MEMORY</code>）按短期/中期/长期分别从 <code>MemoryManager</code> 取数据；<strong>结构化检索</strong>（<code>STRUCTURED</code>）走 <code>query_scene</code> / <code>query_character</code> 的精确字段匹配；<strong>混合检索</strong>（<code>HYBRID</code>）则是把上面几路的结果合并排序。</p>
+<p>关于混合检索的&quot;并行执行、分数归一化&quot;这类说法，需要按源码纠偏：<code>_hybrid_search</code> 的真实实现是<strong>串行</strong>依次调用三路（代码注释自认&quot;简化版，实际可用 asyncio.gather 并行&quot;）；融合时<strong>没有分数归一化</strong>，而是给不同来源<strong>硬编码固定分数</strong>——短期记忆 0.9、中期记忆 0.7、长期记忆 0.6、结构化场景 1.0、结构化角色 0.9；去重用的是&quot;内容前 100 字符作前缀 key&quot;的朴素策略。这套分数设计保证了结构化结果优先、记忆越&quot;近&quot;越优先的排序直觉，但不同来源的分数不可比，融合结果并不能反映真实相关性。</p>
+<p>路由器的设计意图是：调用方只构造一个 <code>KnowledgeQuery</code> 对象（指定查询文本与期望来源），路由器自动完成检索并返回格式化结果。接口设计本身是合理的——问题在于它从未被接入工作流。</p>
+<h3>路由器架构</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Input [查询输入]
+        I1[KnowledgeQuery]
+        I2[query_text: str]
+        I3[source: KnowledgeSource]
+        I4[top_k: int]
+        I5[similarity_threshold: float]
+    end
+
+    subgraph Router [KnowledgeRouter - 未接线]
+        direction TB
+        
+        subgraph Vector [向量检索路径]
+            V1[ScriptKnowledgeBase.query]
+            V2[或缓存的 DocumentRetriever]
+        end
+        
+        subgraph Memory [记忆检索路径]
+            M1[MemoryManager 三层记忆]
+            M2[短期 0.9 / 中期 0.7 / 长期 0.6]
+        end
+        
+        subgraph Structured [结构化检索路径]
+            S1[query_scene 精确匹配 1.0]
+            S2[query_character 精确匹配 0.9]
+        end
+    end
+
+    subgraph Fusion [结果融合 - 真实形态]
+        F1[串行依次调用&lt;br/&gt;非 asyncio.gather]
+        F2[硬编码分数排序&lt;br/&gt;非分数归一化]
+        F3[内容前 100 字符前缀去重]
+        F4[截取 top_k]
+    end
+
+    subgraph Output [查询输出]
+        O1[KnowledgeResult]
+        O2[results: List]
+        O3[source: KnowledgeSource]
+        O4[query_time_ms: float]
+    end
+
+    I1 --&gt; Router
+    
+    I3 --&gt;|VECTOR_INDEX| Vector
+    I3 --&gt;|SEMANTIC_MEMORY| Memory
+    I3 --&gt;|STRUCTURED| Structured
+    I3 --&gt;|HYBRID| Vector
+    I3 --&gt;|HYBRID| Memory
+    I3 --&gt;|HYBRID| Structured
+    
+    Vector --&gt; Fusion
+    Memory --&gt; Fusion
+    Structured --&gt; Fusion
+    
+    Fusion --&gt; Output
+</pre>
+<h3>查询决策流程</h3>
+<pre class="mermaid">flowchart TD
+    Start([接收查询请求]) --&gt; Parse[解析 KnowledgeQuery]
+    Parse --&gt; Check{source 类型分发}
+    
+    Check --&gt;|STRUCTURED| Struct[结构化精确查询]
+    Struct --&gt; S1[query_scene / query_character]
+    
+    Check --&gt;|VECTOR_INDEX| Vector[向量检索]
+    Vector --&gt; V1[确保索引已加载]
+    V1 --&gt;|索引缺失| V2[返回空结果]
+    V1 --&gt;|索引存在| V3[执行相似度检索]
+    
+    Check --&gt;|SEMANTIC_MEMORY| Mem[记忆检索]
+    Mem --&gt; M1[按级别取短期/中期/长期]
+    
+    Check --&gt;|HYBRID| Hybrid[混合检索 _hybrid_search]
+    Hybrid --&gt; H1[串行调用三路]
+    H1 --&gt; H2[硬编码分数合并]
+    H2 --&gt; H3[前缀去重]
+    H3 --&gt; H4[排序取 top_k]
+    
+    S1 --&gt; Format[组装 KnowledgeResult&lt;br/&gt;记录 query_time_ms]
+    V3 --&gt; Format
+    M1 --&gt; Format
+    H4 --&gt; Format
+    
+    Format --&gt; Return([返回结果])
+</pre>
+<h3>知识来源枚举</h3>
+<pre class="mermaid">classDiagram
+    class KnowledgeSource {
+        VECTOR_INDEX
+        SEMANTIC_MEMORY
+        STRUCTURED
+        HYBRID
+    }
+
+    class KnowledgeQuery {
+        +query_text: str
+        +source: KnowledgeSource
+        +top_k: int = 5
+        +filter_script_id: str
+        +filter_scene_id: str
+        +similarity_threshold: float = 0.6
+        +include_metadata: bool = True
+    }
+
+    class KnowledgeResult {
+        +results: List~Dict~
+        +source: KnowledgeSource
+        +query_time_ms: float
+        +total_matches: int
+        +query_text: str
+    }
+
+    KnowledgeQuery --&gt; KnowledgeSource
+    KnowledgeResult --&gt; KnowledgeSource
+</pre>
+<p>这三个数据类在源码中是 <code>@dataclass</code>（而非 Pydantic 模型），字段与默认值均来自 <code>llama_index_router.py</code> 开头部分。写本文时特别提醒：<code>KnowledgeQuery</code> 的默认阈值 0.6、<code>top_k=5</code> 目前只存在于未接线的路由链路上，不能用它们去解释工作流的真实行为——真实配置以拆解六中的对照表为准。</p>
+<hr>
+<h2>关键要点拆解（四）：提示词模板管理器</h2>
+<p><code>PromptTemplateManager</code>（<code>prompts/prompt_template_manager.py</code>，约 1000 行）是专门管理成功提示词模板的组件，也是工作流节点接触知识系统的真实中枢：它同时持有按剧本隔离的模板向量索引与内嵌的 <code>ScriptKnowledgeBase</code> 剧本内容索引（拆解一），并可挂接三层记忆管理器（拆解二）。先澄清一个常见误解：模板库<strong>并不是全局共享</strong>的——<code>_indices</code>、<code>_caches</code> 等结构都以 <code>script_id</code> 为键隔离，模板只在所属剧本内可见；真正全局的只有长期记忆层。</p>
+<p>写入链路是真实接线的：当质量审计节点判定某个片段的提示词通过审查后，<code>workflow_nodes.py</code> 会调用 <code>save_successful_prompt(fragment_id, prompt_text, quality_score, script_id, additional_metadata)</code>。内部组装元数据（<code>source</code> 标记为 <code>quality_audit_passed</code>，叠加片段 ID、质量分数、场景、风格等外部字段），转交 <code>add_template</code> 入库：超过 2000 字符的模板会被截断为 1997 字符加省略号；入库前做 hash 与全文双重去重，并用 <code>_processing_stack</code> 防止递归重入；随后更新索引与 <code>templates_cache.json</code> 缓存，并以默认的 <code>save_to_memory=True</code> 把模板写入长期记忆。</p>
+<p>读取链路同样真实：提示词转换节点生成新提示词后调用 <code>enhance_prompt(fragment.prompt, enhancement_mode=&quot;append&quot;)</code>。内部先走 <code>get_best_match</code>（本质是 <code>search_similar</code> 传 <code>top_k=1</code>），检索经 <code>index.as_retriever</code> 的相似度模式取候选，再做<strong>后置过滤</strong>——低于 <code>min_similarity_score</code> 的丢弃，且只保留 <code>metadata.type</code> 为 <code>prompt_template</code> 的节点；命中后按模式拼装增强文本（精确格式见后文流程图）。</p>
+<p>这里必须纠偏一处编造：&quot;模板管理器在启动时会从长期记忆层加载历史成功模板构建向量索引&quot;并不存在。真实实现中 <code>_save_to_memory</code> 是<strong>只写不读</strong>的单向沉淀（写入长期记忆的 <code>successful_prompt_patterns</code> 键），全类没有任何回读方法。进程重启后，模板库的恢复完全依赖磁盘上的 <code>templates_cache.json</code> 与 <code>index_store/</code>，长期记忆中的模板不会自动回流——这是当前实现的真实缺口，而非特性。</p>
+<p>在这个前提下，&quot;正向循环&quot;是有限成立的：同一剧本内沉淀的成功模板越多，<code>enhance_prompt</code> 可参考的样本越好；但循环半径受限于剧本隔离与单向沉淀，跨剧本的经验复用尚未形成闭环。</p>
+<h3>模板管理架构</h3>
+<p>先纠正两处流传较广的说法：其一，模板库并非&quot;全局共享&quot;——索引与缓存都按 <code>script_id</code> 隔离；其二，检索阈值不是写死的 0.7，而是构造参数 <code>min_similarity_score</code>（类默认 0.5，WorkflowNodes 注入 0.7）。阈值过低会引入低质量模板干扰语义，过高则召回过少，需要在&quot;召回够用&quot;与&quot;宁缺毋滥&quot;之间校准。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Collect [模板收集 - 已接线]
+        C1[质量审计通过] --&gt; C2[save_successful_prompt&lt;br/&gt;提取成功提示词]
+        C2 --&gt; C3[收集元数据&lt;br/&gt;fragment_id, score, scene, style]
+    end
+
+    subgraph Store [模板存储]
+        S1[add_template&lt;br/&gt;超长截断 + hash/全文去重] --&gt; S2[模板向量索引&lt;br/&gt;按剧本隔离]
+        S1 --&gt; S3[templates_cache.json&lt;br/&gt;磁盘缓存]
+    end
+
+    subgraph Retrieve [模板检索]
+        R1[新提示词查询] --&gt; R2[index.as_retriever&lt;br/&gt;similarity_top_k]
+        R2 --&gt; R3[后置过滤&lt;br/&gt;score &gt;= min_similarity_score]
+        R3 --&gt; R4[get_best_match&lt;br/&gt;top_k=1 最佳匹配]
+    end
+
+    subgraph Apply [模板应用]
+        A1[原始提示词] --&gt; A2{enhancement_mode}
+        A2 --&gt;|append| A3[原始在前&lt;br/&gt;追加参考优秀模板块]
+        A2 --&gt;|replace / hybrid| A4[模板在前&lt;br/&gt;原始置后同一实现]
+    end
+
+    subgraph Sink [单向沉淀 - 只写不读]
+        Y1[长期记忆&lt;br/&gt;successful_prompt_patterns]
+    end
+
+    Collect --&gt; Store
+    Store -.-&gt; Sink
+    Retrieve --&gt; Apply
+</pre>
+<h3>PromptTemplateManager 类设计</h3>
+<pre class="mermaid">classDiagram
+    class PromptTemplateManager {
+        -embedding_model: BaseEmbedding
+        -memory_manager: MemoryManager
+        -script_id: str
+        -base_storage_dir: str
+        -chunk_size: int = 512
+        -chunk_overlap: int = 20
+        -min_similarity_score: float = 0.5
+        -top_k: int = 3
+        -max_cache_size: int = 200
+        -script_kb: ScriptKnowledgeBase
+        -_indices: Dict
+        -_caches: Dict
+        -_processing_stack: List
+        
+        +add_template(prompt_text, metadata, script_id, save_to_memory) bool
+        +save_successful_prompt(fragment_id, prompt_text, quality_score, script_id, metadata) bool
+        +search_similar(query_text, script_id, top_k, min_score, include_global) List
+        +get_best_match(query_text, script_id, min_score) Dict
+        +enhance_prompt(original_prompt, script_id, enhancement_mode) str
+        +search_similar_scene(query_text, script_id, top_k) List
+        +add_parsed_script(parsed_data, script_id) bool
+        +is_available() bool
+        +is_script_kb_available() bool
+        +get_statistics(script_id) Dict
+        +clear_for_script(script_id)
+        +clear_all()
+        -_load_cache_for_script(script_id)
+        -_load_index_for_script(script_id)
+        -_create_index_for_script(script_id, documents)
+        -_is_duplicate(script_id, prompt_text) bool
+        -_generate_template_hash(prompt_text) str
+        -_save_to_memory(prompt_text, metadata)
+        -_merge_prompts(original, template) str
+    }
+
+    class ScriptKnowledgeBase {
+        &lt;&lt;内嵌剧本内容索引&gt;&gt;
+    }
+
+    class MemoryManager {
+        &lt;&lt;长期记忆写入目标&gt;&gt;
+    }
+
+    PromptTemplateManager --&gt; ScriptKnowledgeBase : script_kb 内嵌实例
+    PromptTemplateManager --&gt; MemoryManager : 只写不读
+</pre>
+<p>这张类图删掉了原稿中的三个不存在成员：<code>EnhancementMode</code> 枚举（源码中 <code>enhancement_mode</code> 只是字符串参数，取值 append/replace/hybrid/none 由调用方约定）、<code>_load_from_memory</code> 与 <code>_add_template_direct</code> 两个虚构方法。另外三个细节值得注意：<code>search_similar</code> 的 <code>include_global</code> 是哑参数——文档字符串写着&quot;是否包含全局模板（其他剧本）&quot;，但函数体从未使用它，实际检索只在本剧本索引内进行；<code>is_available</code> / <code>is_script_kb_available</code> 是工作流节点的接线前判断，不可用时静默跳过增强而不抛错；<code>_processing_stack</code> 是入库递归保护，防止写入流程触发检索、检索又递归触发写入。</p>
+<h3>提示词增强流程</h3>
+<pre class="mermaid">flowchart TD
+    Start([生成原始提示词]) --&gt; None{enhancement_mode == none}
+    None --&gt;|是| Return1[返回原始提示词]
+    None --&gt;|否| Best[get_best_match&lt;br/&gt;search_similar 取 top_k=1]
+
+    Best --&gt; Filter[后置过滤&lt;br/&gt;score &lt; min_similarity_score 丢弃&lt;br/&gt;非 prompt_template 类型丢弃]
+    Filter --&gt; Result{是否有结果}
+
+    Result --&gt;|无| Return1
+    Result --&gt;|有| Mode{增强模式}
+
+    Mode --&gt;|append| Append[原始在前&lt;br/&gt;参考优秀模板块追加在后]
+    Mode --&gt;|replace 及其他非 append| Merge[_merge_prompts&lt;br/&gt;模板在前 + 原始置后]
+
+    Append --&gt; Return2[返回增强后提示词]
+    Merge --&gt; Return2
+
+    Return1 --&gt; End([结束])
+    Return2 --&gt; End
+</pre>
+<p>流程里有三处与原稿不同：其一，增强入口不判断&quot;模板库是否可用&quot;——<code>is_available</code> 判断在调用方 <code>workflow_nodes.py</code> 完成，<code>enhance_prompt</code> 自身只先处理 <code>none</code> 模式短路；其二，相似度检查不在 <code>enhance_prompt</code> 里，而是 <code>search_similar</code> 的后置过滤（分数达标且类型为 <code>prompt_template</code>），未通过的结果根本不会进入 <code>get_best_match</code>；其三，<code>replace</code> 与 <code>hybrid</code>（以及任何非 append 取值）走的是同一个 <code>_merge_prompts</code> 实现——并没有真正的&quot;智能融合&quot;。两种模式各自的精确拼接都只是一个 f-string：append 为 <code>f&quot;{original}\n\n参考优秀模板:\n{template}&quot;</code>，merge 为 <code>f&quot;{template}\n\n根据当前片段调整:\n{original}&quot;</code>，之后交给 LLM 按&quot;根据当前片段调整&quot;的指令自行消化。</p>
+<hr>
+<h2>关键要点拆解（五）：工作流节点集成与数据流</h2>
+<h3>连续性检查的知识增强</h3>
+<p>连续性守护节点的职责是检查片段序列中是否存在视觉、角色、场景或动作上的不一致。这个节点的知识库增强是<strong>真实接线的</strong>，也是知识系统中少数真正落地的高级功能之一。</p>
+<p>当检查发现问题后，<code>workflow_nodes.py</code> 先判断 <code>is_script_kb_available()</code>，再逐条遍历问题：以 <code>getattr(issue, 'description', str(issue))</code> 取出问题描述作为查询文本，调用 <code>search_similar_scene(issue_desc, script_id=..., top_k=2)</code> 检索相似场景，命中后写入问题对象的 <code>historical_solutions</code> 属性，供后续修复流程参考：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py 连续性检查中的检索调用（源码摘录）</span>
+<span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.knowledge_manager <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.knowledge_manager.is_script_kb_available():
+    enhanced_issues = []
+    <span class="hljs-keyword">for</span> issue <span class="hljs-keyword">in</span> continuity_issues:
+        issue_desc = <span class="hljs-built_in">getattr</span>(issue, <span class="hljs-string">&#x27;description&#x27;</span>, <span class="hljs-built_in">str</span>(issue))
+        similar_scenes = <span class="hljs-variable language_">self</span>.knowledge_manager.search_similar_scene(issue_desc,script_id=state.<span class="hljs-built_in">input</span>.script_id, top_k=<span class="hljs-number">2</span>)
+        <span class="hljs-keyword">if</span> similar_scenes:
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">hasattr</span>(issue, <span class="hljs-string">&#x27;historical_solutions&#x27;</span>):
+                issue.historical_solutions = similar_scenes
+        enhanced_issues.append(issue)
+    state.domain.continuity_issues = enhanced_issues
+</code></pre>
+<p><strong>例如</strong>：若检查发现某角色服装在相邻片段不一致，检索会命中该角色在其他场景中的服装描述或类似问题的历史场景记录，作为修复生成的参考素材。</p>
+<p>三个实现细节值得注意：其一，调用方 <code>self.knowledge_manager</code> 的真实类型是 <code>PromptTemplateManager</code>（历史命名遗留，下一节展开）；其二，<code>search_similar_scene</code> 内部调用 <code>script_kb.query(..., search_type=&quot;similarity&quot;, similarity_top_k=top_k, use_rerank=True)</code>——表面开启了重排序，但拆解一已考证 <code>query()</code> 的三个模式参数是哑参数，<code>use_rerank=True</code> 实际不产生任何重排序行为；其三，<code>hasattr(issue, 'historical_solutions')</code> 的守卫意味着：只有问题对象本身定义了该属性时，检索结果才会被真正挂载。</p>
+<h3>知识库的初始化流程</h3>
+<p>知识库的初始化发生在 WorkflowNodes 的构造函数中，真实接线如下（源码节选）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py 构造函数（节选）</span>
+<span class="hljs-variable language_">self</span>._memory = MemoryManager(llm=<span class="hljs-variable language_">self</span>.llm, script_id=<span class="hljs-variable language_">self</span>.script_id, config=MemoryConfig(...))
+
+<span class="hljs-variable language_">self</span>.knowledge_manager = PromptTemplateManager(
+    embedding_model=<span class="hljs-variable language_">self</span>.embeddings,
+    script_id=<span class="hljs-variable language_">self</span>.script_id,
+    storage_dir=settings.get_data_paths().get(<span class="hljs-string">&#x27;data_embedding&#x27;</span>),
+    memory_manager=<span class="hljs-variable language_">self</span>._memory,
+    min_similarity_score=<span class="hljs-number">0.7</span>,
+    top_k=<span class="hljs-number">3</span>
+)
+
+<span class="hljs-variable language_">self</span>.workflow_memory = WorkflowMemory(script_id, <span class="hljs-variable language_">self</span>._memory, <span class="hljs-variable language_">self</span>.knowledge_manager)
+</code></pre>
+<p>这里有三个容易被误读的细节：其一，属性名叫 <code>self.knowledge_manager</code>，类型却是 <code>PromptTemplateManager</code>——历史命名遗留，极易与 <code>knowledge/knowledge_manager.py</code> 中的门面类混淆；其二，<code>PromptTemplateManager.__init__</code> 并没有做&quot;从磁盘加载向量索引、从长期记忆加载历史模板&quot;这两件事——它只做参数赋值、创建 <code>SentenceSplitter</code>、初始化递归保护栈并实例化内嵌的 <code>ScriptKnowledgeBase</code>；其三，索引与缓存是<strong>懒加载</strong>：首次对某剧本执行 <code>set_current_script</code> 或 <code>search_similar</code> 时，才通过 <code>_load_cache_for_script</code> / <code>_load_index_for_script</code> 读盘，存储目录也在此时由 <code>_get_script_storage_dir</code> 惰性创建。</p>
+<p>剧本解析节点执行时，解析结果确实会入库：<code>script_parser.process(..., knowledge_manager=self.knowledge_manager, script_id=...)</code> 内部调用 <code>knowledge_manager.add_parsed_script(parsed_script, script_id)</code>，完成文档转换、切分、向量化与持久化——入库失败只记 warning 不阻断主流程，是刻意的容错设计。另外要纠正&quot;成功提示词模板被全局共享&quot;的说法：剧本内容索引与模板库<strong>都</strong>按 <code>script_id</code> 隔离，真正跨剧本全局的只有长期记忆层。</p>
+<h3>知识库在工作流中的位置</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Workflow [LangGraph 工作流]
+        direction TB
+        
+        N1[剧本解析节点&lt;br/&gt;parse_script_node]
+        N2[分镜生成节点&lt;br/&gt;split_shots_node]
+        N3[视频分割节点&lt;br/&gt;fragment_for_ai_node]
+        N4[提示词转换节点&lt;br/&gt;generate_prompts_node]
+        N5[质量审计节点&lt;br/&gt;quality_audit_node]
+        N6[连续性守护节点&lt;br/&gt;continuity_check_node]
+        N7[结果生成节点&lt;br/&gt;generate_output_node]
+        
+        N1 --&gt; N2 --&gt; N3 --&gt; N4 --&gt; N5 --&gt; N6 --&gt; N7
+    end
+
+    subgraph Knowledge [知识系统 - 已接线]
+        K4[PromptTemplateManager&lt;br/&gt;属性名 self.knowledge_manager]
+        K2[ScriptKnowledgeBase&lt;br/&gt;内嵌于 K4]
+        K3[MemoryManager&lt;br/&gt;经 WorkflowMemory 封装]
+    end
+
+    subgraph Idle [已实现未接线]
+        K1[KnowledgeRouter]
+    end
+
+    subgraph Integration [集成点]
+        I1[添加剧本到知识库]
+        I2[加载历史上下文]
+        I3[提示词模板增强]
+        I4[保存成功模板]
+        I5[检索相似场景]
+    end
+
+    N1 -.-&gt; I1
+    N1 -.-&gt; I2
+    N2 -.-&gt; I2
+    N3 -.-&gt; I2
+    N4 -.-&gt; I3
+    N5 -.-&gt; I4
+    N6 -.-&gt; I5
+
+    I1 --&gt; K4
+    I2 --&gt; K3
+    I3 --&gt; K4
+    I4 --&gt; K4
+    I5 --&gt; K4
+    K4 --&gt; K2
+    K4 --&gt; K3
+    K1 -.-&gt;|悬空引用| K2
+    K1 -.-&gt;|悬空引用| K3
+</pre>
+<p>与原文版本相比，这张图做了三处纠偏：知识入口统一为 <code>PromptTemplateManager</code>（K4）——剧本入库、模板增强、成功模板保存、相似场景检索四条线全部经它转发，<code>ScriptKnowledgeBase</code>（K2）只是它内嵌的子组件，不是工作流直接接触的对象；<code>KnowledgeRouter</code>（K1）不属于工作流链路，仅以虚线标注悬空引用；“加载历史上下文”（I2）不经过知识中枢，而是 <code>WorkflowMemory</code> 对三层记忆的封装（见下节）。</p>
+<h3>各节点的知识库使用方式</h3>
+<pre class="mermaid">flowchart LR
+    subgraph Parse [剧本解析节点 - 三段式加载]
+        P1[parsing_strategy_recent&lt;br/&gt;短期]
+        P2[stats_parse_script&lt;br/&gt;中期]
+        P3[common_parse_issues&lt;br/&gt;长期]
+        P4[apply_historical_context]
+    end
+
+    subgraph Convert [提示词转换节点]
+        C1[加载历史上下文&lt;br/&gt;含 successful_prompt_patterns]
+        C2[生成原始提示词]
+        C3[enhance_prompt 模板增强]
+    end
+
+    subgraph Audit [质量审计节点]
+        A1[执行质量审查]
+        A2[store_short_term_memory&lt;br/&gt;latest_audit_result]
+        A3{审查是否通过}
+        A4[save_successful_prompt 保存]
+    end
+
+    subgraph Continuity [连续性守护节点]
+        D1[检测连续性问题]
+        D2[search_similar_scene&lt;br/&gt;top_k=2]
+        D3[写入 historical_solutions]
+    end
+
+    P1 --&gt; P4
+    P2 --&gt; P4
+    P3 --&gt; P4
+    C1 --&gt; C2 --&gt; C3
+    A1 --&gt; A2 --&gt; A3
+    A3 --&gt;|通过| A4
+    D1 --&gt; D2 --&gt; D3
+</pre>
+<p>这张图相较原稿删掉了三处未落地的描述：&quot;加载历史解析策略→加载常见问题模式&quot;的链式结构与真实不符——真实是 <code>workflow_memory.get_memory_dict/list</code> 的三段式加载（键名已标注在图中），随后 <code>apply_historical_context</code> 注入解析器；&quot;记录失败模式&quot;并不存在——质量审计失败时不会把失败提示词写入模板库，审查记录只以 <code>latest_audit_result</code> 为键进入短期记忆；&quot;生成修复参数&quot;夸大了检索结果的用途——<code>historical_solutions</code> 只是附加到问题对象上的参考素材，修复参数由另一套 <code>_create_continuity_repair_params</code> 逻辑生成。</p>
+<h3>数据流全景</h3>
+<p>在整个工作流执行过程中，知识库的数据流动如下（对照 <code>workflow_nodes.py</code> 与 <code>workflow_memory.py</code> 源码核实）：</p>
+<blockquote>
+<p><strong>四个处理节点的&quot;两段式&quot;读写</strong>：剧本解析（<code>parse_script</code>）、分镜生成（<code>segment_shot</code>）、视频分割（<code>split_video</code>）、提示词转换（<code>convert_prompt</code>）四个节点开工前先用 <code>workflow_memory.get_memory_dict/list</code> 加载历史上下文（短期问题 + 中期统计 + 长期模式三个键），经 <code>apply_historical_context</code> 注入对应智能体；收工后调用 <code>workflow_memory.after_stage_completion</code> 做三段写入——短期存完整结果、中期存统计摘要、长期存成功模式。</p>
+<p><strong>剧本解析阶段</strong>：问题检测结果以 <code>parse_script_issues</code> 为键写入短期记忆；解析结果经 <code>add_parsed_script</code> 入剧本向量库，并持久化到 <code>parsed_results/</code>。</p>
+<p><strong>分镜生成阶段</strong>：加载 <code>stats_segment_shot</code>（中期）、<code>issues_segment_shot</code>（短期）、<code>common_shot_patterns</code>（长期）指导拆分。</p>
+<p><strong>视频分割阶段</strong>：加载 <code>stats_split_video</code>（中期）、<code>issues_split_video</code>（短期）、<code>common_split_patterns</code>（长期）优化分割。</p>
+<p><strong>提示词转换阶段</strong>：加载 <code>stats_convert_prompt</code>（中期）、<code>issues_convert_prompt</code>（短期）、<code>successful_prompt_patterns</code>（长期）——最后一个键正是拆解四中模板管理器 <code>_save_to_memory</code> 写入的那个，因此&quot;只写不读&quot;要精确理解为&quot;不回读进模板索引&quot;，该键仍会被本节点读作生成参考；生成的提示词经 <code>enhance_prompt</code> 检索本剧本模板增强后用于输出。</p>
+<p><strong>质量审计阶段</strong>：审查结果先以 <code>latest_audit_result</code> 为键写入短期记忆（含分数、违规清单、修复参数与完整报告）；<code>AuditStatus.PASSED</code> 时逐片段 <code>save_successful_prompt</code> 落库（模板索引 + 长期记忆）；失败时不会把失败提示词写入模板库。</p>
+<p><strong>连续性检查阶段</strong>：发现问题后逐条 <code>search_similar_scene(top_k=2)</code>，命中结果写入 <code>historical_solutions</code>。</p>
+</blockquote>
+<h3>完整数据流图</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Input [输入层]
+        I1[原始剧本]
+    end
+
+    subgraph Stage1 [阶段一：剧本解析]
+        S1[ScriptParserTool]
+        S2[ParsedScript]
+        S3[场景/角色/元素]
+    end
+
+    subgraph Stage2 [阶段二：知识入库 - 已接线]
+        K1[add_parsed_script]
+        K2[Document 创建 + 节点切分]
+        K4[parsed_results/ 持久化]
+    end
+
+    subgraph Stage3 [阶段三：分镜处理]
+        G1[ShotSegmenter]
+        G2[VideoSplitter]
+        G3[PromptConverter]
+    end
+
+    subgraph Stage4 [阶段四：模板增强 - 已接线]
+        E1[enhance_prompt&lt;br/&gt;检索本剧本模板]
+        E2[拼接增强文本]
+    end
+
+    subgraph Stage5 [阶段五：质量控制 - 已接线]
+        Q1[QualityAuditor]
+        Q2{审查结果}
+        Q3[save_successful_prompt]
+    end
+
+    subgraph Stage6 [阶段六：连续性检查 - 已接线]
+        C1[ContinuityGuardianChecker]
+        C2[search_similar_scene&lt;br/&gt;top_k=2]
+        C3[historical_solutions 附加]
+    end
+
+    subgraph Store [知识存储]
+        V1[(剧本向量索引&lt;br/&gt;ScriptKnowledgeBase)]
+        T1[(模板索引&lt;br/&gt;每剧本独立)]
+        M1[(三层记忆&lt;br/&gt;经 WorkflowMemory)]
+    end
+
+    subgraph Output [输出层]
+        O1[Instructions]
+        O2[提示词序列]
+    end
+
+    I1 --&gt; S1
+    S1 --&gt; S2
+    S2 --&gt; S3
+
+    S3 --&gt; K1
+    K1 --&gt; K2
+    K2 --&gt; V1
+    K2 --&gt; K4
+
+    S3 --&gt; G1
+    G1 --&gt; G2
+    G2 --&gt; G3
+
+    G3 --&gt; E1
+    T1 -.-&gt;|检索相似模板| E1
+    E1 --&gt; E2
+    E2 --&gt; G3
+
+    G3 --&gt; Q1
+    Q1 --&gt; Q2
+    Q2 --&gt;|通过| Q3
+    Q3 --&gt; T1
+    Q3 --&gt; M1
+
+    G3 --&gt; C1
+    C1 --&gt; C2
+    V1 -.-&gt;|query 检索| C2
+    C2 --&gt; C3
+    C3 -.-&gt;|供修复参考| C1
+
+    G3 --&gt; O1
+    O1 --&gt; O2
+</pre>
+<p>对照原稿，这张图有四处关键修正：其一，删除了&quot;失败→记录失败问题→写入缓存&quot;的链路——审计失败分支在源码中只更新错误状态；其二，原稿把剧本向量索引与模板索引混在同一条 K 链路里，实际上它们是两套独立存储——模板检索只查按剧本隔离的模板索引（T1），剧本索引（V1）只服务相似场景查询；其三，&quot;加载历史上下文&quot;的来源是三层记忆（M1，经 WorkflowMemory 封装），不是解析结果缓存；其四，相似场景检索结果（C3）只是附加到问题对象上的参考素材，并不生成修复参数。</p>
+<h3>知识积累正向循环</h3>
+<pre class="mermaid">flowchart TD
+    Start([任务执行]) --&gt; Generate[生成提示词]
+    Generate --&gt; Audit[质量审查]
+
+    Audit --&gt;|通过| Save[save_successful_prompt]
+    Audit --&gt;|失败| Noop[失败提示词不落库]
+
+    Save --&gt; Local[写入本剧本模板索引&lt;br/&gt;+ templates_cache.json]
+    Save -.-&gt; Global[写入长期记忆&lt;br/&gt;不回读进模板索引]
+
+    Local --&gt;|同剧本后续任务| Retrieve[enhance_prompt 检索]
+    Retrieve --&gt; Enhanced[增强后的提示词]
+    Enhanced --&gt; Generate
+
+    Noop -.-&gt; Generate
+</pre>
+<p>真实的循环范围比原稿描述小得多：闭环只发生在<strong>同一剧本</strong>的模板索引内；长期记忆方向虽会被提示词转换节点读作上下文，但不会回流模板索引。原稿图中的 <code>记录失败模式</code>、<code>加载历史经验</code>、<code>更高的通过率</code> 三个环节均无源码依据——审计失败不会把失败提示词沉淀成任何知识，&quot;通过率提升&quot;也没有任何代码测量——已移除，只保留可被源码验证的链路。</p>
+<hr>
+<h2>关键要点拆解（六）：检索策略配置与持久化</h2>
+<h3>检索策略配置</h3>
+<p>先分清一个常被混用的概念：<strong>KnowledgeRouter 的&quot;四源路由 + 混合检索&quot;配置链并未在工作流中启用</strong>（未接线）。线上真实生效的检索配置只有三条，全部以构造参数或调用点传参的形式存在：</p>
+<blockquote>
+<p><strong>剧本历史上下文加载</strong>（四个处理节点经 WorkflowMemory）：不是向量检索，也不走 KnowledgeRouter——而是按固定键名（如 <code>stats_parse_script</code>、<code>common_parse_issues</code>）从三层记忆直接读取，因此没有&quot;top_k&quot;与&quot;相似度阈值&quot;这两个概念，取舍是&quot;键名精确、范围固定&quot;。</p>
+<p><strong>提示词模板检索</strong>（<code>PromptTemplateManager.search_similar</code>）：相似度检索，<code>top_k</code> 取构造参数默认 3（WorkflowNodes 注入同值），<code>min_similarity_score</code> 取 WorkflowNodes 注入的 0.7（类默认 0.5）；不启用任何重排序。</p>
+<p><strong>连续性检查场景检索</strong>（<code>search_similar_scene</code>）：<code>top_k=2</code>，由调用点直接传入；内部走 <code>script_kb.query</code> 的手动余弦扫描，<strong>全程没有相似度阈值过滤</strong>——与拆解一&quot;query 无阈值、无重排序&quot;的结论一致。</p>
+</blockquote>
+<p>还要纠正一句原稿结论：&quot;支持动态修改而不需要重启&quot;并不成立——这些都是构造参数与调用点硬编码，调整后需要重新初始化组件才能生效。不同场景的取舍差异倒是真实的：模板匹配宁缺毋滥（0.7 高阈值只留强相关），场景检索则靠 <code>top_k</code> 限制条数而非分数过滤噪声。</p>
+<h3>不同场景的检索配置</h3>
+<pre class="mermaid">flowchart LR
+    subgraph S1 [模板检索 - 已接线]
+        T1[search_similar]
+        T2[top_k 3 · 构造参数]
+        T3[min_score 0.7 · 注入值]
+        T4[无重排序]
+    end
+
+    subgraph S2 [场景检索 - 已接线]
+        C1[search_similar_scene]
+        C2[top_k 2 · 调用点传入]
+        C3[无相似度阈值过滤]
+        C4[use_rerank 哑参数]
+    end
+
+    subgraph S3 [历史上下文加载 - 已接线]
+        H1[WorkflowMemory 按固定键读取]
+        H2[短期问题 · 中期统计 · 长期模式]
+        H3[非向量检索]
+    end
+</pre>
+<p>原稿的四个&quot;场景配置&quot;中，只有模板检索与场景检索两条与真实行为部分对应（数值已修正）；&quot;剧本解析场景（HYBRID / 阈值 0.5）&quot;与&quot;错误处理场景（SEMANTIC_MEMORY）&quot;是把未接线 KnowledgeRouter 的默认值与枚举值误当成了线上配置——它们只在独立实例化 KnowledgeRouter 时才存在。</p>
+<h3>持久化与恢复</h3>
+<p>知识库的持久化分三层，真实文件名与加载时机如下：</p>
+<blockquote>
+<p><strong>剧本向量存储</strong>：<code>SimpleVectorStore</code> 持久化为 <code>default__vector_store.json</code>（兼容读取旧名 <code>vector_store.json</code>），配套 <code>docstore.json</code> 与 <code>index_store.json</code>。加载时优先读新文件名，空文件或异常只记 warning 并返回 None；恢复主索引走 <code>StorageContext.from_defaults(persist_dir=...)</code>——源码注释特别标注&quot;关键修复：使用 VectorStoreIndex 构造函数，而不是 from_vector_store&quot;。遇到损坏文件，<code>_recreate_vector_store</code> 会先把损坏文件备份为 <code>*_corrupted_{时间戳}</code>，同时清掉可能损坏的 <code>docstore.json</code> / <code>index_store.json</code>，再重建空存储——自愈而非报错退出。</p>
+<p><strong>解析结果</strong>：每个剧本单独存放在 <code>{storage_dir}/{script_id}/parsed_results/{script_id}.json</code>，与向量文件分离；<code>ScriptKnowledgeBase</code> 构造时通过 <code>_load_all_scripts</code> 扫描全部剧本目录、把这些 JSON 读入内存，而<strong>向量索引不在此时加载</strong>——源码注释明确写着&quot;延迟加载向量存储（在需要时加载）&quot;。</p>
+<p><strong>模板库</strong>：按剧本存放在 <code>{base_storage_dir}/prompt_templates/{script_id}/</code> 下的 <code>templates_cache.json</code> 与 <code>index_store/</code> 目录；模板管理器对两者采用懒加载（首次访问该剧本时读盘），而不是启动时全量扫描。</p>
+</blockquote>
+<p>&quot;重启可恢复&quot;的边界也要说清：恢复的是磁盘上的解析结果、剧本索引与模板缓存三类文件；拆解四已述，长期记忆中的模板不会自动回流模板索引——三者各自独立恢复。</p>
+<h3>持久化架构</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Runtime [运行时]
+        R1[剧本向量索引]
+        R2[模板索引 + _caches]
+        R3[解析结果结构]
+        R4[三层记忆&lt;br/&gt;deque / 摘要 / Chroma 客户端]
+    end
+
+    subgraph Disk [磁盘存储 - 按剧本隔离]
+        D1[(default__vector_store.json&lt;br/&gt;+ docstore.json + index_store.json)]
+        D2[(templates_cache.json&lt;br/&gt;+ index_store/)]
+        D3[(parsed_results/&lt;br/&gt;script_id.json)]
+    end
+
+    subgraph External [外部存储]
+        E1[(Chroma DB&lt;br/&gt;script_xxx_memory)]
+    end
+
+    R1 --&gt;|_save_storage| D1
+    R2 --&gt;|_save_cache_for_script| D2
+    R3 --&gt;|_save_parsed_result| D3
+    R4 --&gt;|add| E1
+
+    D1 --&gt;|首次访问懒加载| R1
+    D2 --&gt;|首次访问懒加载| R2
+    D3 --&gt;|启动时 _load_all_scripts| R3
+    E1 --&gt;|search| R4
+</pre>
+<p>原稿图中的 <code>memory_cache.json</code> 并不存在——三层记忆没有统一的磁盘备份文件（短期记忆落 Redis 或内存 deque，中期摘要有独立文件，长期记忆落 Chroma）。而三类磁盘文件的恢复时机也各不相同：解析结果在构造时加载，其余两类都在首次访问时。</p>
+<h3>服务启动恢复流程</h3>
+<pre class="mermaid">flowchart TD
+    Start([服务启动]) --&gt; Init[WorkflowNodes 构造函数]
+    Init --&gt; PM[创建 PromptTemplateManager]
+    PM --&gt; SKB[构造内嵌 ScriptKnowledgeBase&lt;br/&gt;makedirs + _load_all_scripts]
+    SKB --&gt; Parse[扫描全部剧本目录&lt;br/&gt;解析结果读入内存]
+    Parse --&gt; Idle[等待任务]
+
+    Idle --&gt; Access{某剧本首次被访问}
+    Access --&gt;|模板检索| T1[懒加载 _load_cache_for_script&lt;br/&gt;+ _load_index_for_script]
+    Access --&gt;|剧本索引| S1[_ensure_script_index]
+    S1 --&gt; S2{docstore.json 存在?}
+    S2 --&gt;|是| S3[StorageContext.from_defaults&lt;br/&gt;恢复 VectorStoreIndex]
+    S2 --&gt;|否| S4[创建空存储]
+    S3 --&gt; Ready[该剧本知识就绪]
+    S4 --&gt; Ready
+    T1 --&gt; Ready
+    Ready --&gt; Idle
+</pre>
+<p>真实启动流程分两段：构造期只做&quot;轻工作&quot;——<code>ScriptKnowledgeBase</code> 构造时扫描 <code>storage_dir</code> 下所有剧本并把<strong>解析结果 JSON</strong> 读入内存（<code>_load_all_scripts</code>），<strong>向量索引在此阶段不加载</strong>（注释直言&quot;延迟加载向量存储&quot;）；此后所有重活发生在某剧本首次被访问时：<code>_ensure_script_index</code> 用 <code>StorageContext.from_defaults(persist_dir=...)</code> 恢复索引，模板侧由 <code>_load_cache_for_script</code> / <code>_load_index_for_script</code> 读盘。原稿中&quot;初始化 KnowledgeRouter&quot;的步骤不存在——该组件未被任何生产代码实例化；&quot;从长期记忆恢复并同步 Chroma&quot;也无对应实现——Chroma 集合由长期记忆组件自行管理，不存在启动同步动作。</p>
+<h3>扩展性设计</h3>
+<p>按照&quot;三口径&quot;重新审视原稿列出的四个扩展点，真实成色差异很大：</p>
+<blockquote>
+<p><strong>嵌入模型替换</strong>（真实扩展点）：通过构造函数注入 <code>embedding_model</code>，索引与查询共用同一实例即可替换——代价是替换后必须重建全部索引。</p>
+<p><strong>向量存储替换</strong>（可改造点）：<code>ScriptKnowledgeBase</code> 内部实例化 <code>SimpleVectorStore</code>，替换为 Chroma、Pinecone 需要<strong>修改源码中的实例化与持久化逻辑</strong>，原文&quot;只需修改实例化方式&quot;的说法本身就说明了它是一条改写路径，而非配置项切换。</p>
+<p><strong>检索器自定义</strong>（纸面扩展）：<code>KnowledgeRouter</code> 支持注册新检索源，但该组件本身未接线，扩展它不会影响任何线上行为。</p>
+<p><strong>记忆层级扩展</strong>（纸面扩展）：<code>MemoryLevel</code> 枚举可以加值，但 <code>ScriptMemory</code> 的读写分发基于 <code>short_term / medium_term / long_term</code> 三个硬编码属性与 if/elif 分支——新增层级需要同步改造组合结构与所有分发逻辑。</p>
+</blockquote>
+<p>尤其需要强调<strong>嵌入模型一致性</strong>：索引建立与查询必须使用相同的嵌入模型，否则查询向量与文档向量落在不同向量空间，相似度计算将完全失去意义。这个约束对剧本索引与模板索引同时成立，还存在一个隐蔽的运维陷阱：更换嵌入模型配置后若不清空磁盘索引文件，旧向量与新查询向量会静默失配——检索不报错，只是结果不可信。</p>
+<h3>扩展点架构</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Core [核心系统]
+        Core1[PromptTemplateManager&lt;br/&gt;知识中枢 · 已接线]
+        Core2[MemoryManager&lt;br/&gt;三层记忆 · 已接线]
+        Core3[ScriptKnowledgeBase&lt;br/&gt;剧本索引 · 已接线]
+        Core4[KnowledgeRouter&lt;br/&gt;已实现未接线]
+    end
+
+    subgraph Extension [扩展点]
+        E1[VectorStore 实现&lt;br/&gt;需修改源码实例化]
+        E2[EmbeddingModel&lt;br/&gt;构造注入 · 真实可替换]
+        E3[检索源注册&lt;br/&gt;纸面扩展]
+        E4[MemoryLevel 枚举&lt;br/&gt;需同步改造分发]
+    end
+
+    subgraph Impl [实现现状]
+        I1[SimpleVectorStore&lt;br/&gt;剧本/模板索引在用]
+        I2[外部注入的嵌入模型&lt;br/&gt;索引与查询必须同源]
+        I3[langchain_chroma&lt;br/&gt;长期记忆专用向量库]
+    end
+
+    Core3 --&gt; E1
+    Core3 --&gt; E2
+    Core4 -.-&gt; E3
+    Core2 --&gt; E4
+
+    E1 --&gt; I1
+    E2 --&gt; I2
+    Core2 --&gt; I3
+</pre>
+<p>原稿 Impl 中的 ChromaVectorStore / HybridRetriever / CustomRetriever 等&quot;实现选项&quot;在 LlamaIndex 侧没有对应落点，已替换为真实在用的实现。</p>
+<hr>
+<h2>排坑提示</h2>
+<p>在落地此类 RAG 知识库时，通常需要在以下几个方面重点排查（每条都对应本文考证中的真实实现）：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>嵌入模型一致性</strong>：索引与查询必须使用同一套嵌入模型与同一维度，混用会导致相似度失配——注意这种失配通常<strong>不报错</strong>，只是检索结果变得不可信，排查时优先核对磁盘索引文件的生成时间与当前模型配置。</p>
+</li>
+<li class="lvl-2">
+<p><strong>分块参数调优</strong>：<code>chunk_size</code> 与 <code>chunk_overlap</code> 需结合剧本文本长度反复调试；本项目默认 512/20，且 <code>chunk_size &gt; 1000</code> 会自动切换到 <code>SentenceWindowNodeParser</code>（窗口 3）——调参时要意识到解析器也会跟着变。</p>
+</li>
+<li class="lvl-2">
+<p><strong>相似度阈值的真实语义</strong>：过滤是<strong>检索后的后置过滤</strong>（<code>search_similar</code> 先取回候选再按 <code>min_similarity_score</code> 丢弃），阈值调高会直接改变&quot;有没有结果&quot;，而不是改变&quot;结果的质量排序&quot;；连续性检查链路则完全没有阈值过滤，结果质量完全依赖 <code>top_k</code> 控制。</p>
+</li>
+<li class="lvl-2">
+<p><strong>存储文件完整性</strong>：剧本索引同时依赖 <code>default__vector_store.json</code> 与 <code>docstore.json</code>（模板索引为 <code>templates_cache.json</code> + <code>index_store/</code>），缺失任一都可能导致加载失败或检索为空；项目内置了 <code>*_corrupted_*</code> 备份自愈机制，遇到检索突然为空时先去目录里找这类备份文件。</p>
+</li>
+<li class="lvl-2">
+<p><strong>多剧本隔离</strong>：所有索引、缓存、模板库都以 <code>script_id</code> 为键隔离——漏传 <code>script_id</code> 时会静默降级（如 <code>search_similar</code> 直接返回空列表并记 debug 日志），而不是抛错，排查&quot;检索没结果&quot;时先确认剧本 ID 传了没有。</p>
+</li>
+</ul>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p>按&quot;三口径&quot;回收全文考证，PenShot 的 RAG 知识库真实成色如下：</p>
+<p><strong>已接线的两条主线</strong>。其一，<strong>三层记忆</strong>：短期 deque 滑动窗口（Redis TTL 1 小时）、中期 LLM 摘要链、长期 Chroma 向量库，经 <code>WorkflowMemory</code> 在每个处理节点做&quot;两段式&quot;读写（加载历史上下文 + <code>after_stage_completion</code> 三段写入）；其二，<strong>提示词模板增强</strong>：质量审计通过后 <code>save_successful_prompt</code> 落库（模板索引 + 长期记忆），后续任务经 <code>enhance_prompt</code> 检索本剧本模板拼接增强——这是全系统最完整的&quot;积累-复用&quot;闭环。另有一处已接线的点状增强：连续性检查用 <code>search_similar_scene(top_k=2)</code> 检索相似场景并附加到问题的 <code>historical_solutions</code> 上。</p>
+<p><strong>已接线但以简化实现落地的部分</strong>。剧本向量库 <code>ScriptKnowledgeBase</code> 的 <code>query()</code> 走手动余弦全量扫描（O(N)），<code>search_type / use_rerank / rerank_model</code> 三个接收参数从不使用；<code>search_similar_scene</code> 内部的 <code>use_rerank=True</code> 因此也从不生效——&quot;重排序&quot;在这条链路上只存在于图纸。</p>
+<p><strong>已实现未接线</strong>。<code>KnowledgeRouter</code>（四源路由 + 串行混合检索 + 硬编码分数融合）代码完整但无调用方；<code>create_retriever_for_script</code> 的 MMR 与重排序装配只服务这个未接线的组件；<code>PromptStyleGuardian</code> 与 <code>save_contract</code> 是悬空引用。评估这套系统时，不应把未接线的能力算入&quot;现有能力&quot;。</p>
+<p><strong>三个值得注意的边界</strong>。其一，模板库按剧本隔离，长期记忆的 <code>successful_prompt_patterns</code> 不会回读进模板索引（但仍会被提示词转换节点读作上下文）——跨剧本经验复用尚未闭环；其二，审计失败分支没有任何知识沉淀——失败样本没有被利用；其三，中期记忆是摘要而非台账——不适合需要精确回放的数据。</p>
+<p>对于要构建类似&quot;带记忆的创作智能体&quot;的开发者，建议从可验证的最小闭环起步：先做单剧本的&quot;成功样本沉淀 → 检索增强&quot;循环（这是当前代码里唯一真正跑通的循环），再考虑记忆分层与多路路由；调试时把&quot;嵌入模型一致性、<code>script_id</code> 传递、磁盘索引文件状态&quot;作为首要检查项——<strong>不要</strong>把&quot;检索阈值归一化&quot;列入检查清单，本项目的融合链路上并不存在归一化。</p>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

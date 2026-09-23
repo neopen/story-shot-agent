@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot MCP 服务：七工具契约、手写 JSON-RPC 与双传输真相 · PenShot 文档</title>
+  <meta name="description" content="以 mcp_server.py 与 mcp_http_server.py 源码为准绳考证 PenShot MCP 服务：逐条核验七个工具的输入输出契约与任务状态机、stdio 版手写 JSON-RPC 循环与 HTTP 版完整参数 schema 的差异，解析 initialize 握手、错误码约定与 stdout/stderr 分离的工程细节，纠正 completed 终态、stage 字段等常见误读，并给出经真实示例验证的客户端实现、配置模板与排坑清单。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/mcp.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot MCP 服务：七工具契约、手写 JSON-RPC 与双传输真相">
+  <meta property="og:description" content="以 mcp_server.py 与 mcp_http_server.py 源码为准绳考证 PenShot MCP 服务：逐条核验七个工具的输入输出契约与任务状态机、stdio 版手写 JSON-RPC 循环与 HTTP 版完整参数 schema 的差异，解析 initialize 握手、错误码约定与 stdout/stderr 分离的工程细节，纠正 completed 终态、stage 字段等常见误读，并给出经真实示例验证的客户端实现、配置模板与排坑清单。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/mcp.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html" class="active">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-02-12</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<hr>
+<h2>一、概述：MCP 核心价值</h2>
+<p><a href="https://modelcontextprotocol.io">MCP</a> (Model Context Protocol) 是一个<strong>开放协议</strong>，用于标准化 LLM 应用与外部数据源、工具的连接方式。可以通俗地理解为 AI 应用的 <strong>“USB-C 接口”</strong>——让不同模型能统一接入各种工具和数据，避免为每个工具/模型重复编写适配代码。</p>
+<p>本文分两部分展开：前三章讲透 MCP 协议本身的架构、通信与选型对比；第四章进入源码层，考证 <strong>PenShot MCP Server</strong> 的真实实现——环境配置、CLI 启动、七个工具的输入输出契约、stdio 与 HTTP 两条通道的差异，以及接入 Claude Desktop 的完整配置。先给三个源码级结论，后文逐一展开：</p>
+<ol>
+<li class="lvl-3">
+<p><code>mcp_server.py</code> <strong>没有依赖官方 mcp SDK</strong>，而是用标准库手写 JSON-RPC over stdio 循环，只实现 <code>initialize / tools/list / tools/call</code> 三个方法；</p>
+</li>
+<li class="lvl-3">
+<p>同一批工具存在<strong>两条通道</strong>：stdio 版的工具参数 schema 全部为空对象（<code>{&quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: {}}</code>，客户端看不到参数名），HTTP 联调版的 <code>/tools</code> 则带完整参数描述——接入时要留意这一差异；</p>
+</li>
+<li class="lvl-3">
+<p>任务成功终态的字面量是 <code>success</code>，<strong>不存在 <code>completed</code></strong>：源码里 <code>TaskStatus.SUCCESS</code> 的值为 <code>&quot;success&quot;</code>，不少流传的示例都用错了这个值。</p>
+</li>
+</ol>
+<blockquote>
+<p><strong>概念延伸</strong>：MCP 与 Function Calling、LangChain Tools 最大的区别在于协议中立、生态开放。它定义了 <code>initialize / tools/list / tools/call</code> 等一系列标准 JSON-RPC 方法，让同一个 Server 能被 Claude、Cursor、各类 Agent 框架通用调用。</p>
+</blockquote>
+<h3>架构原理图</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Client[&quot;MCP Client (LLM Host)&quot;]
+        LLM[&quot;LLM 应用&lt;br/&gt;(Claude/ChatGPT等)&quot;]
+    end
+
+    subgraph Server[&quot;MCP Server&quot;]
+        direction TB
+        Resources[&quot;Resources&lt;br/&gt;(文件/数据库)&quot;]
+        Tools[&quot;Tools&lt;br/&gt;(API/函数调用)&quot;]
+        Prompts[&quot;Prompts&lt;br/&gt;(提示词模板)&quot;]
+    end
+
+    subgraph DataSource[&quot;数据源层&quot;]
+        Local[&quot;本地数据&lt;br/&gt;(SQLite/文件系统)&quot;]
+        Remote[&quot;远程服务&lt;br/&gt;(GitHub/Slack/云API)&quot;]
+    end
+
+    Client &lt;--&gt;|&quot;MCP协议&lt;br/&gt;(stdio/SSE)&quot;| Server
+    Resources --&gt; Local
+    Tools --&gt; Remote
+    Tools --&gt; Local
+
+    style Client fill:#e1f5fe
+    style Server fill:#fff3e0
+    style DataSource fill:#e8f5e9
+</pre>
+<hr>
+<h2>二、关键要点拆解</h2>
+<h3>2.1 通信时序图</h3>
+<p>一次典型的工具调用遵循<strong>握手 → 列工具 → 调工具</strong>的流程。下面以读取 <code>config.json</code> 为例，展示了 Client 与 Server 之间如何通过 <code>initialize()</code>、<code>tools/list()</code>、<code>tools/call()</code> 协作完成本地文件与远程 API 的访问：</p>
+<pre class="mermaid">sequenceDiagram
+    participant User as 用户
+    participant Host as LLM Host&lt;br/&gt;(Client)
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant API as External API
+
+    User-&gt;&gt;Host: 提问：&quot;读取config.json&quot;
+    
+    Host-&gt;&gt;Client: 需要工具调用
+    
+    Client-&gt;&gt;Server: initialize()
+    Server--&gt;&gt;Client: 协议版本确认
+    
+    Client-&gt;&gt;Server: tools/list()
+    Server--&gt;&gt;Client: 可用工具列表&lt;br/&gt;(read_file, write_file)
+    
+    Client-&gt;&gt;Server: tools/call(&quot;read_file&quot;,&lt;br/&gt;{path:&quot;config.json&quot;})
+    
+    Server-&gt;&gt;Server: 解析请求
+    
+    alt 本地文件
+        Server-&gt;&gt;Server: 读取文件系统
+        Server--&gt;&gt;Client: 返回文件内容
+    else 远程API
+        Server-&gt;&gt;API: HTTP请求
+        API--&gt;&gt;Server: JSON响应
+        Server--&gt;&gt;Client: 返回结构化数据
+    end
+    
+    Client--&gt;&gt;Host: 工具执行结果
+    Host--&gt;&gt;User: &quot;config.json的内容是...&quot;
+</pre>
+<blockquote>
+<p><strong>参数说明</strong>：<code>tools/call</code> 的第 3 参是 <code>{name, arguments}</code>，<code>name</code> 为目标工具名，<code>arguments</code> 为 JSON 参数对象；工具返回值统一包装进 <code>result.content[]</code>，其中最常见的是 <code>type: &quot;text&quot;</code> 文本内容。</p>
+</blockquote>
+<h3>2.2 核心组件说明</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">角色</th>
+<th style="text-align:left">职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>MCP Client</strong></td>
+<td style="text-align:left">LLM应用 (Host)</td>
+<td style="text-align:left">发起请求、管理会话、处理响应</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>MCP Server</strong></td>
+<td style="text-align:left">能力提供方</td>
+<td style="text-align:left">暴露资源/工具/提示词，处理具体操作</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Transport</strong></td>
+<td style="text-align:left">通信层</td>
+<td style="text-align:left">Stdio (本地进程) 或 SSE (远程HTTP)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Resources</strong></td>
+<td style="text-align:left">数据源</td>
+<td style="text-align:left">文件、数据库记录等只读或订阅型数据</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tools</strong></td>
+<td style="text-align:left">可执行功能</td>
+<td style="text-align:left">API调用、计算、数据库写入等操作</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Prompts</strong></td>
+<td style="text-align:left">模板库</td>
+<td style="text-align:left">预定义的提示词模板，可带参数</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Transport 二选一</strong>：<strong>Stdio</strong> 通过子进程标准输入输出通信，适合本地工具（Claude Desktop 常用）；<strong>SSE</strong>（Server-Sent Events）走 HTTP，适合远程共享部署。PenShot 的 MCP Server 默认走 Stdio 子进程。</p>
+</blockquote>
+<h3>2.3 典型使用场景</h3>
+<pre class="mermaid">flowchart LR
+    subgraph Scenes[&quot;典型使用场景&quot;]
+        S1[&quot;智能客服&lt;br/&gt;查询订单数据库&quot;]
+        S2[&quot;代码助手&lt;br/&gt;读写文件系统&quot;]
+        S3[&quot;数据分析&lt;br/&gt;连接BI工具&quot;]
+        S4[&quot;自动化&lt;br/&gt;GitHub+Slack&quot;]
+    end
+    
+    subgraph Common[&quot;通用模式&quot;]
+        Input[&quot;用户自然语言提问&quot;] --&gt; MCP[&quot;MCP Server&lt;br/&gt;翻译意图&quot;]
+        MCP --&gt; Action[&quot;执行具体操作&quot;]
+        Action --&gt; Output[&quot;返回结构化结果&quot;]
+        Output --&gt; LLM[&quot;LLM生成回复&quot;]
+    end
+
+    style Scenes fill:#f3e5f5
+    style Common fill:#e0f2f1
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">用户输入</th>
+<th style="text-align:left">MCP Server 行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>智能客服</strong></td>
+<td style="text-align:left">“查一下我最近的订单”</td>
+<td style="text-align:left">连接订单数据库 → SQL查询 → 返回订单列表</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>代码助手</strong></td>
+<td style="text-align:left">“读取 config.json 并修改端口为 8080”</td>
+<td style="text-align:left">读文件 → 修改JSON → 写文件 → 确认结果</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>数据分析</strong></td>
+<td style="text-align:left">“生成上月销售趋势图”</td>
+<td style="text-align:left">连接数据仓库 → 聚合查询 → 返回图表数据</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>自动化</strong></td>
+<td style="text-align:left">“创建 issue 并通知团队”</td>
+<td style="text-align:left">GitHub创建 → Slack发送 → 返回状态</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>共同模式</strong>：无论哪种场景，都遵循 <strong>自然语言提问 → Server 翻译意图 → 执行操作 → 返回结构化结果 → LLM 组织回复</strong> 的统一链路，这是 MCP 可作为通用接入层的根本原因。</p>
+</blockquote>
+<h3>2.4 实现方式（最小可运行示例）</h3>
+<h4>Python 实现 (MCP Server)</h4>
+<p>下面的示例使用 MCP 官方 Python SDK 的装饰器风格编写，用于说明<strong>工具声明（<code>list_tools</code>）与工具实现（<code>call_tool</code>）的一一对应关系</strong>。注意这是概念简化写法，启动部分以官方包当前 API 为准（<code>stdio_server</code> 在真实 SDK 中是 async context manager）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># server.py</span>
+<span class="hljs-keyword">from</span> mcp.server <span class="hljs-keyword">import</span> Server, stdio_server
+<span class="hljs-keyword">from</span> mcp.types <span class="hljs-keyword">import</span> Tool, TextContent
+
+app = Server(<span class="hljs-string">&quot;my-file-server&quot;</span>)
+
+<span class="hljs-meta">@app.list_tools()</span>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">list_tools</span>():
+    <span class="hljs-keyword">return</span> [
+        Tool(
+            name=<span class="hljs-string">&quot;read_file&quot;</span>,
+            description=<span class="hljs-string">&quot;读取文件内容&quot;</span>,
+            inputSchema={
+                <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;object&quot;</span>,
+                <span class="hljs-string">&quot;properties&quot;</span>: {
+                    <span class="hljs-string">&quot;path&quot;</span>: {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;string&quot;</span>, <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">&quot;文件路径&quot;</span>}
+                },
+                <span class="hljs-string">&quot;required&quot;</span>: [<span class="hljs-string">&quot;path&quot;</span>]
+            }
+        )
+    ]
+
+<span class="hljs-meta">@app.call_tool()</span>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">call_tool</span>(<span class="hljs-params">name: <span class="hljs-built_in">str</span>, arguments: <span class="hljs-built_in">dict</span></span>):
+    <span class="hljs-keyword">if</span> name == <span class="hljs-string">&quot;read_file&quot;</span>:
+        <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(arguments[<span class="hljs-string">&quot;path&quot;</span>], <span class="hljs-string">&quot;r&quot;</span>) <span class="hljs-keyword">as</span> f:
+            <span class="hljs-keyword">return</span> [TextContent(<span class="hljs-built_in">type</span>=<span class="hljs-string">&quot;text&quot;</span>, text=f.read())]
+
+<span class="hljs-comment"># 启动：stdio_server 是 async context manager，需包在异步入口中运行</span>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">main</span>():
+    <span class="hljs-keyword">async</span> <span class="hljs-keyword">with</span> stdio_server() <span class="hljs-keyword">as</span> (read_stream, write_stream):
+        <span class="hljs-keyword">await</span> app.run(read_stream, write_stream, app.create_initialization_options())
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    <span class="hljs-keyword">import</span> asyncio
+    asyncio.run(main())
+</code></pre>
+<blockquote>
+<p><strong>代码要点</strong>：<code>@app.list_tools()</code> 声明可用工具清单（<code>inputSchema</code> 描述参数约束），<code>@app.call_tool()</code> 实现具体逻辑，两者按工具名对应；真正的 stdio 服务通过 async context manager 常驻运行。</p>
+</blockquote>
+<blockquote>
+<p><strong>PenShot 的选择</strong>：第四章将要考证的 PenShot MCP Server 并没有采用官方 SDK，而是用标准库手写了一个 JSON-RPC over stdio 循环（只处理 <code>initialize / tools/list / tools/call</code> 三个方法），零第三方依赖。收益是部署轻、协议行为完全可控；代价是不支持 notifications、resources、prompts 等 MCP 高级能力，对严格按规范校验的客户端需要实测兼容性。这是典型的 trade-off 取舍，后文完整展开。</p>
+</blockquote>
+<h4>客户端配置 (Claude Desktop)</h4>
+<pre class="hljs"><code><span class="hljs-comment">// macOS: ~/Library/Application Support/Claude/claude_desktop_config.json</span>
+<span class="hljs-comment">// Windows: %APPDATA%\Claude\claude_desktop_config.json</span>
+<span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;mcpServers&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;file-server&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;command&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;python&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;/path/to/server.py&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;env&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;WORKSPACE&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/Users/me/projects&quot;</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;github-server&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;command&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;npx&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;-y&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;@modelcontextprotocol/server-github&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;env&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;GITHUB_PERSONAL_ACCESS_TOKEN&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ghp_xxxx&quot;</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>配置文件位置</strong>：macOS 在 <code>~/Library/Application Support/Claude/</code>，Windows 在 <code>%APPDATA%\Claude\</code>。每个 Server 用 <code>command + args</code> 描述如何启动，<code>env</code> 注入环境变量（如密钥、工作目录）。</p>
+</blockquote>
+<h4>数据传输格式 (JSON-RPC)</h4>
+<pre class="hljs"><code><span class="hljs-comment">// 请求: 调用工具</span>
+<span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;jsonrpc&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2.0&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;method&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;tools/call&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;params&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;read_file&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;arguments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/data/config.json&quot;</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+
+<span class="hljs-comment">// 响应: 工具结果</span>
+<span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;jsonrpc&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2.0&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;result&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;text&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;{\&quot;port\&quot;: 3000, \&quot;debug\&quot;: true}&quot;</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<hr>
+<h2>三、MCP 优势与对比</h2>
+<pre class="mermaid">mindmap
+  root((MCP 核心优势))
+    标准化
+      统一接口协议
+      避免重复适配
+    安全性
+      本地执行
+      数据不离开环境
+    可组合性
+      同时接入多个Server
+      场景灵活组装
+    跨平台
+      本地stdio通信
+      远程SSE通信
+    生态友好
+      开源协议
+      厂商中立
+</pre>
+<p><strong>与替代方案对比</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">特性</th>
+<th style="text-align:left">MCP</th>
+<th style="text-align:left">Function Calling</th>
+<th style="text-align:left">LangChain Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>标准化</strong></td>
+<td style="text-align:left">开放协议</td>
+<td style="text-align:left">各厂商不同</td>
+<td style="text-align:left">框架绑定</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>本地执行</strong></td>
+<td style="text-align:left">原生支持</td>
+<td style="text-align:left">云端执行</td>
+<td style="text-align:left">支持</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>资源订阅</strong></td>
+<td style="text-align:left">原生支持</td>
+<td style="text-align:left">不支持</td>
+<td style="text-align:left">部分</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多服务器</strong></td>
+<td style="text-align:left">原生聚合</td>
+<td style="text-align:left">单次单工具</td>
+<td style="text-align:left">支持</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>学习成本</strong></td>
+<td style="text-align:left">中</td>
+<td style="text-align:left">低</td>
+<td style="text-align:left">中高</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>生态规模</strong></td>
+<td style="text-align:left">快速增长</td>
+<td style="text-align:left">大模型厂商</td>
+<td style="text-align:left">丰富但碎片化</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>选型建议</strong>：如果只需要某个模型厂商内联的工具调用，Function Calling 上手快；若希望一套 Server 多客户端复用、且数据可留在本地，MCP 是更符合长期演进的选择。</p>
+</blockquote>
+<hr>
+<h2>四、PenShot MCP Server 源码考证</h2>
+<p>PenShot MCP Server 支持 Claude Desktop、Cursor 等 MCP 兼容客户端调用，工作方式遵循<strong>提交任务 → 轮询状态 → 获取结果</strong>三部曲。与泛泛的功能介绍不同，本章以源码为准绳逐节考证真实实现：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>stdio 版</strong>（<code>src/penshot/mcp_server.py</code>）：手写 JSON-RPC 循环，零第三方依赖，是 Claude Desktop 配置的标准入口；</p>
+</li>
+<li class="lvl-2">
+<p><strong>HTTP 版</strong>（<code>src/penshot/mcp_http_server.py</code>）：基于 FastAPI 的本地联调服务，把同一批工具暴露为 <code>/tools/*</code> 路由，参数 schema 比 stdio 版更完整；</p>
+</li>
+<li class="lvl-2">
+<p><strong>客户端示例</strong>（<code>examples/mcp/</code>）：仓库提供 <code>mcp_client.py</code>（stdio）与 <code>mcp_http_client.py</code>（HTTP）两个可运行示例，4.4 / 4.5 节直接引用其真实代码。</p>
+</li>
+</ul>
+<pre class="mermaid">sequenceDiagram
+    participant Client as MCP客户端&lt;br/&gt;(Claude/Cursor)
+    participant MCP as Penshot MCP Server
+    participant Task as 任务管理器
+    participant Agent as 分镜智能体
+
+    Client-&gt;&gt;MCP: tools/list (获取工具列表)
+    MCP--&gt;&gt;Client: 返回可用工具
+
+    Client-&gt;&gt;MCP: tools/call (breakdown_script)
+    MCP-&gt;&gt;Task: 创建任务
+    Task--&gt;&gt;MCP: 返回task_id
+    MCP--&gt;&gt;Client: 返回task_id
+
+    loop 轮询状态
+        Client-&gt;&gt;MCP: tools/call (get_task_status)
+        MCP-&gt;&gt;Task: 查询状态
+        Task--&gt;&gt;MCP: 返回进度
+        MCP--&gt;&gt;Client: 返回状态
+    end
+
+    Client-&gt;&gt;MCP: tools/call (get_task_result)
+    MCP-&gt;&gt;Agent: 获取结果
+    Agent--&gt;&gt;MCP: 返回分镜数据
+    MCP--&gt;&gt;Client: 返回结果
+</pre>
+<p><strong>工作流示例图</strong>：</p>
+<pre class="mermaid">flowchart LR
+    subgraph User[用户操作]
+        A[提交剧本] --&gt; B[获取task_id]
+        B --&gt; C[轮询状态]
+        C --&gt; D[获取结果]
+    end
+
+    subgraph MCP[MCP Server]
+        E[breakdown_script] --&gt; F[get_task_status]
+        F --&gt; G[get_task_result]
+    end
+
+    subgraph Penshot[Penshot后端]
+        H[任务队列] --&gt; I[分镜处理]
+        I --&gt; J[结果存储]
+    end
+
+    A --&gt; E
+    C --&gt; F
+    D --&gt; G
+    E --&gt; H
+    I --&gt; J
+    J --&gt; G
+</pre>
+<h3>4.1 支持的工具</h3>
+<p>stdio 版与 HTTP 版暴露同一批七个工具，<code>breakdown_script</code> 负责提交剧本（同步 / 异步两种模式），其余六个用于查询与管理：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">工具名称</th>
+<th style="text-align:left">功能描述</th>
+<th style="text-align:left">必需参数</th>
+<th style="text-align:left">返回要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>breakdown_script</code></td>
+<td style="text-align:left">提交剧本进行分镜拆分</td>
+<td style="text-align:left"><code>script</code></td>
+<td style="text-align:left">异步返回 <code>task_id</code> 与 <code>pending</code> 状态；同步返回完整结果</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>get_task_status</code></td>
+<td style="text-align:left">查询任务状态和进度</td>
+<td style="text-align:left"><code>task_id</code></td>
+<td style="text-align:left">状态 + 当前阶段 + 各阶段进度明细</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>get_task_result</code></td>
+<td style="text-align:left">获取任务结果</td>
+<td style="text-align:left"><code>task_id</code></td>
+<td style="text-align:left"><code>success / status / data / error / 耗时</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>cancel_task</code></td>
+<td style="text-align:left">取消正在执行的任务</td>
+<td style="text-align:left"><code>task_id</code></td>
+<td style="text-align:left"><code>{task_id, cancelled}</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>list_tasks</code></td>
+<td style="text-align:left">列出所有任务</td>
+<td style="text-align:left">可选</td>
+<td style="text-align:left">任务摘要列表（<code>limit</code> 默认 20）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>get_queue_status</code></td>
+<td style="text-align:left">获取队列状态</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">队列长度、活跃任务数、并发上限等</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>get_stats</code></td>
+<td style="text-align:left">获取服务器统计信息</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">提交 / 完成 / 失败累计计数与队列快照</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>典型编排</strong>：<code>breakdown_script</code> 提交后返回 <code>task_id</code>，随后循环 <code>get_task_status</code> 观察进度，终态为 <code>success</code> 时用 <code>get_task_result</code> 取结果（注意不是 <code>completed</code>，源码枚举里没有这个值）；<code>cancel_task</code> 用于中止异常任务，<code>get_queue_status / get_stats</code> 用于运维监控。</p>
+</blockquote>
+<blockquote>
+<p><strong>排坑：stdio 版工具参数 schema 全为空</strong>。<code>mcp_server.py</code> 的 <code>get_tools_list()</code> 把七个工具的 <code>parameters</code> 统一返回为空对象 <code>{&quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: {}}</code>——客户端（LLM）看不到 <code>script</code>、<code>language</code>、<code>wait</code> 等参数名，只能凭 description 猜测。若工具调用参数不符合预期，可对照各 <code>_handle_*</code> 方法实际读取的键名（<code>script</code> / <code>language</code> / <code>wait</code> / <code>timeout</code> / <code>task_id</code> / <code>limit</code>）在系统提示词中自行约束。HTTP 联调版的 <code>/tools</code> 没有这个问题（见 4.5 节）。</p>
+</blockquote>
+<h3>4.2 安装与配置</h3>
+<pre class="hljs"><code>pip install penshot
+</code></pre>
+<p>服务运行前需要提供 LLM 与嵌入模型配置。从仓库根目录复制 <code>.env.example</code> 为 <code>.env</code> 并填入真实密钥（下面的键名取自 <code>.env.example</code>，仅保留最小可运行集合）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># ================= LLM默认配置 =================</span>
+<span class="hljs-comment"># 系统支持的厂商（openai, qwen, deepseek, ollama）</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__BASE_URL</span>=<span class="hljs-string">https://api.openai.com/v1</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__API_KEY</span>=<span class="hljs-string">sk-xxxxxxxxxxxxxxxxxxxxxx</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__MODEL_NAME</span>=<span class="hljs-string">gpt-4o</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__TEMPERATURE</span>=<span class="hljs-string">0.1</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__TIMEOUT</span>=<span class="hljs-string">60</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__MAX_RETRIES</span>=<span class="hljs-string">3</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__MAX_TOKENS</span>=<span class="hljs-string">8192</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__RETRY_DELAY</span>=<span class="hljs-string">1</span>
+<span class="hljs-comment">
+# ================ 嵌入模型默认配置 ================</span>
+<span class="hljs-comment"># 系统支持的厂商（openai, qwen, HuggingFace, ollama）</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__BASE_URL</span>=<span class="hljs-string">https://api.openai.com/v1</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__API_KEY</span>=<span class="hljs-string">sk-xxxxxxxxxxxxxxxxxxxxxx</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__MODEL_NAME</span>=<span class="hljs-string">text-embedding-v4</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__DEVICE</span>=<span class="hljs-string">gpu</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__DIMENSIONS</span>=<span class="hljs-string">1536</span>
+<span class="hljs-comment">
+########################## Redis 配置 ##########################</span>
+<span class="hljs-comment"># 单进程模式下非硬依赖；多进程部署时用于任务状态共享（也可拆成 HOST/PORT/DB 分别配置）</span>
+<span class="hljs-attr">PENSHOT_REDIS_URL</span>=<span class="hljs-string">redis://:123456@localhost:6379/0</span>
+</code></pre>
+<blockquote>
+<p><strong>配置解析</strong>：<code>.env.example</code> 里嵌入模型默认指向 <code>api.openai.com</code>；换千问则把 <code>BASE_URL</code> 改为 <code>https://dashscope-intl.aliyuncs.com/api/v1</code> 并保留 <code>text-embedding-v4</code>。<code>.env.example</code> 还提供 LLM 备用厂商（<code>PENSHOT_LLM__FALLBACK__*</code>，默认 deepseek）与重排序开关（<code>PENSHOT_RETRIEVER__RERANK_ENABLED=false</code>）等可选段。</p>
+</blockquote>
+<h3>4.3 启动与服务端实现剖析</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 基础启动（stdio 模式，从 stdin 读取 JSON-RPC 请求）</span>
+python -m penshot.mcp_server
+
+<span class="hljs-comment"># 指定并发参数</span>
+python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
+</code></pre>
+<blockquote>
+<p><strong>参数语义</strong>：<code>--max-concurrent</code> 控制同时执行的任务数（默认 10），<code>--queue-size</code> 控制队列入队上限（默认 1000）。队列满时 <code>_enqueue_task</code> 打印 warning 并拒绝入队（返回 <code>False</code>）——提交方不会收到明确拒绝信号，高负载场景建议监控 <code>get_queue_status</code> 的 <code>queue_usage_percent</code> 字段提前扩容。</p>
+</blockquote>
+<p>启动后服务内部做了什么？<code>mcp_server.py</code> 的核心循环只有约 60 行，值得逐点拆解：</p>
+<p><strong>① 手写 JSON-RPC 循环（核心事实）</strong>。整个模块只 import 标准库 <code>json / logging / sys</code> 与项目内部模块，不依赖任何 mcp 包：<code>run()</code> 是一个 <code>while True</code> 循环——逐行读 stdin → <code>json.loads</code> → 按 <code>method</code> 分发 → 把响应逐行写回 stdout。只实现三个方法：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">方法</th>
+<th style="text-align:left">行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>initialize</code></td>
+<td style="text-align:left">返回协议版本 <code>0.1.0</code>、<code>serverInfo</code>（name=<code>penshot-mcp-server</code>，version=<code>1.0.0</code>）与 <code>capabilities: {tools: {}}</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>tools/list</code></td>
+<td style="text-align:left">返回七个工具定义（参数 schema 为空对象）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>tools/call</code></td>
+<td style="text-align:left">按 <code>name</code> 查找 handler 执行，结果 <code>json.dumps</code> 后包进 <code>content[0].text</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>② 错误码约定</strong>：handler 内部抛异常返回 <code>-32000</code> + 异常消息；工具名或方法名不存在返回 <code>-32601</code>。这两类错误是客户端调试时的第一线索。</p>
+<p><strong>③ 日志与协议分流</strong>：模块 docstring 直接标注 <code>MCP Server - 所有日志输出到 stderr</code>，<code>setLog()</code> 把 logging 与 langchain / httpx 等第三方日志统一重定向到 stderr 并压到 WARNING 级别，stdout 只保留逐行 JSON-RPC。这是 stdio 传输的基本纪律——任何混入 stdout 的 <code>print</code> 都会破坏协议流，客户端解析会直接失败。</p>
+<p><strong>④ 边界：通知不处理</strong>。循环对这三个方法之外的一切输入（包括 MCP 规范中的 <code>notifications/initialized</code> 通知）统一回 <code>-32601</code>。规范上通知不应有响应，因此严格校验响应配对的客户端需实测兼容性——这是手写实现换取轻量的直接代价。</p>
+<blockquote>
+<p><strong>设计取舍</strong>：为什么不用官方 SDK？这套手写循环让服务保持零第三方依赖、协议行为完全可控（响应结构、错误码、日志走向都是普通源码）；代价是只覆盖 tools 能力的最小集，resources / prompts / 订阅等高级特性不可用，协议版本也停留在写死的 <code>0.1.0</code>。如果只是把工具挂给主流客户端，这条路线足够轻；若要扩展完整 MCP 能力，官方 SDK 是更稳妥的选择。</p>
+</blockquote>
+<h3>4.4 Stdio 客户端：基于真实示例的实现剖析</h3>
+<p><code>examples/mcp/mcp_client.py</code> 提供了可直接运行的 stdio 客户端 <code>MCPStdioClient</code>（241 行），并通过 <code>mcp_server_demo.py</code> 做端到端自测。它的设计出发点在文件注释里写得很清楚：<strong>后台线程持续读取 stdout 并把 JSON 响应放入队列，请求按自增 id 匹配响应，避免阻塞式 readline 在 Windows 上的兼容问题</strong>。下面是核心骨架（节选，省略类型标注）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 节选自 examples/mcp/mcp_client.py</span>
+TERMINAL_STATUS = {<span class="hljs-string">&quot;success&quot;</span>, <span class="hljs-string">&quot;failed&quot;</span>, <span class="hljs-string">&quot;cancelled&quot;</span>}  <span class="hljs-comment"># TaskStatus 经 JSON 序列化后的终态字面量</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">MCPStdioClient</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, python=<span class="hljs-literal">None</span>, server_module=<span class="hljs-string">&quot;penshot.mcp_server&quot;</span></span>):
+        <span class="hljs-variable language_">self</span>.python = python <span class="hljs-keyword">or</span> sys.executable
+        <span class="hljs-variable language_">self</span>.server_module = server_module
+        <span class="hljs-variable language_">self</span>.process = <span class="hljs-literal">None</span>
+        <span class="hljs-variable language_">self</span>._request_id = <span class="hljs-number">0</span>
+        <span class="hljs-variable language_">self</span>._responses = queue.Queue()      <span class="hljs-comment"># 响应队列：后台线程写入，_call 读取</span>
+        <span class="hljs-variable language_">self</span>._stderr_lines = []              <span class="hljs-comment"># 保留最近 50 行 server 日志</span>
+        <span class="hljs-variable language_">self</span>._stderr_lock = threading.Lock()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">start</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-variable language_">self</span>.process = subprocess.Popen(
+            [<span class="hljs-variable language_">self</span>.python, <span class="hljs-string">&quot;-m&quot;</span>, <span class="hljs-variable language_">self</span>.server_module],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=<span class="hljs-literal">True</span>, encoding=<span class="hljs-string">&quot;utf-8&quot;</span>, errors=<span class="hljs-string">&quot;replace&quot;</span>, bufsize=<span class="hljs-number">1</span>,
+        )
+        threading.Thread(target=<span class="hljs-variable language_">self</span>._read_stdout, daemon=<span class="hljs-literal">True</span>).start()   <span class="hljs-comment"># stdout → 队列</span>
+        threading.Thread(target=<span class="hljs-variable language_">self</span>._drain_stderr, daemon=<span class="hljs-literal">True</span>).start()  <span class="hljs-comment"># 持续排空 stderr</span>
+        <span class="hljs-variable language_">self</span>._call(<span class="hljs-string">&quot;initialize&quot;</span>, {})  <span class="hljs-comment"># MCP 握手</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_read_stdout</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-keyword">for</span> line <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.process.stdout:      <span class="hljs-comment"># 阻塞读取放在独立线程，不卡主流程</span>
+            line = line.strip()
+            <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> line:
+                <span class="hljs-keyword">continue</span>
+            <span class="hljs-keyword">try</span>:
+                <span class="hljs-variable language_">self</span>._responses.put(json.loads(line))
+            <span class="hljs-keyword">except</span> json.JSONDecodeError:
+                <span class="hljs-keyword">continue</span>                      <span class="hljs-comment"># 跳过非 JSON 噪音行</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_drain_stderr</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-keyword">for</span> line <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.process.stderr:      <span class="hljs-comment"># 必须持续排空：管道写满会阻塞 server</span>
+            <span class="hljs-keyword">with</span> <span class="hljs-variable language_">self</span>._stderr_lock:
+                <span class="hljs-variable language_">self</span>._stderr_lines.append(line.rstrip())
+                <span class="hljs-keyword">del</span> <span class="hljs-variable language_">self</span>._stderr_lines[:-<span class="hljs-number">50</span>]
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_call</span>(<span class="hljs-params">self, method, params=<span class="hljs-literal">None</span>, timeout=<span class="hljs-number">120.0</span></span>):
+        <span class="hljs-variable language_">self</span>._request_id += <span class="hljs-number">1</span>
+        payload = {<span class="hljs-string">&quot;jsonrpc&quot;</span>: <span class="hljs-string">&quot;2.0&quot;</span>, <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-variable language_">self</span>._request_id, <span class="hljs-string">&quot;method&quot;</span>: method, <span class="hljs-string">&quot;params&quot;</span>: params <span class="hljs-keyword">or</span> {}}
+        <span class="hljs-variable language_">self</span>.process.stdin.write(json.dumps(payload, ensure_ascii=<span class="hljs-literal">False</span>) + <span class="hljs-string">&quot;\n&quot;</span>)
+        <span class="hljs-variable language_">self</span>.process.stdin.flush()
+
+        deadline = time.monotonic() + timeout
+        <span class="hljs-keyword">while</span> <span class="hljs-literal">True</span>:
+            remaining = deadline - time.monotonic()
+            <span class="hljs-keyword">if</span> remaining &lt;= <span class="hljs-number">0</span>:
+                <span class="hljs-keyword">raise</span> TimeoutError(<span class="hljs-string">f&quot;请求 <span class="hljs-subst">{method}</span> 超时（<span class="hljs-subst">{timeout}</span>s）：\n<span class="hljs-subst">{self.stderr_tail()}</span>&quot;</span>)
+            <span class="hljs-keyword">try</span>:
+                message = <span class="hljs-variable language_">self</span>._responses.get(timeout=remaining)
+            <span class="hljs-keyword">except</span> queue.Empty:
+                <span class="hljs-keyword">continue</span>
+            <span class="hljs-keyword">if</span> message.get(<span class="hljs-string">&quot;id&quot;</span>) != <span class="hljs-variable language_">self</span>._request_id:
+                <span class="hljs-keyword">continue</span>                      <span class="hljs-comment"># 丢弃通知或迟到的旧响应</span>
+            <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;error&quot;</span> <span class="hljs-keyword">in</span> message:
+                err = message[<span class="hljs-string">&quot;error&quot;</span>]
+                <span class="hljs-keyword">raise</span> RuntimeError(<span class="hljs-string">f&quot;MCP 错误 <span class="hljs-subst">{err.get(<span class="hljs-string">&#x27;code&#x27;</span>)}</span>: <span class="hljs-subst">{err.get(<span class="hljs-string">&#x27;message&#x27;</span>)}</span>&quot;</span>)
+            <span class="hljs-keyword">return</span> message.get(<span class="hljs-string">&quot;result&quot;</span>, {})
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">call_tool</span>(<span class="hljs-params">self, name, arguments=<span class="hljs-literal">None</span></span>):
+        result = <span class="hljs-variable language_">self</span>._call(<span class="hljs-string">&quot;tools/call&quot;</span>, {<span class="hljs-string">&quot;name&quot;</span>: name, <span class="hljs-string">&quot;arguments&quot;</span>: arguments <span class="hljs-keyword">or</span> {}})
+        content = result.get(<span class="hljs-string">&quot;content&quot;</span>) <span class="hljs-keyword">or</span> []
+        <span class="hljs-keyword">if</span> content <span class="hljs-keyword">and</span> content[<span class="hljs-number">0</span>].get(<span class="hljs-string">&quot;type&quot;</span>) == <span class="hljs-string">&quot;text&quot;</span>:
+            <span class="hljs-keyword">try</span>:
+                <span class="hljs-keyword">return</span> json.loads(content[<span class="hljs-number">0</span>].get(<span class="hljs-string">&quot;text&quot;</span>, <span class="hljs-string">&quot;{}&quot;</span>))  <span class="hljs-comment"># 反转 content[0].text 包装</span>
+            <span class="hljs-keyword">except</span> json.JSONDecodeError:
+                <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;_raw_text&quot;</span>: content[<span class="hljs-number">0</span>].get(<span class="hljs-string">&quot;text&quot;</span>)}
+        <span class="hljs-keyword">return</span> {}
+</code></pre>
+<p>七个内置工具在示例里都有语义化封装（<code>breakdown_script</code> / <code>get_task_status</code> / <code>get_task_result</code> / <code>cancel_task</code> / <code>list_tasks</code> / <code>get_queue_status</code> / <code>get_stats</code>），结果摘要统一按 <code>data.instructions</code> 契约打印（与 SDK / REST 结果结构一致）。</p>
+<blockquote>
+<p><strong>三个值得抄走的设计点</strong>：</p>
+<ol>
+<li class="lvl-3"><strong>stdout 读取必须独立成线程</strong>。主线程只负责发请求、按 id 收结果，避免阻塞式 <code>readline</code> 与超时控制互相干扰（这正是真实示例放弃 readline 轮询方案的原因）；</li>
+<li class="lvl-3"><strong>stderr 必须持续排空</strong>。server 侧日志全走 stderr，客户端不读就会在管道缓冲区写满后把 server 阻塞在写日志上（<code>_drain_stderr</code> 同时保留最近 50 行供报错展示）；</li>
+<li class="lvl-3"><strong>终态集合是 <code>{&quot;success&quot;, &quot;failed&quot;, &quot;cancelled&quot;}</code></strong>。轮询循环只在命中这三个值（或 <code>not_found</code>）时退出——再次强调，没有 <code>completed</code>。</li>
+</ol>
+</blockquote>
+<h3>4.5 HTTP 联调服务与客户端</h3>
+<p><code>src/penshot/mcp_http_server.py</code> 是<strong>产品内置的 HTTP 版 MCP 服务</strong>（模块描述直接标注：用于本地联调），把同一批工具暴露为 <code>/tools/*</code> 路由。需要先澄清一个边界：它不是 MCP 标准的 SSE / Streamable HTTP 传输，而是 FastAPI 风格的 REST 封装——不能用 MCP 协议客户端直连，只能用普通 HTTP 调用。</p>
+<p><strong>启动方式</strong>：</p>
+<pre class="hljs"><code>python -m penshot.mcp_http_server
+</code></pre>
+<p>服务默认监听 <code>127.0.0.1:8000</code>，根路径 <code>GET /</code> 会自描述全部端点：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">方法</th>
+<th style="text-align:left">端点</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/</code></td>
+<td style="text-align:left">服务自描述（名称 / 版本 / 端点清单）</td>
+</tr>
+<tr>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/tools</code></td>
+<td style="text-align:left">工具列表（<strong>带完整参数 schema</strong>）</td>
+</tr>
+<tr>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/tools/breakdown_script</code></td>
+<td style="text-align:left">拆分剧本（body：<code>script / language / wait / timeout</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/tools/get_task_status</code></td>
+<td style="text-align:left">任务状态（任务不存在返回 404）</td>
+</tr>
+<tr>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/tools/get_task_result</code></td>
+<td style="text-align:left">任务结果（任务不存在返回 404）</td>
+</tr>
+<tr>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/tools/cancel_task</code></td>
+<td style="text-align:left">取消任务</td>
+</tr>
+<tr>
+<td style="text-align:left">POST</td>
+<td style="text-align:left"><code>/tools/list_tasks</code></td>
+<td style="text-align:left">任务列表（可带 <code>status_filter / limit</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/tools/queue_status</code></td>
+<td style="text-align:left">队列状态</td>
+</tr>
+<tr>
+<td style="text-align:left">GET</td>
+<td style="text-align:left"><code>/tools/stats</code></td>
+<td style="text-align:left">统计信息</td>
+</tr>
+</tbody>
+</table>
+<p>与 stdio 版最重要的差异在 <code>GET /tools</code>：HTTP 版返回的工具定义带完整 <code>parameters</code> 描述（<code>script</code> / <code>language</code> / <code>wait</code> / <code>timeout</code> 的类型与默认值一目了然），不存在 stdio 版空 schema 的排坑问题。两版共用同一个 <code>create_penshot_agent()</code> 任务池，任务状态与结果完全一致。</p>
+<blockquote>
+<p><strong>源码瑕疵提醒</strong>：HTTP 版 <code>list_tasks</code> 的 <code>status_filter</code> 参数枚举里写着 <code>[&quot;pending&quot;, &quot;processing&quot;, &quot;completed&quot;, &quot;failed&quot;]</code>，但真实状态机里并不存在 <code>completed</code>（成功为 <code>success</code>）——传 <code>status_filter=completed</code> 永远筛不出任务。业务里按状态筛选请用 <code>success</code>；这一处参数说明与实际枚举不一致，属于当前实现的小瑕疵。</p>
+</blockquote>
+<p><code>examples/mcp/mcp_http_client.py</code> 对应提供了 <code>HTTPMCPClient</code> 示例（基于 httpx），核心调用方式（节选）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 节选自 examples/mcp/mcp_http_client.py</span>
+BASE_URL = os.getenv(<span class="hljs-string">&quot;PENSHOT_MCP_HTTP&quot;</span>, <span class="hljs-string">&quot;http://127.0.0.1:8000&quot;</span>)  <span class="hljs-comment"># 可用环境变量覆盖</span>
+
+TERMINAL_STATUS = {<span class="hljs-string">&quot;success&quot;</span>, <span class="hljs-string">&quot;failed&quot;</span>, <span class="hljs-string">&quot;cancelled&quot;</span>}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">HTTPMCPClient</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, base_url=BASE_URL, timeout=<span class="hljs-number">30.0</span></span>):
+        <span class="hljs-variable language_">self</span>._client = httpx.Client(
+            base_url=base_url,
+            timeout=httpx.Timeout(connect=<span class="hljs-number">5.0</span>, read=timeout),
+        )
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">list_tools</span>(<span class="hljs-params">self</span>):
+        resp = <span class="hljs-variable language_">self</span>._client.get(<span class="hljs-string">&quot;/tools&quot;</span>)           <span class="hljs-comment"># HTTP 版带 parameters 描述</span>
+        resp.raise_for_status()
+        <span class="hljs-keyword">return</span> resp.json()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">breakdown_script</span>(<span class="hljs-params">self, script, language=<span class="hljs-string">&quot;zh&quot;</span>, wait=<span class="hljs-literal">False</span>, timeout=<span class="hljs-number">300</span></span>):
+        resp = <span class="hljs-variable language_">self</span>._client.post(
+            <span class="hljs-string">&quot;/tools/breakdown_script&quot;</span>,
+            json={<span class="hljs-string">&quot;script&quot;</span>: script, <span class="hljs-string">&quot;language&quot;</span>: language, <span class="hljs-string">&quot;wait&quot;</span>: wait, <span class="hljs-string">&quot;timeout&quot;</span>: timeout},
+        )
+        resp.raise_for_status()
+        <span class="hljs-keyword">return</span> resp.json()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_task_status</span>(<span class="hljs-params">self, task_id</span>):
+        resp = <span class="hljs-variable language_">self</span>._client.post(<span class="hljs-string">&quot;/tools/get_task_status&quot;</span>, json={<span class="hljs-string">&quot;task_id&quot;</span>: task_id})
+        resp.raise_for_status()
+        <span class="hljs-keyword">return</span> resp.json()
+
+    <span class="hljs-comment"># get_task_result / cancel_task / list_tasks 写法同构；监控类为 GET：</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_queue_status</span>(<span class="hljs-params">self</span>):
+        resp = <span class="hljs-variable language_">self</span>._client.get(<span class="hljs-string">&quot;/tools/queue_status&quot;</span>)
+        resp.raise_for_status()
+        <span class="hljs-keyword">return</span> resp.json()
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_stats</span>(<span class="hljs-params">self</span>):
+        resp = <span class="hljs-variable language_">self</span>._client.get(<span class="hljs-string">&quot;/tools/stats&quot;</span>)
+        resp.raise_for_status()
+        <span class="hljs-keyword">return</span> resp.json()
+</code></pre>
+<blockquote>
+<p><strong>选型建议</strong>：HTTP 版适合本机联调与多客户端共享（不依赖子进程管理），但注意两点：一是默认端口 8000 与项目 REST 服务相同，两者不要同时启动占用同一端口；二是远程暴露时需要自己补认证与限流——服务自带的 CORS 是全放开的，仅供本地开发。</p>
+</blockquote>
+<h3>4.6 集成 Claude Desktop</h3>
+<p>仓库 <code>examples/mcp/</code> 提供两个内容一致的配置模板：<code>claude_desktop_config.json</code> 与 <code>mcp_config.json</code>（后者多一行 <code>_comment</code> 说明）：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;mcpServers&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;penshot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;command&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;python&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;-m&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;penshot.mcp_server&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;--max-concurrent&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;5&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;--queue-size&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;500&quot;</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>配置要点</strong>：</p>
+<ol>
+<li class="lvl-3">模板的 <code>_comment</code> 强调：先执行 <code>pip install -e .</code>，保证命令行中的 <code>python</code> 可导入 penshot；LLM 密钥通过 <code>PENSHOT_LLM__DEFAULT__API_KEY</code> 环境变量或仓库根目录 <code>.env</code> 注入，不要写进配置文件（这也是模板里没有 <code>env</code> 键的原因）；</li>
+<li class="lvl-3"><code>command</code> 写的是裸 <code>python</code>，如果系统有多个解释器，建议换成虚拟环境中的绝对路径，避免 Claude Desktop 拉起时找不到 penshot；</li>
+<li class="lvl-3">配置完成后重启 Claude Desktop，即可用自然语言调起分镜工具。</li>
+</ol>
+</blockquote>
+<p>下面用 4.4 节示例客户端的 <code>call_tool</code>（返回已完成解包的 dict）演示三种典型编排。</p>
+<p><strong>异步模式调用</strong>（适合长剧本）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 异步模式：提交 → 轮询 → 取结果（基于 4.4 节的 MCPStdioClient）</span>
+submit = client.breakdown_script(script_text, language=<span class="hljs-string">&quot;zh&quot;</span>, wait=<span class="hljs-literal">False</span>)
+task_id = submit[<span class="hljs-string">&quot;task_id&quot;</span>]       <span class="hljs-comment"># 示例客户端已解包 content[0].text，直接取字段</span>
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;任务已提交: <span class="hljs-subst">{task_id}</span>, 初始状态: <span class="hljs-subst">{submit[<span class="hljs-string">&#x27;status&#x27;</span>]}</span>&quot;</span>)
+
+state = <span class="hljs-literal">None</span>
+<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-number">15</span>):
+    status = client.get_task_status(task_id)
+    state = status.get(<span class="hljs-string">&quot;status&quot;</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;状态: <span class="hljs-subst">{state}</span>, 阶段: <span class="hljs-subst">{status.get(<span class="hljs-string">&#x27;stage_name&#x27;</span>) <span class="hljs-keyword">or</span> status.get(<span class="hljs-string">&#x27;current_stage&#x27;</span>)}</span>, &quot;</span>
+          <span class="hljs-string">f&quot;进度: <span class="hljs-subst">{status.get(<span class="hljs-string">&#x27;progress&#x27;</span>)}</span>%&quot;</span>)
+    <span class="hljs-keyword">if</span> state <span class="hljs-keyword">in</span> TERMINAL_STATUS <span class="hljs-keyword">or</span> state == <span class="hljs-string">&quot;not_found&quot;</span>:
+        <span class="hljs-keyword">break</span>
+    time.sleep(<span class="hljs-number">2</span>)
+
+<span class="hljs-keyword">if</span> state == <span class="hljs-string">&quot;success&quot;</span>:
+    result = client.get_task_result(task_id)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;处理耗时: <span class="hljs-subst">{result.get(<span class="hljs-string">&#x27;processing_time_ms&#x27;</span>)}</span>ms&quot;</span>)
+</code></pre>
+<blockquote>
+<p>这段结构与 <code>examples/mcp/mcp_client.py</code> 的 <code>main()</code> 一致（含轮询上限 15 次、终态集合 <code>TERMINAL_STATUS</code>）。</p>
+</blockquote>
+<blockquote>
+<p>异步提交后的真实响应结构（stdio 版 handler 原样返回）：</p>
+</blockquote>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;task_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;TSK202603282100504595&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pending&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;message&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;任务已提交&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><strong>同步模式调用</strong>（适合短剧本）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># wait=True：同步等待结果，超时由 timeout 控制</span>
+result = client.breakdown_script(script_text, language=<span class="hljs-string">&quot;zh&quot;</span>, wait=<span class="hljs-literal">True</span>, timeout=<span class="hljs-number">300</span>)
+
+<span class="hljs-keyword">if</span> result.get(<span class="hljs-string">&quot;success&quot;</span>):
+    instructions = (result.get(<span class="hljs-string">&quot;data&quot;</span>) <span class="hljs-keyword">or</span> {}).get(<span class="hljs-string">&quot;instructions&quot;</span>, {})
+    fragments = instructions.get(<span class="hljs-string">&quot;fragments&quot;</span>, [])
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;生成了 <span class="hljs-subst">{<span class="hljs-built_in">len</span>(fragments)}</span> 个片段&quot;</span>)
+</code></pre>
+<blockquote>
+<p>同步模式的真实响应结构（解包后）：</p>
+</blockquote>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;task_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;TSK202603282100504595&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;success&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;success&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;data&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;instructions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;project_info&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>...<span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>...<span class="hljs-punctuation">]</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;error&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;processing_time_ms&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3221383</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>同步响应含 <code>processing_time_ms</code></strong>，可用来评估整条流水线的耗时。上面的数值取自仓库里的真实结果样例（<code>examples/data/results/function_calls_data.json</code>，约 54 分钟，含完整 LLM 流水线与修复记录）；它不是基准测试值，实际耗时随剧本长度、模型速度与重试次数波动。</p>
+</blockquote>
+<p><strong>查询任务状态</strong>：</p>
+<pre class="hljs"><code>status = client.get_task_status(task_id)
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;状态: <span class="hljs-subst">{status[<span class="hljs-string">&#x27;status&#x27;</span>]}</span>&quot;</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;进度: <span class="hljs-subst">{status[<span class="hljs-string">&#x27;progress&#x27;</span>]}</span>%&quot;</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;阶段: <span class="hljs-subst">{status.get(<span class="hljs-string">&#x27;stage_name&#x27;</span>) <span class="hljs-keyword">or</span> status.get(<span class="hljs-string">&#x27;current_stage&#x27;</span>)}</span>&quot;</span>)
+</code></pre>
+<blockquote>
+<p>响应（字段结构为源码 handler 的真实输出，数值仅作示意）：</p>
+</blockquote>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;task_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;TSK202603282100504595&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;processing&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;progress&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">10</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;current_stage&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;parsing_script&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;stage_name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;解析剧本中&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;created_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-03-28T21:00:50.123456&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;updated_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-03-28T21:01:12.654321&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;stages_progress&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;开始解析剧本&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;code&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;parsing_start&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;progress&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;completed&quot;</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;解析剧本中&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;code&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;parsing_script&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;progress&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">50</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;processing&quot;</span><span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>进度感知</strong>：阶段代码用 <code>current_stage</code> 读取，<code>stage_name</code> 是 handler 由 <code>TaskStage.from_code</code> 映射出的中文名（如 <code>parsing_script</code> 对应解析剧本中），<code>progress</code> 为 0-100 的百分比，<code>stages_progress</code> 给出每个阶段的明细。注意两套状态值域：阶段明细里的 <code>status</code> 是阶段级状态（<code>processing / completed</code>），任务级终态则是 <code>success / failed / cancelled</code>——<code>completed</code> 只属于前者，把它当作任务终态判断就是误用的根源。</p>
+</blockquote>
+<p><strong>取消任务</strong>：</p>
+<pre class="hljs"><code>result = client.cancel_task(task_id)
+
+<span class="hljs-keyword">if</span> result.get(<span class="hljs-string">&quot;cancelled&quot;</span>):
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;任务已取消&quot;</span>)
+</code></pre>
+<blockquote>
+<p>返回结构是 <code>{&quot;task_id&quot;: ..., &quot;cancelled&quot;: true}</code>——判断字段是 <code>cancelled</code>，不是 <code>success</code>。</p>
+</blockquote>
+<p><strong>监控服务器状态</strong>：</p>
+<pre class="hljs"><code>queue = client.get_queue_status()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;队列长度: <span class="hljs-subst">{queue[<span class="hljs-string">&#x27;queue_length&#x27;</span>]}</span>, 等待: <span class="hljs-subst">{queue[<span class="hljs-string">&#x27;queue_waiting&#x27;</span>]}</span>, &quot;</span>
+      <span class="hljs-string">f&quot;活跃: <span class="hljs-subst">{queue[<span class="hljs-string">&#x27;active_tasks&#x27;</span>]}</span>, 并发上限: <span class="hljs-subst">{queue[<span class="hljs-string">&#x27;max_concurrent&#x27;</span>]}</span>, &quot;</span>
+      <span class="hljs-string">f&quot;使用率: <span class="hljs-subst">{queue[<span class="hljs-string">&#x27;queue_usage_percent&#x27;</span>]:<span class="hljs-number">.1</span>f}</span>%&quot;</span>)
+
+stats = client.get_stats()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;总提交: <span class="hljs-subst">{stats[<span class="hljs-string">&#x27;total_submitted&#x27;</span>]}</span>, 完成: <span class="hljs-subst">{stats[<span class="hljs-string">&#x27;total_completed&#x27;</span>]}</span>, &quot;</span>
+      <span class="hljs-string">f&quot;失败: <span class="hljs-subst">{stats[<span class="hljs-string">&#x27;total_failed&#x27;</span>]}</span>, 取消: <span class="hljs-subst">{stats[<span class="hljs-string">&#x27;total_cancelled&#x27;</span>]}</span>&quot;</span>)
+</code></pre>
+<blockquote>
+<p><strong>真实字段清单</strong>（<code>PenshotFunction</code> → <code>TaskFactory</code> → <code>AsyncTaskProcessor</code> 逐层透传）：<code>get_queue_status</code> 返回 <code>queue_length / queue_waiting / active_tasks / max_concurrent / queue_max_size / queue_usage_percent</code>；<code>get_stats</code> 在累计计数（<code>total_submitted / total_completed / total_failed / total_cancelled / peak_queue_size / avg_wait_time_ms</code>）之外，还附带一份 <code>queue_status</code> 快照与 <code>active_tasks_detail</code>。</p>
+</blockquote>
+<hr>
+<h2>五、总结与建议</h2>
+<h3>5.1 常见问题排查表</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">现象</th>
+<th style="text-align:left">可能原因</th>
+<th style="text-align:left">处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">客户端看不到工具</td>
+<td style="text-align:left">Server 未启动或 <code>python</code> 无法导入 penshot</td>
+<td style="text-align:left">用 <code>python -m penshot.mcp_server</code> 手动验证；检查 <code>command</code> 是否指向正确解释器</td>
+</tr>
+<tr>
+<td style="text-align:left">调用返回 <code>Tool not found</code></td>
+<td style="text-align:left">工具名拼写不符或方法不支持</td>
+<td style="text-align:left">对照 4.1 工具清单；错误码 <code>-32601</code> 即方法 / 工具不存在</td>
+</tr>
+<tr>
+<td style="text-align:left">调用返回 <code>-32000</code></td>
+<td style="text-align:left">handler 内部异常（多为未配置 LLM key）</td>
+<td style="text-align:left">看 stderr 日志定位；先确认 <code>.env</code> 中的密钥已生效</td>
+</tr>
+<tr>
+<td style="text-align:left">任务一直停在 <code>pending</code></td>
+<td style="text-align:left">队列已满被拒入队</td>
+<td style="text-align:left">用 <code>get_queue_status</code> 查看 <code>queue_usage_percent</code>；必要时调大 <code>--queue-size</code> 或错峰提交</td>
+</tr>
+<tr>
+<td style="text-align:left">同步等待超时</td>
+<td style="text-align:left">长剧本 + 慢模型</td>
+<td style="text-align:left">改用 <code>wait=False</code> 异步模式 + 轮询</td>
+</tr>
+<tr>
+<td style="text-align:left">状态判断永远不命中</td>
+<td style="text-align:left">误把 <code>completed</code> 当任务终态</td>
+<td style="text-align:left">任务终态只有 <code>success / failed / cancelled</code>；<code>completed</code> 仅属于阶段明细</td>
+</tr>
+<tr>
+<td style="text-align:left">结果为空</td>
+<td style="text-align:left">剧本内容问题或任务未成功</td>
+<td style="text-align:left">先看 <code>get_task_result</code> 的 <code>success / error</code> 字段</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 使用建议</h3>
+<p>MCP 接入 PenShot 的核心收益：不用写业务代码、不用关心 Web 界面与私有协议，用一套标准化的提交 - 轮询 - 取结果工具，就能把分镜能力挂进 Claude、Cursor 等任意 MCP 兼容环境。要点总结如下：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>协议层</strong>：PenShot 的 stdio 服务是手写 JSON-RPC 最小集（initialize / tools/list / tools/call），零第三方依赖；换来的边界是不支持 notifications、resources 等高级能力，扩展前需评估；</p>
+</li>
+<li class="lvl-3">
+<p><strong>任务模型</strong>：PenShot 走异步任务池——先提交拿 <code>task_id</code>，再轮询 <code>get_task_status</code>（看 <code>current_stage / stage_name / progress</code>），终态 <code>success</code> 后由 <code>get_task_result</code> 取 <code>data.instructions</code>；</p>
+</li>
+<li class="lvl-3">
+<p><strong>并发与超时</strong>：默认并发 10、队列 1000，队列满直接拒绝入队；长剧本优先 <code>wait: false</code> 异步模式，同步模式务必显式设置 <code>timeout</code>；</p>
+</li>
+<li class="lvl-3">
+<p><strong>两条通道</strong>：stdio 对接桌面客户端（工具 schema 为空，需在系统提示词里约束参数）；HTTP 联调版参数描述完整，适合本机联调与多客户端共享（注意与 REST 服务端口冲突）。</p>
+</li>
+</ol>
+<p><strong>踩坑提醒</strong>：两个高频误读都有源码级答案——任务终态是 <code>success</code> 而非 <code>completed</code>（<code>completed</code> 只出现在阶段进度明细的 <code>status</code> 里，两套值域不要混用）；HTTP 版 <code>list_tasks</code> 的 <code>status_filter=completed</code> 永远筛不出任务（源码枚举瑕疵，请用 <code>success</code>）。迁移或复用本文示例时，以仓库 examples 目录的源码为准。</p>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

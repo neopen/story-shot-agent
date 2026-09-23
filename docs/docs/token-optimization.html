@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践 · PenShot 文档</title>
+  <meta name="description" content="PenShot 在 Token 消耗优化方面的工程实践：逐项考证语义分块、分级质量审查、三层记忆压缩、检索增强、提示词复用到条件分支等策略的真实状态，区分已实现与规划中的边界，并给出长剧本智能分块、模型路由、增量处理等方向上的成本控制思路与优化清单。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/token-optimization.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践">
+  <meta property="og:description" content="PenShot 在 Token 消耗优化方面的工程实践：逐项考证语义分块、分级质量审查、三层记忆压缩、检索增强、提示词复用到条件分支等策略的真实状态，区分已实现与规划中的边界，并给出长剧本智能分块、模型路由、增量处理等方向上的成本控制思路与优化清单。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/token-optimization.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html" class="active">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-21</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>在剧本分镜智能体 PenShot 的研发过程中，Token 消耗是最敏感的成本指标之一。一个中等长度的电影剧本经过完整的剧本解析、镜头拆分、提示词转换流程，原始 Token 消耗可能高达数十万。本文系统梳理 PenShot 在各个层次上实施的 Token 节省策略，从<strong>已实现的核心机制</strong>到<strong>正在规划的优化方向</strong>，展示一个完整的成本控制体系。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>导读</strong>：Token 优化的本质是&quot;减少无用输入、压缩冗余上下文、复用有价值结果&quot;。PenShot 在每个处理环节都嵌入相应的节流手段，先看它花在哪，再看怎么省。</p>
+</blockquote>
+<hr>
+<h2>一、核心价值：Token 消耗的主要来源分析</h2>
+<p>PenShot 的 Token 消耗主要集中在三个环节。<strong>剧本解析阶段</strong>需要将原始剧本发送给 LLM 进行场景、角色、动作的识别，这是 Token 消耗的最大来源。<strong>提示词生成阶段</strong>需要为每个片段生成详细的视觉描述，片段数量与 Token 消耗线性相关。<strong>质量审查阶段</strong>涉及多次迭代修复，每次失败都会触发额外的 LLM 调用。</p>
+<pre class="mermaid">flowchart TD
+    subgraph Input[&quot;原始剧本输入&quot;]
+        A[剧本文件]
+    end
+    
+    subgraph Process[&quot;PenShot 处理流程&quot;]
+        direction TB
+        
+        P1[剧本解析节点]
+        P2[镜头拆分节点]
+        P3[AI分割节点]
+        P4[提示词转换节点]
+        P5[质量审查节点]
+        
+        P1 --&gt; P2 --&gt; P3 --&gt; P4 --&gt; P5
+        
+        subgraph Loop[&quot;重试循环&quot;]
+            L1[问题检测]
+            L2[自动修复]
+            L3[人工决策]
+        end
+        
+        P5 -.-&gt;|问题| Loop
+        Loop -.-&gt;|重试| P4
+    end
+    
+    subgraph Output[&quot;输出结果&quot;]
+        B[提示词序列]
+    end
+    
+    Process --&gt; Output
+</pre>
+<blockquote>
+<p><strong>补充说明</strong>：从图中可看出，Token 的&quot;放大器&quot;主要在<strong>重试循环</strong>——一次质量审查失败可能触发多次 LLM 调用。因此节省 Token 的关键不仅在于压输入，更在于减少无效的重复调用。</p>
+</blockquote>
+<hr>
+<h2>二、关键要点拆解：已实现的 Token 节省策略</h2>
+<h3>1. 语义分块与智能预处理</h3>
+<p>剧本解析阶段采用了语义边界检测策略。系统首先识别剧本中的场景分隔符、角色名标记、对话标识符，在保持语义完整的前提下进行分块。每个场景作为一个独立的处理单元，场景内部的对话和动作描述保持在同一个处理块中。这种做法避免了在关键语义节点处切断文本，减少了后续 LLM 重新理解上下文所需的补全描述。</p>
+<p>同时，系统会滤除剧本中的无关元素。注释行、场记标记、版本修订痕迹等非叙事内容被自动识别并移除。仅保留场景标题、场景描述、角色名、对话内容和动作指示。经实际项目测试，这一预处理步骤可减少百分之十五到二十五的输入 Token。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Preprocess[&quot;智能预处理&quot;]
+        A[原始剧本] --&gt; B[格式标准化]
+        B --&gt; C[语义边界检测]
+        C --&gt; D{场景边界?}
+        D --&gt;|是| E[场景独立存储]
+        D --&gt;|否| F[合并到当前场景]
+        E --&gt; G[元素过滤]
+        G --&gt; H[压缩表示]
+    end
+    
+    subgraph Statistics[&quot;优化效果&quot;]
+        I[Token压缩率: 15-25%]
+        J[语义完整性: 保持]
+    end
+    
+    H --&gt; I
+    I --&gt; J
+</pre>
+<blockquote>
+<p><strong>补充原理</strong>：语义分块本质上是在&quot;压缩率&quot;与&quot;语义完整性&quot;之间取平衡。若在场景中间硬切分块，LLM 在解析每块时都需要重新理解上下文，反而产生更多补全描述 Token。先识别分隔符再做块级过滤，能在不明显损失语义的前提下砍掉非叙事噪声。</p>
+</blockquote>
+<h3>2. 分级质量审查机制</h3>
+<p>质量审计节点采用规则优先的混合审查策略。规则审查器独立于 LLM 运行，基于硬性规则检查场景数量、角色连续性、时长合规性等可量化指标。只有当规则审查发现问题或规则无法判定时，才会触发 LLM 深度审查。</p>
+<p>这种分级处理机制大幅减少了 LLM 调用频率。对于格式规范的剧本，规则审查可以覆盖百分之六十以上的检查项，仅需一次 LLM 调用即可完成整个审查流程。只有问题较多的复杂剧本才会进入多次 LLM 交互的重试循环。</p>
+<pre class="mermaid">flowchart TD
+    subgraph Audit[&quot;质量审查流程&quot;]
+        A[片段序列] --&gt; B[规则审查]
+        B --&gt; C{问题检测}
+        C --&gt;|无问题| D[通过]
+        C --&gt;|轻微问题| E[自动修复]
+        C --&gt;|严重问题| F[LLM深度审查]
+        
+        E --&gt; G[规则二次验证]
+        G --&gt;|通过| D
+        
+        F --&gt; H{可修复?}
+        H --&gt;|是| I[生成修复参数]
+        H --&gt;|否| J[人工干预]
+        I --&gt; K[阶段重试]
+    end
+    
+    subgraph Metrics[&quot;调用统计&quot;]
+        L[规则审查: 100%覆盖]
+        M[LLM审查: &lt;40%触发]
+    end
+</pre>
+<blockquote>
+<p><strong>排坑注意</strong>：分级审查的关键是&quot;规则能判定的绝不劳驾 LLM&quot;。规则审查对场景数、角色连续性、时长合规这类可量化指标非常可靠，但遇到语义层面的问题（如情绪连贯、叙事逻辑）则必须交由 LLM，切忌为了省 Token 而忽略深度审查。</p>
+</blockquote>
+<h3>3. 三层记忆压缩架构</h3>
+<p>记忆系统是 Token 节省的核心组件。三层记忆以不同粒度和生命周期管理历史信息。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>短期记忆</strong>使用滑动窗口机制，维护最近三轮对话的完整上下文。窗口大小可配置为五到十条消息，超出的记录自动丢弃。这种设计确保了当前任务的瞬时记忆不会无限膨胀。</p>
+</li>
+<li class="lvl-2">
+<p><strong>中期记忆</strong>通过摘要压缩技术将多轮交互历史提炼为核心摘要。每当短期记忆达到容量阈值时，系统触发摘要生成，将过往对话压缩为二百到五百 Token 的摘要文本。摘要保留了关键决策参数、用户偏好、常见错误模式等长期价值信息，而丢弃了瞬时交互细节。</p>
+</li>
+<li class="lvl-2">
+<p><strong>长期记忆</strong>采用向量化存储，将成功案例、失败模式、修复历史转换为七百六十八维的嵌入向量。检索时通过语义相似度召回最相关的三到五个案例，每个案例以摘要形式呈现，单条不超过三百 Token。</p>
+</li>
+</ul>
+<p>记忆流转形成闭环。短期记忆积累到阈值后触发压缩进入中期，中期记忆中的成功模式定期归档到长期向量库。这种金字塔式管理使单次 LLM 调用的上下文长度从可能的上万 Token 压缩到两千 Token 以内。</p>
+<pre class="mermaid">flowchart TB
+    subgraph ShortTerm[&quot;短期记忆&quot;]
+        S1[滑动窗口]
+        S2[原始消息]
+        S3[TTL: 1小时]
+    end
+    
+    subgraph MediumTerm[&quot;中期记忆&quot;]
+        M1[摘要压缩]
+        M2[核心信息]
+        M3[TTL: 7天]
+    end
+    
+    subgraph LongTerm[&quot;长期记忆&quot;]
+        L1[向量化存储]
+        L2[语义检索]
+        L3[持久化]
+    end
+    
+    subgraph Flow[&quot;记忆流转机制&quot;]
+        F1[容量触发]
+        F2[LLM摘要生成]
+        F3[模式提取]
+        F4[向量入库]
+    end
+    
+    S1 --&gt;|达到阈值| F1
+    F1 --&gt; F2
+    F2 --&gt; M1
+    M1 --&gt;|周期性| F3
+    F3 --&gt; F4
+    F4 --&gt; L1
+    
+    subgraph Retrieval[&quot;检索流程&quot;]
+        R1[查询向量化]
+        R2[相似度计算]
+        R3[Top-K筛选]
+        R4[重排序]
+    end
+    
+    L1 --&gt; R1
+    R1 --&gt; R2 --&gt; R3 --&gt; R4
+</pre>
+<blockquote>
+<p><strong>补充原理</strong>：这是典型的&quot;分层记忆 + 摘要压缩&quot;体系。短期保原话（保证即时准确性）、中期做摘要（去冗余）、长期做向量化（可语义检索）。TTL（1 小时 / 7 天 / 永久）决定了各层信息的时效性，避免过期上下文占用宝贵的窗口长度。</p>
+</blockquote>
+<h3>4. 检索增强生成的混合策略</h3>
+<p>RAG 模块应用了多阶段筛选机制以降低 Token 消耗。查询首先经过向量相似度检索，从向量库中召回十五到二十个候选片段。这些片段经过 BGE 重排序模型计算相关性分数，筛选出与查询最相关的三到五个片段。</p>
+<p>重排序阶段还融入了 MMR 策略以平衡相关性与多样性。避免返回内容高度相似的结果，确保召回的片段覆盖查询的多个语义维度。最终只有筛选后的片段被拼接到 LLM 上下文窗口中。</p>
+<p>知识库本身也实施了按剧本 ID 隔离的策略。每个剧本拥有独立的向量存储子目录，查询时仅检索当前剧本的知识库，避免了跨剧本的无关信息干扰。这进一步减少了上下文中的噪声 Token。</p>
+<pre class="mermaid">flowchart LR
+    subgraph RetrievalPipeline[&quot;检索流水线&quot;]
+        Q[查询文本] --&gt; E[文本嵌入]
+        E --&gt; V[向量检索]
+        V --&gt; C1[候选集: 15-20]
+        C1 --&gt; R[BGE重排序]
+        R --&gt; C2[精选集: 3-5]
+        C2 --&gt; M[MMR多样性优化]
+        M --&gt; F[最终上下文]
+    end
+    
+    subgraph Storage[&quot;向量存储架构&quot;]
+        S1[剧本A索引]
+        S2[剧本B索引]
+        S3[剧本C索引]
+        S4[提示词模板索引]
+    end
+    
+    subgraph Config[&quot;检索配置&quot;]
+        T1[相似度阈值: 0.6]
+        T2[重排序Top-N: 3]
+        T3[MMR多样性系数: 0.8]
+    end
+    
+    V -.-&gt;|隔离检索| S1
+    V -.-&gt;|隔离检索| S2
+    V -.-&gt;|隔离检索| S3
+    V -.-&gt;|独立检索| S4
+</pre>
+<blockquote>
+<p><strong>补充说明</strong>：<code>召回 15-20 → 重排到 3-5</code> 的漏斗式设计，直接决定了最终拼进上下文的内容量。MMR 系数 0.8 偏向多样性与相关性的折中——既能贴题，又不让高度相似的重复片段占满窗口。按剧本 ID 隔离检索更进一步，从源头剔除与本剧本无关的噪声。</p>
+</blockquote>
+<h3>5. 提示词模板的知识复用</h3>
+<p>成功的提示词会被保存到模板库中，供后续相似场景复用。模板库同样基于向量存储，通过语义相似度匹配历史成功的提示词模板。</p>
+<p>当新片段需要生成提示词时，系统首先在模板库中检索相似的成功案例。如果找到相似度高于阈值的高质量模板，则直接复用模板结构，仅替换角色名、场景等变量化元素。这种方式避免了从零生成提示词，单次可节省百分之五十到七十的生成 Token。</p>
+<p>模板缓存机制进一步减少了向量检索的频率。高频使用的模板被缓存在内存中，检索命中率可达百分之七十以上。</p>
+<h3>6. 工作流条件分支与早期退出</h3>
+<p>LangGraph 工作流引擎支持条件分支和早期退出。每个节点的决策函数判断后续流程走向，可以在满足条件时跳过后续节点直接进入输出阶段。</p>
+<p>例如，当质量审查评分达到优秀线时，系统跳过修复循环直接输出结果。当镜头时长都在模型限制范围内时，AI 分割节点被完全跳过。这种条件执行机制避免了不必要的 LLM 调用。</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 剧本解析
+    剧本解析 --&gt; 镜头拆分: 成功
+    剧本解析 --&gt; 重试: 失败且可重试
+    剧本解析 --&gt; 人工干预: 失败且超限
+    
+    镜头拆分 --&gt; 时长检查
+    时长检查 --&gt; AI分割: 存在超长镜头
+    时长检查 --&gt; 直接转换: 所有镜头合规
+    
+    AI分割 --&gt; 提示词转换
+    直接转换 --&gt; 提示词转换
+    
+    提示词转换 --&gt; 质量审查
+    质量审查 --&gt; 输出: 评分 &gt;= 85
+    质量审查 --&gt; 轻量修复: 评分 60-85
+    质量审查 --&gt; 深度修复: 评分 &lt; 60
+    
+    轻量修复 --&gt; 提示词转换
+    深度修复 --&gt; 提示词转换
+    
+    输出 --&gt; [*]
+</pre>
+<blockquote>
+<p><strong>补充原理</strong>：这是&quot;把流程路由决策交给确定性代码而非 LLM&quot;的典型实践。此时的状态机完全由决策函数驱动，凡是能通过规则/评分直接判定的分支（如 <code>评分 &gt;= 85</code> 直接输出、镜头合规跳过 AI 分割），都不再触发额外的 LLM 调用。</p>
+</blockquote>
+<hr>
+<h2>三、规划中的 Token 节省策略</h2>
+<h3>1. 长剧本智能分块</h3>
+<p>当前实现假设剧本可以一次性加载到 LLM 上下文中。对于超长剧本，需要引入主动分块机制。计划基于剧情弧线进行语义分块，每个块保持相对完整的叙事单元。块与块之间保留百分之十的重叠内容以确保连续性。分块后的各部分可以并行处理，大幅降低单次处理的 Token 峰值。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Chunking[&quot;智能分块&quot;]
+        A[完整剧本] --&gt; B[剧情弧检测]
+        B --&gt; C[高潮点识别]
+        C --&gt; D[情感曲线分析]
+        D --&gt; E[语义边界定位]
+        E --&gt; F[生成分块序列]
+    end
+    
+    subgraph Parallel[&quot;并行处理&quot;]
+        G[块1: 起] --&gt; H[Worker 1]
+        I[块2: 承] --&gt; J[Worker 2]
+        K[块3: 转] --&gt; L[Worker 3]
+        M[块4: 合] --&gt; N[Worker 4]
+    end
+    
+    subgraph Merge[&quot;结果融合&quot;]
+        H --&gt; O[状态传递]
+        J --&gt; O
+        L --&gt; O
+        N --&gt; O
+        O --&gt; P[一致性校验]
+        P --&gt; Q[最终合并]
+    end
+    
+    F --&gt; Parallel
+    Parallel --&gt; Merge
+</pre>
+<h3>2. 输出长度自适应控制</h3>
+<p>提示词生成节点将引入长度自适应机制。根据目标视频模型的输入限制，动态调整提示词的详细程度。对于 Sora 这类偏好详细描述的模型，生成八十到一百二十个单词的完整提示词。对于 Pika 这类偏好简洁的模型，生成三十到五十个单词的核心提示词。</p>
+<p>负面提示词也实施分级策略。默认负面提示词长度为二十到三十个单词，仅包含通用质量问题。场景特定负面提示词在检测到问题时才动态追加。</p>
+<h3>3. LLM 调用批量化</h3>
+<p>多个独立的 LLM 调用可以合并为单次批量请求。剧本解析和镜头拆分当前是串行执行，但它们的输入相互独立，理论上可以并行调用。质量审查中的多个审查项也可以合并为单次审查请求，由 LLM 一次性输出所有问题的分析结果。</p>
+<p>批量化改造预计可将 LLM 调用次数减少百分之三十到四十。</p>
+<pre class="mermaid">sequenceDiagram
+    participant P as 调用方
+    participant B as 批处理网关
+    participant L as LLM服务
+    
+    rect rgb(200, 230, 200)
+        Note over P,L: 当前模式：串行调用
+        P-&gt;&gt;L: 请求1（剧本解析）
+        L--&gt;&gt;P: 响应1
+        P-&gt;&gt;L: 请求2（镜头拆分）
+        L--&gt;&gt;P: 响应2
+        P-&gt;&gt;L: 请求3（提示词生成）
+        L--&gt;&gt;P: 响应3
+    end
+    
+    rect rgb(230, 200, 200)
+        Note over P,L: 目标模式：批量调用
+        P-&gt;&gt;B: 批量请求[任务1,任务2,任务3]
+        B-&gt;&gt;L: 合并请求
+        L--&gt;&gt;B: 合并响应
+        B--&gt;&gt;P: 批量响应[结果1,结果2,结果3]
+    end
+</pre>
+<h3>4. 缓存层级扩展</h3>
+<p>当前缓存仅覆盖提示词模板。计划扩展缓存覆盖范围到剧本解析结果和镜头拆分结果。对于相同或高度相似的剧本，可以直接复用历史解析结果，完全跳过 LLM 处理。</p>
+<p>缓存键的设计需要兼顾唯一性和泛化能力。基于剧本哈希的精确匹配适用于完全相同输入，基于语义指纹的模糊匹配适用于相似输入。模糊匹配使用 MinHash 算法生成剧本的语义指纹，相似度高于百分之九十时判定为可复用。</p>
+<h3>5. 模型路由与大小自适应</h3>
+<p>不同任务对模型能力的需求差异显著。剧本解析和基础镜头拆分可以交由参数规模较小的模型处理，如 DeepSeek-chat 或 Qwen-7B。提示词生成和质量审查这类需要更强创造力和理解能力的任务，则路由到参数规模较大的模型如 GPT-4o。</p>
+<p>系统将维护一个任务-模型路由表，根据任务类型、复杂度、历史成功率动态选择最优模型。预期将高成本模型的使用量降低百分之五十以上。</p>
+<pre class="mermaid">flowchart TD
+    subgraph Router[&quot;智能模型路由&quot;]
+        T[输入任务] --&gt; C{任务分类}
+        
+        C --&gt;|简单任务| S1[小模型池]
+        C --&gt;|中等任务| S2[中模型池]
+        C --&gt;|复杂任务| S3[大模型池]
+        
+        subgraph Small[&quot;小模型&quot;]
+            M1[DeepSeek-chat]
+            M2[Qwen-7B]
+            M3[Llama-3-8B]
+        end
+        
+        subgraph Medium[&quot;中模型&quot;]
+            M4[GPT-3.5]
+            M5[Claude-3-Haiku]
+        end
+        
+        subgraph Large[&quot;大模型&quot;]
+            M6[GPT-4o]
+            M7[Claude-3.5-Sonnet]
+        end
+    end
+    
+    subgraph Metrics[&quot;路由依据&quot;]
+        R1[任务复杂度评分]
+        R2[历史成功率]
+        R3[Token预算]
+        R4[响应时间要求]
+    end
+    
+    S1 --&gt; Small
+    S2 --&gt; Medium
+    S3 --&gt; Large
+</pre>
+<h3>6. 增量处理模式</h3>
+<p>对于迭代式剧本修改场景，引入增量处理模式。系统首先对比新旧版本，识别变更的场景和片段。仅对变更部分重新处理，未变更部分复用缓存结果。</p>
+<p>变更检测基于 AST 级别的剧本结构对比，能够精确到场景级别和对话级别。增量处理模式可将重复任务的 Token 消耗降低百分之八十以上。</p>
+<pre class="mermaid">flowchart LR
+    subgraph VersionControl[&quot;版本管理&quot;]
+        V1[剧本v1] --&gt; D[差异检测]
+        V2[剧本v2] --&gt; D
+    end
+    
+    subgraph Diff[&quot;变更分析&quot;]
+        D --&gt; S{变更类型}
+        S --&gt;|新增场景| A[处理新场景]
+        S --&gt;|修改场景| B[重新处理]
+        S --&gt;|删除场景| C[移除结果]
+        S --&gt;|无变更| E[复用缓存]
+    end
+    
+    subgraph Cache[&quot;缓存复用&quot;]
+        A --&gt; M[合并结果]
+        B --&gt; M
+        C --&gt; M
+        E --&gt; M
+    end
+    
+    subgraph Output[&quot;最终输出&quot;]
+        M --&gt; O[完整结果v2]
+    end
+</pre>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p>当前已实现的 Token 节省策略在实际项目中取得了显著效果。语义分块与智能预处理减少了百分之十五到二十五的输入 Token。分级质量审查机制将 LLM 调用频率降低了约百分之四十。三层记忆压缩架构使单次 LLM 调用的上下文长度从可能的上万 Token 压缩到两千 Token 以内。提示词模板复用避免了百分之五十到七十的重复生成 Token。综合评估显示，已实现策略使整体 Token 消耗降低约百分之六十。</p>
+<p>待实现策略将进一步强化成本控制能力。智能分块与并行处理使系统能够处理任意长度的剧本而无 Token 溢出风险。批量化调用预计可减少百分之三十到四十的 LLM 调用次数。模型路由策略将高成本模型的使用量降低百分之五十以上。增量处理模式可在迭代场景中实现百分之八十的 Token 节省。</p>
+<p><strong>实践建议</strong>：成本优化不是单一手段的胜利，而是<strong>输入端压缩 + 调用端去重 + 模型端分级</strong>的组合拳。建议优先落地&quot;语义分块&quot;与&quot;分级审查&quot;这两个投入产出比最高的策略，再逐步引入记忆压缩、模型路由与增量处理。</p>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

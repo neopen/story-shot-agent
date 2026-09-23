@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 开发指南：双启动链、双层状态机与二次开发扩展点 · PenShot 文档</title>
+  <meta name="description" content="以 main.py、rest_api.py 与 function_calls.py 源码为准绳考证 PenShot 开发全流程：核验依赖安装与 .env 配置键、多条启动链与五种集成通道的真实行为，解析手写 CLI、任务级与阶段级双层状态机及 LangGraph 编排细节，纠正 COMPLETED 终态与 Redis 队列等常见误读，并给出智能体与提示词模板的二次开发扩展路径。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/dev-guide.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 开发指南：双启动链、双层状态机与二次开发扩展点">
+  <meta property="og:description" content="以 main.py、rest_api.py 与 function_calls.py 源码为准绳考证 PenShot 开发全流程：核验依赖安装与 .env 配置键、多条启动链与五种集成通道的真实行为，解析手写 CLI、任务级与阶段级双层状态机及 LangGraph 编排细节，纠正 COMPLETED 终态与 Redis 队列等常见误读，并给出智能体与提示词模板的二次开发扩展路径。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/dev-guide.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html" class="active">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-04-23</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="integration.html">集成指南</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<blockquote>
+<p>本文以源码考证的视角重写开发指南：从 <code>main.py</code>、<code>http_server.py</code>、<code>rest_api.py</code> 与 <code>function_calls.py</code> 出发，逐项核验安装、配置、启动与调用的真实行为，再对照 <code>WorkflowOrchestrator</code>、<code>PromptManager</code> 与 <code>BaseAgent</code> 给出二次开发的真实扩展点。全文按项目概览 → 系统架构 → 快速开始 → 五种集成方式 → 开发环境搭建 → 二次开发 → 性能优化 → 常见问题排查的顺序展开，并纠正三处流传较广的误读：任务终态是 <code>success</code> 而非 <code>COMPLETED</code>、任务队列默认在进程内而非 Redis、<code>penshot.logger</code> 并没有 <code>set_level</code> 函数。如果是初次接触，建议先通读项目概览与系统架构，再按快速开始实操。</p>
+</blockquote>
+<hr>
+<h2>一、项目概览</h2>
+<h3>1.1 什么是 PenShot？</h3>
+<p>PenShot（Pen &amp; Shot）是一个基于大语言模型的多智能体协作系统，专门用于将自然语言剧本自动转换为适合AI视频生成的提示词序列。它通过多个专业化智能体的协同工作，完成剧本解析、镜头分割、视频分割、提示词转换和质量审查等全流程任务。</p>
+<h3>1.2 核心能力</h3>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>剧本智能解析</strong>：支持自然语言剧本、标准格式剧本、AI分镜脚本、纯对话等多种输入格式</p>
+</li>
+<li class="lvl-2">
+<p><strong>智能镜头拆分</strong>：基于剧本语义自动生成镜头序列，保持道具和角色一致性</p>
+</li>
+<li class="lvl-2">
+<p><strong>长镜头智能分割</strong>：对超过时长阈值的镜头进行智能分割，确保视觉连贯性</p>
+</li>
+<li class="lvl-2">
+<p><strong>双语提示词生成</strong>：同时生成英文和原始语言的高质量提示词</p>
+</li>
+<li class="lvl-2">
+<p><strong>音频提示词生成</strong>：基于剧本内容生成配套的音频提示词（台词、环境音、旁白）</p>
+</li>
+<li class="lvl-2">
+<p><strong>质量审查</strong>：自动审查提示词质量，检测截断、道具不一致等问题</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>价值定位</strong>：面向短剧/短视频/AI 影视创作者与自动化流水线，解决从写完剧本到手工拆镜、再到逐段写提示词这一串高重复度劳动，让创作者把精力放在内容本身。</p>
+</blockquote>
+<h3>1.3 技术栈</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">技术选型</th>
+<th style="text-align:left">用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">LLM</td>
+<td style="text-align:left">OpenAI 兼容多厂商（openai / qwen / deepseek / ollama）</td>
+<td style="text-align:left">剧本解析、镜头分割、提示词转换</td>
+</tr>
+<tr>
+<td style="text-align:left">Embedding</td>
+<td style="text-align:left">text-embedding-v4（模板默认，可换 3-small 等）</td>
+<td style="text-align:left">语义检索与 RAG 知识库</td>
+</tr>
+<tr>
+<td style="text-align:left">工作流框架</td>
+<td style="text-align:left">LangGraph ≥ 1.1.4</td>
+<td style="text-align:left">多智能体流程编排</td>
+</tr>
+<tr>
+<td style="text-align:left">API 框架</td>
+<td style="text-align:left">FastAPI + uvicorn</td>
+<td style="text-align:left">RESTful 服务</td>
+</tr>
+<tr>
+<td style="text-align:left">协议支持</td>
+<td style="text-align:left">MCP / A2A</td>
+<td style="text-align:left">接入 IDE 与跨 Agent 协作</td>
+</tr>
+<tr>
+<td style="text-align:left">任务与状态</td>
+<td style="text-align:left">进程内队列 + SQLite 检查点（Redis 可选）</td>
+<td style="text-align:left">任务调度、断点续传与跨进程共享</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>说明</strong>：<code>.env.example</code> 模板默认使用 OpenAI <code>gpt-4o</code> 与 <code>text-embedding-v4</code>，注释明确系统支持 openai、qwen、deepseek、ollama 四类厂商；<code>LLM__FALLBACK__*</code> 备用段可在主模型不可用时自动回退（模板里是 deepseek-chat）。模型切换方式详见常见问题 Q4。</p>
+</blockquote>
+<hr>
+<h2>二、系统架构</h2>
+<h3>2.1 整体架构图</h3>
+<p>系统分为接入层 → 核心处理层（多智能体流水线）→ 基础设施层 → 数据层四层。接入层（REST API / Python SDK / LangGraph 节点 / A2A / MCP Server）统一汇入任务工厂 TaskFactory，再由进程内队列与工作线程驱动五个智能体按序执行，每个智能体共享 LLM 客户端与提示词管理器：</p>
+<pre class="mermaid">graph TB
+    subgraph &quot;接入层&quot;
+        A1[REST API]
+        A2[Python SDK]
+        A3[LangGraph节点]
+        A4[A2A协议]
+        A5[MCP Server]
+    end
+    
+    subgraph &quot;核心处理层 - 多智能体流水线&quot;
+        B1[任务调度器]
+        B2[剧本解析智能体]
+        B3[镜头分割智能体]
+        B4[视频分割智能体]
+        B5[提示词转换智能体]
+        B6[质量审查智能体]
+    end
+    
+    subgraph &quot;基础设施层&quot;
+        C1[LLM客户端]
+        C2[提示词管理器]
+        C3[缓存管理]
+        C4[日志服务]
+    end
+    
+    subgraph &quot;数据层&quot;
+        D1[任务状态]
+        D2[中间结果]
+        D3[最终输出]
+    end
+    
+    A1 --&gt; B1
+    A2 --&gt; B1
+    A3 --&gt; B1
+    A4 --&gt; B1
+    A5 --&gt; B1
+    
+    B1 --&gt; B2
+    B2 --&gt; B3
+    B3 --&gt; B4
+    B4 --&gt; B5
+    B5 --&gt; B6
+    
+    B2 -.-&gt; C1
+    B3 -.-&gt; C1
+    B4 -.-&gt; C1
+    B5 -.-&gt; C1
+    B6 -.-&gt; C1
+    
+    B2 --&gt; C2
+    B3 --&gt; C2
+    B4 --&gt; C2
+    B5 --&gt; C2
+    
+    B1 --&gt; D1
+    B2 --&gt; D2
+    B3 --&gt; D2
+    B4 --&gt; D2
+    B5 --&gt; D2
+    B6 --&gt; D3
+</pre>
+<h3>2.2 核心数据流</h3>
+<p>脚本数据按输入 → 剧本解析 → 镜头分割 → 视频分割 → 提示词转换 → 质量审查单向流动，每步对应一个 LangGraph 节点；提示词转换还会为每个片段附带独立的音频提示词分支：</p>
+<pre class="mermaid">flowchart LR
+    subgraph &quot;输入&quot;
+        I[自然语言剧本]
+    end
+    
+    subgraph &quot;阶段1: 剧本解析&quot;
+        P1[剧本解析智能体]
+        P2[结构化剧本数据]
+    end
+    
+    subgraph &quot;阶段2: 镜头分割&quot;
+        S1[镜头分割智能体]
+        S2[镜头序列数据]
+    end
+    
+    subgraph &quot;阶段3: 视频分割&quot;
+        V1[视频分割智能体]
+        V2[片段序列数据]
+    end
+    
+    subgraph &quot;阶段4: 提示词转换&quot;
+        C1[提示词转换智能体]
+        C2[双语视频提示词]
+        C3[音频提示词]
+    end
+    
+    subgraph &quot;阶段5: 质量审查&quot;
+        Q1[质量审查智能体]
+        Q2[审查报告]
+    end
+    
+    I --&gt; P1 --&gt; P2 --&gt; S1 --&gt; S2 --&gt; V1 --&gt; V2 --&gt; C1 --&gt; C2 --&gt; Q1 --&gt; Q2
+    C1 --&gt; C3
+</pre>
+<h3>2.3 任务状态机：任务级生死线与阶段级进度</h3>
+<p>任务的<strong>生命周期</strong>由两层状态体系共同刻画：任务级 <code>TaskStatus</code> 管生死，共 8 个值；阶段级 <code>TaskStage</code> 管进度，共 24 个带权重的中文阶段。先看任务级状态机——任一环节失败都会落入 <code>FAILED</code> 终止，杜绝半成品被当作成功结果返回：</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: 提交任务（TaskFactory.submit）
+    PENDING --&gt; PROCESSING: 队列调度到工作线程
+    PENDING --&gt; CANCELLED: 排队期间取消
+    PROCESSING --&gt; SUCCESS: 工作流执行完成
+    PROCESSING --&gt; FAILED: 节点失败或未捕获异常
+    PROCESSING --&gt; CANCELLED: 执行期间取消
+    SUCCESS --&gt; [*]
+    FAILED --&gt; [*]
+    CANCELLED --&gt; [*]
+</pre>
+<p>源码里的枚举定义如下（节选自 <code>src/penshot/neopen/task/task_models.py</code>）：</p>
+<pre class="hljs"><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">TaskStatus</span>(<span class="hljs-built_in">str</span>, Enum):
+    PENDING = <span class="hljs-string">&quot;pending&quot;</span>
+    PROCESSING = <span class="hljs-string">&quot;processing&quot;</span>
+    SUCCESS = <span class="hljs-string">&quot;success&quot;</span>      <span class="hljs-comment"># 任务级成功终态是 success，不是 COMPLETED</span>
+    FAILED = <span class="hljs-string">&quot;failed&quot;</span>
+    CANCELLED = <span class="hljs-string">&quot;cancelled&quot;</span>
+    NOT_FOUND = <span class="hljs-string">&quot;not_found&quot;</span>  <span class="hljs-comment"># 查询不存在的任务时使用</span>
+    TIMEOUT = <span class="hljs-string">&quot;timeout&quot;</span>      <span class="hljs-comment"># 等待结果超时</span>
+    UNKNOWN = <span class="hljs-string">&quot;unknown&quot;</span>
+</code></pre>
+<blockquote>
+<p><strong>常见误读</strong>：终态 <code>COMPLETED</code> 在这套代码里并不存在。你在 REST 注释与部分示例里看到的 <code>completed</code> 有两个完全不同的来源：一是 <code>list_tasks</code> 接口 <code>status_filter</code> 里的枚举值（源码瑕疵，传它永远筛不到任务，见 4.4）；二是阶段明细 <code>progress_details</code> 中单个阶段的完成标记（<code>complete_stage</code> 写入 <code>status: &quot;completed&quot;</code>）。判断任务成功一律认 <code>TaskStatus.SUCCESS</code>。</p>
+</blockquote>
+<blockquote>
+<p><strong>阶段语义</strong>：细粒度进度由 <code>TaskStage</code> 提供——从 <code>init</code>、<code>parsing_start</code>、<code>parsing_script</code> 一路到 <code>continuity_complete</code>、<code>output_generating</code>、<code>complete</code>，每个阶段带 code、中文名与权重（0-100，用于加权估算总进度）。<code>/api/v1/status/{task_id}</code> 返回的 <code>current_stage</code>、<code>stage_name</code> 与 <code>stages_progress</code> 就来自这套体系。</p>
+</blockquote>
+<hr>
+<h2>三、核心模块详解</h2>
+<h3>3.1 多智能体协作模型</h3>
+<p>五个智能体按流水线串联，每个智能体都配有 LLM 与规则/模板两套实现，由工厂（Factory）或配置开关在构造期选择，运行时再按需回退：</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;智能体协作图&quot;
+        A[剧本解析智能体&lt;br/&gt;ScriptParserAgent]
+        B[镜头分割智能体&lt;br/&gt;ShotSegmenterAgent]
+        C[视频分割智能体&lt;br/&gt;VideoSplitterAgent]
+        D[提示词转换智能体&lt;br/&gt;PromptConverterAgent]
+        E[质量审查智能体&lt;br/&gt;QualityAuditorAgent]
+        
+        A --&gt;|结构化数据| B
+        B --&gt;|镜头序列| C
+        C --&gt;|片段序列| D
+        D --&gt;|提示词数据| E
+        
+        A -.-&gt;|降级| A1[规则解析器]
+        B -.-&gt;|降级| B1[规则镜头分割器]
+        C -.-&gt;|降级| C1[规则视频分割器]
+        D -.-&gt;|降级| D1[模板转换器]
+    end
+</pre>
+<blockquote>
+<p><strong>降级接线现状</strong>（三口径考证）：运行期降级真实接线了两条——提示词转换在单片段粒度 try/except，LLM 转换失败即回退模板转换器（<code>llm_prompt_converter.py</code>）；视频分割的 LLM 实现内部持有 rule_splitter 实例，异常时整镜头回退规则分割（<code>llm_video_splitter.py</code>）。剧本解析的规则校验路径已实现但调用被注释（<code>script_parser_agent.py</code>），属于预留开关，二次开发时不要把 <code>use_local_rules</code> 当作现成功能。</p>
+</blockquote>
+<h3>3.2 智能体职责说明</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">智能体</th>
+<th style="text-align:left">输入</th>
+<th style="text-align:left">输出</th>
+<th style="text-align:left">核心功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>ScriptParserAgent</strong></td>
+<td style="text-align:left">自然语言剧本</td>
+<td style="text-align:left">ParsedScript</td>
+<td style="text-align:left">解析剧本结构，提取角色、场景、对话、动作</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>ShotSegmenterAgent</strong></td>
+<td style="text-align:left">ParsedScript</td>
+<td style="text-align:left">ShotSequence</td>
+<td style="text-align:left">将剧本元素拆分为镜头，估算时长，分配镜头类型</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>VideoSplitterAgent</strong></td>
+<td style="text-align:left">ShotSequence</td>
+<td style="text-align:left">FragmentSequence</td>
+<td style="text-align:left">智能分割长镜头，生成片段序列</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>PromptConverterAgent</strong></td>
+<td style="text-align:left">FragmentSequence</td>
+<td style="text-align:left">AIVideoInstructions</td>
+<td style="text-align:left">生成双语视频和音频提示词，保持道具一致性</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>QualityAuditorAgent</strong></td>
+<td style="text-align:left">AIVideoInstructions</td>
+<td style="text-align:left">QualityAuditReport</td>
+<td style="text-align:left">审查提示词质量，检测截断、不一致问题</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>代码布局</strong>：每个智能体是一个子包，如 <code>neopen/agent/script_parser/</code> 内含 base_script_parser.py、llm_script_parser.py、rule_script_parser.py 与 script_parser_models.py；对外暴露的 <code>ScriptParserAgent</code> 包装类位于 <code>neopen/agent/script_parser_agent.py</code>，负责注册两套实现、编排解析流程与质量评估。其余四个智能体同构。</p>
+</blockquote>
+<h3>3.3 核心数据模型</h3>
+<p>各阶段产物通过 Pydantic 数据模型逐级传递：<code>ParsedScript → ShotSequence → FragmentSequence → AIVideoInstructions → QualityAuditReport</code>，每一级都标注了关键字段类型与嵌套关系，是二次开发时理解数据结构的重要参考：</p>
+<pre class="mermaid">classDiagram
+    class ParsedScript {
+        +Dict metadata
+        +string title
+        +List~CharacterInfo~ characters
+        +List~SceneInfo~ scenes
+        +GlobalMetadata global_metadata
+        +Dict stats
+    }
+    
+    class CharacterInfo {
+        +string name
+        +string gender
+        +string role
+        +CharacterType type
+        +string description
+        +List~string~ key_traits
+    }
+    
+    class SceneInfo {
+        +string id
+        +string location
+        +string description
+        +string time_of_day
+        +string weather
+        +SceneAudioContext audio_context
+        +List~BaseElement~ elements
+    }
+    
+    class BaseElement {
+        +string id
+        +ElementType type
+        +int sequence
+        +float duration
+        +float confidence
+        +string content
+        +string character
+        +string description
+        +float intensity
+        +string emotion
+        +ElementAudioContext audio_context
+    }
+    
+    class ShotSequence {
+        +List~ShotInfo~ shots
+        +Dict script_reference
+        +Dict stats
+    }
+    
+    class ShotInfo {
+        +string id
+        +string scene_id
+        +string emotion
+        +string description
+        +float start_time
+        +float duration
+        +ShotType shot_type
+        +string main_character
+        +List~string~ element_ids
+        +float confidence
+    }
+    
+    class FragmentSequence {
+        +List~VideoFragment~ fragments
+        +Dict source_info
+        +Dict stats
+    }
+    
+    class VideoFragment {
+        +string id
+        +string shot_id
+        +List~string~ element_ids
+        +string description
+        +float start_time
+        +float duration
+        +Dict continuity_notes
+    }
+    
+    class AIVideoInstructions {
+        +List~AIVideoPrompt~ fragments
+        +Dict project_info
+        +Dict global_settings
+    }
+    
+    class QualityAuditReport {
+        +string status
+        +List~CheckResult~ checks
+        +List~Violation~ violations
+        +Dict stats
+    }
+    
+    ParsedScript --&gt; ShotSequence
+    ShotSequence --&gt; FragmentSequence
+    FragmentSequence --&gt; AIVideoInstructions
+    AIVideoInstructions --&gt; QualityAuditReport
+</pre>
+<blockquote>
+<p><strong>模型文件映射</strong>：上述模型分散在各自子包的 models 文件中——ParsedScript 位于 script_parser_models.py、ShotSequence 位于 shot_segmenter_models.py、FragmentSequence 位于 video_splitter_models.py、AIVideoInstructions 位于 prompt_converter_models.py、QualityAuditReport 位于 quality_auditor_models.py，均基于 Pydantic 实现，跨阶段通过 LangGraph 状态传递。</p>
+</blockquote>
+<hr>
+<h2>四、快速开始（准备工作 → 步骤）</h2>
+<h3>4.1 环境准备</h3>
+<pre class="hljs"><code>git <span class="hljs-built_in">clone</span> https://github.com/neopen/story-shot-agent.git
+<span class="hljs-built_in">cd</span> story-shot-agent
+pip install -e .
+</code></pre>
+<blockquote>
+<p><strong>前置环境要求</strong>：需要 Python 3.10+（pyproject 中 requires-python &gt;= 3.10）与有效的 LLM API 密钥；Redis 7.0+ 可选，用于多进程部署时的任务记录共享。克隆后用 <code>pip install -e .</code> 以可编辑模式安装，便于修改源码即时生效；开发场景可装 <code>pip install -e &quot;.[dev]&quot;</code> 一次带上 pytest、black、flake8、mypy 等工具。安装后会注册 <code>story-shot-agent</code>、<code>vs-agent</code> 与 <code>story-shot-agent-serve</code> 三个命令入口。</p>
+</blockquote>
+<h3>4.2 环境配置</h3>
+<pre class="hljs"><code><span class="hljs-built_in">cp</span> .env.example .<span class="hljs-built_in">env</span>
+</code></pre>
+<p>编辑 <code>.env</code> 文件，配置必要的 LLM 与 Embedding 参数：</p>
+<pre class="hljs"><code><span class="hljs-comment">########################## 应用配置 #########################</span>
+<span class="hljs-attr">PENSHOT_APP__ENVIRONMENT</span>=<span class="hljs-string">development</span>
+<span class="hljs-attr">PENSHOT_APP__LANGUAGE</span>=<span class="hljs-string">zh</span>
+<span class="hljs-comment">
+########################## LLM 模型配置 #########################</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__BASE_URL</span>=<span class="hljs-string">https://api.openai.com/v1</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__API_KEY</span>=<span class="hljs-string">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__MODEL_NAME</span>=<span class="hljs-string">gpt-4o</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__TEMPERATURE</span>=<span class="hljs-string">0.1</span>
+<span class="hljs-attr">PENSHOT_LLM__DEFAULT__TIMEOUT</span>=<span class="hljs-string">60</span>
+<span class="hljs-comment">
+########################## 嵌入模型配置 #########################</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__BASE_URL</span>=<span class="hljs-string">https://api.openai.com/v1</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__API_KEY</span>=<span class="hljs-string">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__MODEL_NAME</span>=<span class="hljs-string">text-embedding-v4</span>
+<span class="hljs-attr">PENSHOT_EMBED__DEFAULT__DIMENSIONS</span>=<span class="hljs-string">1536</span>
+<span class="hljs-comment">
+########################## Redis 配置（可选） ##########################</span>
+<span class="hljs-attr">PENSHOT_REDIS_HOST</span>=<span class="hljs-string">localhost</span>
+<span class="hljs-attr">PENSHOT_REDIS_PORT</span>=<span class="hljs-string">6379</span>
+<span class="hljs-attr">PENSHOT_REDIS_PASSWORD</span>=<span class="hljs-string"></span>
+</code></pre>
+<blockquote>
+<p><strong>配置命名规则</strong>：配置项采用 <code>PENSHOT_LLM__DEFAULT__*</code> 双下划线分层命名，<code>DEFAULT</code> 是默认 profile，<code>FALLBACK</code> 是备用厂商；API_KEY 务必替换为自己的密钥（也支持 <code>${ENV_VAR}</code> 间接引用环境变量）。若使用本地 Ollama，把 <code>BASE_URL</code> 指向 <code>http://localhost:11434/v1</code> 即可。Redis 段同时接受完整的 <code>PENSHOT_REDIS_URL=redis://:password@localhost:6379/0</code> 写法（.env.example 注释里有说明）。</p>
+</blockquote>
+<h3>4.3 启动服务</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 方式 1：主入口（走 penshot.app:app，支持 --host/--port，见下方说明）</span>
+python main.py
+
+<span class="hljs-comment"># 方式 2：独立 HTTP 启动器（额外支持并发与队列参数）</span>
+python -m penshot.http_server --host 127.0.0.1 --port 8000 --max-concurrent 5 --queue-size 500
+
+<span class="hljs-comment"># 方式 3：安装后使用 CLI（serve-rest 子命令，默认监听 0.0.0.0:8000）</span>
+story-shot-agent serve-rest --host 127.0.0.1 --port 8000
+</code></pre>
+<p>服务监听地址由配置决定：默认从 <code>PENSHOT_API__HOST</code>（模板 localhost）与 <code>PENSHOT_API__PORT</code>（8000）读取，命令行参数可覆盖；启动后提供完整 REST API 与 /docs 交互式文档。</p>
+<blockquote>
+<p><strong>多入口差异</strong>（源码考证）：<code>main.py</code> 与 <code>http_server.py</code> 最终都启动 <code>penshot.app:app</code>，但启动器各有侧重——<a href="http://main.py">main.py</a> 支持 <code>--reload</code> 热重载与 workers 多进程（reload 与多进程互斥，reload=True 时强制 workers=1）；<code>http_server.py</code> 额外提供 <code>--max-concurrent/--queue-size</code> 参数（经环境变量传给应用）；CLI 的 <code>serve-rest</code> 是 <a href="http://cli.py">cli.py</a> 里 cmd_serve_rest 的封装。还需注意：多进程模式下任务队列与回调是进程内状态，任务记录需经 Redis 跨进程共享，未配置 Redis 时启动会打印警告且在进程间分裂（提交到进程 A 的任务在进程 B 查询为 not_found）。</p>
+</blockquote>
+<h3>4.4 API 调用示例</h3>
+<p><strong>提交分镜任务</strong>（异步返回 <code>task_id</code>）：</p>
+<pre class="hljs"><code>curl -X POST <span class="hljs-string">&#x27;http://localhost:8000/api/v1/storyboard&#x27;</span> \
+-H <span class="hljs-string">&#x27;Content-Type: application/json&#x27;</span> \
+-d <span class="hljs-string">&#x27;{
+  &quot;script&quot;: &quot;深夜11点，城市公寓客厅，窗外大雨滂沱。林然裹着旧羊毛毯蜷在沙发里，电视静音播放着黑白老电影...&quot;
+}&#x27;</span>
+</code></pre>
+<p><strong>查询任务状态</strong>：</p>
+<pre class="hljs"><code>curl <span class="hljs-string">&#x27;http://localhost:8000/api/v1/status/{task_id}&#x27;</span>
+</code></pre>
+<p><strong>获取任务结果</strong>：</p>
+<pre class="hljs"><code>curl <span class="hljs-string">&#x27;http://localhost:8000/api/v1/result/{task_id}&#x27;</span>
+</code></pre>
+<blockquote>
+<p><strong>调用流程</strong>：典型的三步——提交、轮询状态、取结果。提交后拿到 <code>task_id</code>，循环查询 <code>GET /status/{task_id}</code>，直到 <code>status</code> 变为 <code>success</code>（不是 <code>COMPLETED</code>），再调 <code>GET /result/{task_id}</code> 取提示词数据。请求量不大、想要低延迟的场景可以直接走同步接口 <code>POST /storyboard/sync</code>，一次请求阻塞到出结果；它的错误语义要注意——任务业务失败时抛 HTTP 400，错误文本在 FastAPI 标准的 <code>detail</code> 字段里（取自 <code>result.error</code>，兜底文案为 <code>任务处理失败</code>），成功时才返回完整的 <code>ProcessResult</code> 结构，两条路径的响应体不同，客户端要分开处理。</p>
+</blockquote>
+<p>常用端点速览（<code>rest_api.py</code> 共 17 个路由，以下是集成时最常用的 9 个）：</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/storyboard</code></td>
+<td>异步提交，立即返回 <code>task_id</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/storyboard/sync</code></td>
+<td>同步提交，阻塞到出结果，业务失败返回 400</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/storyboard/batch</code></td>
+<td>批量异步提交，单批上限 50 条</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/storyboard/batch/sync</code></td>
+<td>批量同步提交，单批上限 20 条、超时 600 秒</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/status/{task_id}</code></td>
+<td>查询状态，含 <code>current_stage</code> 与 <code>stages_progress</code> 阶段进度</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/result/{task_id}</code></td>
+<td>获取结果，未完成时返回带 <code>message</code> 的任务结构</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/task/{task_id}</code></td>
+<td>取消任务，对已结束的任务返回 400</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/queue/status</code></td>
+<td>队列负载状态</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/health</code></td>
+<td>健康检查</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>三处接口细节提醒</strong>（源码考证）：其一，取消任务的真实路由是 <code>DELETE /api/v1/task/{task_id}</code>，但 <code>http_server.py</code> 启动横幅里印的是 <code>POST /api/v1/cancel/{id}</code>，照横幅调用只会 404，以 <code>rest_api.py</code> 的路由表为准；其二，<code>GET /tasks</code> 的 docstring 声明了 <code>status_filter</code> 参数（枚举值里还出现了 <code>completed</code>），但函数签名里根本没有这个参数——传了会被静默忽略，且返回的 <code>tasks</code> 恒为空列表，它更像一个尚未接线的占位实现；其三，<code>GET /result/{task_id}</code> 在任务未完成时不返回 HTTP 202，而是正常 200 加上 <code>message</code> 字段提示处理中，客户端要靠 body 里的 <code>status</code> 判断进度，不要依赖 HTTP 状态码。</p>
+</blockquote>
+<h3>4.5 输出数据结构</h3>
+<p>仓库里自带一份真实运行输出 <code>examples/data/results/function_calls_data.json</code>（<code>examples/sdk/06_parse_result.py</code> 用它演示结果解析逻辑），下面是节选后的真实结构：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;task_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;TSK202603282100504595&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;success&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;success&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;data&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;instructions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;generated_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-03-28T21:54:10.815164&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;video_model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;audio_model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XTTSv2&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;total_prompts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;converter_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;LLMPromptConverter&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;repair_history&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">{</span>
+            <span class="hljs-attr">&quot;actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+              <span class="hljs-string">&quot;截断过长提示词: frag_001 989 -&gt; 200&quot;</span><span class="hljs-punctuation">,</span>
+              <span class="hljs-string">&quot;截断过长提示词: frag_002 881 -&gt; 200&quot;</span>
+            <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;issue_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;fixed_issues&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;original_stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;avg_prompt_length&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">935</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;new_stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;avg_prompt_length&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">183</span> <span class="hljs-punctuation">}</span>
+          <span class="hljs-punctuation">}</span>
+        <span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project_info&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AI视频项目&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;total_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">7.27</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;source_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">]</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;medium shot, modern open-plan office, light-gray walls and transparent glass partitions...&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blurry face, distorted keyboard, incorrect hoodie color...&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.77</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cinematic realism, Fujifilm ETERNA grading, natural overcast lighting, 35mm lens&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;audio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+            <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;audio_001&quot;</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;low-frequency office ambient noise (HVAC hum + tactile mechanical keyboard clatter)...&quot;</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;human voice, phone ringtone, footsteps, laughter...&quot;</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;AudioLDM_3&quot;</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;audio_style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;realistic&quot;</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;duration_seconds&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.77</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;format&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;wav&quot;</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;sample_rate&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">24000</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-attr">&quot;seed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42719</span>
+          <span class="hljs-punctuation">}</span>
+        <span class="hljs-punctuation">}</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;global_settings&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;style_consistency&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;use_common_negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;execution_suggestions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;按顺序生成片段&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;保持相同种子值以获得一致性&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;生成后检查片段衔接&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;message&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;processing_time_ms&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3221383</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;created_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-03-28T13:00:50.763673Z&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;completed_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-03-28T13:54:32.146719Z&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>字段说明</strong>（全部取自该真实样例，无构造数据）：外层 <code>task_id/status/success/processing_time_ms/created_at/completed_at</code> 是任务封套，业务数据全在 <code>data.instructions</code> 内——<code>metadata</code> 记录生成时间、模型选择与后处理修复史，<code>project_info</code> 汇总片段数与总时长（2.77 + 4.5 = 7.27 秒），<code>fragments</code> 是逐片段的视频与音频提示词，<code>global_settings</code> 与 <code>execution_suggestions</code> 是给下游视频生成环节的衔接建议。注意 <code>processing_time_ms</code> 为 3221383（约 53.7 分钟），这是含 LLM 多次请求与重试的单次真实耗时，不是性能基准，别拿它做容量规划。</p>
+</blockquote>
+<blockquote>
+<p><strong>两个对照代码时要注意的细节</strong>：其一，<code>fragments[].audio</code> 是配套的声音设计（环境底噪、音效与负面提示词），当前源码 <code>AIVideoPrompt</code> 模型的字段名就是 <code>audio</code>，而仓库这份样例 JSON 是旧版落盘的、用的旧键名 <code>audio_prompt</code>，写解析代码时以模型字段为准，别硬编码键名；其二，<code>repair_history</code> 里这条 <code>989 -&gt; 200</code> 是一次真实触发的超长截断，当前源码中相关实现的计数口径值得留意——<code>llm_prompt_converter.py</code> 与 <code>prompt_converter_agent.py</code> 都用 <code>only_count_en</code>（按英文单词计数）判断超长，但执行截断用的却是字符切片 <code>prompt[:阈值 - 20] + &quot;...&quot;</code>，修复统计里的长度又是 <code>len()</code> 字符口径，一次修复里三种计数口径并存；这也是为什么 <code>new_stats.avg_prompt_length</code> 是 183（180 字符 + 3 个省略号），与触发时的数字不在同一量纲，后文常见问题会展开这套口径问题的排查思路。</p>
+</blockquote>
+<hr>
+<h2>五、集成方式（详细步骤）</h2>
+<h3>5.1 集成架构图</h3>
+<pre class="mermaid">graph LR
+    subgraph &quot;五种调用入口&quot;
+        U1[Python SDK&lt;br/&gt;PenshotFunction]
+        U2[REST API&lt;br/&gt;/api/v1/*]
+        U3[MCP Server&lt;br/&gt;stdio / HTTP]
+        U4[LangGraph 节点]
+        U5[CLI&lt;br/&gt;story-shot-agent]
+    end
+    
+    subgraph &quot;PenShot 核心&quot;
+        P[API 层&lt;br/&gt;function_calls / rest_api]
+        T[任务管理&lt;br/&gt;TaskManager 进程内队列]
+        E[执行引擎&lt;br/&gt;MultiAgentPipeline 10 节点]
+    end
+    
+    subgraph &quot;存储与外部依赖&quot;
+        S[SQLite 检查点&lt;br/&gt;工作流状态]
+        C[LLM 响应缓存&lt;br/&gt;llm_cache]
+        RD[Redis&lt;br/&gt;可选跨进程共享]
+        L[LLM 服务&lt;br/&gt;OpenAI 兼容多厂商]
+    end
+    
+    U1 --&gt; P
+    U2 --&gt; P
+    U3 --&gt; P
+    U4 --&gt; P
+    U5 --&gt; P
+    
+    P --&gt; T
+    T --&gt; E
+    E --&gt; S
+    E --&gt; C
+    E --&gt; L
+    T -.可选.-&gt; RD
+</pre>
+<h3>5.2 五种集成方式一览</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">集成方式</th>
+<th style="text-align:left">适用场景</th>
+<th style="text-align:left">真实示例文件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Python SDK</strong></td>
+<td style="text-align:left">直接集成到 Python 应用</td>
+<td style="text-align:left"><code>examples/sdk/01_sync_breakdown.py</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>嵌入式 FastAPI</strong></td>
+<td style="text-align:left">把分镜能力挂进自有 Web 服务</td>
+<td style="text-align:left"><code>examples/integrations/fastapi_web_app.py</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LangGraph 节点</strong></td>
+<td style="text-align:left">嵌入 LangChain/LangGraph 工作流</td>
+<td style="text-align:left"><code>examples/workflow/01_langgraph_integration.py</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>A2A 风格编排</strong></td>
+<td style="text-align:left">与其他 Agent 协作（示例级封装）</td>
+<td style="text-align:left"><code>examples/integrations/a2a_integration.py</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>MCP 协议</strong></td>
+<td style="text-align:left">接入 IDE 或 Agent 框架</td>
+<td style="text-align:left"><code>examples/mcp/mcp_client.py</code></td>
+</tr>
+</tbody>
+</table>
+<h4>方式 1：Python SDK 调用</h4>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot <span class="hljs-keyword">import</span> ShotLanguage
+<span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> PenshotFunction
+<span class="hljs-keyword">from</span> penshot.neopen.agent.base_models <span class="hljs-keyword">import</span> VideoStyle
+
+<span class="hljs-comment"># PenshotFunction 内部统一管理任务队列、并发与生命周期</span>
+agent = PenshotFunction(language=ShotLanguage.ZH, max_concurrent=<span class="hljs-number">5</span>)
+
+result = agent.breakdown_script(          <span class="hljs-comment"># 同步：提交并等待完成（默认超时 300 秒）</span>
+    SAMPLE_SCRIPT,
+    script_id=<span class="hljs-string">&quot;sdk-sync-001&quot;</span>,             <span class="hljs-comment"># 同属一个剧本的多次请求可传相同 ID，便于关联</span>
+    style=VideoStyle.CINEMATIC,
+    wait_timeout=<span class="hljs-number">600.0</span>,
+)
+<span class="hljs-built_in">print</span>(result.task_id, result.success, result.status.value)
+<span class="hljs-built_in">print</span>(result.data[<span class="hljs-string">&quot;instructions&quot;</span>][<span class="hljs-string">&quot;project_info&quot;</span>])
+
+agent.shutdown()                          <span class="hljs-comment"># 释放后台事件循环与线程</span>
+</code></pre>
+<p>也可以异步提交、回调通知：</p>
+<pre class="hljs"><code>task_id = agent.breakdown_script_async(   <span class="hljs-comment"># 异步：立即返回 task_id</span>
+    SAMPLE_SCRIPT,
+    callback=<span class="hljs-keyword">lambda</span> r: <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;<span class="hljs-subst">{r.task_id}</span> 已完成&quot;</span>),
+)
+status = agent.get_task_status(task_id)   <span class="hljs-comment"># 含 status、stage_name 等字段</span>
+<span class="hljs-comment"># 之后同步等待结果；若在协程里可改用 await agent.wait_for_result_async(task_id)</span>
+result = agent.wait_for_result(task_id, timeout=<span class="hljs-number">600</span>)
+</code></pre>
+<p>完整示例：<a href="https://github.com/neopen/story-shot-agent/blob/main/examples/sdk/01_sync_breakdown.py">examples/sdk/01_sync_breakdown.py</a>（sdk/ 下共 7 个示例，覆盖同步、异步轮询、批量、队列管理、自定义配置、结果解析与文件剧本）</p>
+<blockquote>
+<p><strong>源码考证</strong>：<code>breakdown_script</code> 是同步封装——内部先调 <code>breakdown_script_async</code> 提交，再 <code>wait_for_result</code> 阻塞等待（默认超时 300 秒），所以两条调用路径背后是同一套机制。<code>PenshotFunction(config, language, max_concurrent=10, queue_size=1000)</code> 的并发与排队上限在构造时确定；<code>create_penshot_agent()</code> 只是它的一个便捷工厂函数。另外 <code>wait_for_result_async</code> 只能在事件循环里 await，普通脚本里用同步版 <code>wait_for_result</code>。</p>
+</blockquote>
+<h4>方式 2：嵌入 FastAPI Web 应用</h4>
+<p>可通过标准 HTTP 接口集成至现有业务系统（下面是真实示例的节选简化）：</p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> fastapi <span class="hljs-keyword">import</span> FastAPI, HTTPException
+<span class="hljs-keyword">from</span> penshot <span class="hljs-keyword">import</span> ShotLanguage
+<span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> create_penshot_agent
+
+app = FastAPI(title=<span class="hljs-string">&quot;Penshot API&quot;</span>, version=<span class="hljs-string">&quot;0.1.0&quot;</span>)
+penshot = create_penshot_agent(language=ShotLanguage.ZH, max_concurrent=<span class="hljs-number">5</span>)
+
+<span class="hljs-meta">@app.post(<span class="hljs-params"><span class="hljs-string">&quot;/api/generate&quot;</span></span>)</span>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">generate</span>(<span class="hljs-params">req: WebScriptRequest</span>):  <span class="hljs-comment"># 请求模型：script_text / script_id / wait / timeout</span>
+    <span class="hljs-string">&quot;&quot;&quot;wait=False 立即返回 task_id；wait=True 同步等待完成后再返回。&quot;&quot;&quot;</span>
+    <span class="hljs-keyword">if</span> req.wait:
+        result = penshot.breakdown_script(req.script_text, script_id=req.script_id,
+                                          wait_timeout=req.timeout)
+        <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;task_id&quot;</span>: result.task_id, <span class="hljs-string">&quot;status&quot;</span>: result.status.value}
+    task_id = penshot.breakdown_script_async(req.script_text, script_id=req.script_id)
+    <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;task_id&quot;</span>: task_id, <span class="hljs-string">&quot;status&quot;</span>: <span class="hljs-string">&quot;pending&quot;</span>, <span class="hljs-string">&quot;message&quot;</span>: <span class="hljs-string">&quot;任务已提交&quot;</span>}
+
+<span class="hljs-meta">@app.get(<span class="hljs-params"><span class="hljs-string">&quot;/api/result/{task_id}&quot;</span></span>)</span>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_result</span>(<span class="hljs-params">task_id: <span class="hljs-built_in">str</span></span>):
+    r = penshot.get_task_result(task_id)
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> r:
+        <span class="hljs-keyword">raise</span> HTTPException(status_code=<span class="hljs-number">404</span>, detail=<span class="hljs-string">&quot;任务不存在或未完成&quot;</span>)
+    <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;task_id&quot;</span>: r.task_id, <span class="hljs-string">&quot;success&quot;</span>: r.success, <span class="hljs-string">&quot;data&quot;</span>: r.data}
+</code></pre>
+<p>完整示例：<a href="https://github.com/neopen/story-shot-agent/blob/main/examples/integrations/fastapi_web_app.py">examples/integrations/fastapi_web_app.py</a>（313 行，含同步/异步/批量/取消/配置共 9 个端点；文件头部注释也提醒：状态比较一律取 <code>.value</code>，成功是 <code>success</code>，没有 <code>completed</code>）</p>
+<h4>方式 3：LangGraph 节点集成</h4>
+<p>支持把 SDK 封装成独立 Node 接入外部的 LangChain/LangGraph 工作流，实现端到端自动化流水线。 完整示例：<a href="https://github.com/neopen/story-shot-agent/blob/main/examples/workflow/01_langgraph_integration.py">examples/workflow/01_langgraph_integration.py</a></p>
+<blockquote>
+<p><strong>两套 LangGraph 的区别</strong>（源码考证）：这里容易混淆——PenShot 内部引擎本身就是 LangGraph 编排（<code>MultiAgentPipeline</code> 的 10 节点图，见 2.2），而这份示例演示的是把你的外层业务工作流（自定义 <code>StateGraph</code> + 状态模型）与 PenShot 对接：用 <code>breakdown_script_async</code> 提交、用返回的真实 <code>task_id</code> 轮询、按 <code>result.data[&quot;instructions&quot;]</code> 契约取数。示例头部注释还特别提醒：<code>breakdown_script_async</code> 是普通函数不要 await，<code>wait_for_result_async</code> 是协程要直接 await，<code>script_id</code> 只是关联 ID、不能当轮询 ID 用。</p>
+</blockquote>
+<h4>方式 4：A2A 风格编排</h4>
+<p>支持与上游剧本创作 Agent、下游文生视频/剪辑 Agent 进行上下文传递与任务编排。 完整示例：<a href="https://github.com/neopen/story-shot-agent/blob/main/examples/integrations/a2a_integration.py">examples/integrations/a2a_integration.py</a></p>
+<blockquote>
+<p><strong>A2A 说明</strong>（源码考证）：需要说清边界——仓库里的 <code>a2a_integration.py</code> 并不是 Google A2A 协议本身的实现（没有 Agent Card、没有协议端点），而是一个自包含的 A2A 风格编排示例：自定义代理层任务模型（<code>A2ATask</code> 与 <code>A2ATaskStatus</code>）、内部持有一个 <code>PenshotFunction</code>，演示怎样用一个稳定接口把分镜能力包成可被上游 Agent 调用、供下游视频 Agent 消费的代理。两个细节：A2A 层的任务 ID 由调用方指定（仅用于编排），真正轮询的 <code>task_id</code> 来自 <code>breakdown_script_async</code> 并存入 <code>backend_task_id</code>；A2A 层优先级（<code>A2ATaskPriority</code>）与 PenShot 内部的 <code>TaskPriority</code> 相互独立。</p>
+</blockquote>
+<h4>方式 5：MCP (Model Context Protocol) 支持</h4>
+<p>启动 MCP Server（stdio 模式，默认可直接运行）：</p>
+<pre class="hljs"><code>python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
+</code></pre>
+<p>客户端可调用 4 个工具：<code>breakdown_script</code>（提交分镜任务）、<code>get_task_status</code>（查询状态）、<code>get_task_result</code>（取结果）、<code>cancel_task</code>（取消任务）。 完整示例：<a href="https://github.com/neopen/story-shot-agent/blob/main/examples/mcp/mcp_client.py">examples/mcp/mcp_client.py</a>，HTTP 模式另有 <code>mcp_http_server.py</code> 与配套的 <code>mcp_http_client.py</code>。</p>
+<blockquote>
+<p><strong>MCP 说明</strong>：MCP 是 Anthropic 主导的开放协议，为 AI 应用与工具、数据源之间提供标准化接入方式，常被比作 AI 应用的 USB-C。PenShot 的 MCP Server 是手写 JSON-RPC 实现（未引入官方 MCP SDK），核心方法为 <code>initialize</code>、<code>tools/list</code>、<code>tools/call</code>；接入 Claude Desktop、Cursor 等 MCP 兼容客户端后，可直接在对话中用自然语言触发分镜。</p>
+</blockquote>
+<h3>5.3 任务执行流程图</h3>
+<pre class="mermaid">sequenceDiagram
+    participant Client as 客户端
+    participant API as API 层 rest_api
+    participant TM as TaskManager 进程内队列
+    participant Pipeline as MultiAgentPipeline
+    participant LLM as LLM 服务
+    
+    Client-&gt;&gt;API: POST /api/v1/storyboard
+    API-&gt;&gt;TM: 创建任务（status=pending）
+    API--&gt;&gt;Client: 返回 task_id
+    
+    loop 异步调度（受 max_concurrent 限制）
+        TM-&gt;&gt;Pipeline: 取出任务执行
+        Pipeline-&gt;&gt;LLM: 解析、分镜、拆分、转换等多次调用
+        Pipeline-&gt;&gt;TM: 回写结果（status=success）
+    end
+    
+    Client-&gt;&gt;API: GET /api/v1/result/{task_id}
+    API-&gt;&gt;TM: 查询任务记录
+    API--&gt;&gt;Client: 返回 data.instructions
+</pre>
+<hr>
+<h2>六、开发环境搭建（准备 → 步骤）</h2>
+<h3>6.1 环境要求</h3>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>Python 3.10+（<code>pyproject.toml</code> 的 <code>requires-python</code> 下限）</p>
+</li>
+<li class="lvl-2">
+<p>有效的 LLM API 密钥（OpenAI 兼容接口；默认模型 gpt-4o，可切其他厂商）</p>
+</li>
+<li class="lvl-2">
+<p>Redis 7.0+（可选：默认部署不需要；仅多进程部署时用于跨进程共享任务记录，任务队列本身在进程内）</p>
+</li>
+</ul>
+<h3>6.2 安装步骤</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 1. 克隆项目</span>
+git <span class="hljs-built_in">clone</span> https://github.com/neopen/story-shot-agent.git
+<span class="hljs-built_in">cd</span> story-shot-agent
+
+<span class="hljs-comment"># 2. 创建虚拟环境</span>
+python -m venv venv
+<span class="hljs-built_in">source</span> venv/bin/activate  <span class="hljs-comment"># Windows: venv\Scripts\activate</span>
+
+<span class="hljs-comment"># 3. 安装依赖（开发调试建议装 [dev] 附加组，含 pytest 等测试依赖）</span>
+pip install -e <span class="hljs-string">&quot;.[dev]&quot;</span>
+
+<span class="hljs-comment"># 4. 配置环境变量</span>
+<span class="hljs-built_in">cp</span> .env.example .<span class="hljs-built_in">env</span>
+<span class="hljs-comment"># 编辑 .env 填写 PENSHOT_LLM__DEFAULT__API_KEY 等</span>
+
+<span class="hljs-comment"># 5. 运行测试（tests/ 下含 unit、integration、e2e、benchmarks）</span>
+python -m pytest tests/ -x -q
+</code></pre>
+<blockquote>
+<p><strong>几点说明</strong>（源码考证）：项目用 <code>pyproject.toml</code> 管理依赖，<strong>没有 requirements.txt</strong>，别照老习惯去找它；<code>[dev]</code> 附加组包含 pytest 等测试依赖，只跑服务的话 <code>pip install -e .</code> 也够；Redis 不是启动前置，只有多进程部署才需要（<code>docker run -d -p 6379:6379 redis:7-alpine</code>）；Windows 下激活虚拟环境用 <code>venv\Scripts\activate</code>。</p>
+</blockquote>
+<h3>6.3 项目结构</h3>
+<pre class="hljs"><code>story-shot-agent/
+├── src/penshot/                    # 核心源码（src 布局）
+│   ├── api/                        # 对外接口层
+│   │   ├── function_calls.py       # Python SDK（PenshotFunction）
+│   │   ├── rest_api.py             # REST API（17 个路由）
+│   │   └── index_api.py
+│   ├── app/                        # FastAPI 应用组装与代理
+│   ├── config/                     # 配置加载
+│   │   ├── config_loader.py
+│   │   ├── config_models.py
+│   │   ├── logging.yaml            # 日志级别与格式都在这里
+│   │   └── settings.yaml
+│   ├── neopen/                     # 核心业务模块
+│   │   ├── agent/                  # 五智能体 + LangGraph 编排
+│   │   │   ├── workflow/           # workflow_pipeline / orchestrator
+│   │   │   ├── script_parser/      # 剧本解析（base/llm/rule + factory）
+│   │   │   ├── shot_segmenter/     # 镜头切分
+│   │   │   ├── video_splitter/     # 片段拆分
+│   │   │   ├── prompt_converter/   # 提示词转换
+│   │   │   ├── quality_auditor/    # 质量审查
+│   │   │   └── continuity_guardian/ # 连贯性守护
+│   │   ├── task/                   # 任务管理（task_manager / task_models 等）
+│   │   ├── prompts/                # 提示词模板（v1.x/zh、v1.x/en；v2.x 为空占位）
+│   │   ├── cache/                  # LLM 响应缓存
+│   │   ├── client/                 # LLM 客户端（llm/ 子包）
+│   │   ├── knowledge/              # 知识库（llamaIndex / memory / template）
+│   │   ├── tools/                  # 工具集
+│   │   ├── config/                 # 各智能体参数配置（zh/ + *_config.py）
+│   │   └── shot_config.py          # ShotConfig 总配置模型
+│   ├── utils/                      # 工具函数（str_count_utils 等）
+│   ├── cli.py                      # CLI 入口（8 个子命令）
+│   ├── http_server.py              # 独立 HTTP 启动器
+│   ├── mcp_server.py               # MCP Server（stdio）
+│   ├── mcp_http_server.py          # MCP over HTTP
+│   └── logger.py                   # 日志封装（级别由 config/logging.yaml 决定）
+├── examples/                       # 可运行示例（sdk/rest/mcp/workflow/integrations/cli）
+├── tests/                          # pytest 测试（unit/integration/e2e/benchmarks）
+├── scripts/                        # 运维脚本（cleanup / backup_data / download_reranker 等）
+├── data/  logs/  temp/  assets/    # 运行期数据、日志、临时文件与静态资源
+├── main.py                         # 服务入口（uvicorn 启动 penshot.app:app）
+├── pyproject.toml                  # 项目与依赖配置（无 requirements.txt）
+└── docker-compose.yml / Dockerfile # 容器化部署
+</code></pre>
+<blockquote>
+<p><strong>二次开发入口</strong>：新增功能通常改 <code>src/penshot/neopen/agent/</code>（智能体与编排）、<code>src/penshot/neopen/prompts/v1.x/</code>（提示词模板）、<code>src/penshot/api/</code>（对外接口）。<code>main.py</code> 是服务入口（uvicorn 加载 <code>penshot.app:app</code>），<code>mcp_server.py</code> 是 MCP 入口；日志级别不在代码里改，编辑 <code>src/penshot/config/logging.yaml</code> 即可。</p>
+</blockquote>
+<hr>
+<h2>七、开发指南（二次开发）</h2>
+<h3>7.1 添加新的智能体</h3>
+<p>PenShot 的智能体是&quot;双实现 + 工厂&quot;结构（抽象基类 + LLM/规则两套实现 + factory + models），扩展时建议照抄这个模式。真实扩展路径分三步：</p>
+<p><strong>第 1 步：建智能体子包。</strong> 在 <code>src/penshot/neopen/agent/</code> 下新建 <code>my_agent/</code>，包含 <code>base_my_agent.py</code>（抽象类）、<code>llm_my_agent.py</code> 与 <code>rule_my_agent.py</code>（两套实现）、<code>my_agent_factory.py</code>、<code>my_agent_models.py</code>。基类继承 <code>BaseAgent</code>（纯规则）或 <code>BaseLLMAgent</code>（带 LLM 重试与缓存接口）：</p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.neopen.agent.base_agent <span class="hljs-keyword">import</span> BaseAgent
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">MyBaseAgent</span>(<span class="hljs-title class_ inherited__">BaseAgent</span>):
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">process</span>(<span class="hljs-params">self, *args, **kwargs</span>):
+        <span class="hljs-keyword">raise</span> NotImplementedError  <span class="hljs-comment"># 子类实现具体逻辑</span>
+</code></pre>
+<p><strong>第 2 步：写节点方法。</strong> 工作流节点集中在 <code>workflow/workflow_nodes.py</code> 的 <code>WorkflowNodes</code> 类，签名统一为接收并返回 <code>WorkflowState</code>（新增字段要先在 <code>workflow_state_types.py</code> 的 <code>WorkflowState</code> 里声明）：</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">my_node</span>(<span class="hljs-params">self, state: WorkflowState</span>) -&gt; WorkflowState:
+    state.my_results = <span class="hljs-variable language_">self</span>._do_something(state.raw_script)
+    <span class="hljs-keyword">return</span> state
+</code></pre>
+<p><strong>第 3 步：注册进编排图。</strong> 在 <code>workflow_pipeline.py</code> 的 <code>_build_workflow()</code> 中按真实样式挂节点与条件边：</p>
+<pre class="hljs"><code>orchestrator = WorkflowOrchestrator()
+orchestrator.add_node(
+    <span class="hljs-string">&quot;my_node&quot;</span>,
+    <span class="hljs-keyword">lambda</span> graph_state: <span class="hljs-variable language_">self</span>.workflow_nodes.my_node(graph_state)
+)
+<span class="hljs-comment"># 条件分支：按决策结果路由（成功/重试/失败各去不同节点）</span>
+orchestrator.add_conditional_edge(
+    <span class="hljs-string">&quot;my_node&quot;</span>,
+    <span class="hljs-keyword">lambda</span> graph_state: <span class="hljs-variable language_">self</span>.decision_funcs.decide_after_my_node(graph_state),
+    {
+        PipelineState.SUCCESS: PipelineNode.CONVERT_PROMPT.value,
+        PipelineState.NEEDS_RETRY: <span class="hljs-string">&quot;my_node&quot;</span>,
+        PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value,
+    }
+)
+</code></pre>
+<blockquote>
+<p><strong>源码考证</strong>：<code>add_node(name, node)</code> 的 node 是接收 state 的 callable；<code>add_edge</code> 定义固定流转，<code>add_conditional_edge(source, condition, mapping)</code> 按 condition 返回值在 mapping 里选目标——这正是 10 节点图处理&quot;成功/重试/人工介入/失败&quot;分叉的机制（见 2.2）。图的装配由 <code>MultiAgentPipeline</code> 内部完成：<code>build(state_schema=WorkflowState) → validate() → compile()</code>（挂 SQLite 检查点）。</p>
+</blockquote>
+<h3>7.2 添加新的提示词模板</h3>
+<p>提示词模板放在 <code>src/penshot/neopen/prompts/v1.x/zh/</code>（英文在 <code>v1.x/en/</code>），每个智能体一个 yaml。真实文件结构如下（<code>script_parser_prompt.yaml</code> 节选）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 剧本解析相关提示词模板</span>
+<span class="hljs-attr">version:</span> <span class="hljs-string">&quot;1.3&quot;</span>
+<span class="hljs-attr">changelog:</span> <span class="hljs-string">|
+  - 2026-03-18: 规范化提示词，细节性示例优化
+  - 2026-03-27: 添加修复参数，通过修复建议和问题修复问题
+  - 2026-03-30: 添加 history_hint 参数，支持记忆功能的历史上下文提示
+</span>
+<span class="hljs-attr">script_parser_system:</span>
+  <span class="hljs-attr">name:</span> <span class="hljs-string">&quot;base_script_parser_prompt&quot;</span>
+  <span class="hljs-attr">description:</span> <span class="hljs-string">&quot;系统提示词基础模板，适用于多种剧本格式的解析&quot;</span>
+  <span class="hljs-attr">template:</span> <span class="hljs-string">|
+    你是一个专业的剧本解析AI。请将输入的任意剧本文本内容解析为结构化的JSON结构。
+</span>
+    <span class="hljs-string">【输出格式】</span>
+      {{
+        <span class="hljs-attr">&quot;title&quot;:</span> <span class="hljs-string">&quot;剧本标题&quot;</span>,
+        <span class="hljs-attr">&quot;characters&quot;:</span> [<span class="hljs-string">...</span>]
+      }}
+</code></pre>
+<p>三个注意点：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>顶层固定 <code>version</code> 与 <code>changelog</code> 两段元信息</strong>，每个模板段落由 <code>name</code>、<code>description</code>、<code>template</code> 三个字段组成，新增时建议同步补 changelog 记录；</p>
+</li>
+<li class="lvl-2">
+<p><strong>模板里的字面量大括号要双写 <code>{{ }}</code>，占位符用单大括号</strong>（如 <code>{input}</code>）——渲染走 Python 的 <code>.format()</code>，双写是转义字面量大括号的标准写法，照抄现有文件的开头就不会踩坑；</p>
+</li>
+<li class="lvl-2">
+<p>读取入口是 <code>PromptManager.get_prompt(name)</code> / <code>get_name_prompt(name)</code>（<code>prompt_load_manager.py</code>），内部按&quot;版本 + 语言&quot;定位文件，支持 <code>_prompt</code> 后缀剥离匹配，并带最多 1024 条的进程内缓存。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>v2.x 的现状</strong>（源码考证）：<code>prompts/v2.x/</code> 目录存在但为空占位，实际生效的模板全部在 <code>v1.x/</code>，全局 <code>PromptManager</code> 默认 <code>version=&quot;v1.x&quot;</code>。v2.x 是预留的模板体系演进位，升级时别以为它已经是当前版本。</p>
+</blockquote>
+<h3>7.3 调试技巧</h3>
+<pre class="hljs"><code><span class="hljs-comment"># 1. 调日志级别：不在代码里，编辑 config/logging.yaml（DEBUG/INFO 均可调）</span>
+<span class="hljs-comment">#    logger.py 暴露模块级函数，业务代码里直接用：</span>
+<span class="hljs-keyword">from</span> penshot.logger <span class="hljs-keyword">import</span> debug, info, warning, error, log_with_context, log_performance
+
+info(<span class="hljs-string">&quot;开始调试&quot;</span>)
+log_with_context(<span class="hljs-string">&quot;INFO&quot;</span>, <span class="hljs-string">&quot;带上下文的日志&quot;</span>, {<span class="hljs-string">&quot;task_id&quot;</span>: <span class="hljs-string">&quot;TSK001&quot;</span>})
+log_performance(<span class="hljs-string">&quot;parse_script&quot;</span>, <span class="hljs-number">1234.5</span>)
+
+<span class="hljs-comment"># 2. 单跑流水线：真实构造与入口（来自 workflow_pipeline.py）</span>
+<span class="hljs-comment">#    需要先备好 ShotConfig 与 TaskManager 实例，并已配置 LLM</span>
+<span class="hljs-keyword">from</span> penshot.neopen.agent.workflow.workflow_pipeline <span class="hljs-keyword">import</span> MultiAgentPipeline
+
+pipeline = MultiAgentPipeline(
+    script_id=<span class="hljs-string">&quot;debug-001&quot;</span>,
+    task_id=<span class="hljs-string">&quot;TSK-DEBUG-001&quot;</span>,
+    config=shot_config,
+    task_manager=task_manager,
+)
+result = <span class="hljs-keyword">await</span> pipeline.run_process(raw_script, shot_config)
+
+<span class="hljs-comment"># 3. 最小复现：tests/unit 下按模块跑 pytest；</span>
+<span class="hljs-comment">#    examples/sdk/02-07 覆盖异步轮询、批量、队列管理、配置与解析等场景</span>
+</code></pre>
+<blockquote>
+<p><strong>排坑提示</strong>（源码考证）：两种流传较广的调试写法在这套代码里并不存在——<code>from penshot.logger import set_level</code>（<code>logger.py</code> 没有 <code>set_level</code> 函数，级别只能改 <code>config/logging.yaml</code>）；也不存在 <code>penshot.agent.mock_data</code> 之类的模拟数据模块，不依赖 LLM 的调试优先用 <code>tests/</code> 下的单元测试（配合 mock），再不行就退到 <code>examples/</code> 里找最小场景。</p>
+</blockquote>
+<hr>
+<h2>八、性能优化建议</h2>
+<ol>
+<li class="lvl-3">
+<p><strong>LLM 缓存（默认关闭，属预留能力）</strong>：<code>BaseLLMAgent</code> 提供了 <code>_call_llm_with_cache</code>（md5 缓存键含 prompt、system_prompt、temperature 与 task_id，带 TTL 与容量控制），但 <code>AIConfig.enable_llm_cache</code> 默认是 <code>False</code>，源码注释直言原因是 LLM 输出不稳定；而且缓存键包含 task_id，跨任务即使描述相同也不会命中——它的定位是任务内去重，不是跨任务复用。独立类 <code>LLMCache</code>（<code>cache/llm_cache.py</code>）的实例化在代码里被注释，属未接线状态；启用前建议先实测命中率与质量收益。</p>
+</li>
+<li class="lvl-3">
+<p><strong>并发处理</strong>：<code>max_concurrent</code> 控制同时执行的任务数、<code>queue_size</code> 控制排队上限，两者在 <code>PenshotFunction</code> / <code>create_penshot_agent</code> 构造时确定；取值建议对齐 LLM 服务的速率限制，而不是越大越好。</p>
+</li>
+<li class="lvl-3">
+<p><strong>多进程部署才需要 Redis</strong>：默认的进程内队列没有网络往返开销；只有横向扩展 worker 进程时，Redis 才作为跨进程的任务记录共享层登场（见 4.3 的多入口差异）。</p>
+</li>
+<li class="lvl-3">
+<p><strong>降级策略分两层看</strong>：运行内已接线的有两条——提示词转换失败时按片段回退模板转换、视频拆分规则兜底（见 3.1）；<code>script_parser_agent</code> 里规则校验的接线目前处于注释状态，评估时不要把它算作已生效能力。</p>
+</li>
+<li class="lvl-3">
+<p><strong>提示词长度控制</strong>：注意 <code>max_prompt_length</code> 的计数口径问题（触发按英文单词数、截断按字符数，见 Q2），过长提示词除了 token 成本，更直接的伤害是真实触发的截断会丢掉大量细节。</p>
+</li>
+</ol>
+<hr>
+<h2>九、常见问题</h2>
+<h3>Q1: 任务状态一直是 PENDING？</h3>
+<blockquote>
+<p><strong>排坑</strong>（源码考证）：<code>PENDING</code> 说明任务已创建但还没被取走执行。先分清部署形态——默认是进程内队列，跟 Redis 无关，所以先查两件事：<code>active_tasks</code> 是否已达 <code>max_concurrent</code> 上限（并发打满时新任务排队等）；任务提交与查询是否落在同一进程（多 worker 且未配 Redis 时，提交到进程 A 的任务在进程 B 查询是 <code>not_found</code>）。确实启用了多进程 + Redis 的部署，再核对 <code>.env</code> 中 <code>PENSHOT_REDIS_*</code> 键与连接信息是否一致。</p>
+</blockquote>
+<h3>Q2: 提示词被截断？</h3>
+<blockquote>
+<p><strong>排坑</strong>（源码考证 + 真实案例）：仓库自带的运行样例 <code>examples/data/results/function_calls_data.json</code> 里就留下了真实截断记录，<code>repair_history</code> 显示两条提示词从 989、881 被截到 200。对照源码注意三点：触发判断用 <code>only_count_en</code> 计英文单词数，截断动作却是字符切片 <code>prompt[:阈值 - 20] + &quot;...&quot;</code>，修复统计再用 <code>len()</code> 字符数，三种口径混用；所以看到 <code>989 -&gt; 200</code> 别按单一单位去换算。调参入口是 <code>ShotConfig.max_prompt_length</code>（它的注释写&quot;单词数&quot;，与实现并不完全一致，建议自己实测确认）；不想被截的话，除了调大阈值，更稳的是在提示词模板里约束 LLM 的输出长度。</p>
+</blockquote>
+<h3>Q3: 道具信息丢失？</h3>
+<p>确保 <code>GlobalMetadata</code> 中正确配置了 <code>key_props</code>，并在解析、拆分、转换各阶段的传递链路中保持一致。</p>
+<h3>Q4: 如何自定义 LLM 模型？</h3>
+<p>修改 <code>.env</code> 中的 <code>PENSHOT_LLM__DEFAULT__MODEL_NAME</code> 配置。</p>
+<blockquote>
+<p><strong>排坑</strong>：改模型时需同时核对 <code>BASE_URL</code> 与 <code>API_KEY</code> 是否匹配目标厂商；若为本地 Ollama，<code>BASE_URL</code> 通常指向 <code>http://localhost:11434/v1</code>。<code>gpt-4o</code> 只是模板里的默认值，切换厂商属于配置行为，不涉及代码改动。</p>
+</blockquote>
+<h3>Q5: 生产环境要不要 Redis？</h3>
+<blockquote>
+<p><strong>排坑</strong>（源码考证）：先纠正一个过度概括——Redis 在这套代码里并不是&quot;任务队列 + 状态管理 + 结果缓存&quot;的通吃角色。任务队列与并发控制在进程内（TaskManager），Redis 的定位只有一个：多进程/多实例部署时的任务记录共享层。判断标准很简单：单实例部署不必上 Redis；要跑 uvicorn 多 worker 或横向扩容多副本时才需要，并接受&quot;未配 Redis 时任务在进程间分裂为 not_found&quot;的约束（见 4.3）。</p>
+</blockquote>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

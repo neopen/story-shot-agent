@@ -1,0 +1,3014 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段 · PenShot 文档</title>
+  <meta name="description" content="梳理 PenShot 从 v0.1 MVP 到 v5.0 导演级分镜的完整演进路线：从任意格式剧本自动拆分片段并保证角色、场景与动作一致性，逐版本解读质量保障、智能增强、一致性契约、多模型适配、超长剧本与分布式调度等关键技术的真实落地状态，并对照源码核实各版本能力边界与规划差距。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/evolution.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段">
+  <meta property="og:description" content="梳理 PenShot 从 v0.1 MVP 到 v5.0 导演级分镜的完整演进路线：从任意格式剧本自动拆分片段并保证角色、场景与动作一致性，逐版本解读质量保障、智能增强、一致性契约、多模型适配、超长剧本与分布式调度等关键技术的真实落地状态，并对照源码核实各版本能力边界与规划差距。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/evolution.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html" class="active">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-04-28</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇版本文档。重点是按版本说明功能变化、架构变化和兼容性边界；版本号与发布日期以项目仓库 Release/CHANGELOG 为最终依据。<br>
+<strong>事实边界</strong>：版本文档：版本历史与路线说明应以项目仓库 Release/CHANGELOG 为最终依据。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>从 MVP 到专业级剧本分镜智能体的完整演进历程。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够按版本定位功能变化，并知道升级时哪些内容需要重新验证。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>一、概述：项目定位与核心目标</h2>
+<p>PenShot 是一个<strong>剧本分镜智能体系统</strong>，将自然语言剧本自动转换为结构化的视频分镜和 AI 提示词，最终对接文生视频模型生成视频片段。</p>
+<p><strong>核心目标</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">目标</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>零门槛</strong></td>
+<td style="text-align:left">输入剧本，输出可直接用于视频生成的提示词</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>高质量</strong></td>
+<td style="text-align:left">确保分镜的语义准确性、视觉连续性、角色一致性</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>可扩展</strong></td>
+<td style="text-align:left">支持超长剧本、多场景、复杂角色关系</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>可观测</strong></td>
+<td style="text-align:left">全链路状态追踪、质量审计、人工干预</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心设计原则</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">原则</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>渐进增强</strong></td>
+<td style="text-align:left">每个版本都是独立可用产品，用户按需升级</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>向后兼容</strong></td>
+<td style="text-align:left">API 稳定，存储格式平滑升级</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>可观测优先</strong></td>
+<td style="text-align:left">关键操作有埋点，问题可追踪</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>标准驱动</strong></td>
+<td style="text-align:left">输出格式对齐专业标准（XML/EDL/FCPXML）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>补充说明</strong>：这四条原则决定了演进节奏——&quot;渐进增强&quot;让每个版本都能独立交付，避免大爆炸式重写；&quot;向后兼容&quot;保证老用户的存储与 API 不因升级被破坏；&quot;标准驱动&quot;使输出能直接对接专业剪辑工具链。</p>
+</blockquote>
+<hr>
+<h2>二、关键要点拆解：架构演进总览</h2>
+<p><strong>演进路线图-基础阶段</strong></p>
+<pre class="mermaid">timeline
+    title PenShot 架构演进路线图之基础阶段
+    
+    section v0.1
+        MVP 基础分镜 : 剧本解析支持
+                    : 镜头分析与拆分
+                    : 基础质量审查
+                    : 基础提示词生成
+                    
+    section v0.2
+        质量保障 : 质量审计与自动修复
+                 : 基础连续性检查
+                 : 节点失败智能降级
+                 : 错误处理与人工干预
+                 : 循环检查机制
+                 : 片段置信度评分
+
+    section v0.3
+        智能增强 : LangGraph工作流引擎
+                 : 状态持久化（断点保存）
+                 : 三层记忆系统
+                 : LlamaIndex知识库
+                 : 向量检索与重排序
+                 : 模板匹配与历史学习
+
+    section v0.4
+        一致性保障 : 服装/位置/道具校验
+                   : 全局一致性契约
+                   : 角色状态追踪
+                   : 三视图一致性
+                   : 动作连贯性保持
+                   : 快照机制与状态传递
+
+    section v0.5
+        模型适配 : 模型专项适配
+                 : 音频提示词增强
+                 : 情感分析驱动视觉风格
+                 : 环境声与旁白支持
+                 : 角色对话支持
+
+    section v0.6
+        镜头增强 : 智能长镜头分割
+                 : 复杂镜头语言支持
+                 : 动态时长调整
+                 : 镜头节奏控制
+
+    section v0.7
+        超长剧本 : 分块处理引擎
+                 : 向量上下文记忆
+                 : 跨块一致性校验
+                 : 增量一致性检查
+</pre>
+<p><strong>演进路线图-进阶阶段</strong></p>
+<pre class="mermaid">timeline
+    title PenShot 架构演进路线图之进阶阶段
+    
+    section v1.0
+        多任务多格式 : 批量任务队列
+                     : 多格式导出
+                     : 英文剧本支持
+                     : 中文剧本增强
+
+    section v1.5
+        分布式调度 : NeoTask集成
+                   : 异步任务队列
+                   : 断点续传
+                   : 任务优先级调度
+                   : 定时/延迟任务
+
+    section v2.0
+        企业级 : 多租户隔离
+               : 可视化监控
+               : API服务化
+               : 结果持久化存储
+
+    section v3.0
+        多模态输入 : 图+音+文混合理解
+                   : 实时低分辨率预览
+                   : 自动连续性修复
+                   : 参考图风格迁移
+
+    section v4.0
+        专业生态 : 剪辑软件插件
+                 : 多人协同与版本控制
+                 : 用户反馈自动学习
+                 : 剧本-片段双向追溯
+
+    section v5.0
+        终极形态 : 任意剧本零信息损失视觉化
+                 : 专业导演分镜水准
+                 : 跨模态高度一致性
+                 : 自动优化循环
+</pre>
+<p><strong>版本能力对比总览</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力领域</th>
+<th style="text-align:left">v0.1</th>
+<th style="text-align:left">v0.2</th>
+<th style="text-align:left">v0.3</th>
+<th style="text-align:left">v0.4</th>
+<th style="text-align:left">v0.5</th>
+<th style="text-align:left">v0.6</th>
+<th style="text-align:left">v0.7</th>
+<th style="text-align:left">v1.0</th>
+<th style="text-align:left">v1.5</th>
+<th style="text-align:left">v2.0</th>
+<th style="text-align:left">v3.0</th>
+<th style="text-align:left">v4.0</th>
+<th style="text-align:left">v5.0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>基础分镜</strong></td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>质量保障</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>智能增强</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>一致性保障</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>模型适配</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>镜头增强</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>超长剧本</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多格式多任务</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>分布式调度</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>企业级</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多模态输入</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>专业生态</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+<td style="text-align:left">✅</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>终极形态</strong></td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">🔄</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>✅ 已发布 | 🔄 规划中 | - 未规划</p>
+</blockquote>
+<blockquote>
+<p><strong>补充说明</strong>：这张表清晰展示了&quot;能力叠加&quot;的演进逻辑——后一版本在前一版本能力不丢失的前提下叠加新维度，且新能力往往先用 🔄（规划中）标记，再逐步落到 ✅（已发布），保证产品始终可用。</p>
+</blockquote>
+<hr>
+<h2>三、关键要点拆解：v0.1 → v0.3（基础 → 质量 → 智能）</h2>
+<h3>v0.1：MVP 基础分镜</h3>
+<p>验证核心流程可行性，实现剧本到分镜的端到端基础能力。</p>
+<pre class="mermaid">graph TB
+    subgraph Input[&quot;输入层&quot;]
+        A[原始剧本&lt;br/&gt;中文]
+    end
+    
+    subgraph Core[&quot;PenShot 核心 v0.1&quot;]
+        direction TB
+        
+        P1[剧本解析器&lt;br/&gt;场景/角色/动作提取]
+        P2[分镜生成器&lt;br/&gt;镜头类型/时长估算]
+        P3[提示词转换器&lt;br/&gt;基础版]
+    end
+    
+    subgraph Output[&quot;输出层&quot;]
+        B[结构化分镜 + 基础提示词]
+    end
+    
+    A --&gt; P1 --&gt; P2 --&gt; P3 --&gt; B
+</pre>
+<p><strong>核心功能详解</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模块</th>
+<th style="text-align:left">功能</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>剧本解析</strong></td>
+<td style="text-align:left">场景识别</td>
+<td style="text-align:left">从剧本中提取场景边界、地点、时间</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">角色提取</td>
+<td style="text-align:left">识别主要角色名称、出场顺序</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">动作提取</td>
+<td style="text-align:left">提取关键动作描述</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">对话提取</td>
+<td style="text-align:left">提取角色对话内容、情感标注</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>镜头拆分</strong></td>
+<td style="text-align:left">镜头类型识别</td>
+<td style="text-align:left">远景/中景/特写等基础分类</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">时长估算</td>
+<td style="text-align:left">基于元素数量估算每镜头时长</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">镜头序列生成</td>
+<td style="text-align:left">按时序组织镜头，生成连续ID</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>提示词生成</strong></td>
+<td style="text-align:left">文生视频提示词</td>
+<td style="text-align:left">基础英文提示词格式</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">负面提示词</td>
+<td style="text-align:left">默认负面提示词模板</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>输出</strong></td>
+<td style="text-align:left">JSON 格式</td>
+<td style="text-align:left">结构化分镜数据，包含元数据</td>
+</tr>
+</tbody>
+</table>
+<p><strong>数据流</strong></p>
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        S[剧本文本]
+    end
+    
+    subgraph Process
+        A[剧本解析] --&gt; B[场景列表]
+        B --&gt; C[分镜生成]
+        C --&gt; D[镜头列表]
+        D --&gt; E[提示词生成]
+        E --&gt; F[提示词列表]
+    end
+    
+    subgraph Output
+        R[JSON 分镜文件]
+    end
+    
+    S --&gt; Process
+    F --&gt; R
+</pre>
+<p><strong>使用场景示例</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">输入</th>
+<th style="text-align:left">输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">短视频剧本</td>
+<td style="text-align:left">30秒短视频剧本</td>
+<td style="text-align:left">3-5个镜头，每个镜头带提示词</td>
+</tr>
+<tr>
+<td style="text-align:left">广告分镜</td>
+<td style="text-align:left">15秒广告文案</td>
+<td style="text-align:left">2-3个镜头，突出产品</td>
+</tr>
+<tr>
+<td style="text-align:left">动画片段</td>
+<td style="text-align:left">1分钟动画剧本</td>
+<td style="text-align:left">10-15个镜头，带角色动作</td>
+</tr>
+</tbody>
+</table>
+<p><strong>技术挑战与解决方案</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">挑战</th>
+<th style="text-align:left">解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本格式多样</td>
+<td style="text-align:left">支持标准剧本/对话/自然语言多格式识别</td>
+</tr>
+<tr>
+<td style="text-align:left">LLM 输出不稳定</td>
+<td style="text-align:left">规则校验 + 兜底补全</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头时长不合理</td>
+<td style="text-align:left">基于元素数量的时长估算模型</td>
+</tr>
+<tr>
+<td style="text-align:left">角色名识别错误</td>
+<td style="text-align:left">结合上下文和常见命名规则</td>
+</tr>
+</tbody>
+</table>
+<h3>v0.2：质量保障</h3>
+<p>建立质量闭环，确保输出可靠性和稳定性。</p>
+<pre class="mermaid">graph TB
+    subgraph Core[&quot;PenShot 核心 v0.2&quot;]
+        P1[剧本解析器]
+        P2[分镜生成器]
+        P3[提示词转换器]
+        
+        subgraph QA[&quot;质量保障模块&quot;]
+            A1[质量审计器&lt;br/&gt;规则审查+LLM审查]
+            A2[自动修复器&lt;br/&gt;问题检测与修复]
+            A3[连续性检查器&lt;br/&gt;基础版]
+        end
+        
+        subgraph Control[&quot;流程控制模块&quot;]
+            C1[循环检查]
+            C2[错误处理]
+            C3[人工干预]
+        end
+    end
+    
+    P1 --&gt; P2 --&gt; P3 --&gt; A1
+    A1 --&gt;|有问题| A2
+    A2 --&gt;|修复后| P1
+    A1 --&gt;|通过| A3
+    A3 --&gt;|通过| Output
+    A3 --&gt;|有问题| C3
+    
+    C1 --&gt; P1
+    C2 --&gt; P1
+</pre>
+<p><strong>质量审计</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">功能</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>规则审查</strong></td>
+<td style="text-align:left">场景数、角色数、时长阈值等硬性规则检查</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LLM 深度审查</strong></td>
+<td style="text-align:left">语义理解层面的质量评估</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>问题分类</strong></td>
+<td style="text-align:left">ERROR / MAJOR / MODERATE / WARNING / INFO</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>审计报告</strong></td>
+<td style="text-align:left">结构化问题列表，包含位置和建议</td>
+</tr>
+</tbody>
+</table>
+<p><strong>问题类型示例</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">类型</th>
+<th style="text-align:left">示例</th>
+<th style="text-align:left">严重程度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">场景缺失</td>
+<td style="text-align:left">未能识别到任何场景</td>
+<td style="text-align:left">ERROR</td>
+</tr>
+<tr>
+<td style="text-align:left">角色缺失</td>
+<td style="text-align:left">对话角色未注册</td>
+<td style="text-align:left">MAJOR</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词过短</td>
+<td style="text-align:left">提示词少于10个单词</td>
+<td style="text-align:left">WARNING</td>
+</tr>
+<tr>
+<td style="text-align:left">时长不合理</td>
+<td style="text-align:left">镜头时长超过8秒</td>
+<td style="text-align:left">MODERATE</td>
+</tr>
+<tr>
+<td style="text-align:left">风格不一致</td>
+<td style="text-align:left">检测到3种以上风格</td>
+<td style="text-align:left">MODERATE</td>
+</tr>
+</tbody>
+</table>
+<p><strong>自动修复</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">功能</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>剧本解析修复</strong></td>
+<td style="text-align:left">补充缺失场景、创建默认角色</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>分镜生成修复</strong></td>
+<td style="text-align:left">调整镜头时长、修正镜头类型</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>提示词修复</strong></td>
+<td style="text-align:left">补充截断内容、扩展过短提示词</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>修复历史</strong></td>
+<td style="text-align:left">记录每次修复操作，支持回滚</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>修复统计</strong></td>
+<td style="text-align:left">原始状态 vs 修复后状态对比</td>
+</tr>
+</tbody>
+</table>
+<p><strong>修复操作示例</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">问题</th>
+<th style="text-align:left">修复策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">没有识别到场景</td>
+<td style="text-align:left">按段落分割创建默认场景</td>
+</tr>
+<tr>
+<td style="text-align:left">角色缺失</td>
+<td style="text-align:left">自动创建缺失角色，补充描述</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词过短</td>
+<td style="text-align:left">从原始剧本扩展描述</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头时长过长</td>
+<td style="text-align:left">自动裁剪到阈值以内</td>
+</tr>
+</tbody>
+</table>
+<p><strong>连续性检查（基础版）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">维度</th>
+<th style="text-align:left">检查内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>角色连续性</strong></td>
+<td style="text-align:left">角色是否在应有场景中出现</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>场景连续性</strong></td>
+<td style="text-align:left">场景切换是否突兀、是否过于频繁</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>时间连续性</strong></td>
+<td style="text-align:left">片段间时间间隙、时间重叠</td>
+</tr>
+</tbody>
+</table>
+<p><strong>节点失败降级</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">策略</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>单节点重试</strong></td>
+<td style="text-align:left">失败后自动重试（可配置次数）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>降级方案</strong></td>
+<td style="text-align:left">节点失败后切换到备用处理方式</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>降级日志</strong></td>
+<td style="text-align:left">记录降级原因和影响范围</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>优雅退出</strong></td>
+<td style="text-align:left">节点失败不影响其他节点</td>
+</tr>
+</tbody>
+</table>
+<p><strong>错误处理</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">错误类型</th>
+<th style="text-align:left">处理策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">网络超时</td>
+<td style="text-align:left">指数退避重试</td>
+</tr>
+<tr>
+<td style="text-align:left">LLM 服务错误</td>
+<td style="text-align:left">切换备用模型或重试</td>
+</tr>
+<tr>
+<td style="text-align:left">数据校验失败</td>
+<td style="text-align:left">触发修复流程</td>
+</tr>
+<tr>
+<td style="text-align:left">资源不足</td>
+<td style="text-align:left">延迟后重试</td>
+</tr>
+<tr>
+<td style="text-align:left">系统错误</td>
+<td style="text-align:left">人工干预</td>
+</tr>
+</tbody>
+</table>
+<p><strong>错误分类与恢复</strong></p>
+<pre class="mermaid">flowchart TD
+    E[错误发生] --&gt; C{错误分类}
+    
+    C --&gt;|网络超时| R1[延迟重试&lt;br/&gt;指数退避]
+    C --&gt;|数据校验| R2[自动修复&lt;br/&gt;重新处理]
+    C --&gt;|资源不足| R3[资源释放后重试]
+    C --&gt;|系统错误| R4[人工干预]
+    
+    R1 --&gt; D{重试次数&lt;br/&gt;是否超限}
+    R2 --&gt; D
+    R3 --&gt; D
+    
+    D --&gt;|否| N[继续执行]
+    D --&gt;|是| H[人工干预]
+</pre>
+<p><strong>人工干预</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">功能</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>干预触发</strong></td>
+<td style="text-align:left">工作流暂停，等待人工输入</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>超时处理</strong></td>
+<td style="text-align:left">超时后自动选择默认决策</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>决策记录</strong></td>
+<td style="text-align:left">人工决策历史可追溯</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>干预恢复</strong></td>
+<td style="text-align:left">人工决策后工作流继续执行</td>
+</tr>
+</tbody>
+</table>
+<p><strong>循环检查</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查项</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>节点循环限制</strong></td>
+<td style="text-align:left">单节点最大循环次数（默认3次）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>全局循环限制</strong></td>
+<td style="text-align:left">工作流全局循环上限</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>循环告警</strong></td>
+<td style="text-align:left">接近限制时发出警告</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>循环记录</strong></td>
+<td style="text-align:left">记录每次循环的原因和结果</td>
+</tr>
+</tbody>
+</table>
+<p><strong>片段置信度评分</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">评分维度</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>提示词质量</strong></td>
+<td style="text-align:left">长度、完整性、语义清晰度</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>时长合理性</strong></td>
+<td style="text-align:left">是否符合模型限制</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>角色一致性</strong></td>
+<td style="text-align:left">角色是否前后一致</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>场景连续性</strong></td>
+<td style="text-align:left">与前后片段的衔接</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>综合评分</strong></td>
+<td style="text-align:left">0-100 分质量评估</td>
+</tr>
+</tbody>
+</table>
+<p><strong>置信度等级</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">分数范围</th>
+<th style="text-align:left">等级</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">90-100</td>
+<td style="text-align:left">优秀</td>
+<td style="text-align:left">可直接使用</td>
+</tr>
+<tr>
+<td style="text-align:left">70-89</td>
+<td style="text-align:left">良好</td>
+<td style="text-align:left">建议人工复核</td>
+</tr>
+<tr>
+<td style="text-align:left">50-69</td>
+<td style="text-align:left">及格</td>
+<td style="text-align:left">可能需要修复</td>
+</tr>
+<tr>
+<td style="text-align:left">0-49</td>
+<td style="text-align:left">不合格</td>
+<td style="text-align:left">必须修复</td>
+</tr>
+</tbody>
+</table>
+<p><strong>数据流</strong></p>
+<pre class="mermaid">sequenceDiagram
+    participant User
+    participant Parser as 剧本解析
+    participant Segmenter as 分镜生成
+    participant Converter as 提示词转换
+    participant Auditor as 质量审计
+    participant Repair as 自动修复
+    participant Human as 人工干预
+    
+    User-&gt;&gt;Parser: 提交剧本
+    Parser-&gt;&gt;Segmenter: ParsedScript
+    Segmenter-&gt;&gt;Converter: ShotSequence
+    Converter-&gt;&gt;Auditor: Instructions
+    
+    Auditor-&gt;&gt;Auditor: 规则审查 + LLM审查
+    
+    alt 发现问题
+        Auditor-&gt;&gt;Repair: 问题列表
+        Repair-&gt;&gt;Repair: 执行修复
+        Repair--&gt;&gt;Parser: 修复后重新执行
+    else 通过审查
+        Auditor-&gt;&gt;Converter: 连续性检查
+    end
+    
+    alt 连续性问题
+        Converter-&gt;&gt;Human: 请求人工干预
+        Human--&gt;&gt;Converter: 人工决策
+    else 通过
+        Converter--&gt;&gt;User: 最终结果
+    end
+</pre>
+<p><strong>技术挑战与解决方案</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">挑战</th>
+<th style="text-align:left">解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">问题分类准确率</td>
+<td style="text-align:left">规则 + LLM 双重验证</td>
+</tr>
+<tr>
+<td style="text-align:left">修复副作用</td>
+<td style="text-align:left">记录修复历史，支持回滚</td>
+</tr>
+<tr>
+<td style="text-align:left">无限修复循环</td>
+<td style="text-align:left">重试次数限制 + 人工干预</td>
+</tr>
+<tr>
+<td style="text-align:left">人工干预体验</td>
+<td style="text-align:left">超时自动决策 + 决策建议</td>
+</tr>
+</tbody>
+</table>
+<h3>v0.3：智能增强</h3>
+<p>引入智能决策和知识积累能力，实现经验驱动的自适应优化。</p>
+<pre class="mermaid">graph TB
+    subgraph Workflow[&quot;LangGraph 工作流引擎&quot;]
+        direction TB
+        
+        N1[剧本解析] --&gt; N2[分镜生成]
+        N2 --&gt; N3[视频分割]
+        N3 --&gt; N4[提示词转换]
+        N4 --&gt; N5[质量审计]
+        N5 --&gt; N6[连续性检查]
+        N6 --&gt; N7[结果生成]
+        
+        subgraph Control[&quot;控制节点&quot;]
+            C1[循环检查]
+            C2[错误处理]
+            C3[人工干预]
+        end
+        
+        N1 -.-&gt;|重试| C1
+        N2 -.-&gt;|重试| C1
+        N3 -.-&gt;|重试| C1
+        N4 -.-&gt;|重试| C1
+        N5 -.-&gt;|重试| C1
+        
+        C2 --&gt;|重试| N1
+        C2 --&gt;|人工| C3
+        C3 --&gt;|继续| N7
+    end
+    
+    subgraph Memory[&quot;三层记忆系统&quot;]
+        direction LR
+        M1[短期记忆&lt;br/&gt;当前任务上下文&lt;br/&gt;1小时TTL]
+        M2[中期记忆&lt;br/&gt;任务统计/修复历史&lt;br/&gt;7天TTL]
+        M3[长期记忆&lt;br/&gt;常见问题模式&lt;br/&gt;永久存储]
+    end
+    
+    subgraph Knowledge[&quot;LlamaIndex 知识库&quot;]
+        K1[向量检索&lt;br/&gt;语义相似度]
+        K2[MMR检索&lt;br/&gt;多样性优化]
+        K3[重排序&lt;br/&gt;BGE-reranker]
+        K4[(Chroma向量库)]
+    end
+    
+    Workflow &lt;--&gt; Memory
+    Workflow &lt;--&gt; Knowledge
+</pre>
+<p><strong>LangGraph 工作流引擎</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>状态图编排</strong></td>
+<td style="text-align:left">节点间依赖关系定义，可视化流程</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>条件分支</strong></td>
+<td style="text-align:left">根据决策结果动态路由到不同节点</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>循环支持</strong></td>
+<td style="text-align:left">天然支持重试和修复循环</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>状态持久化</strong></td>
+<td style="text-align:left">Checkpointer 机制，支持断点保存</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>节点定义</strong></td>
+<td style="text-align:left">剧本解析/分镜/分割/转换/审计等10+节点</td>
+</tr>
+</tbody>
+</table>
+<p><strong>工作流节点决策</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">决策状态</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">后续动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">SUCCESS</td>
+<td style="text-align:left">节点执行成功</td>
+<td style="text-align:left">进入下一节点</td>
+</tr>
+<tr>
+<td style="text-align:left">VALID</td>
+<td style="text-align:left">验证通过（有小问题）</td>
+<td style="text-align:left">可继续执行</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_RETRY</td>
+<td style="text-align:left">需要重试</td>
+<td style="text-align:left">重新执行当前节点</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_REPAIR</td>
+<td style="text-align:left">需要修复</td>
+<td style="text-align:left">进入修复流程</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_HUMAN</td>
+<td style="text-align:left">需要人工</td>
+<td style="text-align:left">暂停等待人工决策</td>
+</tr>
+<tr>
+<td style="text-align:left">FAILED</td>
+<td style="text-align:left">执行失败</td>
+<td style="text-align:left">进入错误处理</td>
+</tr>
+<tr>
+<td style="text-align:left">ABORT</td>
+<td style="text-align:left">中止流程</td>
+<td style="text-align:left">结束工作流</td>
+</tr>
+</tbody>
+</table>
+<p><strong>三层记忆系统</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层级</th>
+<th style="text-align:left">存储内容</th>
+<th style="text-align:left">TTL</th>
+<th style="text-align:left">用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>短期记忆</strong></td>
+<td style="text-align:left">当前任务上下文、临时修复策略</td>
+<td style="text-align:left">1小时</td>
+<td style="text-align:left">单次工作流执行</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>中期记忆</strong></td>
+<td style="text-align:left">任务统计信息、修复历史记录</td>
+<td style="text-align:left">7天</td>
+<td style="text-align:left">跨任务经验积累</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>长期记忆</strong></td>
+<td style="text-align:left">常见问题模式、成功模式库</td>
+<td style="text-align:left">永久</td>
+<td style="text-align:left">全局知识沉淀</td>
+</tr>
+</tbody>
+</table>
+<p><strong>记忆流转机制</strong></p>
+<pre class="mermaid">flowchart LR
+    subgraph Execution[&quot;任务执行&quot;]
+        T[当前任务]
+    end
+    
+    subgraph Short[&quot;短期记忆&quot;]
+        S1[任务上下文]
+        S2[临时问题]
+        S3[本次修复]
+    end
+    
+    subgraph Medium[&quot;中期记忆&quot;]
+        M1[统计信息]
+        M2[修复历史]
+        M3[成功率]
+    end
+    
+    subgraph Long[&quot;长期记忆&quot;]
+        L1[常见问题模式]
+        L2[成功模式]
+        L3[风格模板]
+    end
+    
+    T --&gt;|写入| S1
+    T --&gt;|写入| S2
+    T --&gt;|写入| S3
+    
+    S1 -.-&gt;|任务完成沉淀| M1
+    S2 -.-&gt;|聚合分析| M2
+    S3 -.-&gt;|成功案例| M3
+    
+    M1 -.-&gt;|周期性聚合| L1
+    M2 -.-&gt;|模式提取| L2
+    M3 -.-&gt;|模板提取| L3
+    
+    L1 -.-&gt;|加载指导| T
+    L2 -.-&gt;|加载指导| T
+    L3 -.-&gt;|加载指导| T
+</pre>
+<p><strong>LlamaIndex 知识库</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>剧本知识管理</strong></td>
+<td style="text-align:left">结构化剧本存储与检索</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>文档加载器</strong></td>
+<td style="text-align:left">支持 txt / pdf / docx / md 等多格式</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>向量存储</strong></td>
+<td style="text-align:left">Chroma 向量数据库后端</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>索引管理</strong></td>
+<td style="text-align:left">增量索引、持久化存储</td>
+</tr>
+</tbody>
+</table>
+<p><strong>向量检索与重排序</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检索类型</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>相似度检索</strong></td>
+<td style="text-align:left">基于向量相似度的语义搜索</td>
+<td style="text-align:left">查找相似剧本片段</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>MMR 检索</strong></td>
+<td style="text-align:left">多样性优化，避免结果重复</td>
+<td style="text-align:left">模板推荐</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>重排序</strong></td>
+<td style="text-align:left">BGE-reranker 优化结果排序</td>
+<td style="text-align:left">提高检索精度</td>
+</tr>
+</tbody>
+</table>
+<p><strong>检索流程</strong></p>
+<pre class="mermaid">flowchart LR
+    Q[查询文本] --&gt; E[Embedding]
+    E --&gt; V[向量检索]
+    V --&gt;|Top-20| R[重排序模型]
+    R --&gt;|Top-5| F[最终结果]
+    
+    subgraph Cache[&quot;缓存层&quot;]
+        C1[结果缓存]
+    end
+    
+    V --&gt; C1
+    C1 --&gt; F
+</pre>
+<p><strong>模板匹配与历史学习</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>成功提示词模板</strong></td>
+<td style="text-align:left">从历史成功案例提取模板</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>风格模板库</strong></td>
+<td style="text-align:left">不同视觉风格的提示词模板</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>模板融合</strong></td>
+<td style="text-align:left">新提示词与模板智能合并</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>高频问题统计</strong></td>
+<td style="text-align:left">自动统计常见问题类型</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>策略自适应</strong></td>
+<td style="text-align:left">根据历史数据调整处理策略</td>
+</tr>
+</tbody>
+</table>
+<p><strong>记忆与检索协同</strong></p>
+<pre class="mermaid">sequenceDiagram
+    participant Node as 工作流节点
+    participant Router as 知识路由器
+    participant Vector as 向量检索
+    participant Memory as 记忆层
+    participant Structured as 结构化查询
+    
+    Node-&gt;&gt;Router: query(&quot;角色连续性检查&quot;)
+    
+    par 并行检索
+        Router-&gt;&gt;Vector: 语义相似度检索
+        Router-&gt;&gt;Memory: 历史问题模式
+        Router-&gt;&gt;Structured: 精确元数据查询
+    end
+    
+    Vector--&gt;&gt;Router: 3个相似案例（评分0.85+）
+    Memory--&gt;&gt;Router: 2个历史模式（高频问题）
+    Structured--&gt;&gt;Router: 角色信息列表
+    
+    Router-&gt;&gt;Router: 融合排序、去重
+    Router--&gt;&gt;Node: Top-5 综合结果
+</pre>
+<p><strong>技术栈</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">技术选型</th>
+<th style="text-align:left">用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">工作流引擎</td>
+<td style="text-align:left">LangGraph</td>
+<td style="text-align:left">状态图编排、循环/条件分支</td>
+</tr>
+<tr>
+<td style="text-align:left">记忆系统</td>
+<td style="text-align:left">自研 MemoryManager</td>
+<td style="text-align:left">三层记忆、序列化存储</td>
+</tr>
+<tr>
+<td style="text-align:left">知识库</td>
+<td style="text-align:left">LlamaIndex + Chroma</td>
+<td style="text-align:left">向量检索、RAG 增强</td>
+</tr>
+<tr>
+<td style="text-align:left">嵌入模型</td>
+<td style="text-align:left">OpenAI / BGE</td>
+<td style="text-align:left">文本向量化</td>
+</tr>
+<tr>
+<td style="text-align:left">重排序</td>
+<td style="text-align:left">BGE-reranker</td>
+<td style="text-align:left">检索结果优化</td>
+</tr>
+</tbody>
+</table>
+<p><strong>技术挑战与解决方案</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">挑战</th>
+<th style="text-align:left">解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">工作流状态管理</td>
+<td style="text-align:left">LangGraph Checkpointer 持久化</td>
+</tr>
+<tr>
+<td style="text-align:left">记忆序列化</td>
+<td style="text-align:left">JSON + 元数据标记</td>
+</tr>
+<tr>
+<td style="text-align:left">检索延迟</td>
+<td style="text-align:left">预取 + 缓存 + 并行检索</td>
+</tr>
+<tr>
+<td style="text-align:left">异步节点调用</td>
+<td style="text-align:left">同步包装器 + 线程池</td>
+</tr>
+<tr>
+<td style="text-align:left">枚举路由错误</td>
+<td style="text-align:left">决策函数直接返回节点名称</td>
+</tr>
+<tr>
+<td style="text-align:left">长期记忆膨胀</td>
+<td style="text-align:left">容量限制 + 定期清理</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>四、关键要点拆解：v0.4 → v0.7（一致性 → 模型 → 镜头 → 超长剧本）</h2>
+<h3>v0.4：一致性保障</h3>
+<p>从根本上解决跨阶段一致性问题，建立完整的角色/道具/场景追踪体系。</p>
+<pre class="mermaid">graph TB
+    subgraph Contract[&quot;一致性契约 v0.4&quot;]
+        direction TB
+        
+        subgraph Character[&quot;角色一致性&quot;]
+            C1[服装一致性&lt;br/&gt;同一角色服装不变]
+            C2[位置追踪&lt;br/&gt;角色空间位置]
+            C3[道具持有&lt;br/&gt;手持物品追踪]
+        end
+        
+        subgraph Scene[&quot;场景一致性&quot;]
+            S1[场景连续&lt;br/&gt;切换有过渡]
+            S2[时间连续&lt;br/&gt;时间线正确]
+            S3[空间连续&lt;br/&gt;位置合理]
+        end
+        
+        subgraph Style[&quot;风格一致性&quot;]
+            ST1[视觉风格锚点]
+            ST2[色调一致性]
+            ST3[光照一致性]
+        end
+        
+        subgraph View[&quot;三视图一致性&quot;]
+            V1[正面视图]
+            V2[侧面视图]
+            V3[背面视图]
+        end
+    end
+    
+    subgraph Pipeline[&quot;工作流阶段&quot;]
+        P1[剧本解析] --&gt; P2[分镜生成] --&gt; P3[视频分割] --&gt; P4[提示词转换]
+    end
+    
+    Contract &lt;--&gt; Pipeline
+</pre>
+<p><strong>角色服装/位置/道具校验</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">校验项</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">异常示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>服装一致性</strong></td>
+<td style="text-align:left">同一角色服装不应随意变更</td>
+<td style="text-align:left">场景2穿红裙，场景3变蓝裙</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>位置追踪</strong></td>
+<td style="text-align:left">角色空间位置连续变化</td>
+<td style="text-align:left">前一帧在左边，后一帧瞬移到右边</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>道具持有</strong></td>
+<td style="text-align:left">手持道具不会凭空消失/出现</td>
+<td style="text-align:left">拿着杯子，下一帧杯子消失</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>异常检测</strong></td>
+<td style="text-align:left">服装/位置/道具异常变化告警</td>
+<td style="text-align:left">自动标记问题帧</td>
+</tr>
+</tbody>
+</table>
+<p><strong>角色状态追踪示例</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">角色</th>
+<th style="text-align:left">场景1</th>
+<th style="text-align:left">场景2</th>
+<th style="text-align:left">场景3</th>
+<th style="text-align:left">场景4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">张三</td>
+<td style="text-align:left">出场，黑西装</td>
+<td style="text-align:left">出场，黑西装</td>
+<td style="text-align:left">缺席</td>
+<td style="text-align:left">出场，黑西装</td>
+</tr>
+<tr>
+<td style="text-align:left">李四</td>
+<td style="text-align:left">出场，红裙子</td>
+<td style="text-align:left">出场，蓝裙子</td>
+<td style="text-align:left">出场，红裙子</td>
+<td style="text-align:left">出场，红裙子</td>
+</tr>
+<tr>
+<td style="text-align:left">王五</td>
+<td style="text-align:left">出场</td>
+<td style="text-align:left">出场</td>
+<td style="text-align:left">出场</td>
+<td style="text-align:left">缺席</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>补充说明</strong>：此表是&quot;角色状态追踪&quot;的直接产物——每个场景记录角色的出场与外观状态。李四在场景2&quot;红裙→蓝裙&quot;的变化会被标记为潜在异常，由后续审计流程判断是否为剧情要求的换装。</p>
+</blockquote>
+<p><strong>全局一致性契约</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>剧本级契约</strong></td>
+<td style="text-align:left">贯穿剧本解析到提示词生成的统一契约</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>状态共享</strong></td>
+<td style="text-align:left">各阶段共享统一的角色/场景/道具状态</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>契约验证</strong></td>
+<td style="text-align:left">阶段间输出与契约比对，发现不一致</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>契约更新</strong></td>
+<td style="text-align:left">各阶段执行后自动更新契约状态</td>
+</tr>
+</tbody>
+</table>
+<p><strong>契约数据结构</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">字段</th>
+<th style="text-align:left">类型</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">script_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">剧本唯一标识</td>
+</tr>
+<tr>
+<td style="text-align:left">task_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">任务唯一标识</td>
+</tr>
+<tr>
+<td style="text-align:left">characters</td>
+<td style="text-align:left">map</td>
+<td style="text-align:left">角色状态映射</td>
+</tr>
+<tr>
+<td style="text-align:left">scenes</td>
+<td style="text-align:left">map</td>
+<td style="text-align:left">场景状态映射</td>
+</tr>
+<tr>
+<td style="text-align:left">style_anchor</td>
+<td style="text-align:left">object</td>
+<td style="text-align:left">风格锚点</td>
+</tr>
+<tr>
+<td style="text-align:left">version</td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">契约版本号</td>
+</tr>
+</tbody>
+</table>
+<p><strong>角色状态追踪</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">追踪信息</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>出现记录</strong></td>
+<td style="text-align:left">角色在哪些场景/镜头/片段中出现</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>外观锚点</strong></td>
+<td style="text-align:left">角色服装、发型、配饰等描述</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>时空轨迹</strong></td>
+<td style="text-align:left">角色位置变化的时间线</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>状态可视化</strong></td>
+<td style="text-align:left">角色出现热力图、轨迹图</td>
+</tr>
+</tbody>
+</table>
+<p><strong>三视图一致性</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">视图</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>正面视图</strong></td>
+<td style="text-align:left">角色正面外观描述</td>
+<td style="text-align:left">主要镜头、对话场景</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>侧面视图</strong></td>
+<td style="text-align:left">角色侧面外观描述</td>
+<td style="text-align:left">行走、侧面特写</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>背面视图</strong></td>
+<td style="text-align:left">角色背面外观描述</td>
+<td style="text-align:left">背影、跟随镜头</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多视角融合</strong></td>
+<td style="text-align:left">三视图统一到一致性描述</td>
+<td style="text-align:left">360° 角色一致性</td>
+</tr>
+</tbody>
+</table>
+<p><strong>动作连贯性保持</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>动作衔接</strong></td>
+<td style="text-align:left">跨镜头动作自然过渡</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>动作状态机</strong></td>
+<td style="text-align:left">动作开始/执行/结束三阶段状态</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>遮挡处理</strong></td>
+<td style="text-align:left">角色走出画面再进入的处理</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>动作合理性</strong></td>
+<td style="text-align:left">动作是否符合物理规律</td>
+</tr>
+</tbody>
+</table>
+<p><strong>动作状态机</strong></p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 开始: 触发动作
+    开始 --&gt; 执行中: 动作进行
+    执行中 --&gt; 结束: 动作完成
+    执行中 --&gt; 中断: 被遮挡/打断
+    中断 --&gt; 执行中: 恢复执行
+    结束 --&gt; [*]
+    
+    note right of 开始
+        动作启动
+        如：开始站立
+    end note
+    
+    note right of 执行中
+        动作持续
+        如：正在行走
+    end note
+</pre>
+<p><strong>一致性检查维度</strong></p>
+<pre class="mermaid">graph LR
+    subgraph Check[&quot;一致性检查矩阵&quot;]
+        direction TB
+        
+        C1[角色服装&lt;br/&gt;跨场景一致]
+        C2[角色位置&lt;br/&gt;空间连续]
+        C3[道具状态&lt;br/&gt;不凭空消失]
+        C4[场景切换&lt;br/&gt;有过渡]
+        C5[时间线&lt;br/&gt;不重叠不间隙]
+        C6[视觉风格&lt;br/&gt;色调统一]
+        C7[光照效果&lt;br/&gt;连贯]
+        C8[动作衔接&lt;br/&gt;自然流畅]
+    end
+</pre>
+<p><strong>技术挑战与解决方案</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">挑战</th>
+<th style="text-align:left">解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">服装描述的自动提取</td>
+<td style="text-align:left">NER + 规则匹配</td>
+</tr>
+<tr>
+<td style="text-align:left">位置变化的合理性判断</td>
+<td style="text-align:left">空间关系图谱</td>
+</tr>
+<tr>
+<td style="text-align:left">三视图描述的自动生成</td>
+<td style="text-align:left">从单视图推理多视图</td>
+</tr>
+<tr>
+<td style="text-align:left">动作连贯性的量化评估</td>
+<td style="text-align:left">动作状态机 + 运动分析</td>
+</tr>
+</tbody>
+</table>
+<h3>v0.5：模型适配</h3>
+<p>适配主流视频生成模型，增强情感表达和提示词质量。</p>
+<pre class="mermaid">graph TB
+    subgraph ModelAdapt[&quot;模型适配层 v0.5&quot;]
+        direction TB
+        
+        subgraph PromptAdapter[&quot;提示词适配器&quot;]
+            S1[Sora适配&lt;br/&gt;长提示词/细节丰富]
+            P1[Pika适配&lt;br/&gt;短提示词/动效优先]
+            R1[Runway适配&lt;br/&gt;Gen-2/Gen-3格式]
+            K1[可灵适配&lt;br/&gt;中文优化]
+        end
+        
+        subgraph AudioEnhance[&quot;音频增强&quot;]
+            A1[音频提示词生成&lt;br/&gt;语气/情绪/节奏]
+            A2[音频时长匹配&lt;br/&gt;与视频同步]
+        end
+        
+        subgraph EmotionDriven[&quot;情感驱动&quot;]
+            E1[情感分析&lt;br/&gt;剧本情绪识别]
+            E2[视觉风格映射&lt;br/&gt;情绪→色调/光照]
+            E3[历史模式学习&lt;br/&gt;从成功案例学习]
+        end
+    end
+    
+    subgraph Downstream[&quot;下游模型&quot;]
+        D1[Sora]
+        D2[Pika]
+        D3[Runway]
+        D4[可灵]
+    end
+    
+    ModelAdapt --&gt; Downstream
+</pre>
+<p><strong>多模型提示词适配</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模型</th>
+<th style="text-align:left">提示词特点</th>
+<th style="text-align:left">适配策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Sora</strong></td>
+<td style="text-align:left">偏好详细、丰富描述</td>
+<td style="text-align:left">添加相机角度、光照、氛围、画质标签</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Pika</strong></td>
+<td style="text-align:left">偏好简洁、动效优先</td>
+<td style="text-align:left">突出运动描述、控制长度</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Runway Gen-2</strong></td>
+<td style="text-align:left">格式要求严格</td>
+<td style="text-align:left">按模板格式化输出</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Runway Gen-3</strong></td>
+<td style="text-align:left">支持运动笔刷</td>
+<td style="text-align:left">添加运动区域描述</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>可灵</strong></td>
+<td style="text-align:left">中文优化</td>
+<td style="text-align:left">直接输出中文提示词</td>
+</tr>
+</tbody>
+</table>
+<p><strong>适配器模式</strong></p>
+<pre class="hljs"><code>通用提示词 → 模型适配器 → 模型专用格式
+                ↓
+        ┌───────┼───────┐
+        ↓       ↓       ↓
+      Sora    Pika    Runway
+</code></pre>
+<p><strong>音频提示词增强</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">增强维度</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>语气描述</strong></td>
+<td style="text-align:left">说话语气、情绪表达</td>
+<td style="text-align:left">“cheerful, bright tone”</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>节奏控制</strong></td>
+<td style="text-align:left">语速、停顿描述</td>
+<td style="text-align:left">“slow, deliberate pace”</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>背景音效</strong></td>
+<td style="text-align:left">环境音、氛围音</td>
+<td style="text-align:left">“ambient cafe noise”</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>音频时长</strong></td>
+<td style="text-align:left">与视频时长对齐</td>
+<td style="text-align:left">自动裁剪或扩展</td>
+</tr>
+</tbody>
+</table>
+<p><strong>情感分析驱动视觉风格</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">情绪</th>
+<th style="text-align:left">色调</th>
+<th style="text-align:left">光照</th>
+<th style="text-align:left">相机运动</th>
+<th style="text-align:left">氛围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">快乐</td>
+<td style="text-align:left">暖色、饱和</td>
+<td style="text-align:left">柔和、黄金时刻</td>
+<td style="text-align:left">平稳、流畅</td>
+<td style="text-align:left">明亮、轻松</td>
+</tr>
+<tr>
+<td style="text-align:left">悲伤</td>
+<td style="text-align:left">冷色、低饱和</td>
+<td style="text-align:left">阴天、柔和</td>
+<td style="text-align:left">缓慢、停留</td>
+<td style="text-align:left">忧郁、安静</td>
+</tr>
+<tr>
+<td style="text-align:left">紧张</td>
+<td style="text-align:left">暗色、高对比</td>
+<td style="text-align:left">戏剧性、明暗</td>
+<td style="text-align:left">手持、快速切换</td>
+<td style="text-align:left">压迫、悬疑</td>
+</tr>
+<tr>
+<td style="text-align:left">恐惧</td>
+<td style="text-align:left">冷暗、模糊</td>
+<td style="text-align:left">闪烁、阴影</td>
+<td style="text-align:left">抖动、不稳定</td>
+<td style="text-align:left">诡异、不安</td>
+</tr>
+<tr>
+<td style="text-align:left">浪漫</td>
+<td style="text-align:left">暖粉、柔和</td>
+<td style="text-align:left">温暖、背光</td>
+<td style="text-align:left">缓慢推移</td>
+<td style="text-align:left">温馨、甜蜜</td>
+</tr>
+</tbody>
+</table>
+<p><strong>情绪-风格映射流程</strong></p>
+<pre class="mermaid">flowchart LR
+    T[剧本文本] --&gt; E[情感分析]
+    E --&gt;|情绪标签| M[风格映射]
+    M --&gt;|色调| C[色彩方案]
+    M --&gt;|光照| L[光照方案]
+    M --&gt;|运镜| K[相机运动]
+    
+    C --&gt; P[提示词生成]
+    L --&gt; P
+    K --&gt; P
+</pre>
+<p><strong>历史模式学习</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模式类型</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">更新机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>成功提示词模式</strong></td>
+<td style="text-align:left">历史生成效果好的提示词</td>
+<td style="text-align:left">人工标注 + 自动收集</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>失败规避模式</strong></td>
+<td style="text-align:left">历史失败案例的特征</td>
+<td style="text-align:left">从错误中学习</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>风格模板库</strong></td>
+<td style="text-align:left">不同风格的标准化模板</td>
+<td style="text-align:left">用户选择 + 自动聚类</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>模型偏好库</strong></td>
+<td style="text-align:left">各模型的提示词偏好</td>
+<td style="text-align:left">A/B 测试 + 效果反馈</td>
+</tr>
+</tbody>
+</table>
+<p><strong>技术挑战与解决方案</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">挑战</th>
+<th style="text-align:left">解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">不同模型提示词格式差异</td>
+<td style="text-align:left">适配器模式 + 模板库</td>
+</tr>
+<tr>
+<td style="text-align:left">音频与视频时长对齐</td>
+<td style="text-align:left">动态时长调整算法</td>
+</tr>
+<tr>
+<td style="text-align:left">情感识别准确率</td>
+<td style="text-align:left">多模型投票 + 人工校准</td>
+</tr>
+<tr>
+<td style="text-align:left">模式库规模膨胀</td>
+<td style="text-align:left">定期清理 + 热度排序</td>
+</tr>
+</tbody>
+</table>
+<h3>v0.6：镜头增强</h3>
+<p>提升镜头语言表达能力，支持专业级镜头设计。</p>
+<pre class="mermaid">graph TB
+    subgraph ShotEnhance[&quot;镜头增强层 v0.6&quot;]
+        direction TB
+        
+        subgraph LongShot[&quot;智能长镜头分割&quot;]
+            L1[语义完整性&lt;br/&gt;保持动作连贯]
+            L2[自然分割点&lt;br/&gt;识别场景边界]
+            L3[时长约束&lt;br/&gt;不超过模型限制]
+        end
+        
+        subgraph ComplexShot[&quot;复杂镜头语言&quot;]
+            S1[推镜头&lt;br/&gt;靠近主体]
+            S2[拉镜头&lt;br/&gt;远离主体]
+            S3[摇镜头&lt;br/&gt;水平旋转]
+            S4[移镜头&lt;br/&gt;平行移动]
+            S5[跟镜头&lt;br/&gt;跟随主体]
+        end
+        
+        subgraph Timing[&quot;动态时长调整&quot;]
+            T1[基于内容时长]
+            T2[基于节奏时长]
+            T3[片段时长协调]
+            T4[全局时长优化]
+        end
+    end
+</pre>
+<p><strong>智能长镜头分割</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">策略</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>语义完整性</strong></td>
+<td style="text-align:left">长镜头保持语义完整，不在动作中间切断</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>动作连贯性</strong></td>
+<td style="text-align:left">跨子镜头动作自然衔接</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>分割点检测</strong></td>
+<td style="text-align:left">自动识别自然分割点（场景切换、动作完成）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>时长约束</strong></td>
+<td style="text-align:left">不超过模型时长限制（Sora 60s / Runway 10s）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>分割策略对比</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">策略</th>
+<th style="text-align:left">优点</th>
+<th style="text-align:left">缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">等长分割</td>
+<td style="text-align:left">简单、可预测</td>
+<td style="text-align:left">破坏语义完整性</td>
+</tr>
+<tr>
+<td style="text-align:left">语义分割</td>
+<td style="text-align:left">保持动作连贯</td>
+<td style="text-align:left">长度不固定</td>
+</tr>
+<tr>
+<td style="text-align:left">混合策略</td>
+<td style="text-align:left">平衡效果与约束</td>
+<td style="text-align:left">实现复杂</td>
+</tr>
+</tbody>
+</table>
+<p><strong>复杂镜头语言</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">镜头类型</th>
+<th style="text-align:left">英文</th>
+<th style="text-align:left">描述</th>
+<th style="text-align:left">适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">推镜头</td>
+<td style="text-align:left">Dolly In / Push In</td>
+<td style="text-align:left">相机向主体靠近</td>
+<td style="text-align:left">强调、紧张时刻</td>
+</tr>
+<tr>
+<td style="text-align:left">拉镜头</td>
+<td style="text-align:left">Dolly Out / Pull Out</td>
+<td style="text-align:left">相机远离主体</td>
+<td style="text-align:left">揭示环境、结束段落</td>
+</tr>
+<tr>
+<td style="text-align:left">摇镜头</td>
+<td style="text-align:left">Pan</td>
+<td style="text-align:left">相机水平旋转</td>
+<td style="text-align:left">扫视环境、跟拍</td>
+</tr>
+<tr>
+<td style="text-align:left">移镜头</td>
+<td style="text-align:left">Tracking Shot</td>
+<td style="text-align:left">相机平行移动</td>
+<td style="text-align:left">跟拍行走、探索</td>
+</tr>
+<tr>
+<td style="text-align:left">跟镜头</td>
+<td style="text-align:left">Follow Shot</td>
+<td style="text-align:left">相机跟随主体移动</td>
+<td style="text-align:left">动作场面、追逐</td>
+</tr>
+<tr>
+<td style="text-align:left">升降镜头</td>
+<td style="text-align:left">Crane Shot</td>
+<td style="text-align:left">相机上下移动</td>
+<td style="text-align:left">揭示空间、宏大场面</td>
+</tr>
+</tbody>
+</table>
+<p><strong>镜头组合示例</strong></p>
+<pre class="hljs"><code>场景：主角在街头行走，发现一个神秘商店
+
+镜头1：远景跟镜头 - 主角从远处走来
+镜头2：中景移镜头 - 跟随主角行走
+镜头3：特写推镜头 - 主角发现商店，表情变化
+镜头4：拉镜头 - 从主角面部拉到商店全景
+</code></pre>
+<p><strong>动态时长调整</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">调整策略</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>基于内容时长</strong></td>
+<td style="text-align:left">对话场景适当延长，动作场景适当缩短</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>基于节奏时长</strong></td>
+<td style="text-align:left">紧张快节奏用短镜头，舒缓用长镜头</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>片段时长协调</strong></td>
+<td style="text-align:left">相邻片段时长差异不过大</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>全局时长优化</strong></td>
+<td style="text-align:left">总体时长符合目标（如30秒广告）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>时长与节奏关系</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">节奏</th>
+<th style="text-align:left">镜头时长</th>
+<th style="text-align:left">适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">极快</td>
+<td style="text-align:left">1-2秒</td>
+<td style="text-align:left">追逐、打斗、高潮</td>
+</tr>
+<tr>
+<td style="text-align:left">快</td>
+<td style="text-align:left">2-3秒</td>
+<td style="text-align:left">紧张对话、动作</td>
+</tr>
+<tr>
+<td style="text-align:left">中等</td>
+<td style="text-align:left">3-5秒</td>
+<td style="text-align:left">普通对话、叙述</td>
+</tr>
+<tr>
+<td style="text-align:left">慢</td>
+<td style="text-align:left">5-8秒</td>
+<td style="text-align:left">情感戏、环境展示</td>
+</tr>
+<tr>
+<td style="text-align:left">极慢</td>
+<td style="text-align:left">8秒以上</td>
+<td style="text-align:left">长镜头、氛围营造</td>
+</tr>
+</tbody>
+</table>
+<h3>v0.7：超长剧本</h3>
+<p>支持小说、电影级别的超长剧本处理。</p>
+<pre class="mermaid">graph TB
+    subgraph LongScript[&quot;超长剧本引擎 v0.7&quot;]
+        direction TB
+        
+        subgraph Chunker[&quot;分块处理引擎&quot;]
+            CH1[智能分块策略&lt;br/&gt;场景/角色弧/情绪波]
+            CH2[块间重叠设计&lt;br/&gt;保证连续性]
+            CH3[并行处理&lt;br/&gt;多块并发]
+            CH4[块合并&lt;br/&gt;序列重组]
+        end
+        
+        subgraph Context[&quot;向量上下文记忆&quot;]
+            CX1[跨块状态传递]
+            CX2[语义记忆检索]
+            CX3[上下文压缩]
+            CX4[记忆衰减]
+        end
+        
+        subgraph Validator[&quot;跨块一致性校验&quot;]
+            V1[角色跨块一致]
+            V2[场景跨块一致]
+            V3[道具跨块一致]
+            V4[风格跨块一致]
+            V5[增量检查优化]
+        end
+    end
+</pre>
+<p><strong>分块处理引擎</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">分块策略</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>按场景分块</strong></td>
+<td style="text-align:left">每N个场景一块</td>
+<td style="text-align:left">通用、简单</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>按角色弧分块</strong></td>
+<td style="text-align:left">按主角出现周期分块</td>
+<td style="text-align:left">角色驱动剧本</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>按情绪波分块</strong></td>
+<td style="text-align:left">按情绪起伏分块</td>
+<td style="text-align:left">情感驱动剧本</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>平衡分块</strong></td>
+<td style="text-align:left">混合策略</td>
+<td style="text-align:left">通用最优</td>
+</tr>
+</tbody>
+</table>
+<p><strong>分块示例</strong></p>
+<pre class="hljs"><code>剧本：100个场景的电影剧本
+分块策略：按场景分块，每30个场景一块
+重叠场景：5个
+
+块1：场景1-35（含场景31-35重叠）
+块2：场景31-65（含场景61-65重叠）
+块3：场景61-95（含场景91-95重叠）
+块4：场景91-100
+</code></pre>
+<p><strong>向量上下文记忆</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>跨块状态传递</strong></td>
+<td style="text-align:left">前一块的结束状态传递到后一块</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>语义记忆检索</strong></td>
+<td style="text-align:left">跨块检索相似语义信息</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>上下文压缩</strong></td>
+<td style="text-align:left">长上下文智能压缩，保留关键信息</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>记忆衰减</strong></td>
+<td style="text-align:left">远距离记忆权重自动衰减</td>
+</tr>
+</tbody>
+</table>
+<p><strong>状态传递示例</strong></p>
+<pre class="hljs"><code>块1结束状态：
+  - 张三：在医院，穿着病号服
+  - 场景：医院走廊，白天
+  - 情绪：焦虑
+
+块2开始状态：
+  - 继承：张三在医院
+  - 场景切换：从走廊到病房
+  - 保持：病号服、白天、焦虑
+
+验证：角色状态一致 ✓
+</code></pre>
+<p><strong>跨块一致性校验</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">校验项</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>角色跨块一致</strong></td>
+<td style="text-align:left">角色状态在块间不丢失</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>场景跨块一致</strong></td>
+<td style="text-align:left">场景属性在块间一致</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>道具跨块一致</strong></td>
+<td style="text-align:left">道具状态在块间连续</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>风格跨块一致</strong></td>
+<td style="text-align:left">视觉风格在块间统一</td>
+</tr>
+</tbody>
+</table>
+<p><strong>增量一致性检查</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">优化</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>只检查变化部分</strong></td>
+<td style="text-align:left">仅检查受影响的场景范围</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>受影响场景扩散</strong></td>
+<td style="text-align:left">自动计算变更的影响范围</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>增量修复建议</strong></td>
+<td style="text-align:left">最小化修复范围</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>检查缓存</strong></td>
+<td style="text-align:left">未变化部分缓存结果，避免重复检查</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>五、关键要点拆解：v1.0 → v5.0（批量 → 分布式 → 企业 → 多模态 → 生态）</h2>
+<h3>v1.0：多任务多格式</h3>
+<p>提升吞吐量和兼容性，支持批量处理和多格式输出。</p>
+<p><strong>批量任务队列</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>任务排队</strong></td>
+<td style="text-align:left">多任务顺序/并发处理</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>优先级队列</strong></td>
+<td style="text-align:left">高中低优先级调度</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>任务依赖</strong></td>
+<td style="text-align:left">任务间依赖关系管理</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>进度追踪</strong></td>
+<td style="text-align:left">批量任务整体进度可视化</td>
+</tr>
+</tbody>
+</table>
+<p><strong>多格式导出</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">格式</th>
+<th style="text-align:left">说明</th>
+<th style="text-align:left">用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>JSON</strong></td>
+<td style="text-align:left">结构化数据格式</td>
+<td style="text-align:left">程序读取、二次处理</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>XML</strong></td>
+<td style="text-align:left">通用 XML 格式</td>
+<td style="text-align:left">跨平台交换</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>EDL</strong></td>
+<td style="text-align:left">剪辑决策列表</td>
+<td style="text-align:left">专业剪辑软件导入</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>FCPXML</strong></td>
+<td style="text-align:left">Final Cut Pro 格式</td>
+<td style="text-align:left">Final Cut Pro 导入</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>CSV</strong></td>
+<td style="text-align:left">表格数据格式</td>
+<td style="text-align:left">Excel 查看、编辑</td>
+</tr>
+</tbody>
+</table>
+<p><strong>英文剧本支持</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>英文语料适配</strong></td>
+<td style="text-align:left">英文剧本解析优化</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>英文提示词</strong></td>
+<td style="text-align:left">直接生成英文提示词</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>中英混合</strong></td>
+<td style="text-align:left">中英混合剧本支持</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>翻译桥接</strong></td>
+<td style="text-align:left">中文分析→英文提示词</td>
+</tr>
+</tbody>
+</table>
+<h3>v1.5：分布式调度</h3>
+<p>支持高可用、弹性伸缩和复杂任务编排。</p>
+<pre class="mermaid">graph TB
+    subgraph Scheduler[&quot;NeoTask 调度层&quot;]
+        TP[TaskPool&lt;br/&gt;任务池]
+        QS[QueueScheduler&lt;br/&gt;队列调度]
+        WP[WorkerPool&lt;br/&gt;Worker池]
+        
+        subgraph HA[&quot;高可用保障&quot;]
+            WD[看门狗&lt;br/&gt;锁续期]
+            HB[心跳检测&lt;br/&gt;节点监控]
+            REC[故障恢复&lt;br/&gt;任务回收]
+        end
+    end
+    
+    subgraph Storage[&quot;存储层&quot;]
+        REDIS[(Redis&lt;br/&gt;任务队列/状态)]
+        SQL[(PostgreSQL&lt;br/&gt;任务持久化)]
+    end
+    
+    subgraph Workers[&quot;执行节点&quot;]
+        W1[Worker 1&lt;br/&gt;PenShot实例]
+        W2[Worker 2&lt;br/&gt;PenShot实例]
+        W3[Worker N&lt;br/&gt;PenShot实例]
+    end
+</pre>
+<p><strong>NeoTask 集成</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>嵌入式任务池</strong></td>
+<td style="text-align:left">库形式集成，无额外依赖</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多存储后端</strong></td>
+<td style="text-align:left">内存 / SQLite / Redis</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>任务生命周期</strong></td>
+<td style="text-align:left">PENDING → RUNNING → SUCCESS/FAILED</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>优先级队列</strong></td>
+<td style="text-align:left">Sorted Set 实现</td>
+</tr>
+</tbody>
+</table>
+<p><strong>异步任务队列</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>异步提交</strong></td>
+<td style="text-align:left">非阻塞任务提交</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>异步等待</strong></td>
+<td style="text-align:left">async/await 支持</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>批量提交</strong></td>
+<td style="text-align:left">一次提交多个任务</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>任务取消</strong></td>
+<td style="text-align:left">支持取消正在执行的任务</td>
+</tr>
+</tbody>
+</table>
+<p><strong>断点续传</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>工作流快照</strong></td>
+<td style="text-align:left">定期保存工作流状态</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>中断恢复</strong></td>
+<td style="text-align:left">从最近的快照恢复执行</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>幂等设计</strong></td>
+<td style="text-align:left">重复执行不产生副作用</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>任务重试</strong></td>
+<td style="text-align:left">失败任务自动重试</td>
+</tr>
+</tbody>
+</table>
+<h3>v2.0：企业级 / v3.0：多模态 / v4.0：专业生态 / v5.0：终极形态</h3>
+<p><strong>v2.0：企业级</strong>——多租户、可观测、可管理，满足企业级部署需求。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>多租户隔离</strong></td>
+<td style="text-align:left">租户独立配额、独立存储、数据隔离</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>可视化监控</strong></td>
+<td style="text-align:left">Prometheus + Grafana 集成</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>API 服务化</strong></td>
+<td style="text-align:left">FastAPI + WebSocket 实时推送</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>结果持久化</strong></td>
+<td style="text-align:left">结果存储到 OSS/本地文件</td>
+</tr>
+</tbody>
+</table>
+<p><strong>v3.0：多模态输入</strong>——支持图文音混合输入，实现更丰富的剧本理解。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>图+音+文混合理解</strong></td>
+<td style="text-align:left">多模态语义融合理解</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>实时低分辨率预览</strong></td>
+<td style="text-align:left">快速迭代验证，节省成本</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>自动连续性修复</strong></td>
+<td style="text-align:left">智能修复视频不连续问题</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>参考图风格迁移</strong></td>
+<td style="text-align:left">提供参考图，风格迁移到生成视频</td>
+</tr>
+</tbody>
+</table>
+<p><strong>v4.0：专业生态</strong>——融入专业创作工作流，成为专业工具链的一环。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>剪辑软件插件</strong></td>
+<td style="text-align:left">Premiere / FCP / DaVinci 插件</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多人协同</strong></td>
+<td style="text-align:left">团队协作、任务分配</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>版本控制</strong></td>
+<td style="text-align:left">剧本版本管理、分镜版本对比</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>用户反馈学习</strong></td>
+<td style="text-align:left">从用户纠错中自动学习进化</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>剧本-片段追溯</strong></td>
+<td style="text-align:left">双向追溯，可定位问题来源</td>
+</tr>
+</tbody>
+</table>
+<p><strong>v5.0：终极形态</strong>——达到专业导演分镜水准，实现真正的智能分镜。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>任意剧本零信息损失</strong></td>
+<td style="text-align:left">任何语言、任何长度、任何类型的剧本</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>专业导演分镜水准</strong></td>
+<td style="text-align:left">构图、节奏、叙事达到专业导演水平</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>风格可定制</strong></td>
+<td style="text-align:left">个性化风格学习与迁移</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>结果可追溯</strong></td>
+<td style="text-align:left">全链路可解释、可审计</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>自动优化循环</strong></td>
+<td style="text-align:left">持续自我进化</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>跨模态高度一致性</strong></td>
+<td style="text-align:left">图、文、音、视频四模态统一</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">graph LR
+    subgraph Input[&quot;任意输入&quot;]
+        I1[小说]
+        I2[电影剧本]
+        I3[口述故事]
+        I4[分镜草图]
+        I5[参考视频]
+    end
+    
+    subgraph PenShot[&quot;PenShot 核心&quot;]
+        P[智能理解 + 一致性保障 + 风格迁移]
+    end
+    
+    subgraph Output[&quot;专业输出&quot;]
+        O1[导演级分镜]
+        O2[视频片段]
+        O3[剪辑时间线]
+        O4[特效描述]
+    end
+    
+    Input --&gt; PenShot --&gt; Output
+</pre>
+<hr>
+<h2>六、技术债务与演进方向</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">领域</th>
+<th style="text-align:left">当前状态（v0.3）</th>
+<th style="text-align:left">改进方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">工作流节点</td>
+<td style="text-align:left">同步方法</td>
+<td style="text-align:left">支持原生异步节点</td>
+</tr>
+<tr>
+<td style="text-align:left">枚举路由</td>
+<td style="text-align:left">已解决</td>
+<td style="text-align:left">保持决策函数直接返回字符串</td>
+</tr>
+<tr>
+<td style="text-align:left">记忆序列化</td>
+<td style="text-align:left">JSON + 元数据</td>
+<td style="text-align:left">支持更复杂的嵌套结构</td>
+</tr>
+<tr>
+<td style="text-align:left">知识检索</td>
+<td style="text-align:left">同步包装器</td>
+<td style="text-align:left">原生异步支持</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性检查</td>
+<td style="text-align:left">基础维度</td>
+<td style="text-align:left">扩展到角色/道具/三视图</td>
+</tr>
+<tr>
+<td style="text-align:left">模型适配</td>
+<td style="text-align:left">单一模型</td>
+<td style="text-align:left">多模型适配器</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p><strong>关键设计决策</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">决策</th>
+<th style="text-align:left">版本</th>
+<th style="text-align:left">原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">LangGraph 工作流</td>
+<td style="text-align:left">v0.3</td>
+<td style="text-align:left">天然支持循环/条件分支/状态管理</td>
+</tr>
+<tr>
+<td style="text-align:left">三层记忆架构</td>
+<td style="text-align:left">v0.3</td>
+<td style="text-align:left">平衡性能与持久化</td>
+</tr>
+<tr>
+<td style="text-align:left">LlamaIndex 集成</td>
+<td style="text-align:left">v0.3</td>
+<td style="text-align:left">成熟的 RAG 框架</td>
+</tr>
+<tr>
+<td style="text-align:left">全局一致性契约</td>
+<td style="text-align:left">v0.4</td>
+<td style="text-align:left">根本解决跨阶段一致性问题</td>
+</tr>
+<tr>
+<td style="text-align:left">NeoTask 集成</td>
+<td style="text-align:left">v1.5</td>
+<td style="text-align:left">复用成熟的分布式任务调度</td>
+</tr>
+<tr>
+<td style="text-align:left">多模态理解</td>
+<td style="text-align:left">v3.0</td>
+<td style="text-align:left">适应更丰富的输入场景</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心能力演进</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">版本</th>
+<th style="text-align:left">核心能力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">v0.1</td>
+<td style="text-align:left">剧本 → 提示词</td>
+</tr>
+<tr>
+<td style="text-align:left">v0.2</td>
+<td style="text-align:left">+ 质量闭环</td>
+</tr>
+<tr>
+<td style="text-align:left">v0.3</td>
+<td style="text-align:left">+ 智能决策 + 知识积累</td>
+</tr>
+<tr>
+<td style="text-align:left">v0.4</td>
+<td style="text-align:left">+ 一致性保障</td>
+</tr>
+<tr>
+<td style="text-align:left">v0.5</td>
+<td style="text-align:left">+ 多模型适配</td>
+</tr>
+<tr>
+<td style="text-align:left">v0.6</td>
+<td style="text-align:left">+ 专业镜头语言</td>
+</tr>
+<tr>
+<td style="text-align:left">v0.7</td>
+<td style="text-align:left">+ 超长剧本</td>
+</tr>
+<tr>
+<td style="text-align:left">v1.0</td>
+<td style="text-align:left">+ 批量 + 多格式</td>
+</tr>
+<tr>
+<td style="text-align:left">v1.5</td>
+<td style="text-align:left">+ 分布式 + 高可用</td>
+</tr>
+<tr>
+<td style="text-align:left">v2.0</td>
+<td style="text-align:left">+ 多租户 + 可观测</td>
+</tr>
+<tr>
+<td style="text-align:left">v3.0</td>
+<td style="text-align:left">+ 多模态输入</td>
+</tr>
+<tr>
+<td style="text-align:left">v4.0</td>
+<td style="text-align:left">+ 专业生态</td>
+</tr>
+<tr>
+<td style="text-align:left">v5.0</td>
+<td style="text-align:left">+ 导演级分镜</td>
+</tr>
+</tbody>
+</table>
+<p><strong>实践建议</strong>：PenShot 的演进路线对同类&quot;LLM 智能体&quot;产品有较强参考价值——先用 v0.1 打通<strong>端到端最小闭环</strong>，再用 v0.2/v0.3 补齐<strong>质量与智能</strong>，随后才谈<strong>一致性与专业适配</strong>，最后过渡到批量、分布式与企业化。每个版本都以可独立交付为前提，避免了重写式演进的高风险。</p>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

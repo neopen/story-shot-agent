@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 向量检索：手动余弦替代检索器，空结果与重排序的源码真相 · PenShot 文档</title>
+  <meta name="description" content="PenShot 向量检索：辨析&quot;文本 → 向量 → 余弦排序&quot;链路的真实实现，解析 query() 为何用手写余弦相似度替代 LlamaIndex 检索器，&quot;返回 0 条结果&quot;的完整排查复盘与索引损坏自愈机制，以及 BGE 重排序默认关闭、仅停在未接线路由上的真实接线现状与排坑清单。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/vector-search.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 向量检索：手动余弦替代检索器，空结果与重排序的源码真相">
+  <meta property="og:description" content="PenShot 向量检索：辨析&quot;文本 → 向量 → 余弦排序&quot;链路的真实实现，解析 query() 为何用手写余弦相似度替代 LlamaIndex 检索器，&quot;返回 0 条结果&quot;的完整排查复盘与索引损坏自愈机制，以及 BGE 重排序默认关闭、仅停在未接线路由上的真实接线现状与排坑清单。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/vector-search.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html" class="active">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-21</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>背景问题：向量检索为什么返回空结果</h2>
+<p>向量检索是 PenShot 剧本分镜智能体的核心能力之一，它使系统能够&quot;记住&quot;过去处理过的剧本片段，通过将文本内容转换为高维向量空间中的点，以语义相似度而非字面匹配找到与当前查询最接近的历史记录。在源码中，它的真实服务场景有三个：提示词转换节点通过 <code>enhance_prompt</code> 检索同剧本内的成功模板用于增强生成；连续性守护节点通过 <code>search_similar_scene</code> 检索相似场景充实问题的 <code>historical_solutions</code>；剧本解析结果通过 <code>add_parsed_script</code> 入库，形成场景与角色两类可检索文档。</p>
+<p>这里先纠偏一个常见误解：质量审查阶段<strong>并不检索</strong>&quot;历史问题及其修复方案&quot;——审计失败时没有任何知识落点，而审计通过时它的动作反倒是<strong>写入</strong>（<code>save_successful_prompt</code> 把成功提示词沉淀为模板，供后续查询使用）。在这条链路上，知识是先沉淀、后被检索的。</p>
+<p>然而在基于 LlamaIndex 构建知识库的过程中，我们遇到了一个非常典型的问题：<strong>向量检索始终返回 0 条结果</strong>，尽管向量存储文件与文档存储文件都存在且完整、手动计算的余弦相似度也完全正常。本文将完整复盘这一问题的根因、排查过程与解决方案，并顺带考证&quot;手写余弦相似度替代检索器&quot;背后的真实取舍，以及重排序在源码中的接线现状。</p>
+<h3>向量检索原理：从文本到向量</h3>
+<p>向量检索的核心思想是将非结构化的文本数据转换为结构化的数学向量。这个过程由嵌入模型完成——一个经过大规模语料训练的深度学习模型，能够将任意长度的文本映射为固定维度的浮点数向量。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input[&quot;输入层&quot;]
+        T1[&quot;剧本文本&quot;]
+        T2[&quot;提示词模板&quot;]
+        T3[&quot;角色描述&quot;]
+    end
+    
+    subgraph Embedding[&quot;嵌入模型&quot;]
+        E[&quot;Embedding Model\n(768/1024/1536维)&quot;]
+    end
+    
+    subgraph Vector[&quot;向量空间&quot;]
+        V1[&quot;v1: [0.12, -0.34, 0.56, ...]&quot;]
+        V2[&quot;v2: [0.45, -0.12, 0.78, ...]&quot;]
+        V3[&quot;v3: [-0.23, 0.67, -0.45, ...]&quot;]
+    end
+    
+    T1 --&gt; E
+    T2 --&gt; E
+    T3 --&gt; E
+    E --&gt; V1
+    E --&gt; V2
+    E --&gt; V3
+</pre>
+<blockquote>
+<p>在这个高维向量空间中，语义相似的文本会被映射到彼此接近的位置。例如，&quot;林然裹着旧羊毛毯&quot;和&quot;年轻女性裹着羊毛毯&quot;这两个描述虽然文字不完全相同，但它们的向量在空间中是相近的。这种性质使得向量检索能够理解同义词、近义词和上下文语义。</p>
+</blockquote>
+<p>关于 embedding 维度的经验：常见的嵌入维度为 768 / 1024 / 1536，维度越高编码信息越丰富，但索引体积与查询耗时也随之上升。PenShot 中嵌入模型由外部注入（构造参数），代码本身不绑定维度——仓库当前真实使用的嵌入维度为 1024（见后文存储结构一节的数据快照）。</p>
+<h3>余弦相似度计算</h3>
+<p>检索时，系统将用户的查询文本也转换为向量，然后计算查询向量与库中每个文档向量的余弦相似度。余弦相似度的取值范围在 -1 到 1 之间，值越接近 1 表示两个向量方向越一致，语义越相似。</p>
+<pre class="mermaid">flowchart TD
+    Q[&quot;用户查询文本\n'林然的羊毛毯'&quot;]
+    E1[&quot;embed_query()&quot;]
+    QV[&quot;查询向量\n[q1, q2, q3, ...]&quot;]
+    
+    subgraph Documents[&quot;文档库&quot;]
+        D1[&quot;文档1向量&quot;]
+        D2[&quot;文档2向量&quot;]
+        D3[&quot;文档N向量&quot;]
+    end
+    
+    subgraph Calculation[&quot;相似度计算&quot;]
+        C1[&quot;cos θ = (A·B) / (|A|×|B|)&quot;]
+    end
+    
+    subgraph Results[&quot;结果排序&quot;]
+        R1[&quot;1. 林然角色 (0.64)&quot;]
+        R2[&quot;2. 场景描述 (0.44)&quot;]
+        R3[&quot;3. 其他角色 (0.39)&quot;]
+    end
+    
+    Q --&gt; E1 --&gt; QV
+    QV --&gt; Calculation
+    D1 --&gt; Calculation
+    D2 --&gt; Calculation
+    D3 --&gt; Calculation
+    Calculation --&gt; Results
+</pre>
+<p>图中第二行的数字为示意——真实检索的分数区间可参考后文验证结果（调试实测集中在 0.49-0.64），低分并不意味着异常，只是语义空间中的常见分布。</p>
+<p>余弦相似度的计算公式为：</p>
+<pre class="hljs"><code>similarity = <span class="hljs-built_in">cos</span>(θ) = (A · B) / (||A|| × ||B||)
+</code></pre>
+<blockquote>
+<p>其中 A 和 B 分别代表查询向量和文档向量，分子是向量的点积，分母是向量模长的乘积。这个公式的本质是计算两个向量之间的夹角余弦值，不受向量长度的影响。</p>
+</blockquote>
+<p>需要意识到一个关键点：向量检索衡量的是<strong>语义相似度</strong>，而非<strong>字面匹配</strong>。这正是它与关键词检索的分水岭——关键词检索依赖字符命中，对同义词束手无策；向量检索则天然兼容&quot;意思接近但写法不同&quot;的文本。但反过来，它的排序也未必等于用户真正关心的相关性——这正是交叉编码器重排序要解决的问题，不过它在 PenShot 中的真实接线状态，后文会专门考证。</p>
+<h3>检索流程架构</h3>
+<p>PenShot 的向量检索采用分层架构，但真实的链路与教科书画法有差距：写入侧完整，检索侧则并存两套实现——模板库走 LlamaIndex 检索器加后置过滤，剧本内容库走手写余弦全量扫描；重排序代码完整却停在未接线状态。下图已标注每个环节的真实形态。</p>
+<pre class="mermaid">flowchart TB
+    subgraph DataLayer [数据层]
+        D1[剧本解析结果&lt;br/&gt;场景/角色两类文档]
+        D2[成功提示词模板&lt;br/&gt;质量审计通过后写入]
+    end
+
+    subgraph IndexLayer [索引层]
+        I1[文本分块&lt;br/&gt;SentenceSplitter&lt;br/&gt;chunk_size 大于 1000 时切换窗口解析器]
+        I2[向量化&lt;br/&gt;外部注入的嵌入模型]
+        I3[SimpleVectorStore&lt;br/&gt;按 script_id 隔离 + 三文件持久化]
+    end
+
+    subgraph RetrievalLayer [检索层 - 两套实现并存]
+        P1[模板库路径&lt;br/&gt;as_retriever + 后置过滤]
+        P2[内容库路径&lt;br/&gt;手写余弦全量扫描 + Top-K]
+    end
+
+    subgraph Application [应用层 - 已接线]
+        A1[提示词增强&lt;br/&gt;enhance_prompt]
+        A2[连续性检查&lt;br/&gt;search_similar_scene]
+    end
+
+    subgraph IdleLayer [未接线]
+        X1[重排序 BGE-reranker&lt;br/&gt;配置默认关闭]
+    end
+
+    D1 --&gt; I1
+    D2 --&gt; I1
+    I1 --&gt; I2 --&gt; I3
+    I3 --&gt; P1 --&gt; A1
+    I3 --&gt; P2 --&gt; A2
+    X1 -.-&gt; P1
+    X1 -.-&gt; P2
+</pre>
+<p>关于这张图，有三处与&quot;标准 RAG 流水线&quot;的差异需要点明：其一，检索层并存<strong>两套实现</strong>——<code>PromptTemplateManager.search_similar</code> 走 LlamaIndex 的 <code>as_retriever</code> 并附加分数与类型双重后置过滤，而剧本内容库的 <code>query()</code> 干脆绕开检索器，用 <code>embed_query</code> 加 <code>np.dot</code> 手写全量余弦；两者的分数口径与过滤语义并不一致。其二，应用层只有两个真实消费方：提示词增强与连续性检查——质量审查在链路上是&quot;写入方&quot;而非&quot;检索方&quot;。其三，重排序（BGE-reranker）的初始化代码完整（见后文重排序一节），但配置默认关闭，且引用它的 <code>KnowledgeRouter</code> 全仓库无人调用，因此在主链路上呈虚线状态。</p>
+<hr>
+<h2>代码与实现</h2>
+<h3>初始化知识库</h3>
+<p>在使用向量检索功能之前，需要先初始化剧本知识库实例。知识库会为每个剧本创建独立的存储目录，实现数据隔离。</p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.neopen.knowledge.llamaIndex.llama_index_knowledge <span class="hljs-keyword">import</span> ScriptKnowledgeBase
+<span class="hljs-keyword">from</span> penshot.neopen.shot_config <span class="hljs-keyword">import</span> ShotConfig
+
+<span class="hljs-comment"># 初始化配置和嵌入模型（ShotConfig 继承 AIConfig，get_embed_by_config 是真实方法）</span>
+config = ShotConfig()
+embeddings = config.get_embed_by_config()
+
+<span class="hljs-comment"># 创建知识库实例（指定剧本ID）</span>
+kb = ScriptKnowledgeBase(
+    embeddings=embeddings,
+    script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>
+)
+</code></pre>
+<p>初始化时有两个容易被误读的行为：其一，<code>storage_dir</code> 不传时默认为 <code>data/embedding/script_kb</code>，并在构造时用 <code>os.makedirs</code> 惰性建目录；其二，构造函数会调用 <code>_load_all_scripts()</code>，但<strong>它只加载各剧本的解析结果 JSON</strong>（遍历 <code>parsed_results/</code> 目录），向量索引此时并不加载——真正的索引恢复发生在首次查询时由 <code>_ensure_script_index</code> 完成（这正是后文排坑叙事的主角）。此外 <code>chunk_size</code>（默认 512）与 <code>chunk_overlap</code>（默认 20）也是构造参数，直接决定入库时的分块形态。</p>
+<h3>添加剧本到知识库</h3>
+<p>知识库支持三种真实存在的添加入口：添加已解析的剧本对象、添加剧本文本、添加剧本文件。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 方式一：添加已解析的剧本对象</span>
+kb.add_parsed_script(parsed_script, script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>)
+
+<span class="hljs-comment"># 方式二：直接添加剧本文本</span>
+kb.add_script_text(script_text, script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>)
+
+<span class="hljs-comment"># 方式三：添加剧本文件（按 UTF-8 文本读取，实际适用于 .txt/.md 等纯文本）</span>
+kb.add_script_file(<span class="hljs-string">&quot;path/to/script.txt&quot;</span>, script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>)
+</code></pre>
+<p>这里需要对&quot;方式三&quot;做一处纠偏：该方法的真实实现是 <code>open(file_path, 'r', encoding='utf-8')</code> 读取全量文本再交给解析器——它<strong>只支持纯文本格式</strong>，并不具备 .pdf/.docx 的二进制解析能力。三种入口的后续流程完全一致：脚本解析为 <code>ParsedScript</code> → <code>create_documents</code> 生成文档（每个场景一个 <code>type: scene</code> 文档 + 每个角色一个 <code>type: character</code> 文档，并注入 <code>script_id</code> 元数据）→ 分块为节点 → 写入向量索引 → 通过 <code>_save_storage</code> 将向量、文档与索引元数据三件套落盘。</p>
+<h3>执行向量检索</h3>
+<p><code>query()</code> 的真实实现是&quot;手写余弦 + 全量扫描&quot;：将查询文本用 <code>embed_query</code> 转成向量后，遍历向量存储中的每个向量逐个计算余弦相似度，排序后截断取 Top-K。方法签名保留的三个参数 <code>search_type</code> / <code>use_rerank</code> / <code>rerank_model</code> 在方法体中<strong>从未被读取</strong>——传了不会报错，也不会产生任何行为。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 执行查询（三个检索行为参数实为哑参数，建议省略以免误读）</span>
+result = kb.query(
+    query_text=<span class="hljs-string">&quot;林然的羊毛毯&quot;</span>,
+    script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>,
+    similarity_top_k=<span class="hljs-number">5</span>
+)
+
+<span class="hljs-comment"># 处理结果：formatted_results 含 id/score/text/metadata/rank 五个字段</span>
+<span class="hljs-keyword">for</span> item <span class="hljs-keyword">in</span> result.get(<span class="hljs-string">&quot;results&quot;</span>, []):
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;相似度: <span class="hljs-subst">{item[<span class="hljs-string">&#x27;score&#x27;</span>]:<span class="hljs-number">.4</span>f}</span>&quot;</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;内容: <span class="hljs-subst">{item[<span class="hljs-string">&#x27;text&#x27;</span>][:<span class="hljs-number">100</span>]}</span>...&quot;</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;类型: <span class="hljs-subst">{item[<span class="hljs-string">&#x27;metadata&#x27;</span>].get(<span class="hljs-string">&#x27;type&#x27;</span>)}</span>&quot;</span>)
+</code></pre>
+<blockquote>
+<p>查询结果按相似度从高到低排序，且<strong>不做任何阈值过滤</strong>——低于任何分数线的结果同样会占满 Top-K 名额（这与模板库路径的&quot;后置过滤&quot;完全不同，使用时需要自行判断分数）。若未指定且未设置任何剧本 ID，<code>query()</code> 会记录 debug 日志并返回带 <code>error</code> 字段的空结果字典，不会跨剧本检索。</p>
+</blockquote>
+<h3>结构化查询</h3>
+<p>除了语义检索，知识库还有两个<strong>不经向量链路</strong>的精确查询入口：<code>query_scene</code> 与 <code>query_character</code>。它们直接在构造时加载的 <code>parsed_results</code> 内存字典中遍历比对——按 <code>id</code>/<code>number</code> 找场景、按 <code>name</code> 找角色，命中即返回原始字典，既不计算相似度，也不做模糊匹配。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 按场景ID查询（先匹配 scene[&quot;id&quot;]，再兼容字符串化的 scene[&quot;number&quot;]）</span>
+scene = kb.query_scene(<span class="hljs-string">&quot;scene_001&quot;</span>, script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>)
+
+<span class="hljs-comment"># 按角色名查询（精确匹配 character[&quot;name&quot;]）</span>
+character = kb.query_character(<span class="hljs-string">&quot;林然&quot;</span>, script_id=<span class="hljs-string">&quot;my_script_001&quot;</span>)
+</code></pre>
+<p>这两个方法的实际查询对象是磁盘 <code>parsed_results/</code> 目录 JSON 的内存副本，而不是向量库——把它们与语义检索混为一谈，是理解该模块时最常见的偏差之一。</p>
+<hr>
+<h2>应用场景</h2>
+<p>向量检索在实际工作流中主要服务于两个已接线场景（提示词增强与连续性检查），以及一个容易被误解为&quot;检索&quot;的写入场景（质量审计）。逐一来看。</p>
+<h3>提示词生成增强</h3>
+<p>提示词转换节点生成原始提示词后，会调用 <code>enhance_prompt(fragment.prompt, enhancement_mode=&quot;append&quot;)</code>，走模板库路径：<code>get_best_match</code>（实为 <code>search_similar</code> 传 <code>top_k=1</code>）→ LlamaIndex <code>as_retriever</code> 相似度检索 → <strong>分数与类型双重后置过滤</strong>（不达 <code>min_similarity_score</code> 或类型不是 <code>prompt_template</code> 的候选直接丢弃）。命中后按 append 模式拼接，未命中则原样返回。</p>
+<pre class="mermaid">flowchart LR
+    F[转换节点生成&lt;br/&gt;原始提示词] --&gt; E[enhance_prompt&lt;br/&gt;append 模式]
+    E --&gt; S[get_best_match&lt;br/&gt;search_similar top_k=1]
+    S --&gt; G{分数与类型&lt;br/&gt;后置过滤}
+    G --&gt;|命中| P[原始提示词在前&lt;br/&gt;追加参考优秀模板块]
+    G --&gt;|未命中或 none 模式| O[原样返回]
+</pre>
+<p>一个容易被&quot;融合&quot;二字带偏的细节：append 模式的真实拼接只是一个 f-string——<code>原始提示词 + &quot;参考优秀模板:\n&quot; + 模板文本</code>；<code>replace</code> 与 <code>hybrid</code> 模式同样只是模板在前的另一种拼接（<code>_merge_prompts</code>），所谓&quot;融合&quot;并不存在额外算法，真正消化参考模板的是下游 LLM 自己。</p>
+<h3>质量审计的知识落点：写入而非检索</h3>
+<p>原稿此处描述为&quot;质量审查检索历史问题及修复方案，自动应用修复策略&quot;——这在源码中<strong>不存在</strong>。真实的质量审计节点是模板库的<strong>写入方</strong>：当审计状态为 <code>PASSED</code> 且存在修饰指令时，对每个片段调用 <code>save_successful_prompt</code>，把通过的提示词连同质量分、场景、风格等元数据沉淀进模板索引；审计失败时没有任何知识落点。</p>
+<pre class="mermaid">flowchart TD
+    A[质量审计通过 PASSED] --&gt; B[save_successful_prompt&lt;br/&gt;逐片段写入]
+    B --&gt; C[add_template&lt;br/&gt;2000 字符截断 + hash/全文去重]
+    C --&gt; D[模板向量索引&lt;br/&gt;同剧本隔离]
+    C --&gt; E[templates_cache.json&lt;br/&gt;磁盘缓存]
+    C --&gt; F[长期记忆&lt;br/&gt;successful_prompt_patterns]
+
+    G[质量审计失败] -.-&gt;|当前实现无沉淀| H[无知识落点]
+</pre>
+<p>这个方向值得强调：在这条链路上知识是<strong>先沉淀、后被检索</strong>——审计的成功样本成为未来 <code>enhance_prompt</code> 的参考；而审计失败留下的只有错误记录，不会进入任何知识库。失败案例的知识化，是当前实现尚未覆盖的边界。</p>
+<h3>连续性一致性检查</h3>
+<p>连续性守护节点发现片段间的不一致后，会对每个问题执行一次检索：以问题描述为查询文本，调用 <code>search_similar_scene(issue_desc, script_id=..., top_k=2)</code>，在剧本内容索引（场景/角色文档）中找出相似的历史场景，写回问题对象的 <code>historical_solutions</code> 属性，为后续修复生成提供素材。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Issues [连续性守护发现的问题]
+        I1[问题1: 服装不一致&lt;br/&gt;description 作查询文本]
+        I2[问题2: 场景光线跳跃]
+    end
+
+    subgraph Query [逐条检索]
+        Q[search_similar_scene&lt;br/&gt;top_k=2]
+    end
+
+    subgraph Store [剧本内容索引]
+        S1[场景文档&lt;br/&gt;type: scene]
+        S2[角色文档&lt;br/&gt;type: character]
+    end
+
+    I1 --&gt; Q
+    I2 --&gt; Q
+    Q --&gt; Store
+    Store --&gt;|命中结果| H[写回 issue.historical_solutions&lt;br/&gt;供修复生成参考]
+</pre>
+<p>这里需要澄清两个常见误解：其一，检索的是剧本内容索引（入库的场景/角色文档），不是什么&quot;角色状态向量库&quot;——一致的<strong>判定</strong>由守护节点自身的检查逻辑完成，向量检索只负责为修复补素材；其二，<code>search_similar_scene</code> 内部调用 <code>script_kb.query(..., use_rerank=True)</code>，而 <code>query()</code> 的 <code>use_rerank</code> 是哑参数（拆解见前文），所以这条链路同样<strong>没有真实的重排序行为</strong>。此外，检索结果只有在问题对象定义了 <code>historical_solutions</code> 属性时才会被真正挂载（源码中有 <code>hasattr</code> 守卫），否则检索白做但不报错。</p>
+<hr>
+<h2>数据存储结构</h2>
+<p>PenShot 的向量数据按剧本隔离，每个剧本拥有独立目录；同一 storage_dir 下，剧本知识库与提示词模板库分立两个子目录。以下结构直接对照仓库 <code>data/embedding/</code> 下的真实运行目录绘制：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Root [data/embedding/]
+        subgraph ScriptKB [script_kb/]
+            S1[&quot;SN1780745829485283341820/&quot;]
+            S2[&quot;.../&quot;]
+        end
+
+        subgraph PromptTemplates [prompt_templates/]
+            P1[&quot;SN1780745829485283341820/&quot;]
+            P2[&quot;.../&quot;]
+        end
+    end
+
+    subgraph ScriptDir [script_kb/script_id/ 真实文件]
+        V[&quot;default__vector_store.json&lt;br/&gt;向量数据&quot;]
+        D[&quot;docstore.json&lt;br/&gt;节点文本与元数据&quot;]
+        I[&quot;index_store.json&lt;br/&gt;索引元数据&quot;]
+        G[&quot;graph_store.json&lt;br/&gt;内容恒为空对象&quot;]
+        IM[&quot;image__vector_store.json&lt;br/&gt;同为默认空占位&quot;]
+        R[&quot;parsed_results/&lt;br/&gt;解析结果 JSON&quot;]
+    end
+
+    S1 --&gt; ScriptDir
+</pre>
+<p>真实数据比示意图更有说服力：以仓库中 <code>SN1780745829485283341820</code> 剧本为例，<code>default__vector_store.json</code> 内有 <strong>12 条 1024 维向量</strong>，与 <code>docstore.json</code> 的 12 个节点一一对应（4 个场景 + 8 个角色——文档数量 = 场景数 + 角色数，这是 <code>create_documents</code> 的固定切分逻辑）；每个节点的元数据形如 <code>{&quot;type&quot;: &quot;scene&quot;, &quot;scene_id&quot;: &quot;scene_001&quot;, &quot;location&quot;: &quot;城市公寓客厅&quot;, &quot;time_of_day&quot;: &quot;深夜&quot;, &quot;element_count&quot;: 8, &quot;script_id&quot;: &quot;SN...&quot;}</code>，<code>script_id</code> 由 <code>add_parsed_script</code> 逐文档注入。</p>
+<p>两个容易误读的点：其一，<code>graph_store.json</code> 与 <code>image__vector_store.json</code> 看起来像&quot;关系图/图像索引&quot;，实际内容恒为 <code>{&quot;graph_dict&quot;: {}}</code>、<code>{&quot;embedding_dict&quot;: {}, ...}</code> 一类的空对象——它们只是 LlamaIndex <code>StorageContext.persist()</code> 的默认落盘行为，VectorStoreIndex 从不读写；其二，文件名的真实形态是 <code>default__vector_store.json</code>（双下划线），历史遗留的 <code>vector_store.json</code> 仅在加载时被兜底兼容。当向量文件损坏时，<code>_recreate_vector_store</code> 会先把它备份为 <code>*_corrupted_{时间戳}</code>，再删除 docstore 与 index_store 重建空索引——这是&quot;删掉重来&quot;的自愈路径，损坏前的原始数据仍保留在备份文件中。</p>
+<hr>
+<h2>核心逻辑解释与重排序</h2>
+<p>基础向量检索的排序只依赖整体语义接近度，可能把&quot;语义相关但实际不合适&quot;的结果排在前面。交叉编码器重排序（BGE-reranker 是典型代表）能把这类误差压下去——但 PenShot 的现状需要如实说明：<strong>重排序的初始化代码完整存在，但配置默认关闭，且唯一引用它的路由组件未接线</strong>，在主链路上并未真实生效。先看它设计中的工作形态：</p>
+<pre class="mermaid">flowchart LR
+    Q[用户查询] --&gt; V[as_retriever 初筛&lt;br/&gt;similarity_top_k 条候选]
+    V --&gt; R[SentenceTransformerRerank&lt;br/&gt;交叉编码器逐对打分]
+    R --&gt; F[最终结果&lt;br/&gt;top_n 取 3 与 k 的最小值]
+</pre>
+<blockquote>
+<p>向量检索（双编码器）和重排序（交叉编码器）的区别在于：</p>
+<ul class="lvl-1">
+<li class="lvl-2">双编码器将查询和文档分别编码，速度快但精度相对较低；</li>
+<li class="lvl-2">交叉编码器将查询和文档拼接后一起编码，精度高但速度慢。</li>
+</ul>
+<p>两者结合可以兼顾效率和精度。</p>
+</blockquote>
+<p>把这段链路拉回源码，可以完整看到它的&quot;接线实况&quot;：其一，装配逻辑位于 <code>create_retriever_for_script</code>——支持 <code>similarity</code>/<code>mmr</code> 两种模式（MMR 的 <code>mmr_threshold=0.6</code>），重排序模型选择链为&quot;本地路径（配置默认 <code>data/models</code>）→ 配置名 → 兜底 <code>BAAI/bge-reranker-large</code>&quot;；仓库 <code>data/models/</code> 下确实存放着下载好的 <code>bge-reranker-large</code>，说明这套能力曾被真实部署过。其二，触发条件是 <code>use_rerank or retriever_config.rerank_enabled</code>，而 <code>RetrieverConfig.rerank_enabled</code> 的默认值是 <strong>False</strong>——不显式开启就不会加载重排序模型。其三，重排序生效时会用 <code>index.as_retriever(similarity_top_k=..., node_postprocessors=[rerank])</code> <strong>重建检索器</strong>，重建调用不携带 <code>vector_store_query_mode</code>——因此 mmr 模式会被覆盖，两者无法叠加使用（一个静默的配置陷阱）。其四，也是决定性的：这三个检索器方法只被 <code>llama_index_router.py</code> 的 <code>KnowledgeRouter</code> 引用，而 <code>KnowledgeRouter</code> 全仓库没有生产调用方——重排序因此在&quot;已实现未接线&quot;之列。</p>
+<hr>
+<h2>问题排查与解决：返回 0 条结果的完整复盘</h2>
+<h3>问题现象</h3>
+<p>项目早期，基于 LlamaIndex 搭建的剧本知识库出现了一个棘手现象：检索始终返回 0 条结果，尽管：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>向量存储文件存在且完整（当时的调试快照为 3 个向量，768/1024 维）</p>
+</li>
+<li class="lvl-2">
+<p>文档存储文件存在且完整（同一快照下 3 个文档节点）</p>
+</li>
+<li class="lvl-2">
+<p>手动计算的余弦相似度正常（0.44-0.64），排序也符合直觉</p>
+</li>
+</ul>
+<h3>根本原因</h3>
+<p>排查后确认，这不是单点故障，而是三个问题叠加的结果。其中第一条需要先纠正一个流传甚广的归因：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>原因一（纠偏）：问题不在&quot;检索器默认阈值&quot;</strong></p>
+<p>很多资料声称&quot;<code>index.as_retriever()</code> 默认内置约 0.7 的相似度阈值&quot;——这与 LlamaIndex 的实际行为不符：默认的向量检索器<strong>不做任何分数过滤</strong>，<code>similarity_top_k</code> 只控制返回数量，只有显式配置 <code>similarity_cutoff</code> 之类的参数才会出现阈值行为。</p>
+<p>真正让 <code>retrieve()</code> 返回空的原因更隐蔽：<strong>从 <code>vector_store.json</code> 单独恢复的索引没有文本</strong>。向量存储里只有节点 id 与向量，节点文本与元数据全部在 docstore 中；当索引的存储上下文不完整时，检索器找不到可返回的文本节点，表现就是&quot;有向量、有文件、却返回 0 条&quot;。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 问题代码：从向量存储恢复的索引缺少 docstore 文本</span>
+retriever = index.as_retriever(similarity_top_k=<span class="hljs-number">5</span>)
+nodes = retriever.retrieve(query)  <span class="hljs-comment"># 返回 0 条结果</span>
+</code></pre>
+<p>那&quot;0.7 阈值&quot;的传说从何而来？在本项目里它确实存在——但位置是<strong>应用层</strong>：<code>PromptTemplateManager.search_similar</code> 的后置过滤，<code>min_similarity_score</code> 类默认为 0.5、WorkflowNodes 注入 0.7。把应用层的阈值设计误记成框架默认行为，正是这次排查中绕过的最大弯路。</p>
+</li>
+<li class="lvl-2">
+<p><strong>原因二：vector_store.query() 查询模式不匹配</strong></p>
+<p>直接调用 <code>vector_store.query(VectorStoreQuery(...))</code> 时，返回的节点仍需依赖 <code>text_id_to_ref_doc_id</code> 映射回查 docstore 才能取出文本；查询模式（<code>VectorStoreQueryMode</code>）与写入时的配置不一致时，还可能得到空候选。一句话：这条路能走通，但需要把存储上下文配齐，收益不如后文的方案二。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 问题代码</span>
+vector_query = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=<span class="hljs-number">5</span>)
+query_result = vector_store.query(vector_query)  <span class="hljs-comment"># nodes 为空</span>
+</code></pre>
+</li>
+<li class="lvl-2">
+<p><strong>原因三：索引加载方式错误</strong></p>
+<p>使用 <code>VectorStoreIndex.from_vector_store()</code> 加载已有存储时，该方法无法恢复已持久化的存储上下文（文档文本不在向量存储里），报错堪称直白：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 问题代码</span>
+index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embeddings)
+<span class="hljs-comment"># ValueError: Cannot initialize from a vector store that does not store text.</span>
+</code></pre>
+<p>源码中至今保留着这次修复的注释——<code>_ensure_script_index</code> 里的&quot;关键修复：使用 VectorStoreIndex 构造函数，而不是 from_vector_store&quot;，就是这段排查留下的路标。</p>
+</li>
+</ul>
+<h3>解决方案</h3>
+<ul class="lvl-0">
+<li class="lvl-2">
+<h4>方案一：正确加载索引（修复加载错误）</h4>
+<pre class="hljs"><code><span class="hljs-comment"># 正确方式：从目录加载完整的存储上下文</span>
+storage_context = StorageContext.from_defaults(persist_dir=script_dir)
+index = VectorStoreIndex(
+    nodes=[],
+    storage_context=storage_context,
+    embed_model=embeddings
+)
+</code></pre>
+<p>这正是 <code>_ensure_script_index</code> 采用的修复（源码注释&quot;关键修复：使用 VectorStoreIndex 构造函数，而不是 from_vector_store&quot;即指此处）：<code>nodes=[]</code> 表示不传入新文档、完全从 <code>storage_context</code> 恢复；存储上下文由 <code>persist_dir</code> 一次性加载 vector / docstore / index 三件套，文本与向量同时就位。</p>
+</li>
+<li class="lvl-2">
+<h4>方案二：手动计算余弦相似度（本项目最终选择）</h4>
+<pre class="hljs"><code><span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+
+query_embedding = embeddings.embed_query(query_text)
+results = []
+<span class="hljs-keyword">for</span> doc_id, embedding <span class="hljs-keyword">in</span> vector_store._data.embedding_dict.items():
+    dot = np.dot(query_embedding, embedding)
+    norm_q = np.linalg.norm(query_embedding)
+    norm_d = np.linalg.norm(embedding)
+    similarity = dot / (norm_q * norm_d) <span class="hljs-keyword">if</span> norm_q &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">and</span> norm_d &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">else</span> <span class="hljs-number">0</span>
+
+    doc = storage_context.docstore.get_document(doc_id)
+    results.append({
+        <span class="hljs-string">&quot;doc_id&quot;</span>: doc_id,
+        <span class="hljs-string">&quot;similarity&quot;</span>: similarity,
+        <span class="hljs-string">&quot;text&quot;</span>: doc.text <span class="hljs-keyword">if</span> <span class="hljs-built_in">hasattr</span>(doc, <span class="hljs-string">&#x27;text&#x27;</span>) <span class="hljs-keyword">else</span> <span class="hljs-built_in">str</span>(doc),
+        <span class="hljs-string">&quot;metadata&quot;</span>: doc.metadata <span class="hljs-keyword">if</span> <span class="hljs-built_in">hasattr</span>(doc, <span class="hljs-string">&#x27;metadata&#x27;</span>) <span class="hljs-keyword">else</span> {}
+    })
+
+results.sort(key=<span class="hljs-keyword">lambda</span> x: x[<span class="hljs-string">&quot;similarity&quot;</span>], reverse=<span class="hljs-literal">True</span>)
+<span class="hljs-keyword">return</span> results[:top_k]
+</code></pre>
+<p>注意它和方案一的关系：手动余弦并不是&quot;绕开存储上下文&quot;——它同样从 <code>storage_context</code> 取 docstore 与向量，只是把检索这一步从框架管线换成了 20 行显式计算。直接收益是<strong>分数完全透明</strong>：每个候选的相似度可见、可日志、可单测，过滤策略完全由调用方掌握，也不再依赖检索器对存储完整性的隐式假设。这就是本项目最终选择手写余弦的真实原因。</p>
+</li>
+<li class="lvl-2">
+<h4>方案三：真实源码中的完整实现</h4>
+<p>上述思路落地后的成品即 <code>ScriptKnowledgeBase.query()</code>。与示意代码相比，真实实现（llama_index_knowledge.py，精简摘录如下）多了几层防护：</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">query</span>(<span class="hljs-params">self, query_text: <span class="hljs-built_in">str</span>, script_id: <span class="hljs-built_in">str</span>, similarity_top_k: <span class="hljs-built_in">int</span> = <span class="hljs-literal">None</span></span>):
+    target_id = script_id <span class="hljs-keyword">or</span> <span class="hljs-variable language_">self</span>._current_script_id
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> target_id:
+        <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;query&quot;</span>: query_text, <span class="hljs-string">&quot;results&quot;</span>: [], <span class="hljs-string">&quot;total_results&quot;</span>: <span class="hljs-number">0</span>, <span class="hljs-string">&quot;error&quot;</span>: <span class="hljs-string">&quot;未指定剧本ID&quot;</span>}
+
+    <span class="hljs-variable language_">self</span>._ensure_script_index(target_id)
+    index = <span class="hljs-variable language_">self</span>._indices.get(target_id)
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> index:
+        <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;query&quot;</span>: query_text, <span class="hljs-string">&quot;results&quot;</span>: [], <span class="hljs-string">&quot;total_results&quot;</span>: <span class="hljs-number">0</span>, <span class="hljs-string">&quot;error&quot;</span>: <span class="hljs-string">&quot;索引未创建&quot;</span>}
+
+    <span class="hljs-keyword">if</span> similarity_top_k <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span>:
+        similarity_top_k = <span class="hljs-number">5</span>
+    vector_store = <span class="hljs-variable language_">self</span>._vector_stores.get(target_id)
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> vector_store <span class="hljs-keyword">or</span> <span class="hljs-keyword">not</span> <span class="hljs-built_in">hasattr</span>(vector_store, <span class="hljs-string">&#x27;_data&#x27;</span>):
+        <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;query&quot;</span>: query_text, <span class="hljs-string">&quot;results&quot;</span>: [], <span class="hljs-string">&quot;total_results&quot;</span>: <span class="hljs-number">0</span>, <span class="hljs-string">&quot;error&quot;</span>: <span class="hljs-string">&quot;向量存储未就绪&quot;</span>}
+
+    query_embedding = <span class="hljs-variable language_">self</span>.embeddings.embed_query(query_text)
+    <span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+    results = []
+    <span class="hljs-keyword">for</span> doc_id, embedding <span class="hljs-keyword">in</span> vector_store._data.embedding_dict.items():
+        dot = np.dot(query_embedding, embedding)
+        norm_q = np.linalg.norm(query_embedding)
+        norm_d = np.linalg.norm(embedding)
+        similarity = dot / (norm_q * norm_d) <span class="hljs-keyword">if</span> norm_q &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">and</span> norm_d &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">else</span> <span class="hljs-number">0</span>
+
+        doc = <span class="hljs-literal">None</span>
+        storage_context = <span class="hljs-variable language_">self</span>._storage_contexts.get(target_id)
+        <span class="hljs-keyword">if</span> storage_context <span class="hljs-keyword">and</span> <span class="hljs-built_in">hasattr</span>(storage_context, <span class="hljs-string">&#x27;docstore&#x27;</span>):
+            doc = storage_context.docstore.get_document(doc_id)
+
+        text = <span class="hljs-string">&quot;&quot;</span>
+        metadata = {}
+        <span class="hljs-keyword">if</span> doc:
+            text = doc.text <span class="hljs-keyword">if</span> <span class="hljs-built_in">hasattr</span>(doc, <span class="hljs-string">&#x27;text&#x27;</span>) <span class="hljs-keyword">else</span> <span class="hljs-built_in">str</span>(doc)
+            metadata = doc.metadata <span class="hljs-keyword">if</span> <span class="hljs-built_in">hasattr</span>(doc, <span class="hljs-string">&#x27;metadata&#x27;</span>) <span class="hljs-keyword">else</span> {}
+
+        results.append({
+            <span class="hljs-string">&quot;doc_id&quot;</span>: doc_id, <span class="hljs-string">&quot;similarity&quot;</span>: similarity,
+            <span class="hljs-string">&quot;text&quot;</span>: text, <span class="hljs-string">&quot;metadata&quot;</span>: metadata
+        })
+
+    results.sort(key=<span class="hljs-keyword">lambda</span> x: x[<span class="hljs-string">&quot;similarity&quot;</span>], reverse=<span class="hljs-literal">True</span>)
+    results = results[:similarity_top_k]
+    <span class="hljs-comment"># 其余部分为格式化输出：每项补齐 id / score / text / metadata / rank 五个字段</span>
+</code></pre>
+<p>这些防护分别是：剧本 ID 缺省与索引未创建时的<strong>早退</strong>（返回带 <code>error</code> 字段的结构化结果而不是抛异常）、向量存储尚未就绪时的可读错误、<strong>零向量除法保护</strong>（模长为 0 时返回 0 而非 NaN）、以及 docstore 缺失时的文本空串兜底。整个函数体还被 try/except 包裹——查询失败不会拖垮上游工作流，只会留下错误信息。</p>
+</li>
+</ul>
+<h3>关键经验总结</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">问题</th>
+<th style="text-align:left">错误做法</th>
+<th style="text-align:left">正确做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">索引加载</td>
+<td style="text-align:left"><code>VectorStoreIndex.from_vector_store()</code></td>
+<td style="text-align:left"><code>StorageContext.from_defaults()</code> + <code>VectorStoreIndex()</code></td>
+</tr>
+<tr>
+<td style="text-align:left">向量检索</td>
+<td style="text-align:left"><code>as_retriever().retrieve()</code> 黑盒管线</td>
+<td style="text-align:left">手写余弦全量扫描，分数完全透明</td>
+</tr>
+<tr>
+<td style="text-align:left">相似度过滤</td>
+<td style="text-align:left">把&quot;0.7 阈值&quot;误当检索器默认行为</td>
+<td style="text-align:left">明确归属：框架默认不过滤，过滤在本项目应用层</td>
+</tr>
+<tr>
+<td style="text-align:left">存储恢复</td>
+<td style="text-align:left">只加载 vector_store.json</td>
+<td style="text-align:left">从目录整体恢复 vector / docstore / index 三件套</td>
+</tr>
+</tbody>
+</table>
+<h3>验证结果</h3>
+<p>修复后，查询测试正常返回结果（以下数字为项目调试期实测记录，非通用基准）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">查询词</th>
+<th style="text-align:left">最佳匹配</th>
+<th style="text-align:left">相似度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">“林然”</td>
+<td style="text-align:left">角色&quot;林然&quot;</td>
+<td style="text-align:left">0.6363</td>
+</tr>
+<tr>
+<td style="text-align:left">“羊毛毯”</td>
+<td style="text-align:left">角色&quot;林然&quot;</td>
+<td style="text-align:left">0.4883</td>
+</tr>
+<tr>
+<td style="text-align:left">“场景”</td>
+<td style="text-align:left">场景文档</td>
+<td style="text-align:left">0.5088</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>结果本身值得玩味：三条查询的最佳匹配都落在 0.49-0.64 区间。这类&quot;中低分&quot;结果正是阈值设计的经典困境——模板库路径用 <code>min_similarity_score=0.7</code> 做后置过滤（宁缺毋滥），而剧本内容库的手写余弦<strong>不做任何过滤</strong>（召回优先）。同一个系统里两种分数口径与过滤策略并存，是理解 PenShot 检索行为时必须记住的对照。</p>
+</blockquote>
+<hr>
+<h2>注意事项与排坑提示</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>嵌入模型一致性</strong>：创建索引时使用的嵌入模型必须与查询时使用的模型完全相同，否则向量空间不一致，相似度计算将失去意义。需要特别强调：PenShot <strong>不会自动校验</strong>这一点——换模型后查询既不报错也不警告，只会静默给出失真的分数或空结果。手动管理存储文件时，换模型应立即重建索引。</p>
+</li>
+<li class="lvl-2">
+<p><strong>相似度阈值归属</strong>：LlamaIndex 检索器默认<strong>没有</strong>分数阈值；真正带阈值的是应用层的后置过滤（模板库路径的 <code>min_similarity_score</code>）。在手写余弦的实现里，过滤与否完全由调用方决定：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 手写余弦的返回值不过滤，调用方可按需自行筛选</span>
+results = [r <span class="hljs-keyword">for</span> r <span class="hljs-keyword">in</span> result[<span class="hljs-string">&quot;results&quot;</span>] <span class="hljs-keyword">if</span> r[<span class="hljs-string">&quot;score&quot;</span>] &gt; <span class="hljs-number">0.3</span>]  <span class="hljs-comment"># 按业务需要调整</span>
+</code></pre>
+</li>
+<li class="lvl-2">
+<p><strong>存储文件完整性</strong>：一次完整的持久化产出 <code>default__vector_store.json</code>（向量）、<code>docstore.json</code>（文本与元数据）、<code>index_store.json</code>（索引元数据）三件套，缺任一个都可能导致索引恢复不完整。使用 <code>StorageContext.from_defaults(persist_dir=...)</code> 可以整体恢复；若向量文件损坏，<code>_recreate_vector_store</code> 会自动备份为 <code>*_corrupted_{时间戳}</code> 后重建。</p>
+</li>
+<li class="lvl-2">
+<p><strong>内存与性能考虑</strong>：手写余弦需要把全部向量载入内存并逐个计算——以真实数据为例，单剧本 12 条 1024 维向量是小菜一碟，但规模上到数万文档时 O(N) 扫描会成为瓶颈。按剧本隔离存储天然限制了单次加载的数据量；若未来需要更大规模，项目的长期记忆层已经给出了迁移样板（Chroma 向量库，见 RAG 知识库一文）。</p>
+</li>
+<li class="lvl-2">
+<p><strong>多剧本隔离</strong>：始终在查询时指定 <code>script_id</code> 参数——但与你可能预期的相反，忘记指定<strong>不会</strong>检索到其他剧本的内容：<code>query()</code> 会记录 debug 日志并返回带 <code>error</code> 字段的空结果，<code>search_similar</code> 同样静默返回空列表。这个&quot;静默降级&quot;设计保证了隔离性，代价是调用方不检查 <code>error</code> 字段时就难以察觉。</p>
+</li>
+</ul>
+<h3>三条高频排坑提示</h3>
+<ol>
+<li class="lvl-3">
+<p><strong>检索为空的头号原因</strong>：不是&quot;检索器默认阈值&quot;，而是<strong>索引恢复不完整</strong>（docstore 文本缺失）或 <code>vector_store._data</code> 未就绪。先确认存储上下文三件套是否齐全，再打印手写余弦的实际分数排查。</p>
+</li>
+<li class="lvl-3">
+<p><strong>索引加载报 <code>ValueError: Cannot initialize from a vector store that does not store text</code></strong>：这是 <code>from_vector_store</code> 的典型报错。改用 <code>StorageContext.from_defaults(persist_dir=...)</code> 从目录整体加载，并以 <code>VectorStoreIndex(nodes=[], storage_context=...)</code> 构造。</p>
+</li>
+<li class="lvl-3">
+<p><strong>嵌入模型不一致导致结果失真</strong>：写入索引与查询务必使用同一嵌入模型与维度；系统不会报错，只会静默给出错误分数——换模型应立即重建索引。</p>
+</li>
+</ol>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结</h2>
+<p>向量检索是 PenShot 记忆系统与知识增强能力的地基。按&quot;三口径&quot;收束全文：<strong>已接线</strong>的是两条真实检索路径——模板库路径（<code>search_similar</code>：<code>as_retriever</code> + 分数/类型双重后置过滤）与剧本内容库路径（<code>query()</code>：手写余弦全量扫描，分数透明但不过滤）；它们分别支撑提示词增强与连续性检查两个下游场景，写入侧由质量审计的成功模板沉淀与剧本解析入库构成完整闭环。<strong>已实现未接线</strong>的是重排序（BGE-reranker 默认关闭、检索器方法无生产调用方）与 MMR 检索器。<strong>需要记住的边界</strong>同样有三个：审计失败的样本没有任何知识落点；漏传 script_id 与嵌入模型失配都只会静默降级、不报错；手写余弦的 O(N) 扫描在小剧本下无感，但规模上去后需要迁移专业向量库。</p>
+<p>理解&quot;文本→向量→余弦排序&quot;这条链路只是起点；知道自己系统里哪些环节真正接线、哪些还在图纸上，才是排坑时最可靠的地图。</p>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

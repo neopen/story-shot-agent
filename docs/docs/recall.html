@@ -1,0 +1,2387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 召回体系：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？ · PenShot 文档</title>
+  <meta name="description" content="PenShot 召回体系：GraphRAG 与 RRF 融合为何尚未落地、所谓混合检索为何未接线、手动余弦全量扫描与已接线的三层记忆系统各自如何运转，并按已接线、未接线、规划中三口径逐项给出真实状态与工程边界参考，澄清外部宣传与代码事实之间的差距。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/recall.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 召回体系：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？">
+  <meta property="og:description" content="PenShot 召回体系：GraphRAG 与 RRF 融合为何尚未落地、所谓混合检索为何未接线、手动余弦全量扫描与已接线的三层记忆系统各自如何运转，并按已接线、未接线、规划中三口径逐项给出真实状态与工程边界参考，澄清外部宣传与代码事实之间的差距。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/recall.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html" class="active">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-01</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 召回体系：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="integration.html">集成指南</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>不逐条复述功能清单，而是拿源码逐一核对：哪些召回机制真的在跑、哪些写了却没有接线、哪些仅存在于规划之中</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>核心价值与需求背景</h2>
+<h3>为什么剧本分镜需要&quot;召回&quot;</h3>
+<p>剧本分镜智能体的核心任务是把原始剧本拆解并增强为可供 AI 视频模型使用的提示词序列。面对动辄数万字的剧本，模型单独推理既无法精确定位&quot;某句台词&quot;“某个人物的设定”，也无法复用自己的历史成功经验。召回（Retrieval）就是解决这个问题的关键环节——它决定了系统能否在正确的时间取出正确的上下文。</p>
+<p>在文档与规划层面，PenShot 的召回体系被描述为<strong>多路召回 + 融合重排</strong>的组合拳。但把源码摊开逐项核对之后，结论要克制得多：真正进入工作流调用链的召回链路其实只有两段——<strong>已接线</strong>的三层记忆系统（MemoryManager 被注入提示词模板管理、工作流记忆与输出写入三处消费），以及<strong>形态朴素</strong>的剧本知识库检索（手动余弦相似度全量扫描）。而 GraphRAG、BM25、RRF 融合、学习排序（LTR）这些名字，在整个仓库里检索不到对应实现。</p>
+<p>本文按三个口径逐章核对：<strong>已接线</strong>（真正进入调用链）、<strong>已实现未接线</strong>（代码存在但无调用方）、<strong>规划中</strong>（仅存在于文档与路线图）。每一项判断都给出源码位置或&quot;零命中&quot;的检索结论。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>逻辑关系缺失</strong>：剧本中主角与助手前三集建立的信任，在第五集&quot;助手背叛&quot;时才产生戏剧张力。仅靠语义相似度检索不到这种深层的因果与人物关系——这是 GraphRAG 试图解决的问题，也是 PenShot 目前尚未落地的规划项。</p>
+</li>
+<li class="lvl-2">
+<p><strong>一致性维护</strong>：跨集创作时角色性格、外貌、世界观的一致性极易&quot;崩塌&quot;，需要长短时记忆系统在生成时强制参考既有设定——这一部分真实存在，且已接线。</p>
+</li>
+</ul>
+<p>下文先纵览各类召回方案与平滑演进思路，再逐章拆解每一项机制在源码中的真实状态。</p>
+<hr>
+<h2>关键要点拆解（一）：常用召回方案对比</h2>
+<p>以下是剧本分镜场景中几类主流的召回方案及各自的适用场景与技术挑战。<strong>先说明性质</strong>：本节的方案与详解综合了行业公开资料（阿里云 AnalyticDB、爱奇艺&quot;纳逗 Pro&quot;等），属于行业方案综述——每一种方案在 PenShot 中的落地状态各不相同，后文第三章起会逐项核对，不建议把本节内容当作&quot;PenShot 已实现功能&quot;来读。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">方案名称</th>
+<th style="text-align:left">核心原理</th>
+<th style="text-align:left">适合场景</th>
+<th style="text-align:left">技术挑战</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>GraphRAG</strong></td>
+<td style="text-align:left">构建知识图谱，通过实体和关系进行检索</td>
+<td style="text-align:left">人物关系复杂、逻辑因果强的剧本（如悬疑、宫斗）。</td>
+<td style="text-align:left">图谱构建成本高，数据稀疏时效果不佳。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>长记忆模块</strong></td>
+<td style="text-align:left">隔离存储长期（角色设定）和短期（当前剧情）信息</td>
+<td style="text-align:left">需要保证跨集数角色性格、说话风格一致性的长剧创作。</td>
+<td style="text-align:left">需设计有效的记忆总结与压缩机制。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>自迭代优化</strong></td>
+<td style="text-align:left">通过&quot;生成-质检-修复&quot;闭环持续优化</td>
+<td style="text-align:left">解决生成内容的硬伤（如逻辑矛盾、人设崩塌）导致的&quot;伪召回&quot;。</td>
+<td style="text-align:left">依赖高质量、多维度的自动化质检标准。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>混合检索策略</strong></td>
+<td style="text-align:left">结合关键词（BM25）、向量、结构化标签的多路召回</td>
+<td style="text-align:left">需要高精度、高召回率，且兼容模糊语义和精确匹配的通用场景。</td>
+<td style="text-align:left">多路结果的融合与重排序算法设计复杂。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多智能体协作</strong></td>
+<td style="text-align:left">不同Agent负责不同维度的检索（如分镜、台词）</td>
+<td style="text-align:left">分工明确的专业影视制作流水线，各环节对素材需求差异大。</td>
+<td style="text-align:left">智能体间的通信与任务编排开销大。</td>
+</tr>
+</tbody>
+</table>
+<h3>方案详解</h3>
+<p><strong>GraphRAG：让AI真正&quot;读懂&quot;剧本逻辑</strong></p>
+<blockquote>
+<p>传统RAG基于向量相似度，容易忽略剧情中复杂的逻辑关系。阿里云AnalyticDB的方案引入了<strong>GraphRAG</strong>，它在向量检索的基础上，构建了包含&quot;角色-事件-场景&quot;的知识图谱。</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>用法</strong>：当用户要求&quot;写一段男主发现助手背叛后的对峙戏&quot;时，系统不仅找&quot;背叛&quot;相关语义，还能图谱中定位&quot;男主&quot;和&quot;助手&quot;的关系及历史。</li>
+<li class="lvl-2"><strong>价值</strong>：确保后续情节发展与前面埋下的伏笔和人物关系逻辑自洽。</li>
+</ul>
+</blockquote>
+<p><strong>长记忆模块：确保人设&quot;不崩塌&quot;</strong></p>
+<blockquote>
+<p>剧本创作的最大痛点是角色或场景的&quot;不一致&quot;。AnalyticDB for PostgreSQL内置的<strong>Long-term Memory</strong>技术就是为此设计。</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>分层存储</strong>：将<strong>长期记忆</strong>（如角色性格、外貌、核心世界观）与<strong>短期记忆</strong>（如当前场景对话、情绪）分开管理。</li>
+<li class="lvl-2"><strong>效果</strong>：在生成新对话时，AI会强制参考长期记忆库中的角色设定，有效防止角色&quot;精分&quot;。</li>
+</ul>
+</blockquote>
+<p><strong>框架仿写与结构化提取：迁移&quot;神&quot;而非&quot;形&quot;</strong></p>
+<blockquote>
+<p>爱奇艺&quot;纳逗Pro&quot;智能体及阿里云方案均强调了<strong>结构化提取</strong>的重要性。</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>做法</strong>：从参考剧本中提取出<strong>叙事框架</strong>（如起承转合的结构、冲突模式、情感线），将其剥离具体台词后存入向量库。</li>
+<li class="lvl-2"><strong>应用</strong>：当用户想写一个&quot;现代版罗密欧与朱丽叶&quot;时，系统能召回的是两个家族世仇下的爱情冲突框架，而非直接给古代台词，实现了高层次的创意复用。</li>
+</ul>
+</blockquote>
+<p><strong>自迭代优化：用&quot;质检&quot;倒逼&quot;召回&quot;</strong></p>
+<blockquote>
+<p>有时召回失败不是因为没找到，而是因为生成的内容质量不过关（如角色做出了不符合人设的动作）。这就引入了质检闭环：</p>
+<ul class="lvl-1">
+<li class="lvl-2"><strong>流程</strong>：生成 → 自动质检（检查角色、逻辑、格式等多个维度） → 发现缺陷（如&quot;逻辑一致性&quot;低分） → <strong>触发定向召回</strong>（专门去找前文中相关的逻辑设定） → 修复。</li>
+<li class="lvl-2"><strong>意义</strong>：通过反馈机制，让系统知道自己&quot;漏掉了什么&quot;，实现自我进化。</li>
+</ul>
+</blockquote>
+<hr>
+<h2>关键要点拆解（二）：平滑演进——从短剧到长片</h2>
+<p>考虑到&quot;智能体短期支持短剧单次交互，长期支持电影/动漫/电视剧长剧本&quot;的需求，需要选择一套具备<strong>平滑演进能力</strong>的技术方案。核心原则是：短期方案作为长期的组件或简化版，避免未来重构。</p>
+<p><strong>先明确本章性质</strong>：这是一份<strong>演进规划与行业方案参考</strong>（含 ViMax 等外部对标），不是当前实现清单。图示中的&quot;事件图谱、多级缓存、导演 Agent&quot;等组件大多尚未落地——每个组件的真实状态以第三章的核对表与第八章的结论为准。</p>
+<pre class="mermaid">flowchart LR
+    subgraph 短期[短剧模式&lt;br&gt;单次交互 / 10万字以内]
+        A1[用户输入&lt;br&gt;剧本/创意] --&gt; A2[混合检索&lt;br&gt;关键词+向量]
+        A2 --&gt; A3[单智能体&lt;br&gt;端到端生成]
+        A3 --&gt; A4[输出短剧成片]
+    end
+
+    subgraph 长期[长剧本模式&lt;br&gt;电影/动漫/电视剧]
+        B1[长文本输入&lt;br&gt;10万-百万字] --&gt; B2[语义索引&lt;br&gt;分层切片+事件图谱]
+        B2 --&gt; B3[多智能体协作&lt;br&gt;编剧/分镜/视觉/质检]
+        B3 --&gt; B4[长记忆存储&lt;br&gt;角色/场景/世界观]
+        B4 --&gt; B5[GraphRAG&lt;br&gt;关系增强检索]
+        B5 --&gt; B6[输出长片/剧集]
+    end
+
+    A4 -.-&gt;|能力升级&lt;br&gt;组件复用| B3
+    A2 -.-&gt;|技术演进| B5
+    A3 -.-&gt;|架构扩展| B4
+    
+    style A1 fill:#e1f5fe
+    style A2 fill:#b3e5fc
+    style A3 fill:#4fc3f7
+    style B1 fill:#fff3e0
+    style B2 fill:#ffe0b2
+    style B3 fill:#ffb74d
+    style B4 fill:#ff9800
+    style B5 fill:#f57c00
+</pre>
+<h3>单次交互模式（短剧）</h3>
+<p>短剧（单集2-5分钟，总时长20-60分钟）的核心需求是<strong>快速响应</strong>和<strong>成本可控</strong>。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">技术选择</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>查询理解</strong></td>
+<td style="text-align:left">关键词(BM25) + 轻量向量检索</td>
+<td style="text-align:left">双路召回，平衡精度与召回率</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>记忆管理</strong></td>
+<td style="text-align:left">单次会话上下文(同场景内)</td>
+<td style="text-align:left">无需长期记忆，降低复杂度</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>智能体架构</strong></td>
+<td style="text-align:left"><strong>单智能体</strong>或<strong>双智能体</strong>(剧本+分镜)</td>
+<td style="text-align:left">简化调度，端到端效率优先</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>召回优化</strong></td>
+<td style="text-align:left">实时反馈调整</td>
+<td style="text-align:left">生成不满意→触发重新召回</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>成本控制</strong></td>
+<td style="text-align:left">模型轻量化（蒸馏/量化等方向）</td>
+<td style="text-align:left">降低成本属于规划目标，暂无实测数据</td>
+</tr>
+</tbody>
+</table>
+<h3>超长剧本支持（电影）</h3>
+<p>电影/电视剧/动漫（单集40分钟以上，总时长数小时）的核心挑战是<strong>长上下文管理</strong>和<strong>跨集一致性</strong>。</p>
+<blockquote>
+<p>万字级剧本 → 语义索引系统 → 事件图谱构建 → 分层检索</p>
+</blockquote>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>采用<strong>语义索引管道</strong>：将长篇内容分割为5-15分钟的重叠窗口，提取层次化摘要</p>
+</li>
+<li class="lvl-2">
+<p><strong>章节事件图谱</strong>：用RAG技术分析长文本结构，提取事件、动作和情感点</p>
+</li>
+<li class="lvl-2">
+<p>参考ViMax的<strong>智能长脚本引擎</strong>：支持小说级内容自动分段</p>
+</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">方案</th>
+<th style="text-align:left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>GraphRAG</strong></td>
+<td style="text-align:left">知识图谱 + 向量检索</td>
+<td style="text-align:left">理解人物关系、因果逻辑</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>长记忆存储</strong></td>
+<td style="text-align:left">结构化记忆库</td>
+<td style="text-align:left">角色设定、场景资产、世界观</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>多级缓存</strong></td>
+<td style="text-align:left">热/温/冷三层</td>
+<td style="text-align:left">高频角色设备→快速检索</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>混合检索</strong></td>
+<td style="text-align:left">关键词+向量+结构化标签</td>
+<td style="text-align:left">多路召回+重排序</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>质检闭环</strong></td>
+<td style="text-align:left">生成→检查→修复→优化</td>
+<td style="text-align:left">自我进化的反馈机制</td>
+</tr>
+</tbody>
+</table>
+<h3>多智能体协作架构</h3>
+<pre class="mermaid">flowchart TD
+    subgraph U[用户交互层]
+        U1[用户输入&lt;br&gt;剧本创意/要求]
+        U2[终端输出&lt;br&gt;分镜脚本/资产]
+    end
+
+    subgraph D[决策层 - 导演Agent]
+        D1[全局任务拆解]
+        D2[场景分配与调度]
+        D3[冲突仲裁]
+        D4[风格一致性控制]
+    end
+
+    subgraph E[执行层 - 智能体池]
+        direction LR
+        E1[编剧Agent&lt;br&gt;剧本细化/台词生成]
+        E2[分镜Agent&lt;br&gt;镜头语言/构图]
+        E3[视觉Agent&lt;br&gt;角色/场景生成]
+        E4[技术Agent&lt;br&gt;格式转换/输出]
+    end
+
+    subgraph M[记忆与检索层]
+        M1[长期记忆库&lt;br&gt;角色/世界观/资产]
+        M2[短期记忆库&lt;br&gt;当前会话/场景]
+        M3[GraphRAG引擎&lt;br&gt;关系增强检索]
+        M4[混合检索引擎&lt;br&gt;关键词+向量]
+    end
+
+    subgraph S[监督层 - 质检Agent]
+        S1[逻辑一致性检查]
+        S2[角色人设校验]
+        S3[格式规范审核]
+        S4[反馈回路]
+    end
+
+    U1 --&gt; D
+    D --&gt;|任务分发| E
+    E &lt;--&gt;|读写| M
+    E --&gt;|生成结果| S
+    S --&gt;|通过| U2
+    S --&gt;|不通过| D
+    S -.-&gt;|反馈信号| M
+    
+    D &lt;--&gt;|状态同步| M
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层级</th>
+<th style="text-align:left">核心职责</th>
+<th style="text-align:left">关键组件</th>
+<th style="text-align:left">演进要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>决策层</strong></td>
+<td style="text-align:left">像导演一样拆解任务、分配资源、仲裁冲突</td>
+<td style="text-align:left">任务拆解器、调度器、风格控制器</td>
+<td style="text-align:left">短剧可简化，长片需强冲突仲裁能力</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>执行层</strong></td>
+<td style="text-align:left">专业化Agent并行处理不同维度的创作</td>
+<td style="text-align:left">编剧、分镜、视觉、技术Agent</td>
+<td style="text-align:left">短期可合并为单Agent，长期需独立扩展</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>记忆层</strong></td>
+<td style="text-align:left">为所有Agent提供统一的记忆与检索服务</td>
+<td style="text-align:left">长/短期记忆、GraphRAG、混合检索</td>
+<td style="text-align:left">分层独立演进，从简单缓存到图谱增强</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>监督层</strong></td>
+<td style="text-align:left">质量把控与反馈闭环</td>
+<td style="text-align:left">多维度质检器、反馈生成器</td>
+<td style="text-align:left">逐渐增加质检维度，从人工到自动化</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>关键数据流</strong></p>
+<ol>
+<li class="lvl-3"><strong>主创作流</strong>：用户输入 → 导演拆解 → 各 Agent 创作 → 质检 → 输出</li>
+<li class="lvl-3"><strong>记忆流</strong>：创作过程中持续读写记忆库，保持一致性</li>
+<li class="lvl-3"><strong>反馈流</strong>：质检发现缺陷 → 触发导演重新调度或定向召回</li>
+<li class="lvl-3"><strong>仲裁流</strong>：导演 Agent 随时干预风格冲突或资源分配问题</li>
+</ol>
+<p>（注：以上是规划蓝图的数据流定义——当前实现中没有导演 Agent，编排由固定的工作流承担，详见第八章。）</p>
+</blockquote>
+<p>从短期升级到长期时，以下能力需要<strong>渐进式构建</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">演进维度</th>
+<th style="text-align:left">短期(短剧)</th>
+<th style="text-align:left">长期(长片)</th>
+<th style="text-align:left">升级策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>上下文长度</strong></td>
+<td style="text-align:left">单场景(约5分钟)</td>
+<td style="text-align:left">跨场景/跨集(数小时)</td>
+<td style="text-align:left">逐步增加语义索引窗口</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>角色管理</strong></td>
+<td style="text-align:left">当前场景一致性</td>
+<td style="text-align:left">跨集人物弧光跟踪</td>
+<td style="text-align:left">从短时记忆→结构化长记忆</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>场景资产</strong></td>
+<td style="text-align:left">单剧风格统一</td>
+<td style="text-align:left">多剧集风格库复用</td>
+<td style="text-align:left">建立数字资产库</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>质检机制</strong></td>
+<td style="text-align:left">人工抽检</td>
+<td style="text-align:left">自动化质检+反馈闭环</td>
+<td style="text-align:left">逐步增加质检规则维度</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>召回策略</strong></td>
+<td style="text-align:left">单路向量检索</td>
+<td style="text-align:left">GraphRAG+多路混合</td>
+<td style="text-align:left">先上混合检索，再叠加图谱</td>
+</tr>
+</tbody>
+</table>
+<h3>已实现的核心能力（核对版）</h3>
+<p>原版 mindmap 列出的&quot;21 条成功模板、78 条长期记忆、768 维嵌入、HNSW 索引、10+ 质检维度&quot;——<strong>逐项核对后，其中只有部分为真，具体数字均无可查来源</strong>。重画为按接线状态标注的核对版：</p>
+<pre class="mermaid">mindmap
+  root((PenShot 召回体系))
+    已接线
+      模板召回
+        嵌入相似度匹配
+        阈值 0.7 去重入库
+      三层记忆
+        短期滑动窗口
+        中期摘要存储
+        长期 Chroma 检索
+      剧本知识库
+        手动余弦扫描
+        场景角色精确查询
+      质检闭环
+        规则审计 5 项
+        LLM 语义审计
+    已实现未接线
+      KnowledgeRouter 混合检索
+      Reranker 重排序
+    规划中
+      GraphRAG
+      BM25 关键词召回
+      RRF 融合
+</pre>
+<blockquote>
+<p>运行时的真实数字（模板数、记忆条目数、知识库文档数）可以通过各模块的 get_statistics() / get_stats() 接口查询——文档里固定写死的数字，正是需要在核对中被剔除的部分。</p>
+</blockquote>
+<hr>
+<h2>关键要点拆解（三）：召回策略全景架构</h2>
+<h3>整体架构图：三口径核对版</h3>
+<p>原版架构图描绘的是&quot;五层闭环&quot;的理想形态。既然本文以源码核对为主线，这里直接把理想图重画为<strong>三口径核对版</strong>——每条链路都标注真实状态，信息密度比理想架构图更高：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Wired[&quot;① 已接线：在调用链上真实运转&quot;]
+        W1[提示词转换节点]
+        W2[知识库检索&lt;br/&gt;ScriptKnowledgeBase.query&lt;br/&gt;手动余弦相似度全量扫描]
+        W3[模板召回&lt;br/&gt;PromptTemplateManager&lt;br/&gt;阈值0.7 / top_k=3]
+        W4[三层记忆&lt;br/&gt;MemoryManager + WorkflowMemory&lt;br/&gt;四阶段开工读历史、完工写归档]
+        W5[结构化查询&lt;br/&gt;query_scene / query_character&lt;br/&gt;精确字段匹配]
+        W1 --&gt; W2
+        W1 --&gt; W3
+        W1 --&gt; W4
+        W1 --&gt; W5
+    end
+
+    subgraph Impl[&quot;② 已实现未接线：有代码，无调用方&quot;]
+        I1[KnowledgeRouter&lt;br/&gt;四源混合检索]
+        I2[重排序 Reranker&lt;br/&gt;BAAI/bge-reranker-large]
+        I2 -.-&gt; I1
+    end
+
+    subgraph Plan[&quot;③ 规划中：全仓库零命中&quot;]
+        P1[GraphRAG 知识图谱]
+        P2[BM25 关键词召回]
+        P3[RRF 融合 / 学习排序 LTR]
+    end
+
+    I1 -.-&gt;|未接入主流程| W1
+    P1 -.-&gt;|路线图| W2
+    P2 -.-&gt;|路线图| W3
+    P3 -.-&gt;|路线图| I1
+
+    style Wired fill:#e8f5e9
+    style Impl fill:#fff8e1
+    style Plan fill:#fce4ec
+</pre>
+<h3>设计目标与兑现状态</h3>
+<p>需求文档为召回系统设定了五项目标。目标本身没有问题，但必须和&quot;兑现状态&quot;分开表述——以下逐条标注当前源码的真实情况：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>高召回率（目标 95% 以上）</strong>：规划口径。当前向量检索是手动余弦全量扫描，仓库内没有召回率评测集，95% 属于设计目标而非实测值。</p>
+</li>
+<li class="lvl-2">
+<p><strong>低延迟响应（目标 200ms 以内）</strong>：预算口径。真实链路的耗时随文档量增长（全量扫描的天然代价），仓库内没有压测脚本与延迟数据。</p>
+</li>
+<li class="lvl-2">
+<p><strong>语义理解准确</strong>：部分兑现。ScriptKnowledgeBase.query 用嵌入向量做余弦相似度匹配，能实现语句级语义召回；&quot;区分角色在说话与被提及&quot;这类细粒度能力未在当前实现中出现。</p>
+</li>
+<li class="lvl-2">
+<p><strong>逻辑关系感知</strong>：未兑现。角色互动、事件因果、场景转换逻辑需要图谱结构支撑，对应 GraphRAG 规划，全仓库零命中。</p>
+</li>
+<li class="lvl-2">
+<p><strong>跨剧本知识迁移</strong>：有限兑现。长期记忆与模板库均按 script_id 隔离（Chroma collection 名与持久化路径都带 script_id），&quot;从历史成功剧本学习&quot;目前是单剧本内的复用。</p>
+</li>
+</ul>
+<h3>召回策略真实性对照表</h3>
+<p>原版表格列的是&quot;权重/延迟&quot;设计预想，这些数值没有对应的实现或实测数据。换一张可以逐项核对的表：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">策略</th>
+<th style="text-align:left">文档中的描述</th>
+<th style="text-align:left">源码真身</th>
+<th style="text-align:left">状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">语义向量</td>
+<td style="text-align:left">BGE Embedding + HNSW 图索引</td>
+<td style="text-align:left">ScriptKnowledgeBase.query：手动余弦相似度全量扫描</td>
+<td style="text-align:left">✅ 已接线</td>
+</tr>
+<tr>
+<td style="text-align:left">模板召回</td>
+<td style="text-align:left">Hash 索引精确匹配</td>
+<td style="text-align:left">PromptTemplateManager：嵌入相似度（阈值 0.7，top_k=3）</td>
+<td style="text-align:left">✅ 已接线</td>
+</tr>
+<tr>
+<td style="text-align:left">记忆系统</td>
+<td style="text-align:left">分层存储 LRU + 向量</td>
+<td style="text-align:left">WorkflowMemory + MemoryManager：deque 滑动窗口 + LangChain 历史 + Chroma</td>
+<td style="text-align:left">✅ 已接线</td>
+</tr>
+<tr>
+<td style="text-align:left">结构化查询</td>
+<td style="text-align:left">标签过滤</td>
+<td style="text-align:left">query_scene / query_character：遍历列表精确比对</td>
+<td style="text-align:left">✅ 已接线</td>
+</tr>
+<tr>
+<td style="text-align:left">混合检索</td>
+<td style="text-align:left">多路召回 + RRF 融合</td>
+<td style="text-align:left">KnowledgeRouter._hybrid_search：串行调用 + 分数排序 + 前缀去重</td>
+<td style="text-align:left">⚠️ 已实现未接线</td>
+</tr>
+<tr>
+<td style="text-align:left">重排序</td>
+<td style="text-align:left">CrossEncoder 精排</td>
+<td style="text-align:left">SentenceTransformerRerank（bge-reranker-large）挂在未接线路径上</td>
+<td style="text-align:left">⚠️ 已实现未接线</td>
+</tr>
+<tr>
+<td style="text-align:left">关键词召回</td>
+<td style="text-align:left">BM25 倒排索引</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">❌ 零命中</td>
+</tr>
+<tr>
+<td style="text-align:left">知识图谱</td>
+<td style="text-align:left">GraphRAG 属性图</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">❌ 零命中</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>说明：文档口径的&quot;权重/延迟&quot;列被替换为&quot;状态&quot;列，因为后者可以对照源码逐项验证。三档状态的判定标准在引言中给出——特别地，&quot;已实现未接线&quot;意味着读者能读到完整实现，但运行时永远不会被触发。</p>
+</blockquote>
+<h3>真实调用链序列图</h3>
+<p>原版序列图画的是&quot;四路并行召回 + 重排序&quot;的理想流程。下面这张换成源码里真实发生的调用——以剧本解析节点与提示词转换节点为例：</p>
+<pre class="mermaid">sequenceDiagram
+    participant Node as 工作流节点
+    participant WM as WorkflowMemory
+    participant MM as MemoryManager
+    participant Tpl as PromptTemplateManager
+    participant KB as ScriptKnowledgeBase
+
+    Note over Node: 阶段开工前——读历史
+    Node-&gt;&gt;WM: get_memory_dict(&quot;parsing_strategy_recent&quot;, SHORT)
+    Node-&gt;&gt;WM: get_memory_dict(&quot;stats_parse_script&quot;, MEDIUM)
+    Node-&gt;&gt;WM: get_memory_list(&quot;common_parse_issues&quot;, LONG)
+    WM-&gt;&gt;MM: recall(key, level)
+    MM--&gt;&gt;WM: MemoryContext（含反序列化）
+    WM--&gt;&gt;Node: 历史上下文 → apply_historical_context()
+
+    Note over Node,Tpl: 转换节点额外两次检索
+    Node-&gt;&gt;Tpl: search_similar_prompts(fragment, top_k=3)
+    Tpl--&gt;&gt;Node: 嵌入相似度 ≥ 0.7 的历史成功模板
+    Node-&gt;&gt;KB: query(text, similarity_top_k)
+    KB--&gt;&gt;Node: 手动余弦打分 + 排序截断的 Top-K
+
+    Note over Node,MM: 阶段完工后——写归档
+    Node-&gt;&gt;WM: after_stage_completion(stage, result)
+    WM-&gt;&gt;MM: 写入短期（完整结果）+ 中期（统计摘要）+ 长期（成功模式）
+</pre>
+<p>对比原版序列图可以看到：图中没有&quot;并行召回&quot;，也没有&quot;重排序&quot;——它们所在的那条链路（KnowledgeRouter）至今没有调用方。真实链路是&quot;开工读历史、干活查两库、完工写归档&quot;，不复杂，但确实在跑。</p>
+<hr>
+<h2>关键要点拆解（四）：混合检索策略详解</h2>
+<h3>核心解决的问题</h3>
+<p>剧本分镜场景中，用户查询呈现多样化的特点：有时需要精确的角色名称匹配（如&quot;林小雨的所有台词&quot;），有时需要语义相似的内容（如&quot;雨天的氛围场景&quot;），有时需要结构化的筛选（如&quot;第三幕的对话&quot;）。单一检索方式无法同时覆盖这些需求，&quot;混合检索&quot;因此成为文档中的重点设计。</p>
+<p>但需要先把两件事分开：<strong>需求是真实的，混合检索的&quot;文档描述&quot;与&quot;源码实现&quot;却差距很大</strong>。逐项对照：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">需求类型</th>
+<th style="text-align:left">示例查询</th>
+<th style="text-align:left">文档方案</th>
+<th style="text-align:left">源码现状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">精确匹配</td>
+<td style="text-align:left">“查找陈阳的所有台词”</td>
+<td style="text-align:left">关键词 BM25</td>
+<td style="text-align:left">零命中；接近的替代是 query_character 精确字段比对</td>
+</tr>
+<tr>
+<td style="text-align:left">语义相似</td>
+<td style="text-align:left">“类似雨中相遇的浪漫场景”</td>
+<td style="text-align:left">向量检索</td>
+<td style="text-align:left">✅ 手动余弦全量扫描（已接线）</td>
+</tr>
+<tr>
+<td style="text-align:left">关系推理</td>
+<td style="text-align:left">“男主发现真相后的反应镜头”</td>
+<td style="text-align:left">GraphRAG</td>
+<td style="text-align:left">零命中，规划项</td>
+</tr>
+<tr>
+<td style="text-align:left">结构筛选</td>
+<td style="text-align:left">“第二幕中时长&gt;3秒的特写”</td>
+<td style="text-align:left">标签过滤</td>
+<td style="text-align:left">部分支持：query_scene 按场景编号精确查询，无时长等复合条件</td>
+</tr>
+</tbody>
+</table>
+<h3>检索的真实形态：一次全量扫描</h3>
+<p>ScriptKnowledgeBase.query 的实际流程远比&quot;多路召回融合&quot;朴素——它就是一次嵌入 + 全量扫描 + 排序截断：</p>
+<pre class="mermaid">flowchart LR
+    Q[查询文本] --&gt; E[embeddings.embed_query]
+    E --&gt; L[遍历向量库&lt;br/&gt;embedding_dict 全部条目]
+    L --&gt; D[&quot;逐条计算余弦相似度&lt;br/&gt;np.dot / (‖q‖·‖d‖)&quot;]
+    D --&gt; S[按 similarity 降序排序]
+    S --&gt; K[截断 top_k&lt;br/&gt;默认 5]
+    K --&gt; R[格式化返回&lt;br/&gt;id / score / text / metadata / rank]
+
+    style L fill:#fff3e0
+    style D fill:#fff3e0
+</pre>
+<p>没有倒排索引、没有 HNSW 图、没有 RRF 融合——优点是完全可解释、零额外依赖；代价是 O(N) 复杂度，每次查询都要把向量库里的每个文档过一遍。文档规模小的时候这完全够用，但它是&quot;正确的简单&quot;，而不是&quot;高性能的复杂&quot;。</p>
+<h3>融合算法：文档说法与真实实现的距离</h3>
+<p><strong>倒数排序融合（RRF）</strong>：多路召回的标准融合算法，只依赖排序位置（rank）而非原始分值，天然回避&quot;向量相似度 0.9 vs BM25 8.5&quot;这类量纲不可比问题，公式为 RRF_score = Σ 1/(k + rank_i)，k 常取 60。<strong>但 PenShot 仓库中检索不到 RRF 的实现</strong>——这个算法目前只存在于设计文档和文章演示代码里。</p>
+<p><strong>加权求和</strong>：各源分数归一化后按权重合并。同样未实现——所谓&quot;经验调优权重&quot;没有对应的配置项或代码。</p>
+<p><strong>学习排序（LTR）</strong>：需要标注数据训练排序模型。未实现，且在&quot;融合策略&quot;本身都还没上线的阶段，讨论 LTR 属于超纲。</p>
+<p>那么已实现的融合在哪里？在 KnowledgeRouter._hybrid_search 里——注意，这条链路<strong>整体未接线</strong>。它的真实逻辑只有三步：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>串行调用</strong>三路检索（向量 + 记忆 + 结构化）。源码注释自己写明了：“简化版，实际可用 asyncio.gather”——作者清楚这里本该并行；</p>
+</li>
+<li class="lvl-3">
+<p>合并后按 score 降序排序。而记忆与结构化结果的 score 是<strong>硬编码常量</strong>：短期记忆 0.9、中期记忆 0.7、长期记忆 0.6、结构化场景 1.0、结构化角色 0.9——它们反映的是&quot;来源权重&quot;的直觉，而不是与查询的真实相关性；</p>
+</li>
+<li class="lvl-3">
+<p>用内容前 100 字符作 key 做前缀去重，截断 top_k 返回。</p>
+</li>
+</ol>
+<p>评估这段实现时不宜套用&quot;多路融合算法&quot;的滤镜。更准确的说法是：它是一个把三路结果拼在一起的基础聚合器，排序靠硬编码分数、去重靠字符串前缀。它离 RRF 这类算法只差&quot;排名位置&quot;这一个转化，但这一步还没迈出去。</p>
+<h3>概念示例：简化版混合检索 Demo</h3>
+<p>⚠️ <strong>代码性质说明</strong>：以下代码是<strong>概念示例，并非 PenShot 项目源码</strong>。它的价值在于帮助读者理解&quot;多路召回 + RRF 融合&quot;的教科书思路，可以与上一节的真实实现对照阅读——示例里的 BM25、RRF 在项目中都没有对应代码。如需核对真实实现，请以 KnowledgeRouter（未接线）与 ScriptKnowledgeBase（已接线）为准。</p>
+<pre class="hljs"><code><span class="hljs-comment"># hybrid_retriever_demo.py</span>
+<span class="hljs-string">&quot;&quot;&quot;
+混合检索器演示 - 展示多路召回与融合的核心逻辑（概念示例）
+&quot;&quot;&quot;</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">HybridRetrieverDemo</span>:
+    <span class="hljs-string">&quot;&quot;&quot;混合检索器 - 核心逻辑演示&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-comment"># 模拟存储的剧本数据</span>
+        <span class="hljs-variable language_">self</span>.documents = [
+            {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;doc_001&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;林小雨蹲在长椅旁，用手帕擦拭湿漉漉的《飞鸟集》&quot;</span>, <span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;林小雨&quot;</span>, <span class="hljs-string">&quot;长椅&quot;</span>, <span class="hljs-string">&quot;飞鸟集&quot;</span>]},
+            {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;doc_002&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;陈阳急刹车，电动车溅起水花，书掉进水洼&quot;</span>, <span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;陈阳&quot;</span>, <span class="hljs-string">&quot;电动车&quot;</span>, <span class="hljs-string">&quot;水洼&quot;</span>]},
+            {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;doc_003&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;雨渐小，阳光穿透云层，两人并肩跑向屋檐&quot;</span>, <span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;雨&quot;</span>, <span class="hljs-string">&quot;阳光&quot;</span>, <span class="hljs-string">&quot;屋檐&quot;</span>]},
+            {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;doc_004&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;陈阳从雨衣内掏出防水袋，眼神温柔&quot;</span>, <span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;陈阳&quot;</span>, <span class="hljs-string">&quot;雨衣&quot;</span>, <span class="hljs-string">&quot;防水袋&quot;</span>]},
+            {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;doc_005&quot;</span>, <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;林小雨翻开《飞鸟集》，里面夹着电影票根&quot;</span>, <span class="hljs-string">&quot;tags&quot;</span>: [<span class="hljs-string">&quot;林小雨&quot;</span>, <span class="hljs-string">&quot;飞鸟集&quot;</span>, <span class="hljs-string">&quot;票根&quot;</span>]},
+        ]
+        
+        <span class="hljs-comment"># 模拟的哈希索引（用于精确匹配）</span>
+        <span class="hljs-variable language_">self</span>.hash_index = <span class="hljs-variable language_">self</span>._build_hash_index()
+        
+        <span class="hljs-comment"># 模拟的BM25索引</span>
+        <span class="hljs-variable language_">self</span>.bm25_index = <span class="hljs-variable language_">self</span>._build_bm25_index()
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">multi_recall</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span>, top_k: <span class="hljs-built_in">int</span> = <span class="hljs-number">3</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;
+        多路召回演示
+        
+        流程：精确匹配 -&gt; BM25 -&gt; 向量检索 -&gt; 融合去重
+        &quot;&quot;&quot;</span>
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;\n查询: <span class="hljs-subst">{query}</span>&quot;</span>)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;-&quot;</span> * <span class="hljs-number">50</span>)
+        
+        <span class="hljs-comment"># 1. 精确匹配召回</span>
+        exact_results = <span class="hljs-variable language_">self</span>._exact_match(query)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;精确匹配召回: <span class="hljs-subst">{<span class="hljs-built_in">len</span>(exact_results)}</span>条&quot;</span>)
+        
+        <span class="hljs-comment"># 2. BM25召回</span>
+        bm25_results = <span class="hljs-variable language_">self</span>._bm25_search(query)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;BM25召回: <span class="hljs-subst">{<span class="hljs-built_in">len</span>(bm25_results)}</span>条&quot;</span>)
+        
+        <span class="hljs-comment"># 3. 向量召回（模拟）</span>
+        vector_results = <span class="hljs-variable language_">self</span>._vector_search(query)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;向量召回: <span class="hljs-subst">{<span class="hljs-built_in">len</span>(vector_results)}</span>条&quot;</span>)
+        
+        <span class="hljs-comment"># 4. 融合与排序</span>
+        all_results = exact_results + bm25_results + vector_results
+        fused = <span class="hljs-variable language_">self</span>._rrf_fusion(all_results)
+        
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;\n融合后top-<span class="hljs-subst">{top_k}</span>:&quot;</span>)
+        <span class="hljs-keyword">for</span> i, r <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(fused[:top_k]):
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;  <span class="hljs-subst">{i+<span class="hljs-number">1</span>}</span>. <span class="hljs-subst">{r[<span class="hljs-string">&#x27;content&#x27;</span>][:<span class="hljs-number">50</span>]}</span>... (得分: <span class="hljs-subst">{r[<span class="hljs-string">&#x27;score&#x27;</span>]:<span class="hljs-number">.3</span>f}</span>)&quot;</span>)
+        
+        <span class="hljs-keyword">return</span> fused[:top_k]
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_exact_match</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;精确匹配 - 基于哈希索引&quot;&quot;&quot;</span>
+        results = []
+        query_hash = <span class="hljs-built_in">hash</span>(query) % <span class="hljs-number">10000</span>
+        
+        <span class="hljs-comment"># 模拟hash匹配</span>
+        <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.documents:
+            <span class="hljs-keyword">if</span> <span class="hljs-built_in">any</span>(tag == query <span class="hljs-keyword">for</span> tag <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;tags&quot;</span>]):
+                results.append({
+                    <span class="hljs-string">&quot;id&quot;</span>: doc[<span class="hljs-string">&quot;id&quot;</span>],
+                    <span class="hljs-string">&quot;content&quot;</span>: doc[<span class="hljs-string">&quot;content&quot;</span>],
+                    <span class="hljs-string">&quot;score&quot;</span>: <span class="hljs-number">1.0</span>,
+                    <span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;exact&quot;</span>
+                })
+        <span class="hljs-keyword">return</span> results
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_bm25_search</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;BM25关键词检索&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 简化的BM25模拟</span>
+        keywords = query.split()
+        results = []
+        
+        <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.documents:
+            score = <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> kw <span class="hljs-keyword">in</span> keywords:
+                <span class="hljs-keyword">if</span> kw <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;content&quot;</span>]:
+                    score += <span class="hljs-number">1</span>
+                <span class="hljs-keyword">for</span> tag <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;tags&quot;</span>]:
+                    <span class="hljs-keyword">if</span> kw <span class="hljs-keyword">in</span> tag:
+                        score += <span class="hljs-number">0.5</span>
+            
+            <span class="hljs-keyword">if</span> score &gt; <span class="hljs-number">0</span>:
+                results.append({
+                    <span class="hljs-string">&quot;id&quot;</span>: doc[<span class="hljs-string">&quot;id&quot;</span>],
+                    <span class="hljs-string">&quot;content&quot;</span>: doc[<span class="hljs-string">&quot;content&quot;</span>],
+                    <span class="hljs-string">&quot;score&quot;</span>: score / <span class="hljs-built_in">len</span>(keywords),
+                    <span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;bm25&quot;</span>
+                })
+        
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">sorted</span>(results, key=<span class="hljs-keyword">lambda</span> x: -x[<span class="hljs-string">&quot;score&quot;</span>])
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_vector_search</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;向量语义检索（模拟）&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 模拟语义相似度</span>
+        semantic_map = {
+            <span class="hljs-string">&quot;雨天&quot;</span>: [<span class="hljs-string">&quot;雨&quot;</span>, <span class="hljs-string">&quot;水洼&quot;</span>, <span class="hljs-string">&quot;雨衣&quot;</span>],
+            <span class="hljs-string">&quot;人物&quot;</span>: [<span class="hljs-string">&quot;林小雨&quot;</span>, <span class="hljs-string">&quot;陈阳&quot;</span>],
+            <span class="hljs-string">&quot;物品&quot;</span>: [<span class="hljs-string">&quot;飞鸟集&quot;</span>, <span class="hljs-string">&quot;防水袋&quot;</span>, <span class="hljs-string">&quot;票根&quot;</span>],
+            <span class="hljs-string">&quot;动作&quot;</span>: [<span class="hljs-string">&quot;擦拭&quot;</span>, <span class="hljs-string">&quot;刹车&quot;</span>, <span class="hljs-string">&quot;跑&quot;</span>]
+        }
+        
+        results = []
+        <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.documents:
+            score = <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> category, keywords <span class="hljs-keyword">in</span> semantic_map.items():
+                <span class="hljs-keyword">for</span> kw <span class="hljs-keyword">in</span> keywords:
+                    <span class="hljs-keyword">if</span> kw <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;content&quot;</span>] <span class="hljs-keyword">or</span> kw <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;tags&quot;</span>]:
+                        score += <span class="hljs-number">0.3</span>
+            
+            <span class="hljs-comment"># 查询与文档的语义匹配</span>
+            <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;雨&quot;</span> <span class="hljs-keyword">in</span> query <span class="hljs-keyword">and</span> (<span class="hljs-string">&quot;雨&quot;</span> <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;content&quot;</span>] <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;水&quot;</span> <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;content&quot;</span>]):
+                score += <span class="hljs-number">0.5</span>
+            <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;书&quot;</span> <span class="hljs-keyword">in</span> query <span class="hljs-keyword">and</span> <span class="hljs-string">&quot;飞鸟集&quot;</span> <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;content&quot;</span>]:
+                score += <span class="hljs-number">0.5</span>
+            
+            <span class="hljs-keyword">if</span> score &gt; <span class="hljs-number">0</span>:
+                results.append({
+                    <span class="hljs-string">&quot;id&quot;</span>: doc[<span class="hljs-string">&quot;id&quot;</span>],
+                    <span class="hljs-string">&quot;content&quot;</span>: doc[<span class="hljs-string">&quot;content&quot;</span>],
+                    <span class="hljs-string">&quot;score&quot;</span>: <span class="hljs-built_in">min</span>(<span class="hljs-number">1.0</span>, score),
+                    <span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;vector&quot;</span>
+                })
+        
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">sorted</span>(results, key=<span class="hljs-keyword">lambda</span> x: -x[<span class="hljs-string">&quot;score&quot;</span>])
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_rrf_fusion</span>(<span class="hljs-params">self, results</span>):
+        <span class="hljs-string">&quot;&quot;&quot;倒数排序融合（RRF）&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">from</span> collections <span class="hljs-keyword">import</span> defaultdict
+        
+        k = <span class="hljs-number">60</span>
+        rrf_scores = defaultdict(<span class="hljs-built_in">float</span>)
+        rank_by_source = defaultdict(<span class="hljs-built_in">list</span>)
+        
+        <span class="hljs-comment"># 按召回源分组并排序</span>
+        <span class="hljs-keyword">for</span> r <span class="hljs-keyword">in</span> results:
+            rank_by_source[r[<span class="hljs-string">&quot;source&quot;</span>]].append(r)
+        
+        <span class="hljs-keyword">for</span> source, source_results <span class="hljs-keyword">in</span> rank_by_source.items():
+            <span class="hljs-keyword">for</span> rank, r <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(<span class="hljs-built_in">sorted</span>(source_results, key=<span class="hljs-keyword">lambda</span> x: -x[<span class="hljs-string">&quot;score&quot;</span>])):
+                rrf_scores[r[<span class="hljs-string">&quot;id&quot;</span>]] += <span class="hljs-number">1.0</span> / (k + rank + <span class="hljs-number">1</span>)
+        
+        <span class="hljs-comment"># 构建最终结果</span>
+        final_results = []
+        doc_map = {r[<span class="hljs-string">&quot;id&quot;</span>]: r <span class="hljs-keyword">for</span> r <span class="hljs-keyword">in</span> results}
+        
+        <span class="hljs-keyword">for</span> doc_id, score <span class="hljs-keyword">in</span> <span class="hljs-built_in">sorted</span>(rrf_scores.items(), key=<span class="hljs-keyword">lambda</span> x: -x[<span class="hljs-number">1</span>]):
+            <span class="hljs-keyword">if</span> doc_id <span class="hljs-keyword">in</span> doc_map:
+                r = doc_map[doc_id].copy()
+                r[<span class="hljs-string">&quot;score&quot;</span>] = score
+                final_results.append(r)
+        
+        <span class="hljs-keyword">return</span> final_results
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_build_hash_index</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-string">&quot;&quot;&quot;构建哈希索引&quot;&quot;&quot;</span>
+        index = {}
+        <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.documents:
+            <span class="hljs-keyword">for</span> tag <span class="hljs-keyword">in</span> doc[<span class="hljs-string">&quot;tags&quot;</span>]:
+                index[tag] = doc[<span class="hljs-string">&quot;id&quot;</span>]
+        <span class="hljs-keyword">return</span> index
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_build_bm25_index</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-string">&quot;&quot;&quot;构建BM25索引&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 实际实现使用 rank_bm25 库</span>
+        <span class="hljs-keyword">pass</span>
+
+
+<span class="hljs-comment"># 运行演示</span>
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    retriever = HybridRetrieverDemo()
+    
+    <span class="hljs-comment"># 测试不同查询</span>
+    queries = [<span class="hljs-string">&quot;林小雨&quot;</span>, <span class="hljs-string">&quot;雨天的场景&quot;</span>, <span class="hljs-string">&quot;书&quot;</span>]
+    
+    <span class="hljs-keyword">for</span> q <span class="hljs-keyword">in</span> queries:
+        retriever.multi_recall(q, top_k=<span class="hljs-number">3</span>)
+</code></pre>
+<p><strong>代码输出示例</strong></p>
+<pre class="hljs"><code>查询: 林小雨
+--------------------------------------------------
+精确匹配召回: 2条
+BM25召回: 2条
+向量召回: 3条
+
+融合后top-3:
+  1. 林小雨蹲在长椅旁，用手帕擦拭湿漉漉的《飞鸟集》... (得分: 0.016)
+  2. 林小雨翻开《飞鸟集》，里面夹着电影票根... (得分: 0.016)
+  3. 雨渐小，阳光穿透云层，两人并肩跑向屋檐... (得分: 0.008)
+
+查询: 雨天的场景
+--------------------------------------------------
+精确匹配召回: 0条
+BM25召回: 2条
+向量召回: 4条
+
+融合后top-3:
+  1. 雨渐小，阳光穿透云层，两人并肩跑向屋檐... (得分: 0.033)
+  2. 陈阳急刹车，电动车溅起水花，书掉进水洼... (得分: 0.025)
+  3. 林小雨蹲在长椅旁，用手帕擦拭湿漉漉的《飞鸟集》... (得分: 0.016)
+</code></pre>
+<blockquote>
+<p>注意分数尺度：0.016 ≈ 1/(60+1)，即该文档只在单一召回路中排名靠前。这个输出仅供理解 RRF 的打分方式，来自示例代码的模拟数据，与 PenShot 的真实运行结果无关。</p>
+</blockquote>
+<hr>
+<h2>关键要点拆解（五）：GraphRAG 知识图谱</h2>
+<h3>核心解决的问题</h3>
+<p>传统RAG（检索增强生成）基于向量相似度进行检索，这种方式难以理解剧情中的复杂逻辑关系。例如：</p>
+<blockquote>
+<p><strong>场景一</strong>：剧本中&quot;男主&quot;和&quot;助手&quot;在前三集建立了深厚的信任关系，第五集&quot;助手背叛&quot;。当用户要求生成&quot;男主发现助手背叛后的对峙戏&quot;时，传统RAG只能检索到&quot;背叛&quot;相关的片段，但无法理解&quot;为什么背叛会带来强烈的情绪冲击&quot;——这需要理解前文中建立的信任关系。</p>
+<p><strong>场景二</strong>：用户要求&quot;延续上一场的氛围&quot;，传统RAG无法理解&quot;上一场&quot;指的是哪个场景，更无法理解该场景的氛围特征是什么。</p>
+</blockquote>
+<p>GraphRAG 的思路，是在向量检索的基础上构建&quot;角色-事件-场景&quot;实体与互动、因果、时序关系的知识图谱，把&quot;检索&quot;升级为&quot;推理&quot;。<strong>但需要先明确：PenShot 仓库中检索不到图谱实体抽取、图存储、图遍历的任何实现</strong>——以下是设计蓝图与落地评估，不是&quot;已实现功能详解&quot;。想先看结论的读者可以直接跳到本章末的落地评估部分。</p>
+<h3>规划蓝图：知识图谱架构（未实现）</h3>
+<p>以下实体 / 关系 / 属性三层结构来自设计文档。它描述的是&quot;如果做 GraphRAG，图谱应该长什么样&quot;，而不是当前代码的结构：</p>
+<pre class="mermaid">graph TB
+    subgraph Entities[&quot;实体层&quot;]
+        C[角色实体]
+        S[场景实体]
+        P[道具实体]
+        E[事件实体]
+        L[地点实体]
+        T[时间实体]
+    end
+    
+    subgraph Relations[&quot;关系层&quot;]
+        R1[角色-角色&lt;br/&gt;关系/对话]
+        R2[角色-场景&lt;br/&gt;出现在]
+        R3[角色-道具&lt;br/&gt;持有/使用]
+        R4[事件-事件&lt;br/&gt;因果/时序]
+        R5[场景-场景&lt;br/&gt;转换/过渡]
+    end
+    
+    subgraph Properties[&quot;属性层&quot;]
+        A1[角色属性&lt;br/&gt;性格/外貌/台词]
+        A2[场景属性&lt;br/&gt;氛围/光线/时间]
+        A3[事件属性&lt;br/&gt;情感/强度/时长]
+    end
+    
+    C --&gt; R1
+    C --&gt; R2
+    C --&gt; R3
+    S --&gt; R2
+    S --&gt; R5
+    P --&gt; R3
+    E --&gt; R4
+    E --&gt; A3
+    
+    C --&gt; A1
+    S --&gt; A2
+
+    style Entities fill:#e3f2fd
+    style Relations fill:#fff3e0
+    style Properties fill:#e8f5e9
+</pre>
+<p><strong>实体类型说明</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">实体类型</th>
+<th style="text-align:left">示例</th>
+<th style="text-align:left">关键属性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色实体</td>
+<td style="text-align:left">林小雨、陈阳</td>
+<td style="text-align:left">性别、性格、外貌、关键台词</td>
+</tr>
+<tr>
+<td style="text-align:left">场景实体</td>
+<td style="text-align:left">咖啡店外、公寓客厅</td>
+<td style="text-align:left">地点、时间、天气、氛围</td>
+</tr>
+<tr>
+<td style="text-align:left">道具实体</td>
+<td style="text-align:left">《飞鸟集》、雨衣、票根</td>
+<td style="text-align:left">颜色、状态、重要性</td>
+</tr>
+<tr>
+<td style="text-align:left">事件实体</td>
+<td style="text-align:left">雨中相遇、电话对话</td>
+<td style="text-align:left">类型、强度、情绪</td>
+</tr>
+<tr>
+<td style="text-align:left">地点实体</td>
+<td style="text-align:left">城市街角、屋檐下</td>
+<td style="text-align:left">空间特征、连接关系</td>
+</tr>
+<tr>
+<td style="text-align:left">时间实体</td>
+<td style="text-align:left">深夜11点、下周三</td>
+<td style="text-align:left">时序位置、持续时间</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关系类型说明</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">关系类型</th>
+<th style="text-align:left">方向</th>
+<th style="text-align:left">权重计算</th>
+<th style="text-align:left">示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">出现在</td>
+<td style="text-align:left">角色→场景</td>
+<td style="text-align:left">出现次数/总次数</td>
+<td style="text-align:left">林小雨出现在scene_001</td>
+</tr>
+<tr>
+<td style="text-align:left">持有</td>
+<td style="text-align:left">角色→道具</td>
+<td style="text-align:left">持续时间占比</td>
+<td style="text-align:left">陈阳持有防水袋</td>
+</tr>
+<tr>
+<td style="text-align:left">导致</td>
+<td style="text-align:left">事件→事件</td>
+<td style="text-align:left">因果强度评分</td>
+<td style="text-align:left">刹车→书掉落</td>
+</tr>
+<tr>
+<td style="text-align:left">在…之前</td>
+<td style="text-align:left">事件→事件</td>
+<td style="text-align:left">时序距离</td>
+<td style="text-align:left">接电话→挂电话</td>
+</tr>
+<tr>
+<td style="text-align:left">互动</td>
+<td style="text-align:left">角色↔角色</td>
+<td style="text-align:left">对话次数/共现次数</td>
+<td style="text-align:left">林小雨↔陈阳</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>表中&quot;权重计算&quot;列（出现次数占比、因果强度评分、时序距离等）是为图谱检索预留的打分构想，当前没有实现。</p>
+</blockquote>
+<h3>规划蓝图：GraphRAG 检索流程（未实现）</h3>
+<p>理想流程如图所示——实体识别、图谱遍历、向量检索并行、融合推理。对照当前代码：向量检索这一支真实存在（手动余弦），图谱遍历这一支不存在：</p>
+<pre class="mermaid">sequenceDiagram
+    participant User as 用户查询
+    participant Parser as 查询解析器
+    participant Graph as 知识图谱
+    participant Vector as 向量索引
+    participant Fusion as 融合引擎
+    participant Output as 输出
+
+    User-&gt;&gt;Parser: &quot;男主发现助手背叛&quot;
+    
+    Parser-&gt;&gt;Parser: 实体识别
+    Note over Parser: 实体: {男主, 助手, 背叛}
+    
+    par 图谱遍历
+        Parser-&gt;&gt;Graph: 查找&quot;男主&quot;节点
+        Graph--&gt;&gt;Parser: 男主属性、关系
+        Parser-&gt;&gt;Graph: 查找&quot;助手&quot;节点
+        Graph--&gt;&gt;Parser: 助手属性、关系
+        Parser-&gt;&gt;Graph: 查找&quot;背叛&quot;事件
+        Graph--&gt;&gt;Parser: 背叛事件、因果关系
+    and 向量检索
+        Parser-&gt;&gt;Vector: 相似语义检索
+        Vector--&gt;&gt;Parser: 相关片段
+    end
+    
+    Parser-&gt;&gt;Fusion: 提交多路结果
+    
+    Fusion-&gt;&gt;Fusion: 图谱推理
+    Note over Fusion: 推理: 男主→关系→助手→背叛事件
+    
+    Fusion-&gt;&gt;Output: 召回结果
+    Output--&gt;&gt;User: 相关分镜/台词
+</pre>
+<blockquote>
+<p>排坑说明：GraphRAG 的实现成本明显高于纯向量检索——图谱构建需要额外的实体识别与关系抽取，数据稀疏时（样本不足）关系边稀少，效果甚至可能不如向量检索。因此 GraphRAG 更适合关系密集、逻辑因果强的长剧场景，短剧可先用已接线的链路打底，再评估是否叠加图谱。</p>
+</blockquote>
+<h3>概念示例：图谱构建与检索 Demo</h3>
+<p>⚠️ <strong>代码性质说明</strong>：以下代码是<strong>概念示例，并非 PenShot 项目源码</strong>。它演示&quot;实体识别 → 图遍历 → 路径打分&quot;的通用思路（广度优先遍历、深度限制 3 层、路径越短分越高等），与项目代码无关——项目里没有这段实现的对应物。</p>
+<pre class="hljs"><code><span class="hljs-comment"># graph_rag_demo.py</span>
+<span class="hljs-string">&quot;&quot;&quot;
+GraphRAG演示 - 知识图谱构建与推理检索（概念示例）
+&quot;&quot;&quot;</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">GraphRAGDemo</span>:
+    <span class="hljs-string">&quot;&quot;&quot;GraphRAG核心逻辑演示&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-comment"># 实体存储</span>
+        <span class="hljs-variable language_">self</span>.entities = {}
+        <span class="hljs-comment"># 关系存储（邻接表）</span>
+        <span class="hljs-variable language_">self</span>.relations = {}
+        <span class="hljs-comment"># 实体类型索引</span>
+        <span class="hljs-variable language_">self</span>.type_index = {}
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">build_from_script</span>(<span class="hljs-params">self, script_data</span>):
+        <span class="hljs-string">&quot;&quot;&quot;
+        从剧本构建知识图谱
+        
+        构建步骤：
+        1. 添加角色实体 - 每个角色成为图中的一个节点
+        2. 添加场景实体 - 每个场景成为图中的一个节点
+        3. 添加事件实体 - 每个动作/对话成为事件节点
+        4. 建立关系边 - 根据剧本内容建立实体间的连接
+        &quot;&quot;&quot;</span>
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;构建知识图谱...&quot;</span>)
+        
+        <span class="hljs-comment"># 1. 添加角色实体</span>
+        <span class="hljs-keyword">for</span> char <span class="hljs-keyword">in</span> script_data.get(<span class="hljs-string">&quot;characters&quot;</span>, []):
+            <span class="hljs-variable language_">self</span>._add_entity(
+                entity_id=<span class="hljs-string">f&quot;char_<span class="hljs-subst">{char[<span class="hljs-string">&#x27;name&#x27;</span>]}</span>&quot;</span>,
+                name=char[<span class="hljs-string">&quot;name&quot;</span>],
+                entity_type=<span class="hljs-string">&quot;character&quot;</span>,
+                properties={
+                    <span class="hljs-string">&quot;gender&quot;</span>: char.get(<span class="hljs-string">&quot;gender&quot;</span>),
+                    <span class="hljs-string">&quot;role&quot;</span>: char.get(<span class="hljs-string">&quot;role&quot;</span>),
+                    <span class="hljs-string">&quot;description&quot;</span>: char.get(<span class="hljs-string">&quot;description&quot;</span>)
+                }
+            )
+        
+        <span class="hljs-comment"># 2. 添加场景实体</span>
+        <span class="hljs-keyword">for</span> scene <span class="hljs-keyword">in</span> script_data.get(<span class="hljs-string">&quot;scenes&quot;</span>, []):
+            <span class="hljs-variable language_">self</span>._add_entity(
+                entity_id=<span class="hljs-string">f&quot;scene_<span class="hljs-subst">{scene[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>,
+                name=scene.get(<span class="hljs-string">&quot;location&quot;</span>, <span class="hljs-string">&quot;&quot;</span>),
+                entity_type=<span class="hljs-string">&quot;scene&quot;</span>,
+                properties={
+                    <span class="hljs-string">&quot;time&quot;</span>: scene.get(<span class="hljs-string">&quot;time_of_day&quot;</span>),
+                    <span class="hljs-string">&quot;weather&quot;</span>: scene.get(<span class="hljs-string">&quot;weather&quot;</span>)
+                }
+            )
+        
+        <span class="hljs-comment"># 3. 添加事件实体和关系</span>
+        <span class="hljs-keyword">for</span> scene <span class="hljs-keyword">in</span> script_data.get(<span class="hljs-string">&quot;scenes&quot;</span>, []):
+            scene_id = <span class="hljs-string">f&quot;scene_<span class="hljs-subst">{scene[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>
+            <span class="hljs-keyword">for</span> elem <span class="hljs-keyword">in</span> scene.get(<span class="hljs-string">&quot;elements&quot;</span>, []):
+                event_id = <span class="hljs-string">f&quot;event_<span class="hljs-subst">{elem[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>
+                <span class="hljs-variable language_">self</span>._add_entity(
+                    entity_id=event_id,
+                    name=elem.get(<span class="hljs-string">&quot;content&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)[:<span class="hljs-number">30</span>],
+                    entity_type=elem.get(<span class="hljs-string">&quot;type&quot;</span>, <span class="hljs-string">&quot;action&quot;</span>),
+                    properties={
+                        <span class="hljs-string">&quot;emotion&quot;</span>: elem.get(<span class="hljs-string">&quot;emotion&quot;</span>),
+                        <span class="hljs-string">&quot;intensity&quot;</span>: elem.get(<span class="hljs-string">&quot;intensity&quot;</span>, <span class="hljs-number">0.5</span>)
+                    }
+                )
+                <span class="hljs-comment"># 事件发生在场景中</span>
+                <span class="hljs-variable language_">self</span>._add_relation(event_id, scene_id, <span class="hljs-string">&quot;occurs_in&quot;</span>)
+                
+                <span class="hljs-comment"># 如果事件涉及角色，建立关系</span>
+                <span class="hljs-keyword">if</span> elem.get(<span class="hljs-string">&quot;character&quot;</span>):
+                    char_id = <span class="hljs-string">f&quot;char_<span class="hljs-subst">{elem[<span class="hljs-string">&#x27;character&#x27;</span>]}</span>&quot;</span>
+                    <span class="hljs-variable language_">self</span>._add_relation(char_id, event_id, <span class="hljs-string">&quot;performs&quot;</span>)
+        
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;图谱构建完成: <span class="hljs-subst">{<span class="hljs-built_in">len</span>(self.entities)}</span>个实体, <span class="hljs-subst">{self._count_relations()}</span>条关系&quot;</span>)
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">retrieve</span>(<span class="hljs-params">self, query, context=<span class="hljs-literal">None</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;
+        图谱检索 - 结合实体识别和关系推理
+        
+        检索流程：
+        1. 从查询中识别实体
+        2. 在图中定位这些实体节点
+        3. 进行广度优先遍历，收集关联实体
+        4. 对路径进行相关性排序
+        &quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 1. 实体识别</span>
+        entities = <span class="hljs-variable language_">self</span>._extract_entities(query)
+        <span class="hljs-keyword">if</span> context:
+            entities.update(<span class="hljs-variable language_">self</span>._extract_context_entities(context))
+        
+        <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> entities:
+            <span class="hljs-keyword">return</span> []
+        
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;识别实体: <span class="hljs-subst">{entities}</span>&quot;</span>)
+        
+        <span class="hljs-comment"># 2. 广度优先遍历</span>
+        results = []
+        visited = <span class="hljs-built_in">set</span>(entities)
+        queue = [(e, <span class="hljs-number">0</span>, [e]) <span class="hljs-keyword">for</span> e <span class="hljs-keyword">in</span> entities]
+        
+        <span class="hljs-keyword">while</span> queue:
+            current, depth, path = queue.pop(<span class="hljs-number">0</span>)
+            
+            <span class="hljs-keyword">if</span> depth &gt; <span class="hljs-number">3</span>:  <span class="hljs-comment"># 限制遍历深度</span>
+                <span class="hljs-keyword">continue</span>
+            
+            <span class="hljs-comment"># 获取邻居节点</span>
+            neighbors = <span class="hljs-variable language_">self</span>.relations.get(current, [])
+            
+            <span class="hljs-keyword">for</span> neighbor <span class="hljs-keyword">in</span> neighbors:
+                <span class="hljs-keyword">if</span> neighbor <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> visited:
+                    visited.add(neighbor)
+                    new_path = path + [neighbor]
+                    
+                    results.append({
+                        <span class="hljs-string">&quot;entity_id&quot;</span>: neighbor,
+                        <span class="hljs-string">&quot;entity&quot;</span>: <span class="hljs-variable language_">self</span>.entities.get(neighbor),
+                        <span class="hljs-string">&quot;path&quot;</span>: new_path,
+                        <span class="hljs-string">&quot;depth&quot;</span>: depth + <span class="hljs-number">1</span>
+                    })
+                    
+                    queue.append((neighbor, depth + <span class="hljs-number">1</span>, new_path))
+        
+        <span class="hljs-comment"># 3. 排序</span>
+        results.sort(key=<span class="hljs-keyword">lambda</span> x: (x[<span class="hljs-string">&quot;depth&quot;</span>], <span class="hljs-variable language_">self</span>._path_score(x[<span class="hljs-string">&quot;path&quot;</span>])))
+        
+        <span class="hljs-keyword">return</span> results
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_extract_entities</span>(<span class="hljs-params">self, text</span>):
+        <span class="hljs-string">&quot;&quot;&quot;从文本中提取实体&quot;&quot;&quot;</span>
+        entities = <span class="hljs-built_in">set</span>()
+        <span class="hljs-keyword">for</span> entity_id, entity <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.entities.items():
+            <span class="hljs-keyword">if</span> entity[<span class="hljs-string">&quot;name&quot;</span>] <span class="hljs-keyword">and</span> entity[<span class="hljs-string">&quot;name&quot;</span>] <span class="hljs-keyword">in</span> text:
+                entities.add(entity_id)
+            <span class="hljs-comment"># 检查属性匹配</span>
+            <span class="hljs-keyword">if</span> entity[<span class="hljs-string">&quot;entity_type&quot;</span>] == <span class="hljs-string">&quot;character&quot;</span>:
+                <span class="hljs-keyword">if</span> entity[<span class="hljs-string">&quot;name&quot;</span>] <span class="hljs-keyword">in</span> text:
+                    entities.add(entity_id)
+        <span class="hljs-keyword">return</span> entities
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_extract_context_entities</span>(<span class="hljs-params">self, context</span>):
+        <span class="hljs-string">&quot;&quot;&quot;从上下文中提取实体（当前角色、当前场景等）&quot;&quot;&quot;</span>
+        entities = <span class="hljs-built_in">set</span>()
+        <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;current_character&quot;</span> <span class="hljs-keyword">in</span> context:
+            char_id = <span class="hljs-string">f&quot;char_<span class="hljs-subst">{context[<span class="hljs-string">&#x27;current_character&#x27;</span>]}</span>&quot;</span>
+            <span class="hljs-keyword">if</span> char_id <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.entities:
+                entities.add(char_id)
+        <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;current_scene&quot;</span> <span class="hljs-keyword">in</span> context:
+            scene_id = <span class="hljs-string">f&quot;scene_<span class="hljs-subst">{context[<span class="hljs-string">&#x27;current_scene&#x27;</span>]}</span>&quot;</span>
+            <span class="hljs-keyword">if</span> scene_id <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.entities:
+                entities.add(scene_id)
+        <span class="hljs-keyword">return</span> entities
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_path_score</span>(<span class="hljs-params">self, path</span>):
+        <span class="hljs-string">&quot;&quot;&quot;计算路径相关性分数&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 路径越短分数越高</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-number">1.0</span> / (<span class="hljs-built_in">len</span>(path) + <span class="hljs-number">1</span>)
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_add_entity</span>(<span class="hljs-params">self, entity_id, name, entity_type, properties=<span class="hljs-literal">None</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;添加实体&quot;&quot;&quot;</span>
+        <span class="hljs-variable language_">self</span>.entities[entity_id] = {
+            <span class="hljs-string">&quot;id&quot;</span>: entity_id,
+            <span class="hljs-string">&quot;name&quot;</span>: name,
+            <span class="hljs-string">&quot;entity_type&quot;</span>: entity_type,
+            <span class="hljs-string">&quot;properties&quot;</span>: properties <span class="hljs-keyword">or</span> {}
+        }
+        
+        <span class="hljs-keyword">if</span> entity_type <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.type_index:
+            <span class="hljs-variable language_">self</span>.type_index[entity_type] = []
+        <span class="hljs-variable language_">self</span>.type_index[entity_type].append(entity_id)
+        
+        <span class="hljs-keyword">if</span> entity_id <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.relations:
+            <span class="hljs-variable language_">self</span>.relations[entity_id] = []
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_add_relation</span>(<span class="hljs-params">self, from_id, to_id, rel_type</span>):
+        <span class="hljs-string">&quot;&quot;&quot;添加关系&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">if</span> from_id <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.relations:
+            <span class="hljs-variable language_">self</span>.relations[from_id] = []
+        <span class="hljs-variable language_">self</span>.relations[from_id].append(to_id)
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_count_relations</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-string">&quot;&quot;&quot;统计关系数量&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">sum</span>(<span class="hljs-built_in">len</span>(v) <span class="hljs-keyword">for</span> v <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.relations.values())
+
+
+<span class="hljs-comment"># 演示数据</span>
+demo_script = {
+    <span class="hljs-string">&quot;title&quot;</span>: <span class="hljs-string">&quot;雨中的约定&quot;</span>,
+    <span class="hljs-string">&quot;characters&quot;</span>: [
+        {<span class="hljs-string">&quot;name&quot;</span>: <span class="hljs-string">&quot;林小雨&quot;</span>, <span class="hljs-string">&quot;gender&quot;</span>: <span class="hljs-string">&quot;女&quot;</span>, <span class="hljs-string">&quot;role&quot;</span>: <span class="hljs-string">&quot;主角&quot;</span>},
+        {<span class="hljs-string">&quot;name&quot;</span>: <span class="hljs-string">&quot;陈阳&quot;</span>, <span class="hljs-string">&quot;gender&quot;</span>: <span class="hljs-string">&quot;男&quot;</span>, <span class="hljs-string">&quot;role&quot;</span>: <span class="hljs-string">&quot;主角&quot;</span>}
+    ],
+    <span class="hljs-string">&quot;scenes&quot;</span>: [
+        {
+            <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;scene_001&quot;</span>,
+            <span class="hljs-string">&quot;location&quot;</span>: <span class="hljs-string">&quot;咖啡店外&quot;</span>,
+            <span class="hljs-string">&quot;time_of_day&quot;</span>: <span class="hljs-string">&quot;下午&quot;</span>,
+            <span class="hljs-string">&quot;weather&quot;</span>: <span class="hljs-string">&quot;雨天&quot;</span>,
+            <span class="hljs-string">&quot;elements&quot;</span>: [
+                {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;elem_001&quot;</span>, <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;action&quot;</span>, <span class="hljs-string">&quot;character&quot;</span>: <span class="hljs-string">&quot;林小雨&quot;</span>, 
+                 <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;林小雨蹲在长椅旁擦拭湿漉漉的书&quot;</span>, <span class="hljs-string">&quot;emotion&quot;</span>: <span class="hljs-string">&quot;anxious&quot;</span>},
+                {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;elem_002&quot;</span>, <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;action&quot;</span>, <span class="hljs-string">&quot;character&quot;</span>: <span class="hljs-string">&quot;陈阳&quot;</span>, 
+                 <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;陈阳急刹车，书掉进水洼&quot;</span>, <span class="hljs-string">&quot;emotion&quot;</span>: <span class="hljs-string">&quot;surprise&quot;</span>},
+                {<span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;elem_003&quot;</span>, <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;dialogue&quot;</span>, <span class="hljs-string">&quot;character&quot;</span>: <span class="hljs-string">&quot;陈阳&quot;</span>, 
+                 <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;对不起！这书是你的？&quot;</span>, <span class="hljs-string">&quot;emotion&quot;</span>: <span class="hljs-string">&quot;apologetic&quot;</span>}
+            ]
+        }
+    ]
+}
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    graph = GraphRAGDemo()
+    graph.build_from_script(demo_script)
+    
+    <span class="hljs-comment"># 测试检索</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\n&quot;</span> + <span class="hljs-string">&quot;=&quot;</span>*<span class="hljs-number">50</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;测试检索: &#x27;陈阳道歉&#x27;&quot;</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;=&quot;</span>*<span class="hljs-number">50</span>)
+    
+    results = graph.retrieve(<span class="hljs-string">&quot;陈阳道歉&quot;</span>)
+    
+    <span class="hljs-keyword">for</span> r <span class="hljs-keyword">in</span> results[:<span class="hljs-number">5</span>]:
+        entity = r[<span class="hljs-string">&quot;entity&quot;</span>]
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;  - <span class="hljs-subst">{entity[<span class="hljs-string">&#x27;entity_type&#x27;</span>]}</span>: <span class="hljs-subst">{entity[<span class="hljs-string">&#x27;name&#x27;</span>]}</span> (深度: <span class="hljs-subst">{r[<span class="hljs-string">&#x27;depth&#x27;</span>]}</span>)&quot;</span>)
+</code></pre>
+<blockquote>
+<p>这个 Demo 揭示了 GraphRAG 落地时最现实的问题：图谱质量完全取决于实体识别与关系抽取的质量。演示里靠&quot;名字在文本中出现&quot;做实体识别，真实剧本里&quot;他&quot;“那个女孩”&quot;老板&quot;之类的指代会让这套逻辑立刻失灵——这也是为什么项目当前没有把图谱排进开发队列。</p>
+</blockquote>
+<h3>GraphRAG 落地评估：为什么它还是规划项</h3>
+<p>把上述蓝图与项目现状对照，可以看清 GraphRAG 迟迟没有落地的工程原因：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">落地前提</th>
+<th style="text-align:left">现状</th>
+<th style="text-align:left">缺口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">实体识别（角色/场景/道具/事件）</td>
+<td style="text-align:left">ScriptParser 有结构化解析结果</td>
+<td style="text-align:left">无独立实体抽取与消歧组件</td>
+</tr>
+<tr>
+<td style="text-align:left">关系抽取（互动/因果/时序）</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">需 LLM 抽取 + 校验，成本高</td>
+</tr>
+<tr>
+<td style="text-align:left">图存储与查询</td>
+<td style="text-align:left">无（neo4j / networkx 等均未引入）</td>
+<td style="text-align:left">需引入图数据库或内存图结构</td>
+</tr>
+<tr>
+<td style="text-align:left">检索融合</td>
+<td style="text-align:left">手动余弦（已接线）；KnowledgeRouter（未接线）</td>
+<td style="text-align:left">图谱结果无法进入现有链路</td>
+</tr>
+</tbody>
+</table>
+<p>如果将来要落地，最务实的切入点是：<strong>复用 ScriptParser 已有的结构化解析结果</strong>（角色、场景、要素本来就是现成的实体来源），先做一层轻量内存图（不需要引入图数据库），把&quot;角色共现&quot;“场景时序&quot;两类关系建起来，接入 KnowledgeRouter 的 _structured_search 分支做灰度验证。图谱不是从零开始的独立工程，而是已有解析数据的&quot;关系化再利用”。</p>
+<hr>
+<h2>关键要点拆解（六）：长短时记忆系统</h2>
+<h3>核心解决的问题</h3>
+<p>剧本创作中最大的痛点是角色或场景的&quot;不一致&quot;。具体表现为：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">不一致类型</th>
+<th style="text-align:left">示例</th>
+<th style="text-align:left">后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色性格突变</td>
+<td style="text-align:left">内向角色突然变得外向</td>
+<td style="text-align:left">观众出戏，人物可信度下降</td>
+</tr>
+<tr>
+<td style="text-align:left">外貌描述矛盾</td>
+<td style="text-align:left">前文说&quot;黑色外套&quot;，后文写&quot;灰色大衣&quot;</td>
+<td style="text-align:left">视觉一致性被破坏</td>
+</tr>
+<tr>
+<td style="text-align:left">能力设定冲突</td>
+<td style="text-align:left">前文不会游泳，后文跳河救人</td>
+<td style="text-align:left">逻辑漏洞</td>
+</tr>
+<tr>
+<td style="text-align:left">关系定位混乱</td>
+<td style="text-align:left">前文是同学，后文变成陌生人</td>
+<td style="text-align:left">叙事断裂</td>
+</tr>
+</tbody>
+</table>
+<p>这些问题的根源在于：生成新内容时，系统&quot;忘记&quot;了之前已经建立的设定。长短时记忆系统通过分层存储来解决这个问题。</p>
+<h3>三层记忆架构（按源码核订）</h3>
+<pre class="mermaid">flowchart TB
+    subgraph ShortTerm[&quot;短期记忆 (Short-Term)&quot;]
+        S1[会话历史&lt;br/&gt;LangChain ChatMessageHistory]
+        S2[滑动窗口&lt;br/&gt;deque maxlen=20]
+        S3[Redis 可选&lt;br/&gt;key: penshot:memory:{session_id}]
+    end
+
+    subgraph MediumTerm[&quot;中期记忆 (Medium-Term)&quot;]
+        M1[阶段统计摘要]
+        M2[修复记录]
+        M_Compress[压缩存储&lt;br/&gt;max_tokens=500]
+    end
+
+    subgraph LongTerm[&quot;长期记忆 (Long-Term)&quot;]
+        L1[成功模式]
+        L2[常见问题模式]
+        L3[可复用知识向量]
+        L_Vector[Chroma 向量库&lt;br/&gt;collection: script_{script_id}_memory]
+    end
+
+    subgraph Access[&quot;统一访问层&quot;]
+        A_WM[WorkflowMemory&lt;br/&gt;四阶段读历史、写归档]
+        A_MM[MemoryManager&lt;br/&gt;recall / get / add]
+    end
+
+    A_WM --&gt; A_MM
+    A_MM --&gt; ShortTerm
+    A_MM --&gt; MediumTerm
+    A_MM --&gt; LongTerm
+
+    style ShortTerm fill:#e3f2fd
+    style MediumTerm fill:#fff3e0
+    style LongTerm fill:#e8f5e9
+    style Access fill:#fce4ec
+</pre>
+<p><strong>三层记忆的职责划分（按源码实现核订）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">记忆层</th>
+<th style="text-align:left">存储内容</th>
+<th style="text-align:left">容量 / 窗口</th>
+<th style="text-align:left">生命周期</th>
+<th style="text-align:left">实际机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">短期记忆</td>
+<td style="text-align:left">会话历史 + 阶段完整结果</td>
+<td style="text-align:left">deque maxlen=20（窗口）</td>
+<td style="text-align:left">Redis 模式 1 小时；内存模式无自动过期</td>
+<td style="text-align:left">滑动窗口 + 可选 Redis TTL，<strong>非 LRU</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">中期记忆</td>
+<td style="text-align:left">阶段统计摘要、修复记录</td>
+<td style="text-align:left">max_tokens=500</td>
+<td style="text-align:left">任务周期内</td>
+<td style="text-align:left">摘要压缩存储</td>
+</tr>
+<tr>
+<td style="text-align:left">长期记忆</td>
+<td style="text-align:left">成功模式、常见问题、知识向量</td>
+<td style="text-align:left">WorkflowMemory 按策略归档</td>
+<td style="text-align:left">Chroma 持久化到磁盘</td>
+<td style="text-align:left">语义检索（k=3 + 分数阈值）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>两处易混淆的数字：MemoryManager 的&quot;窗口 20 条&quot;是 deque 长度；WorkflowMemory 类文档里还定义了自己的归档策略（短期保留最近 5 条、中期最多 20 条、长期最多 30 条）。两套数字分属不同层，不冲突。</p>
+</blockquote>
+<p><strong>短期记忆详解</strong></p>
+<p>短期记忆基于 LangChain 的 ChatMessageHistory 构建，存两类内容：会话消息对（用户输入 + AI 输出），以及手工维护的 deque 滑动窗口（maxlen 由 short_term_size 决定，工作流里取 20）。</p>
+<blockquote>
+<p>常见说法&quot;短期记忆用 LRU + TTL&quot;需要修正：源码里的窗口是 <code>deque(maxlen=20)</code>（short_term_memory.py）——满了自动从队首丢弃，这是<strong>固定长度滑动窗口（FIFO）</strong>，不是按访问时间淘汰的 LRU。TTL 只在 Redis 模式下生效（RedisChatMessageHistory 的 ttl=3600）；纯内存模式下没有自动过期，退场靠窗口滚动。系统还准备了一条兜底通道：Redis 不可用且配置了 term_persist_path 时，会话落到 <code>{path}/{script_id}/short_term.json</code> 文件。</p>
+</blockquote>
+<p>启动时的可用性探测值得单独一提：ShortTermMemory 会先 <code>redis.from_url(...).ping()</code> 试探，成功才用 Redis，失败仅打一条 warning 就切换到内存存储——<strong>静默降级</strong>，调用方无感知。</p>
+<p><strong>中期记忆详解</strong></p>
+<p>中期记忆的写入时机与工作流阶段绑定：每个节点完成后，WorkflowMemory.after_stage_completion() 提取该阶段统计（场景数、角色数、问题数、修复参数等），作为一条带时间戳的摘要存入中期层。读取侧则相反——每个阶段开工前先取 <code>stats_parse_script</code>（解析统计）、<code>stats_segment_shot</code>（分镜统计）等历史摘要，注入智能体作为参照。</p>
+<blockquote>
+<p>&quot;压缩存储（max_tokens=500）&quot;与代码一致，这个限制挂在 MemoryConfig.medium_term_max_tokens 上。需要说明的是：实际压缩发生在写入路径，读出来的就是已压缩的统计字典；&quot;任务完成时归档到长期或清理&quot;属于规划描述，当前代码没有自动归档/清理逻辑，需要显式调用。</p>
+</blockquote>
+<p><strong>长期记忆详解</strong></p>
+<p>长期记忆的底层是 <strong>Chroma 向量库</strong>（langchain_chroma），collection 按剧本隔离：<code>script_{script_id}_memory</code>，持久化目录为 <code>{term_persist_path}/{script_id}</code>。检索时用 <code>similarity_search_with_score</code> 取回 Top-K（k=3）并按 <code>long_term_score_threshold</code> 过滤低分结果。写入的内容包括：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>各阶段提炼的&quot;成功模式&quot;与可复用结论</p>
+</li>
+<li class="lvl-2">
+<p>长期层维护的常见问题模式（<code>_load_common_patterns()</code> 在工作流启动时就把它们读回来）</p>
+</li>
+<li class="lvl-2">
+<p>经过质检的片段与修复经验</p>
+</li>
+</ul>
+<blockquote>
+<p>文章早期版本写过&quot;已存储 78 条文档、768 维 BGE 嵌入&quot;——<strong>这两个具体数字没有可在仓库中追溯的来源</strong>，勘正为：集合中文档数可随时通过 <code>get_stats()</code> 查询（返回 Chroma collection 的实际 count），嵌入维度取决于运行时配置的嵌入模型，都不应写成固定值。</p>
+</blockquote>
+<h3>记忆生命周期：一次事件，三层分发</h3>
+<p>真实代码里没有&quot;短期提升为中期、中期提升为长期&quot;的自动升华机制——after_stage_completion() 是在同一次事件里把不同粒度的结果<strong>分别写进三层</strong>：</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 阶段完成事件
+    阶段完成事件 --&gt; 短期记忆: 完整结果
+    阶段完成事件 --&gt; 中期记忆: 统计摘要
+    阶段完成事件 --&gt; 长期记忆: 成功模式
+    
+    短期记忆 --&gt; 短期记忆: 窗口滚动（deque 挤出队首）
+    短期记忆 --&gt; [*]: 窗口满时挤出
+    
+    中期记忆 --&gt; 中期记忆: 追加阶段摘要
+    
+    长期记忆 --&gt; 长期记忆: 向量化 + 持久化到 Chroma
+    
+    note right of 短期记忆
+        窗口: maxlen=20
+        Redis模式TTL: 3600秒
+        降级链: Redis→内存→文件
+    end note
+    
+    note right of 中期记忆
+        最大Token: 500
+        内容: 阶段统计摘要
+    end note
+    
+    note right of 长期记忆
+        存储: Chroma 向量库
+        检索: k=3 + 阈值过滤
+        隔离: script_{script_id}_memory
+    end note
+</pre>
+<blockquote>
+<p>排坑说明：长期记忆采用向量检索后，两条限制值得注意——其一，查询向量必须与建立索引时使用的嵌入模型一致，否则相似度分数失去意义（换嵌入模型等于换度量尺）；其二，长期库的质量取决于写入内容的筛选策略——这部分逻辑集中在 WorkflowMemory 的长期存储路径，值得核对源码后再评估。</p>
+</blockquote>
+<h3>概念示例：三层记忆的存储与检索 Demo</h3>
+<p>⚠️ <strong>代码性质说明</strong>：以下代码是<strong>概念示例，并非 PenShot 项目源码</strong>。真实实现分散在 <code>knowledge/memory/</code> 目录（short_term_memory.py / medium_term_memory.py / long_term_memory.py），与示例的差别已在上面逐节标注——最典型的两处：真实短期记忆用 LangChain + deque（可选 Redis），示例用 OrderedDict 模拟 LRU；真实长期记忆用 Chroma 向量库（已接线），示例用关键词匹配模拟语义检索。</p>
+<pre class="hljs"><code><span class="hljs-string">&quot;&quot;&quot;
+记忆系统演示 - 三层记忆的存储与检索（概念示例）
+&quot;&quot;&quot;</span>
+
+<span class="hljs-keyword">from</span> datetime <span class="hljs-keyword">import</span> datetime, timedelta
+<span class="hljs-keyword">from</span> collections <span class="hljs-keyword">import</span> OrderedDict
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ShortTermMemory</span>:
+    <span class="hljs-string">&quot;&quot;&quot;短期记忆 - LRU缓存 + TTL过期&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, max_size=<span class="hljs-number">20</span>, ttl_seconds=<span class="hljs-number">3600</span></span>):
+        <span class="hljs-variable language_">self</span>.max_size = max_size
+        <span class="hljs-variable language_">self</span>.ttl = ttl_seconds
+        <span class="hljs-variable language_">self</span>._store = OrderedDict()  <span class="hljs-comment"># key -&gt; (value, timestamp)</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">set</span>(<span class="hljs-params">self, key, value</span>):
+        <span class="hljs-string">&quot;&quot;&quot;存储短期记忆&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 容量控制</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(<span class="hljs-variable language_">self</span>._store) &gt;= <span class="hljs-variable language_">self</span>.max_size:
+            <span class="hljs-variable language_">self</span>._store.popitem(last=<span class="hljs-literal">False</span>)
+        <span class="hljs-variable language_">self</span>._store[key] = (value, datetime.now())
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get</span>(<span class="hljs-params">self, key</span>):
+        <span class="hljs-string">&quot;&quot;&quot;获取短期记忆（自动检查过期）&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">if</span> key <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>._store:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>
+        
+        value, timestamp = <span class="hljs-variable language_">self</span>._store[key]
+        <span class="hljs-keyword">if</span> datetime.now() - timestamp &gt; timedelta(seconds=<span class="hljs-variable language_">self</span>.ttl):
+            <span class="hljs-keyword">del</span> <span class="hljs-variable language_">self</span>._store[key]
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>
+        
+        <span class="hljs-comment"># LRU: 移到末尾</span>
+        <span class="hljs-variable language_">self</span>._store.move_to_end(key)
+        <span class="hljs-keyword">return</span> value
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_all</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-string">&quot;&quot;&quot;获取所有未过期的记忆&quot;&quot;&quot;</span>
+        result = {}
+        <span class="hljs-keyword">for</span> key, (value, timestamp) <span class="hljs-keyword">in</span> <span class="hljs-built_in">list</span>(<span class="hljs-variable language_">self</span>._store.items()):
+            <span class="hljs-keyword">if</span> datetime.now() - timestamp &lt;= timedelta(seconds=<span class="hljs-variable language_">self</span>.ttl):
+                result[key] = value
+            <span class="hljs-keyword">else</span>:
+                <span class="hljs-keyword">del</span> <span class="hljs-variable language_">self</span>._store[key]
+        <span class="hljs-keyword">return</span> result
+
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">MediumTermMemory</span>:
+    <span class="hljs-string">&quot;&quot;&quot;中期记忆 - 阶段摘要存储&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, max_tokens=<span class="hljs-number">500</span></span>):
+        <span class="hljs-variable language_">self</span>.max_tokens = max_tokens
+        <span class="hljs-variable language_">self</span>.summaries = {}  <span class="hljs-comment"># stage -&gt; summary</span>
+        <span class="hljs-variable language_">self</span>._current_tokens = <span class="hljs-number">0</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">add_summary</span>(<span class="hljs-params">self, stage, summary</span>):
+        <span class="hljs-string">&quot;&quot;&quot;添加阶段摘要&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 估算token数（简单按字符数/2估算）</span>
+        estimated_tokens = <span class="hljs-built_in">len</span>(summary) // <span class="hljs-number">2</span>
+        
+        <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>._current_tokens + estimated_tokens &gt; <span class="hljs-variable language_">self</span>.max_tokens:
+            <span class="hljs-comment"># 触发压缩：保留最重要的信息</span>
+            summary = <span class="hljs-variable language_">self</span>._compress(summary)
+            estimated_tokens = <span class="hljs-built_in">len</span>(summary) // <span class="hljs-number">2</span>
+        
+        <span class="hljs-variable language_">self</span>.summaries[stage] = summary
+        <span class="hljs-variable language_">self</span>._current_tokens += estimated_tokens
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_summary</span>(<span class="hljs-params">self, stage=<span class="hljs-literal">None</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;获取摘要&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">if</span> stage:
+            <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>.summaries.get(stage)
+        <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>.summaries
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_compress</span>(<span class="hljs-params">self, text</span>):
+        <span class="hljs-string">&quot;&quot;&quot;压缩文本（保留关键信息）&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 简化实现：取前200字符 + &quot;...&quot;</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(text) &gt; <span class="hljs-number">200</span>:
+            <span class="hljs-keyword">return</span> text[:<span class="hljs-number">200</span>] + <span class="hljs-string">&quot;...&quot;</span>
+        <span class="hljs-keyword">return</span> text
+
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">LongTermMemory</span>:
+    <span class="hljs-string">&quot;&quot;&quot;长期记忆 - 向量存储 + 语义检索&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-comment"># 模拟向量存储</span>
+        <span class="hljs-variable language_">self</span>.documents = []  <span class="hljs-comment"># 实际使用向量数据库</span>
+        <span class="hljs-variable language_">self</span>.id_counter = <span class="hljs-number">0</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">store</span>(<span class="hljs-params">self, content, metadata</span>):
+        <span class="hljs-string">&quot;&quot;&quot;存储长期记忆&quot;&quot;&quot;</span>
+        doc_id = <span class="hljs-string">f&quot;doc_<span class="hljs-subst">{self.id_counter}</span>&quot;</span>
+        <span class="hljs-variable language_">self</span>.id_counter += <span class="hljs-number">1</span>
+        
+        <span class="hljs-variable language_">self</span>.documents.append({
+            <span class="hljs-string">&quot;id&quot;</span>: doc_id,
+            <span class="hljs-string">&quot;content&quot;</span>: content,
+            <span class="hljs-string">&quot;metadata&quot;</span>: metadata,
+            <span class="hljs-string">&quot;timestamp&quot;</span>: datetime.now()
+        })
+        
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;存储长期记忆: <span class="hljs-subst">{doc_id}</span> - <span class="hljs-subst">{content[:<span class="hljs-number">50</span>]}</span>...&quot;</span>)
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">search</span>(<span class="hljs-params">self, query, top_k=<span class="hljs-number">3</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;语义检索（模拟）&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 实际实现使用向量相似度计算</span>
+        results = []
+        query_lower = query.lower()
+        
+        <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> <span class="hljs-variable language_">self</span>.documents:
+            <span class="hljs-comment"># 简单的关键词匹配（实际应用使用向量检索）</span>
+            content_lower = doc[<span class="hljs-string">&quot;content&quot;</span>].lower()
+            score = <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> word <span class="hljs-keyword">in</span> query_lower.split():
+                <span class="hljs-keyword">if</span> word <span class="hljs-keyword">in</span> content_lower:
+                    score += <span class="hljs-number">1</span>
+            
+            <span class="hljs-keyword">if</span> score &gt; <span class="hljs-number">0</span>:
+                results.append({
+                    <span class="hljs-string">&quot;id&quot;</span>: doc[<span class="hljs-string">&quot;id&quot;</span>],
+                    <span class="hljs-string">&quot;content&quot;</span>: doc[<span class="hljs-string">&quot;content&quot;</span>],
+                    <span class="hljs-string">&quot;metadata&quot;</span>: doc[<span class="hljs-string">&quot;metadata&quot;</span>],
+                    <span class="hljs-string">&quot;score&quot;</span>: score / <span class="hljs-built_in">len</span>(query_lower.split())
+                })
+        
+        results.sort(key=<span class="hljs-keyword">lambda</span> x: -x[<span class="hljs-string">&quot;score&quot;</span>])
+        <span class="hljs-keyword">return</span> results[:top_k]
+
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">MemorySystemDemo</span>:
+    <span class="hljs-string">&quot;&quot;&quot;记忆系统完整演示&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-variable language_">self</span>.short_term = ShortTermMemory()
+        <span class="hljs-variable language_">self</span>.medium_term = MediumTermMemory()
+        <span class="hljs-variable language_">self</span>.long_term = LongTermMemory()
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">process_interaction</span>(<span class="hljs-params">self, user_input, response</span>):
+        <span class="hljs-string">&quot;&quot;&quot;
+        处理一次交互
+        
+        流程：存储短期记忆 -&gt; 检查是否需要阶段总结 -&gt; 评估是否需要长期存储
+        &quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 1. 存储到短期记忆</span>
+        <span class="hljs-variable language_">self</span>.short_term.<span class="hljs-built_in">set</span>(<span class="hljs-string">f&quot;interaction_<span class="hljs-subst">{datetime.now().timestamp()}</span>&quot;</span>, {
+            <span class="hljs-string">&quot;input&quot;</span>: user_input,
+            <span class="hljs-string">&quot;response&quot;</span>: response,
+            <span class="hljs-string">&quot;timestamp&quot;</span>: datetime.now()
+        })
+        
+        <span class="hljs-comment"># 2. 如果是重要结果，存储到中期记忆</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(user_input) &gt; <span class="hljs-number">100</span> <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;完成&quot;</span> <span class="hljs-keyword">in</span> response:
+            <span class="hljs-variable language_">self</span>.medium_term.add_summary(
+                <span class="hljs-string">f&quot;stage_<span class="hljs-subst">{datetime.now().strftime(<span class="hljs-string">&#x27;%H%M%S&#x27;</span>)}</span>&quot;</span>,
+                <span class="hljs-string">f&quot;输入: <span class="hljs-subst">{user_input[:<span class="hljs-number">100</span>]}</span>... 输出: <span class="hljs-subst">{response[:<span class="hljs-number">100</span>]}</span>...&quot;</span>
+            )
+        
+        <span class="hljs-comment"># 3. 如果是高质量结果，存储到长期记忆</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;通过&quot;</span> <span class="hljs-keyword">in</span> response <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;成功&quot;</span> <span class="hljs-keyword">in</span> response:
+            <span class="hljs-variable language_">self</span>.long_term.store(
+                content=<span class="hljs-string">f&quot;输入: <span class="hljs-subst">{user_input}</span>\n输出: <span class="hljs-subst">{response}</span>&quot;</span>,
+                metadata={<span class="hljs-string">&quot;quality&quot;</span>: <span class="hljs-string">&quot;high&quot;</span>, <span class="hljs-string">&quot;timestamp&quot;</span>: datetime.now().isoformat()}
+            )
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_context</span>(<span class="hljs-params">self, query</span>):
+        <span class="hljs-string">&quot;&quot;&quot;获取上下文（用于LLM提示）&quot;&quot;&quot;</span>
+        context_parts = []
+        
+        <span class="hljs-comment"># 短期记忆</span>
+        recent = <span class="hljs-variable language_">self</span>.short_term.get_all()
+        <span class="hljs-keyword">if</span> recent:
+            context_parts.append(<span class="hljs-string">&quot;【最近的交互】&quot;</span>)
+            <span class="hljs-keyword">for</span> key, value <span class="hljs-keyword">in</span> <span class="hljs-built_in">list</span>(recent.items())[-<span class="hljs-number">3</span>:]:
+                context_parts.append(<span class="hljs-string">f&quot;  - 输入: <span class="hljs-subst">{value[<span class="hljs-string">&#x27;input&#x27;</span>][:<span class="hljs-number">50</span>]}</span>...&quot;</span>)
+        
+        <span class="hljs-comment"># 中期记忆</span>
+        summaries = <span class="hljs-variable language_">self</span>.medium_term.get_summary()
+        <span class="hljs-keyword">if</span> summaries:
+            context_parts.append(<span class="hljs-string">&quot;【阶段摘要】&quot;</span>)
+            <span class="hljs-keyword">for</span> stage, summary <span class="hljs-keyword">in</span> summaries.items():
+                context_parts.append(<span class="hljs-string">f&quot;  - <span class="hljs-subst">{stage}</span>: <span class="hljs-subst">{summary[:<span class="hljs-number">80</span>]}</span>...&quot;</span>)
+        
+        <span class="hljs-comment"># 长期记忆（语义检索）</span>
+        similar = <span class="hljs-variable language_">self</span>.long_term.search(query)
+        <span class="hljs-keyword">if</span> similar:
+            context_parts.append(<span class="hljs-string">&quot;【相关历史案例】&quot;</span>)
+            <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> similar:
+                context_parts.append(<span class="hljs-string">f&quot;  - <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;content&#x27;</span>][:<span class="hljs-number">80</span>]}</span>... (相关度: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;score&#x27;</span>]:<span class="hljs-number">.2</span>f}</span>)&quot;</span>)
+        
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;\n&quot;</span>.join(context_parts)
+
+
+<span class="hljs-comment"># 演示</span>
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    memory = MemorySystemDemo()
+    
+    <span class="hljs-comment"># 模拟多次交互</span>
+    interactions = [
+        (<span class="hljs-string">&quot;生成林小雨在雨中等待的分镜&quot;</span>, <span class="hljs-string">&quot;已生成分镜：中景，林小雨蹲在长椅旁... 审查通过&quot;</span>),
+        (<span class="hljs-string">&quot;调整光线为更柔和的阴天光&quot;</span>, <span class="hljs-string">&quot;已调整：Fujifilm ETERNA色调，阴天自然光... 审查通过&quot;</span>),
+        (<span class="hljs-string">&quot;陈阳的雨衣颜色是什么&quot;</span>, <span class="hljs-string">&quot;陈阳穿着亮黄色雨衣，来自scene_001的角色设定&quot;</span>),
+    ]
+    
+    <span class="hljs-keyword">for</span> inp, out <span class="hljs-keyword">in</span> interactions:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;\n用户: <span class="hljs-subst">{inp}</span>&quot;</span>)
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;系统: <span class="hljs-subst">{out}</span>&quot;</span>)
+        memory.process_interaction(inp, out)
+    
+    <span class="hljs-comment"># 获取上下文</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\n&quot;</span> + <span class="hljs-string">&quot;=&quot;</span>*<span class="hljs-number">50</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;当前上下文（用于下一轮生成）&quot;</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;=&quot;</span>*<span class="hljs-number">50</span>)
+    context = memory.get_context(<span class="hljs-string">&quot;雨天的场景氛围&quot;</span>)
+    <span class="hljs-built_in">print</span>(context)
+</code></pre>
+<h3>真实接线：它在调用链上</h3>
+<p>与前几章多处&quot;未接线&quot;形成对照的是，记忆系统是<strong>已接线</strong>的——它是本系列文章中少见的&quot;文档写到的，代码里真的在跑&quot;的模块。证据在 workflow_nodes.py 的构造与解析节点里：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py —— WorkflowNodes 初始化（真实源码摘录）</span>
+<span class="hljs-variable language_">self</span>._memory = MemoryManager(
+    llm=<span class="hljs-variable language_">self</span>.llm,
+    script_id=<span class="hljs-variable language_">self</span>.script_id,
+    config=MemoryConfig(
+        embeddings=<span class="hljs-variable language_">self</span>.embeddings,
+        short_term_size=<span class="hljs-number">20</span>,
+        short_term_ttl=<span class="hljs-number">3600</span>,
+        medium_term_max_tokens=<span class="hljs-number">500</span>,
+        long_term_enabled=<span class="hljs-literal">True</span>,
+        long_term_k=<span class="hljs-number">3</span>,
+    )
+)
+
+<span class="hljs-comment"># 注入三处消费：提示词模板管理 / 工作流记忆 / 输出写入</span>
+<span class="hljs-variable language_">self</span>.knowledge_manager = PromptTemplateManager(
+    ..., memory_manager=<span class="hljs-variable language_">self</span>._memory,
+    min_similarity_score=<span class="hljs-number">0.7</span>, top_k=<span class="hljs-number">3</span>
+)
+<span class="hljs-variable language_">self</span>.workflow_memory = WorkflowMemory(script_id, <span class="hljs-variable language_">self</span>._memory, <span class="hljs-variable language_">self</span>.knowledge_manager)
+<span class="hljs-variable language_">self</span>.output_writer = WorkflowOutputWriter(<span class="hljs-variable language_">self</span>.storage, <span class="hljs-variable language_">self</span>._memory)
+</code></pre>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py —— 解析节点：开工读历史、完工写归档（真实源码摘录）</span>
+recent_strategy = <span class="hljs-variable language_">self</span>.workflow_memory.get_memory_dict(
+    <span class="hljs-string">&quot;parsing_strategy_recent&quot;</span>, level=MemoryLevel.SHORT_TERM)
+historical_stats = <span class="hljs-variable language_">self</span>.workflow_memory.get_memory_dict(
+    <span class="hljs-string">&quot;stats_parse_script&quot;</span>, level=MemoryLevel.MEDIUM_TERM)
+common_issues = <span class="hljs-variable language_">self</span>.workflow_memory.get_memory_list(
+    <span class="hljs-string">&quot;common_parse_issues&quot;</span>, level=MemoryLevel.LONG_TERM, default=[])
+<span class="hljs-comment"># ... 注入解析器</span>
+<span class="hljs-variable language_">self</span>.script_parser.apply_historical_context(historical_context)
+
+<span class="hljs-comment"># ... 解析与问题检测之后</span>
+<span class="hljs-variable language_">self</span>.workflow_memory.after_stage_completion(
+    stage=<span class="hljs-string">&quot;parse_script&quot;</span>, result=parsed_script,
+    metadata={<span class="hljs-string">&quot;repair_applied&quot;</span>: ..., <span class="hljs-string">&quot;issue_count&quot;</span>: ...})
+</code></pre>
+<p>这段代码回答了两个常被问到的问题：<strong>记忆什么时候读？</strong>——每个阶段开工前（解析、分镜、拆分、转换四个阶段写法一致）；<strong>记忆什么时候写？</strong>——每个阶段完成时，after_stage_completion 一次写三层。&quot;历史统计 + 常见问题&quot;注入的收益是经验的跨任务复用：上一次解析踩过的坑，会以 <code>common_parse_issues</code> 的形式出现在下一次解析的上下文里——这是&quot;自迭代&quot;在代码里最真实的形态，比权重调整之类的叙事朴素得多，但确实在运转。</p>
+<hr>
+<h2>关键要点拆解（七）：自迭代优化闭环</h2>
+<h3>核心解决的问题</h3>
+<p>传统的召回系统是静态的——检索策略一旦确定就不会改变。剧本分镜场景需要的是&quot;生成-质检-修复&quot;闭环：生成结果被审计，不合格的打回重做，成功的经验沉淀下来。</p>
+<p>但需要先区分两种&quot;自迭代&quot;：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>策略自调整</strong>：系统自动分析问题根源，然后修改检索策略（例如&quot;增加角色情绪历史作为检索维度&quot;）。<strong>这种机制在 PenShot 中不存在</strong>——仓库里没有任何&quot;根据审计结果调整召回参数&quot;的代码；</p>
+</li>
+<li class="lvl-3">
+<p><strong>参数化返工 + 经验沉淀</strong>：审计不合格 → 生成修复参数 → 节点带参重跑；成功的结果与修复记录写入记忆层与模板库。<strong>这是真实实现的形态</strong>，细节如下文。</p>
+</li>
+</ol>
+<p>后文按第 2 种口径展开。</p>
+<h3>自迭代优化流程图</h3>
+<pre class="mermaid">flowchart LR
+    subgraph Gen[&quot;生成&quot;]
+        G1[节点执行&lt;br/&gt;解析/分镜/拆分/转换]
+    end
+
+    subgraph Audit[&quot;质检&quot;]
+        A1[RuleQualityAuditor&lt;br/&gt;5 项规则检查]
+        A2[LLMQualityAuditor&lt;br/&gt;语义审计]
+        A3[QualityAuditReport&lt;br/&gt;分数 + 问题清单]
+        A1 --&gt; A3
+        A2 --&gt; A3
+    end
+
+    subgraph Repair[&quot;返工&quot;]
+        R1[生成修复参数&lt;br/&gt;issue_types + suggestions]
+        R2[节点带参重跑&lt;br/&gt;apply_repair_params]
+        R3[循环次数保护&lt;br/&gt;_check_node_loop_limit]
+        R1 --&gt; R2
+        R3 -.-&gt; R2
+    end
+
+    subgraph Learn[&quot;沉淀&quot;]
+        L1[WorkflowMemory&lt;br/&gt;成功后写三层记忆]
+        L2[save_successful_prompt&lt;br/&gt;成功提示词入库]
+    end
+
+    G1 --&gt; A1
+    A3 --&gt;|未通过| R1
+    R2 --&gt;|重跑| G1
+    A3 --&gt;|通过| L1
+    L1 --&gt; L2
+    L2 -.-&gt;|下次开工作为历史上下文| G1
+
+    style Repair fill:#fff3e0
+    style Learn fill:#e8f5e9
+</pre>
+<h3>真实质检：两层审计，五个规则维度</h3>
+<p>文章早期版本写&quot;覆盖 10+ 个检查维度&quot;，并按角色一致性、道具状态机等叙事维度描述&quot;检查方式&quot;——<strong>这些检查方式在源码中不存在</strong>。真实的质检由两个审计器组成：</p>
+<p><strong>RuleQualityAuditor（规则审计，5 项）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查项</th>
+<th style="text-align:left">源码方法</th>
+<th style="text-align:left">检查内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">片段时长</td>
+<td style="text-align:left">_check_fragment_duration</td>
+<td style="text-align:left">每个片段的时长是否在允许区间</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词内容</td>
+<td style="text-align:left">_check_prompt_content</td>
+<td style="text-align:left">提示词是否为空、是否含占位符残留</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词长度</td>
+<td style="text-align:left">_check_prompt_length</td>
+<td style="text-align:left">长度是否超出模型可接受范围</td>
+</tr>
+<tr>
+<td style="text-align:left">片段数量</td>
+<td style="text-align:left">_check_fragment_count</td>
+<td style="text-align:left">片段总数是否符合预期</td>
+</tr>
+<tr>
+<td style="text-align:left">模型支持</td>
+<td style="text-align:left">_check_model_support</td>
+<td style="text-align:left">目标视频模型是否支持该配置</td>
+</tr>
+</tbody>
+</table>
+<p><strong>LLMQualityAuditor（语义审计）</strong>：用 LLM 对生成结果做连贯性与质量审查，输出评分与问题描述。</p>
+<p>两层审计共同产出 QualityAuditReport（分数 + 问题清单）。<strong>值得注意的恰是规则审计的口径</strong>：五项全是&quot;工程格式&quot;维度（时长/长度/数量），而不是&quot;叙事&quot;维度（角色一致性/道具状态）——后者由 LLM 审计与连续性守护（另一套组件）承担。文章的叙事化描述属于对职责的误记。</p>
+<h3>修复回流流程详解（真实口径）</h3>
+<p><strong>步骤一：问题发现</strong>——节点产出（如 AIVideoInstructions）被两层审计器检查，生成 QualityAuditReport，包含总体评分与问题列表。<strong>不是</strong>文章早期版本所说的&quot;输出问题位置到片段的哪个属性&quot;这类细粒度定位。</p>
+<p><strong>步骤二：修复参数生成</strong>——审计未通过时，系统生成修复参数 repair_params（issue_types 表明问题类型、suggestions 给出修复建议），写入工作流状态。</p>
+<p><strong>步骤三：节点带参重跑</strong>——下一次进入该节点时，节点先读取 repair_params（apply_repair_params），把它注入提示词作为额外修正指令，然后重新执行。<strong>没有</strong>&quot;定向召回角色情绪历史&quot;之类的定向检索增强——真实的重跑是&quot;同一个节点、带更多上下文、再试一次&quot;。</p>
+<p><strong>步骤四：循环保护</strong>——重跑次数受节点级循环限制保护（workflow_decision 中的 _check_node_loop_limit），达到上限后不再盲目重试。</p>
+<p><strong>步骤五：经验沉淀</strong>——成功的阶段结果经 after_stage_completion 写入三层记忆；成功提示词经 WorkflowMemory 调用 knowledge_manager.save_successful_prompt 进入模板库（嵌入相似度阈值 0.7 去重后保存）。下一次任务开工时，这些沉淀会作为历史上下文被重新读出——闭环由此合上。</p>
+<h3>概念示例：生成-质检-修复闭环 Demo</h3>
+<p>⚠️ <strong>代码性质说明</strong>：以下代码是<strong>概念示例，并非 PenShot 项目源码</strong>。示例演示的&quot;修复策略定向增强召回&quot;（按角色/场景触发 _character_memory_recall 等）在项目中<strong>没有对应实现</strong>——真实的修复回流是&quot;修复参数注入 + 节点重跑&quot;，见上一节。</p>
+<pre class="hljs"><code><span class="hljs-string">&quot;&quot;&quot;
+自迭代优化演示 - 生成-质检-修复-学习闭环（概念示例）
+&quot;&quot;&quot;</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">SelfHealingDemo</span>:
+    <span class="hljs-string">&quot;&quot;&quot;自迭代优化闭环演示&quot;&quot;&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-variable language_">self</span>.repair_history = []
+        <span class="hljs-variable language_">self</span>.success_patterns = []
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">generate_with_quality_loop</span>(<span class="hljs-params">self, query, context, max_attempts=<span class="hljs-number">3</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;
+        带质检闭环的生成
+        
+        流程：生成 -&gt; 质检 -&gt; 有问题则修复 -&gt; 重试 -&gt; 记录学习
+        &quot;&quot;&quot;</span>
+        attempt = <span class="hljs-number">0</span>
+        last_result = <span class="hljs-literal">None</span>
+        repair_strategy = <span class="hljs-literal">None</span>
+        
+        <span class="hljs-keyword">while</span> attempt &lt; max_attempts:
+            attempt += <span class="hljs-number">1</span>
+            
+            <span class="hljs-comment"># 1. 执行召回</span>
+            recall_results = <span class="hljs-variable language_">self</span>._multi_recall(query, context, repair_strategy)
+            
+            <span class="hljs-comment"># 2. 生成内容</span>
+            result = <span class="hljs-variable language_">self</span>._generate(query, recall_results)
+            
+            <span class="hljs-comment"># 3. 质量审计</span>
+            issues = <span class="hljs-variable language_">self</span>._audit(result, context)
+            
+            <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> issues:
+                <span class="hljs-comment"># 通过质检</span>
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot; 第<span class="hljs-subst">{attempt}</span>次尝试通过质检&quot;</span>)
+                <span class="hljs-variable language_">self</span>._record_success(query, result, repair_strategy)
+                <span class="hljs-keyword">return</span> result
+            
+            <span class="hljs-comment"># 4. 分析问题根源</span>
+            root_cause = <span class="hljs-variable language_">self</span>._analyze_root_cause(issues, result, context)
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot; 第<span class="hljs-subst">{attempt}</span>次尝试发现问题: <span class="hljs-subst">{root_cause[<span class="hljs-string">&#x27;description&#x27;</span>]}</span>&quot;</span>)
+            
+            <span class="hljs-comment"># 5. 生成修复策略</span>
+            repair_strategy = <span class="hljs-variable language_">self</span>._generate_repair_strategy(root_cause, issues)
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot; 修复策略: <span class="hljs-subst">{repair_strategy[<span class="hljs-string">&#x27;description&#x27;</span>]}</span>&quot;</span>)
+            
+            last_result = result
+        
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot; <span class="hljs-subst">{max_attempts}</span>次尝试后仍未通过质检&quot;</span>)
+        <span class="hljs-keyword">return</span> last_result
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_multi_recall</span>(<span class="hljs-params">self, query, context, repair_strategy=<span class="hljs-literal">None</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;多路召回（可根据修复策略调整）&quot;&quot;&quot;</span>
+        results = {
+            <span class="hljs-string">&quot;exact&quot;</span>: [],
+            <span class="hljs-string">&quot;vector&quot;</span>: [],
+            <span class="hljs-string">&quot;graph&quot;</span>: [],
+            <span class="hljs-string">&quot;memory&quot;</span>: []
+        }
+        
+        <span class="hljs-comment"># 基础召回</span>
+        results[<span class="hljs-string">&quot;exact&quot;</span>] = <span class="hljs-variable language_">self</span>._exact_recall(query)
+        results[<span class="hljs-string">&quot;vector&quot;</span>] = <span class="hljs-variable language_">self</span>._vector_recall(query)
+        
+        <span class="hljs-comment"># 根据修复策略增强召回</span>
+        <span class="hljs-keyword">if</span> repair_strategy:
+            <span class="hljs-keyword">if</span> repair_strategy[<span class="hljs-string">&quot;type&quot;</span>] == <span class="hljs-string">&quot;character&quot;</span>:
+                <span class="hljs-comment"># 增强角色相关召回</span>
+                char_name = repair_strategy[<span class="hljs-string">&quot;target&quot;</span>]
+                results[<span class="hljs-string">&quot;memory&quot;</span>] = <span class="hljs-variable language_">self</span>._character_memory_recall(char_name)
+            <span class="hljs-keyword">elif</span> repair_strategy[<span class="hljs-string">&quot;type&quot;</span>] == <span class="hljs-string">&quot;scene&quot;</span>:
+                <span class="hljs-comment"># 增强场景相关召回</span>
+                scene_name = repair_strategy[<span class="hljs-string">&quot;target&quot;</span>]
+                results[<span class="hljs-string">&quot;memory&quot;</span>] = <span class="hljs-variable language_">self</span>._scene_context_recall(scene_name)
+        
+        <span class="hljs-keyword">return</span> results
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_audit</span>(<span class="hljs-params">self, result, context</span>):
+        <span class="hljs-string">&quot;&quot;&quot;
+        质量审计 - 检测多个维度的问题
+        
+        返回问题列表，空列表表示通过
+        &quot;&quot;&quot;</span>
+        issues = []
+        
+        <span class="hljs-comment"># 检查角色一致性</span>
+        character_issue = <span class="hljs-variable language_">self</span>._check_character_consistency(result, context)
+        <span class="hljs-keyword">if</span> character_issue:
+            issues.append(character_issue)
+        
+        <span class="hljs-comment"># 检查场景连续性</span>
+        scene_issue = <span class="hljs-variable language_">self</span>._check_scene_continuity(result, context)
+        <span class="hljs-keyword">if</span> scene_issue:
+            issues.append(scene_issue)
+        
+        <span class="hljs-comment"># 检查动作逻辑</span>
+        action_issue = <span class="hljs-variable language_">self</span>._check_action_logic(result, context)
+        <span class="hljs-keyword">if</span> action_issue:
+            issues.append(action_issue)
+        
+        <span class="hljs-keyword">return</span> issues
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_analyze_root_cause</span>(<span class="hljs-params">self, issues, result, context</span>):
+        <span class="hljs-string">&quot;&quot;&quot;分析问题根源&quot;&quot;&quot;</span>
+        <span class="hljs-comment"># 根据问题类型判断根源</span>
+        <span class="hljs-keyword">for</span> issue <span class="hljs-keyword">in</span> issues:
+            <span class="hljs-keyword">if</span> issue[<span class="hljs-string">&quot;type&quot;</span>] == <span class="hljs-string">&quot;character_inconsistent&quot;</span>:
+                <span class="hljs-keyword">return</span> {
+                    <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;character&quot;</span>,
+                    <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">f&quot;角色<span class="hljs-subst">{issue[<span class="hljs-string">&#x27;character&#x27;</span>]}</span>的描述不一致&quot;</span>,
+                    <span class="hljs-string">&quot;target&quot;</span>: issue[<span class="hljs-string">&quot;character&quot;</span>],
+                    <span class="hljs-string">&quot;missing_info&quot;</span>: <span class="hljs-string">&quot;角色的完整设定或情绪历史&quot;</span>
+                }
+            <span class="hljs-keyword">elif</span> issue[<span class="hljs-string">&quot;type&quot;</span>] == <span class="hljs-string">&quot;scene_jump&quot;</span>:
+                <span class="hljs-keyword">return</span> {
+                    <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;scene&quot;</span>,
+                    <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">f&quot;场景切换不连贯: <span class="hljs-subst">{issue[<span class="hljs-string">&#x27;from&#x27;</span>]}</span> -&gt; <span class="hljs-subst">{issue[<span class="hljs-string">&#x27;to&#x27;</span>]}</span>&quot;</span>,
+                    <span class="hljs-string">&quot;target&quot;</span>: issue[<span class="hljs-string">&quot;to&quot;</span>],
+                    <span class="hljs-string">&quot;missing_info&quot;</span>: <span class="hljs-string">&quot;过渡描述或场景氛围&quot;</span>
+                }
+        
+        <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;unknown&quot;</span>, <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">&quot;未知问题&quot;</span>, <span class="hljs-string">&quot;target&quot;</span>: <span class="hljs-literal">None</span>}
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_generate_repair_strategy</span>(<span class="hljs-params">self, root_cause, issues</span>):
+        <span class="hljs-string">&quot;&quot;&quot;生成修复策略&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">if</span> root_cause[<span class="hljs-string">&quot;type&quot;</span>] == <span class="hljs-string">&quot;character&quot;</span>:
+            <span class="hljs-keyword">return</span> {
+                <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;character&quot;</span>,
+                <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">f&quot;增强召回角色&#x27;<span class="hljs-subst">{root_cause[<span class="hljs-string">&#x27;target&#x27;</span>]}</span>&#x27;的设定和历史&quot;</span>,
+                <span class="hljs-string">&quot;target&quot;</span>: root_cause[<span class="hljs-string">&quot;target&quot;</span>],
+                <span class="hljs-string">&quot;enhanced_recall&quot;</span>: <span class="hljs-literal">True</span>
+            }
+        <span class="hljs-keyword">elif</span> root_cause[<span class="hljs-string">&quot;type&quot;</span>] == <span class="hljs-string">&quot;scene&quot;</span>:
+            <span class="hljs-keyword">return</span> {
+                <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;scene&quot;</span>,
+                <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">f&quot;增强召回场景&#x27;<span class="hljs-subst">{root_cause[<span class="hljs-string">&#x27;target&#x27;</span>]}</span>&#x27;的氛围和上下文&quot;</span>,
+                <span class="hljs-string">&quot;target&quot;</span>: root_cause[<span class="hljs-string">&quot;target&quot;</span>],
+                <span class="hljs-string">&quot;enhanced_recall&quot;</span>: <span class="hljs-literal">True</span>
+            }
+        
+        <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;retry&quot;</span>, <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">&quot;重新尝试生成&quot;</span>, <span class="hljs-string">&quot;enhanced_recall&quot;</span>: <span class="hljs-literal">False</span>}
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_record_success</span>(<span class="hljs-params">self, query, result, repair_strategy</span>):
+        <span class="hljs-string">&quot;&quot;&quot;记录成功案例，供未来学习&quot;&quot;&quot;</span>
+        <span class="hljs-variable language_">self</span>.success_patterns.append({
+            <span class="hljs-string">&quot;query&quot;</span>: query,
+            <span class="hljs-string">&quot;result&quot;</span>: result[:<span class="hljs-number">100</span>],
+            <span class="hljs-string">&quot;repair_used&quot;</span>: repair_strategy,
+            <span class="hljs-string">&quot;timestamp&quot;</span>: datetime.now().isoformat()
+        })
+        
+        <span class="hljs-keyword">if</span> repair_strategy:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot; 已记录成功修复模式: <span class="hljs-subst">{repair_strategy[<span class="hljs-string">&#x27;type&#x27;</span>]}</span>&quot;</span>)
+    
+    <span class="hljs-comment"># 以下为模拟方法（实际实现需要完整逻辑）</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_exact_recall</span>(<span class="hljs-params">self, query</span>): <span class="hljs-keyword">return</span> []
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_vector_recall</span>(<span class="hljs-params">self, query</span>): <span class="hljs-keyword">return</span> []
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_character_memory_recall</span>(<span class="hljs-params">self, char</span>): <span class="hljs-keyword">return</span> []
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_scene_context_recall</span>(<span class="hljs-params">self, scene</span>): <span class="hljs-keyword">return</span> []
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_generate</span>(<span class="hljs-params">self, query, results</span>): <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;生成的内容&quot;</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_check_character_consistency</span>(<span class="hljs-params">self, result, context</span>): <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_check_scene_continuity</span>(<span class="hljs-params">self, result, context</span>): <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">_check_action_logic</span>(<span class="hljs-params">self, result, context</span>): <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>
+
+
+<span class="hljs-comment"># 演示</span>
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    healer = SelfHealingDemo()
+    
+    result = healer.generate_with_quality_loop(
+        query=<span class="hljs-string">&quot;生成林小雨和陈阳在雨中相遇的分镜&quot;</span>,
+        context={<span class="hljs-string">&quot;current_scene&quot;</span>: <span class="hljs-string">&quot;scene_001&quot;</span>, <span class="hljs-string">&quot;characters&quot;</span>: [<span class="hljs-string">&quot;林小雨&quot;</span>, <span class="hljs-string">&quot;陈阳&quot;</span>]}
+    )
+</code></pre>
+<hr>
+<h2>关键要点拆解（八）：多智能体协作召回的真实形态</h2>
+<p>在影视制作流程中，不同环节对素材的需求差异很大：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">智能体</th>
+<th style="text-align:left">职责</th>
+<th style="text-align:left">素材需求</th>
+<th style="text-align:left">数据特征</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">脚本解析器</td>
+<td style="text-align:left">理解剧本结构</td>
+<td style="text-align:left">角色、场景、对话、动作</td>
+<td style="text-align:left">结构化数据</td>
+</tr>
+<tr>
+<td style="text-align:left">分镜生成器</td>
+<td style="text-align:left">将文字转为视觉描述</td>
+<td style="text-align:left">镜头类型、构图、运镜</td>
+<td style="text-align:left">视觉元素</td>
+</tr>
+<tr>
+<td style="text-align:left">视频分割器</td>
+<td style="text-align:left">将长镜头切分为片段</td>
+<td style="text-align:left">动作断点、对话停顿</td>
+<td style="text-align:left">时序数据</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词转换器</td>
+<td style="text-align:left">生成 AI 视频提示词</td>
+<td style="text-align:left">风格、光线、色彩</td>
+<td style="text-align:left">描述性文本</td>
+</tr>
+</tbody>
+</table>
+<p>理想中的&quot;协作召回&quot;是这样的：每个智能体维护自己的向量索引，智能体间互相调用检索结果。<strong>这套描述在 PenShot 中没有实现</strong>——真实形态要朴素得多，也更符合工程直觉：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>不是&quot;每个智能体一套索引&quot;，而是共用一套资源、按 script_id 隔离</strong>：所有节点共享同一个 PromptTemplateManager / ScriptKnowledgeBase / MemoryManager（均由 WorkflowNodes 在初始化时创建）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>不是&quot;智能体间互相调用&quot;，而是工作流顺序编排 + 状态传递</strong>：上游节点把结果写进 WorkflowState，下游节点从中读取；</p>
+</li>
+<li class="lvl-2">
+<p><strong>&quot;上下文保持连贯&quot;的真实机制是 WorkflowMemory</strong>：每个阶段开工读历史、完工写归档，这是跨节点共享上下文的枢纽。</p>
+</li>
+</ul>
+<h3>多智能体协作架构（真实版）</h3>
+<p>原版架构图把&quot;知识图谱&quot;放在了共享层，还引用了一个不存在的 Agents2 节点（mermaid 渲染会报错）——这本身就说明它离代码很远。重画为真实结构：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Flow[&quot;工作流编排（顺序执行）&quot;]
+        direction LR
+        P[脚本解析器] --&gt; S[分镜生成器] --&gt; V[视频分割器] --&gt; C[提示词转换器]
+    end
+
+    subgraph Shared[&quot;共享资源（均按 script_id 隔离）&quot;]
+        WM[WorkflowMemory&lt;br/&gt;每阶段开工读/完工写]
+        MM[MemoryManager&lt;br/&gt;三层记忆]
+        Tpl[PromptTemplateManager&lt;br/&gt;成功模板库]
+        KB[ScriptKnowledgeBase&lt;br/&gt;剧本知识库]
+    end
+
+    P --&gt; WM
+    S --&gt; WM
+    V --&gt; WM
+    C --&gt; WM
+    WM --&gt; MM
+    C --&gt; Tpl
+    C --&gt; KB
+
+    style Flow fill:#e3f2fd
+    style Shared fill:#e8f5e9
+</pre>
+<h3>智能体间协作序列（真实链路）</h3>
+<p>节点间的交付次序与数据流向是真实存在的——每一环的&quot;存记忆&quot;对应 after_stage_completion，&quot;取上下文&quot;对应各节点开工时的 get_memory_* 三连（图中为简洁只画了存储侧）：</p>
+<pre class="mermaid">sequenceDiagram
+    participant User as 用户
+    participant Parser as 脚本解析器
+    participant Segmenter as 分镜生成器
+    participant Splitter as 视频分割器
+    participant Converter as 提示词转换器
+    participant Memory as 共享记忆
+
+    User-&gt;&gt;Parser: 提交剧本
+    
+    Parser-&gt;&gt;Parser: 解析角色/场景
+    Parser-&gt;&gt;Memory: 存储解析结果
+    
+    Parser-&gt;&gt;Segmenter: 传递角色+场景信息
+    
+    Segmenter-&gt;&gt;Segmenter: 生成分镜序列
+    Segmenter-&gt;&gt;Memory: 存储分镜结果
+    
+    Segmenter-&gt;&gt;Splitter: 传递分镜序列
+    
+    Splitter-&gt;&gt;Splitter: 分割长镜头
+    Splitter-&gt;&gt;Memory: 存储分割结果
+    
+    Splitter-&gt;&gt;Converter: 传递片段信息
+    
+    Converter-&gt;&gt;Converter: 生成提示词
+    Converter-&gt;&gt;Memory: 检索相似模板
+    
+    Memory--&gt;&gt;Converter: 返回历史模板
+    
+    Converter-&gt;&gt;Converter: 融合生成最终提示词
+    Converter-&gt;&gt;User: 输出结果
+</pre>
+<p>图中&quot;共享记忆&quot;一栏会让人误以为四个智能体都能任意读写同一块记忆——实际写法是：每个节点只操作 script_id 对应的那组隔离存储；跨节点传递靠的是 WorkflowState 中的领域字段，共享记忆只是&quot;跨任务&quot;的经验层，两者职责不同。</p>
+<hr>
+<h2>排坑提示</h2>
+<p>综合本次源码核对，给召回体系的工程落地提炼五条更有针对性的提示：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>先确认&quot;哪个模块真的在跑&quot;</strong>：PenShot 的教训是文档与代码的差距可以很大——GraphRAG 零命中、混合检索未接线、记忆系统真在跑。集成前先做一次&quot;调用方检索&quot;，比读文档可靠。</p>
+</li>
+<li class="lvl-2">
+<p><strong>&quot;已实现未接线&quot;是隐蔽陷阱</strong>：KnowledgeRouter 有完整的四源检索与重排序接线，但无调用方。这类代码在重构时最容易被误删，也最容易让人误以为功能已上线——建议在文件头标注接线状态。</p>
+</li>
+<li class="lvl-2">
+<p><strong>静默降级要能被观测</strong>：短期记忆的 Redis 探测失败时只打 warning，降级本身是合理设计，但缺少&quot;当前处于哪档降级&quot;的可观测指标，线上排查会很被动。</p>
+</li>
+<li class="lvl-2">
+<p><strong>手写相似度扫描要知道它的边界</strong>：ScriptKnowledgeBase.query 是 O(N) 全量扫描，文档量小时简单可靠，规模上来后需换索引结构（HNSW 等）——届时注意迁移路径与分数口径的变化。</p>
+</li>
+<li class="lvl-2">
+<p><strong>质检闭环的重试必须有界</strong>：节点级循环限制（_check_node_loop_limit）是现有保护；修复参数虽会记录（repair_applied），但&quot;哪种修复建议最有效&quot;缺乏回访统计——这是自迭代闭环下一步最有价值的增强点。</p>
+</li>
+</ul>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p>把全文的核对结论收拢成一张清单——PenShot 召回体系的真实面貌是&quot;两段已接线的朴素链路 + 一套已实现未接线的混合检索 + 一批规划中的概念&quot;：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">机制</th>
+<th style="text-align:left">文档口径</th>
+<th style="text-align:left">源码口径</th>
+<th style="text-align:left">性质</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">三层记忆</td>
+<td style="text-align:left">分层存储、跨任务复用</td>
+<td style="text-align:left">MemoryManager + WorkflowMemory，四阶段读写</td>
+<td style="text-align:left">✅ 已接线</td>
+</tr>
+<tr>
+<td style="text-align:left">模板召回</td>
+<td style="text-align:left">历史成功案例复用</td>
+<td style="text-align:left">PromptTemplateManager（阈值 0.7、top_k=3）</td>
+<td style="text-align:left">✅ 已接线</td>
+</tr>
+<tr>
+<td style="text-align:left">向量检索</td>
+<td style="text-align:left">BGE + HNSW</td>
+<td style="text-align:left">手动余弦全量扫描</td>
+<td style="text-align:left">✅ 已接线（形态朴素）</td>
+</tr>
+<tr>
+<td style="text-align:left">混合检索</td>
+<td style="text-align:left">RRF 融合多路召回</td>
+<td style="text-align:left">串行聚合 + 硬编码分数 + 前缀去重</td>
+<td style="text-align:left">⚠️ 未接线</td>
+</tr>
+<tr>
+<td style="text-align:left">重排序</td>
+<td style="text-align:left">CrossEncoder 精排</td>
+<td style="text-align:left">bge-reranker-large 挂在未接线路径</td>
+<td style="text-align:left">⚠️ 未接线</td>
+</tr>
+<tr>
+<td style="text-align:left">GraphRAG</td>
+<td style="text-align:left">知识图谱推理</td>
+<td style="text-align:left">无</td>
+<td style="text-align:left">❌ 零命中</td>
+</tr>
+<tr>
+<td style="text-align:left">策略自迭代</td>
+<td style="text-align:left">自动调整检索维度</td>
+<td style="text-align:left">无（真实的是修复参数重跑 + 经验沉淀）</td>
+<td style="text-align:left">❌ 概念混淆</td>
+</tr>
+</tbody>
+</table>
+<p>给同类&quot;带记忆创作智能体&quot;的三条建议，来自这次核对的直接观察：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>记忆的价值在&quot;读&quot;而不在&quot;写&quot;</strong>：PenShot 的记忆系统之所以是全系列少见的&quot;真在跑&quot;模块，关键在于每阶段开工前的读取动作（历史统计、常见问题注入）——只写不读的记忆是最常见的过度设计；</p>
+</li>
+<li class="lvl-3">
+<p><strong>融合算法的前置条件是统一分数口径</strong>：在&quot;手动余弦 + 硬编码分数&quot;的混合分数体系升级到 RRF 之前，先做归一化或排名化改造，否则融合只会放大分数口径的混乱；</p>
+</li>
+<li class="lvl-3">
+<p><strong>把&quot;接线状态&quot;当成一等公民</strong>：未接线的完整实现（KnowledgeRouter）、零命中的规划（GraphRAG）与已接线的链路混在一起，最直接的治理手段是让每种状态都有可核查的标记——这也是本系列文章的立意。</p>
+</li>
+</ol>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

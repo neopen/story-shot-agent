@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 技术架构：十节点状态机、决策路由与三级循环防护 · PenShot 文档</title>
+  <meta name="description" content="深入拆解 PenShot 十节点 LangGraph 状态图：六大业务智能体、四个控制节点、七态决策路由、节点/阶段/全局三级循环防护与 SQLite 检查点持久化；对照源码如实标注超时防护边界、Redis 降级路径与循环预警共用标记等工程细节。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/architecture.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 技术架构：十节点状态机、决策路由与三级循环防护">
+  <meta property="og:description" content="深入拆解 PenShot 十节点 LangGraph 状态图：六大业务智能体、四个控制节点、七态决策路由、节点/阶段/全局三级循环防护与 SQLite 检查点持久化；对照源码如实标注超时防护边界、Redis 降级路径与循环预警共用标记等工程细节。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/architecture.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html" class="active">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-02-12</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 技术架构：十节点状态机、决策路由与三级循环防护</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="mcp.html">MCP Server</a> · <a href="recall.html">召回策略</a> · <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇架构文档。重点是解释组件之间的职责、数据流和关键设计取舍，并区分当前实现与设计层面的推演。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够沿着数据流定位主要组件，并解释关键设计取舍。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>一、概述：系统核心价值</h2>
+<p>PenShot（Pen &amp; Shot）是一个<strong>基于 LangGraph 的多智能体协作系统</strong>，目标是把&quot;自然语言剧本&quot;端到端转化为&quot;可直接投喂给 AI 视频模型（Runway Gen-2 / Sora / Veo / Pika 等，对应源码中的 <code>VideoModelType</code> 枚举）的指令序列&quot;。它将&quot;分镜&quot;这一复杂任务拆解为<strong>解析、拆分、分段、转换、审查、守护</strong>六个相互衔接的专业节点，每个节点只专注一项职责，再由 WorkflowOrchestrator 统一装配成图、由 MultiAgentPipeline 调度执行。</p>
+<p>这种架构带来的核心收益有三点：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>职责清晰</strong>：单一 Agent 的 prompt 与数据结构可各自优化，避免&quot;一个 LLM 干所有事&quot;导致的指令冲突与质量漂移。</p>
+</li>
+<li class="lvl-2">
+<p><strong>可控可重试</strong>：每个节点都能独立判定成功/失败，配合修复参数实现精准的局部重试，而非整条链路推倒重来。</p>
+</li>
+<li class="lvl-2">
+<p><strong>错误兜底</strong>：内置重试、错误处理与人工干预三重机制，保证长链路任务的鲁棒性。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>概念澄清</strong>：LangGraph 是 LangChain 官方推出的<strong>图状态机框架</strong>，通过 <code>StateGraph</code> 描述节点（Node）与边（Edge）、条件分支（Conditional Edge），天然支持循环、路由与状态持久化，是多智能体流程编排的主流选择。</p>
+<p><strong>核对说明</strong>：本文的节点名、枚举值、循环上限、存储 key 等均与 story-shot-agent v0.3.x 源码（<code>agent/workflow/</code>、<code>task/</code>、<code>knowledge/memory/</code> 等目录）逐一核对；凡属设计推测、疑点或当前实现的不足，都会明确标注。</p>
+</blockquote>
+<pre class="mermaid">flowchart TB
+    subgraph Input[输入层]
+        A[原始剧本文本]
+    end
+
+    subgraph Agents[核心智能体]
+        direction LR
+        P[剧本解析智能体&lt;br/&gt;Parser Agent]
+        S[镜头拆分智能体&lt;br/&gt;Shot Segmenter]
+        V[视频分段智能体&lt;br/&gt;Video Splitter]
+        C[指令转换智能体&lt;br/&gt;Prompt Converter]
+        Q[质量审查智能体&lt;br/&gt;Quality Auditor]
+        G[连续性守护节点&lt;br/&gt;Continuity Guardian]
+    end
+
+    subgraph Output[输出层]
+        OUTZ[结果生成节点&lt;br/&gt;Generate Output]
+        Z[AI视频指令]
+    end
+
+    subgraph Support[支持服务]
+        LLM[LLM服务]
+        DB[(任务存储&lt;br/&gt;Redis/内存)]
+    end
+
+    A --&gt; P
+    P --&gt; S
+    S --&gt; V
+    V --&gt; C
+    C --&gt; Q
+    Q --&gt; G
+    G --&gt; OUTZ
+    OUTZ --&gt; Z
+
+    P -.-&gt; LLM
+    C -.-&gt; LLM
+    Q -.-&gt; LLM
+    P -.-&gt; DB
+    S -.-&gt; DB
+    V -.-&gt; DB
+    C -.-&gt; DB
+</pre>
+<hr>
+<h2>二、关键要点拆解</h2>
+<h3>2.1 整体架构</h3>
+<p><strong>智能体框架</strong>：LangGraph（专为多智能体状态机设计）</p>
+<p>整个系统可分为 <strong>输入层 → LangGraph 多智能体核心工作流 → 记忆层 → 输出层</strong> 四个区块。核心工作流包含六个业务智能体（剧本解析 / 镜头拆分 / 视频分段 / 指令转换 / 质量审查 / 连续性守护）与四个控制节点（循环检查 LOOP_CHECK / 错误处理 ERROR_HANDLER / 人工干预 HUMAN_INTERVENTION / 结果生成 GENERATE_OUTPUT）：前者负责内容生产，后者负责计数、路由与兜底。记忆层由 ScriptMemory 门面统一管理短期 / 中期 / 长期三层记忆（Chroma 是长期记忆的底层向量存储，并非独立的第四层）。输出端经 WorkflowOutputFixer 修复片段序列后以 JSON 返回；对外接口有 Python API（PenshotFunction）、REST API、MCP Server 与 CLI 四种形态。</p>
+<blockquote>
+<p><strong>边界说明</strong>：<code>video_model</code> 参数（runway_gen2 / sora / veo / pika 等）只影响提示词的风格适配——PenShot 输出的是指令序列，系统本身不调用这些视频模型生成视频，也不内置 FFmpeg 合成环节；下游渲染需要使用者自行接驳工具链。</p>
+</blockquote>
+<pre class="mermaid">flowchart TD
+    subgraph Input [输入层]
+        A1[客户端 / 上游智能体] --&gt; A2[Python API / REST API / MCP / CLI]
+        A2 --&gt; A3[任务管理器&lt;br/&gt;TaskFactory + 优先级队列]
+    end
+
+    subgraph Core [LangGraph 多智能体核心工作流]
+        direction TB
+        
+        P1[剧本解析智能体] --&gt; P2[镜头拆分智能体]
+        P2 --&gt; C1[循环检查&lt;br/&gt;LOOP_CHECK]
+        C1 --&gt; P3[视频分段智能体]
+        P3 --&gt; C1
+        C1 --&gt; P4[指令转换智能体]
+        P4 --&gt; C1
+        C1 --&gt; P5[质量审计智能体]
+        P5 --&gt; P6[连续性守护智能体]
+        P6 --&gt; P7[结果生成节点]
+        
+        subgraph Control [控制与异常节点]
+            C2[错误处理&lt;br/&gt;ERROR_HANDLER]
+            C3[人工干预&lt;br/&gt;HUMAN_INTERVENTION]
+        end
+        
+        C1 -.-&gt;|循环超限| C2
+        C1 -.-&gt;|需要人工| C3
+        P1 -.-&gt;|失败| C2
+        P5 -.-&gt;|失败| C2
+    end
+
+    subgraph Memory [记忆层]
+        M1[(短期记忆&lt;br/&gt;Redis/文件)]
+        M2[(中期记忆&lt;br/&gt;磁盘摘要)]
+        M3[(长期记忆&lt;br/&gt;Chroma 向量库)]
+    end
+
+    subgraph Output [输出层]
+        O1[WorkflowOutputFixer&lt;br/&gt;片段序列修复] --&gt; O2[JSON 结果]
+    end
+
+    A3 --&gt; P1
+    M1 --&gt; Core
+    M2 --&gt; Core
+    M3 --&gt; Core
+    P7 --&gt; O1
+
+</pre>
+<h4>技术栈</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">技术（v0.3.x 真实实现）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">智能体框架</td>
+<td style="text-align:left">LangGraph（StateGraph + 条件边）、LangChain</td>
+</tr>
+<tr>
+<td style="text-align:left">LLM 支持</td>
+<td style="text-align:left">OpenAI、Ollama、通义千问、DeepSeek（客户端注册表路由）</td>
+</tr>
+<tr>
+<td style="text-align:left">任务管理</td>
+<td style="text-align:left">进程内异步优先级队列（AsyncTaskProcessor）+ Redis 任务存储（降级内存）</td>
+</tr>
+<tr>
+<td style="text-align:left">检查点</td>
+<td style="text-align:left">LangGraph SqliteSaver（data/checkpoints/，不可用时降级内存）</td>
+</tr>
+<tr>
+<td style="text-align:left">记忆系统</td>
+<td style="text-align:left">ScriptMemory 三层记忆（Redis/磁盘/Chroma）</td>
+</tr>
+<tr>
+<td style="text-align:left">错误处理</td>
+<td style="text-align:left">错误分类（7 类）+ 重试机制 + 人工干预</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>选型解读</strong>：LLM 层同时兼容云端 API 与本地部署（Ollama），便于在私有化与成本之间权衡，客户端注册表（CLIENT_REGISTRY）按 <code>base_url</code> 自动探测厂商；任务队列选择<strong>进程内实现</strong>而非外部队列（如 Celery/RQ），换取零外部依赖的轻量部署，代价是跨进程扩展能力有限——多副本或崩溃场景依靠 Redis 任务存储与 SQLite 检查点兜底（见 2.2 状态持久化小节）。</p>
+</blockquote>
+<h4>智能体职责</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">智能体</th>
+<th style="text-align:left">职责</th>
+<th style="text-align:left">输入 → 输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>1. 剧本解析智能体</strong></td>
+<td style="text-align:left">将任意格式剧本统一解析为结构化叙事单元，提取场景、角色、动作、对话、道具、情绪等</td>
+<td style="text-align:left">原始文本 → 结构化序列（场景、角色、对话等）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>2. 镜头拆分智能体</strong></td>
+<td style="text-align:left">基于情感强度、节奏变化等，将剧本划分为最小可独立表达的镜头单元，并分配合理时长</td>
+<td style="text-align:left">结构化对象 → 带时间戳的镜头序列</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>3. 视频分段智能体</strong></td>
+<td style="text-align:left">将超长镜头按片段时长上限（默认 5 秒）切分，分割点对齐关键帧与动作自然停顿处，输出符合AI视频模型要求的片段序列</td>
+<td style="text-align:left">镜头序列 → 符合AI视频长度限制的片段序列</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>4. 指令转换智能体</strong></td>
+<td style="text-align:left">为每个AI片段生成模型适配的文生视频提示词（Prompt），包含构图、光线、运动等</td>
+<td style="text-align:left">片段内容 + 连续性锚点 → 可直接用于AI视频生成指令</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>5. 质量审查智能体</strong></td>
+<td style="text-align:left">对全序列进行连贯性、时长合规性、角色漂移等检查，输出修正建议</td>
+<td style="text-align:left">AI片段序列 → <strong>审查报告</strong> （通过 / 修正建议列表）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>6. 连续性守护节点</strong></td>
+<td style="text-align:left">跨阶段连续性检查，识别角色、场景、动作、风格等连续性问题</td>
+<td style="text-align:left">所有阶段输出 → 连续性检查结果</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>设计说明</strong>：这六个节点呈&quot;<strong>细化 → 拆分 → 合规化 → 转译 → 校验 → 兜底</strong>&quot;的流水线逻辑。&quot;按 5 秒切分&quot;适配主流文生视频模型的单段时长硬上限（<code>max_fragment_duration</code> 默认 5.0 秒）；&quot;在动作自然停顿处切割&quot;写在分段提示词的分割规则里（动作完成瞬间 / 转身前 / 视线转移时），可避免动作半途被截断造成的视觉跳变。</p>
+</blockquote>
+<h3>2.2 工作流编排</h3>
+<p>采用 <strong>LangGraph</strong> 实现多智能体协作流程，支持状态管理、循环控制和错误恢复。每个业务节点后都有<strong>决策判断</strong>（<code>PipelineDecision</code> 决策函数），根据执行结果返回七种决策状态之一并路由到不同后续路径。特别地：拆分 / 分段 / 转换三个阶段成功后并不直接进入下一节点，而是先经过<strong>循环检查节点（LOOP_CHECK）</strong>——它同时承担&quot;计数器递增、上限检查、阶段推进&quot;三项职责（详见后文决策路由映射）：</p>
+<pre class="mermaid">flowchart TD
+    Start([开始/剧本输入]) --&gt; Parse[剧本解析节点]
+
+    Parse --&gt; Decision1{解析结果判断}
+    Decision1 --&gt;|成功| Split[镜头拆分节点]
+    Decision1 --&gt;|需要重试| Parse
+    Decision1 --&gt;|严重失败| Error[错误处理节点]
+    Decision1 --&gt;|需要人工干预| Human[人工干预节点]
+
+    Split --&gt; Decision2{拆分结果判断}
+    Decision2 --&gt;|成功| Loop{循环检查节点&lt;br/&gt;LOOP_CHECK}
+    Decision2 --&gt;|需要重试/修复| Split
+    Decision2 --&gt;|严重失败/超限| Error
+
+    Loop --&gt;|阶段推进| Fragment[视频分段节点]
+
+    Fragment --&gt; Decision3{分段结果判断}
+    Decision3 --&gt;|成功| Loop
+    Decision3 --&gt;|需要重试/修复| Fragment
+    Decision3 --&gt;|严重失败/超限| Error
+
+    Loop --&gt;|阶段推进| Prompt[提示词生成节点]
+
+    Prompt --&gt; DecisionP{生成结果判断}
+    DecisionP --&gt;|通过| Loop
+    DecisionP --&gt;|需要重试/修复| Prompt
+    DecisionP --&gt;|严重失败| Error
+
+    Loop --&gt;|阶段推进| Audit[质量审查节点]
+
+    Audit --&gt; Decision4{审查结果判断}
+    Decision4 --&gt;|通过/轻微问题| Continuity[连续性守护节点]
+    Decision4 --&gt;|需要重试/修复| Prompt
+    Decision4 --&gt;|需要人工干预| Human
+    Decision4 --&gt;|失败/中止| Error
+
+    Continuity --&gt; Decision5{连续性判断}
+    Decision5 --&gt;|通过| Output[生成输出节点]
+    Decision5 --&gt;|需要修复| Prompt
+    Decision5 --&gt;|需要人工干预| Human
+    Decision5 --&gt;|严重失败| Error
+
+    Output --&gt; End([工作流完成])
+
+    Error --&gt; DecisionE{错误处理判断}
+    DecisionE --&gt;|按错误来源回退| Node[对应阶段节点&lt;br/&gt;解析/拆分/分段/转换]
+    DecisionE --&gt;|需要人工干预| Human
+    DecisionE --&gt;|中止流程| End
+
+    Human --&gt; DecisionH{人工决策判断}
+    DecisionH --&gt;|继续流程| Output
+    DecisionH --&gt;|重新开始| Parse
+    DecisionH --&gt;|调整提示词| Prompt
+    DecisionH --&gt;|重试失败| Error
+    DecisionH --&gt;|中止流程| End
+</pre>
+<h4>决策状态</h4>
+<p>每个节点的执行结果统一收敛为一组<strong>判定状态</strong>，由决策函数解释并路由，这是 LangGraph 条件分支的落地形态：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">状态</th>
+<th style="text-align:left">含义</th>
+<th style="text-align:left">后续动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">SUCCESS</td>
+<td style="text-align:left">完全成功</td>
+<td style="text-align:left">进入下一节点</td>
+</tr>
+<tr>
+<td style="text-align:left">VALID</td>
+<td style="text-align:left">验证通过（有小问题）</td>
+<td style="text-align:left">带病继续执行</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_RETRY</td>
+<td style="text-align:left">需要重试</td>
+<td style="text-align:left">重新执行当前节点</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_REPAIR</td>
+<td style="text-align:left">需要修复</td>
+<td style="text-align:left">应用修复参数后重试</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_HUMAN</td>
+<td style="text-align:left">需要人工干预</td>
+<td style="text-align:left">进入人工干预节点</td>
+</tr>
+<tr>
+<td style="text-align:left">FAILED</td>
+<td style="text-align:left">一般失败</td>
+<td style="text-align:left">进入错误处理</td>
+</tr>
+<tr>
+<td style="text-align:left">ABORT</td>
+<td style="text-align:left">中止流程</td>
+<td style="text-align:left">直接结束（END）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>源码注</strong>：<code>PipelineState</code> 枚举的注释显示 <code>NEEDS_REPAIR</code> 合并了早期的 <code>NEEDS_ADJUSTMENT</code> 与 <code>NEEDS_FIX</code> 两个状态——语义收敛后，所有&quot;修改后重试&quot;的场景统一走一条修复链路，减少了路由分支。</p>
+</blockquote>
+<blockquote>
+<p><strong>状态机设计要点</strong>：<code>SUCCESS</code> 与 <code>VALID</code> 都&quot;放行&quot;，但语义不同——<code>VALID</code> 表示有轻微瑕疵、可带病继续；只有 <code>NEEDS_REPAIR</code> 才携带修复参数回退。这样既保证质量，又避免因轻微问题反复重试拖垮吞吐。</p>
+</blockquote>
+<h4>工作流流程图</h4>
+<pre class="mermaid">flowchart TD
+    Start([开始]) --&gt; Parse[剧本解析]
+    Parse --&gt;|SUCCESS| Split[镜头拆分]
+    Parse --&gt;|NEEDS_RETRY| Parse
+    Parse --&gt;|FAILED| Error[错误处理]
+    Parse --&gt;|NEEDS_HUMAN| Human[人工干预]
+
+    Split --&gt;|SUCCESS| Loop{循环检查}
+    Split --&gt;|NEEDS_RETRY/REPAIR| Split
+
+    Loop --&gt;|推进| Fragment[视频分段]
+    Fragment --&gt;|SUCCESS| Loop
+    Fragment --&gt;|NEEDS_RETRY/REPAIR| Fragment
+
+    Loop --&gt;|推进| Prompt[提示词生成]
+    Prompt --&gt;|SUCCESS/VALID| Loop
+    Prompt --&gt;|NEEDS_RETRY/REPAIR| Prompt
+
+    Loop --&gt;|推进| Audit[质量审查]
+    Audit --&gt;|SUCCESS/VALID| Continuity[连续性守护]
+    Audit --&gt;|NEEDS_RETRY/REPAIR| Prompt
+    Audit --&gt;|NEEDS_HUMAN| Human
+    Audit --&gt;|ABORT| End([完成])
+
+    Continuity --&gt;|SUCCESS/VALID| Output[生成输出]
+    Continuity --&gt;|NEEDS_REPAIR| Prompt
+    Continuity --&gt;|NEEDS_HUMAN| Human
+
+    Output --&gt; End
+    Error --&gt;|按错误来源回退| Node[对应阶段节点&lt;br/&gt;解析/拆分/分段/转换]
+    Error --&gt;|NEEDS_HUMAN| Human
+    Error --&gt;|ABORT| End
+    Human --&gt;|SUCCESS/VALID| Output
+    Human --&gt;|NEEDS_RETRY| Parse
+    Human --&gt;|NEEDS_REPAIR| Prompt
+    Human --&gt;|ABORT| End
+</pre>
+<h4>流程协作序列图</h4>
+<p>下图完整刻画了一次分镜任务从&quot;提交 → 入队 → 六阶段流水线 → 结果回调&quot;的细化时序，穿插了大量 <code>alt</code> 分支（有修复参数、镜头&gt;5秒、审查通过/需要修复、连续性发现问题等），体现了状态持久化与局部重试的协作方式：</p>
+<blockquote>
+<p><strong>阅读提示</strong>：本图为&quot;理想化协作全景&quot;，省略了 LOOP_CHECK 循环检查节点的介入细节（真实图里它位于每个阶段成功之后，详见后文决策路由表）；任务状态写入经 TaskRepository（Redis 优先、内存降级）。</p>
+</blockquote>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant User as 用户/调用方
+    participant API as API/MCP接口
+    participant TF as TaskFactory&lt;br/&gt;任务工厂
+    participant Q as 任务队列&lt;br/&gt;Priority Queue
+    participant WP as AsyncTaskProcessor&lt;br/&gt;异步任务处理器
+    participant WF as Workflow&lt;br/&gt;流程编排器
+    
+    participant Parser as 剧本解析智能体
+    participant LLM as LLM服务
+    participant Shot as 镜头拆分智能体
+    participant Split as 视频分段智能体
+    participant Prompt as 指令转换智能体
+    participant QA as 质量审查智能体
+    participant CG as 连续性守护节点
+    
+    participant Redis as Redis&lt;br/&gt;状态存储
+    participant Callback as 回调服务
+
+    %% 任务提交阶段
+    User-&gt;&gt;API: 1. 提交剧本
+    API-&gt;&gt;TF: 2. 创建任务
+    TF-&gt;&gt;Redis: 3. 保存任务状态(PENDING，Redis/内存降级)
+    TF--&gt;&gt;API: 4. 返回task_id
+    API--&gt;&gt;User: 5. 返回task_id
+
+    %% 任务入队阶段
+    TF-&gt;&gt;Q: 6. 任务入队(按优先级)
+    Q--&gt;&gt;TF: 7. 入队成功
+    TF-&gt;&gt;Redis: 8. 更新状态(PROCESSING)
+
+    %% 工作线程调度
+    loop 并发控制
+        WP-&gt;&gt;Q: 9. 拉取任务
+        Q--&gt;&gt;WP: 10. 返回任务
+        WP-&gt;&gt;WF: 11. 启动工作流
+    end
+
+    %% 阶段1: 剧本解析
+    WF-&gt;&gt;Parser: 12. 解析剧本
+    Parser-&gt;&gt;LLM: 13. 调用LLM解析
+    LLM--&gt;&gt;Parser: 14. 返回结构化数据
+    
+    alt 有修复参数
+        Parser-&gt;&gt;Parser: 15. 应用修复参数
+    end
+    
+    Parser-&gt;&gt;Parser: 16. 质量评估+问题检测
+    Parser--&gt;&gt;WF: 17. 返回ParsedScript
+    WF-&gt;&gt;Redis: 18. 保存中间结果
+
+    %% 阶段2: 镜头拆分
+    WF-&gt;&gt;Shot: 19. 拆分镜头
+    Shot-&gt;&gt;LLM: 20. 调用LLM生成镜头
+    LLM--&gt;&gt;Shot: 21. 返回镜头序列
+    
+    alt 有修复参数
+        Shot-&gt;&gt;Shot: 22. 应用修复参数
+    end
+    
+    Shot-&gt;&gt;Shot: 23. 时长估算+增强
+    Shot-&gt;&gt;Shot: 24. 问题检测
+    Shot--&gt;&gt;WF: 25. 返回ShotSequence
+    WF-&gt;&gt;Redis: 26. 保存中间结果
+
+    %% 阶段3: 视频分段
+    WF-&gt;&gt;Split: 27. 视频分段
+    Split-&gt;&gt;LLM: 28. 调用LLM智能分割
+    LLM--&gt;&gt;Split: 29. 返回分割方案
+    
+    alt 镜头时长&gt;5秒
+        Split-&gt;&gt;Split: 30. 智能切分
+        Split-&gt;&gt;Split: 31. 连续性验证
+    end
+    
+    Split-&gt;&gt;Split: 32. 问题检测
+    Split--&gt;&gt;WF: 33. 返回FragmentSequence
+    WF-&gt;&gt;Redis: 34. 保存中间结果
+
+    %% 阶段4: 指令转换
+    WF-&gt;&gt;Prompt: 35. 生成提示词
+    Prompt-&gt;&gt;LLM: 36. 调用LLM生成Prompt
+    LLM--&gt;&gt;Prompt: 37. 返回提示词(视频+音频)
+    
+    alt 有修复参数
+        Prompt-&gt;&gt;Prompt: 38. 应用修复参数
+    end
+    
+    Prompt-&gt;&gt;Prompt: 39. 问题检测
+    Prompt--&gt;&gt;WF: 40. 返回AIVideoInstructions
+    WF-&gt;&gt;Redis: 41. 保存中间结果
+
+    %% 阶段5: 质量审查
+    WF-&gt;&gt;QA: 42. 质量审查
+    QA-&gt;&gt;QA: 43. 规则审查
+    QA-&gt;&gt;LLM: 44. LLM深度审查
+    LLM--&gt;&gt;QA: 45. 返回审查结果
+    QA-&gt;&gt;QA: 46. 合并报告+问题分类
+    QA-&gt;&gt;QA: 47. 生成修复参数
+    QA--&gt;&gt;WF: 48. 返回AuditReport
+
+    alt 审查通过
+        WF-&gt;&gt;CG: 49. 连续性检查
+    else 需要修复
+        WF-&gt;&gt;WF: 50. 写入 state.repair_params
+        Note over WF,Prompt: NEEDS_REPAIR 返回指令转换阶段重新生成
+    end
+
+    %% 阶段6: 连续性守护
+    CG-&gt;&gt;CG: 51. 角色连续性检查
+    CG-&gt;&gt;CG: 52. 场景连续性检查
+    CG-&gt;&gt;CG: 53. 动作连续性检查
+    CG-&gt;&gt;CG: 54. 风格连续性检查
+    CG-&gt;&gt;CG: 55. 时间连续性检查
+    CG-&gt;&gt;CG: 56. 道具连续性检查
+
+    alt 发现连续性问题
+        CG-&gt;&gt;CG: 57. 问题分类(严重/中等/轻微)
+        CG-&gt;&gt;CG: 58. 生成修复参数
+        CG--&gt;&gt;WF: 59. 返回ContinuityIssues
+        Note over WF,Prompt: NEEDS_REPAIR 返回指令转换阶段修复
+    else 检查通过
+        CG--&gt;&gt;WF: 60. 检查通过
+    end
+
+    %% 结果输出阶段
+    WF-&gt;&gt;WF: 61. 组装最终结果
+    WF-&gt;&gt;Redis: 62. 保存最终结果(SUCCESS)
+    WF-&gt;&gt;Callback: 63. 触发回调(如有)
+    WF--&gt;&gt;WP: 64. 返回结果
+    WP--&gt;&gt;TF: 65. 任务完成
+
+    %% 用户查询结果
+    User-&gt;&gt;API: 66. 查询结果
+    API-&gt;&gt;TF: 67. 获取结果
+    TF-&gt;&gt;Redis: 68. 读取结果
+    Redis--&gt;&gt;TF: 69. 返回结果
+    TF--&gt;&gt;API: 70. 返回TaskResponse
+    API--&gt;&gt;User: 71. 返回分镜数据
+</pre>
+<h4>各节点协作图</h4>
+<p><strong>决策路由映射表（源码提取）</strong></p>
+<p>下表直接从 <code>workflow_pipeline.py</code> 的条件边定义与 <code>workflow_decision.py</code> 的决策函数提取，是&quot;每个节点执行完之后，LangGraph 实际会去哪里&quot;的完整答案：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">节点</th>
+<th style="text-align:left">SUCCESS / VALID</th>
+<th style="text-align:left">NEEDS_RETRY / NEEDS_REPAIR</th>
+<th style="text-align:left">NEEDS_HUMAN</th>
+<th style="text-align:left">FAILED / ABORT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">PARSE_SCRIPT</td>
+<td style="text-align:left">→ SEGMENT_SHOT</td>
+<td style="text-align:left">NEEDS_RETRY → 自身</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">→ ERROR_HANDLER</td>
+</tr>
+<tr>
+<td style="text-align:left">SEGMENT_SHOT</td>
+<td style="text-align:left">→ LOOP_CHECK</td>
+<td style="text-align:left">两者 → 自身</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">→ ERROR_HANDLER</td>
+</tr>
+<tr>
+<td style="text-align:left">SPLIT_VIDEO</td>
+<td style="text-align:left">→ LOOP_CHECK</td>
+<td style="text-align:left">两者 → 自身</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">→ ERROR_HANDLER</td>
+</tr>
+<tr>
+<td style="text-align:left">CONVERT_PROMPT</td>
+<td style="text-align:left">两者 → LOOP_CHECK</td>
+<td style="text-align:left">两者 → 自身</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">→ ERROR_HANDLER</td>
+</tr>
+<tr>
+<td style="text-align:left">LOOP_CHECK</td>
+<td style="text-align:left">按阶段推进到 SPLIT_VIDEO / CONVERT_PROMPT / AUDIT_QUALITY</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">→ ERROR_HANDLER</td>
+</tr>
+<tr>
+<td style="text-align:left">AUDIT_QUALITY</td>
+<td style="text-align:left">两者 → CONTINUITY_CHECK</td>
+<td style="text-align:left">两者 → CONVERT_PROMPT</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">FAILED → ERROR_HANDLER；ABORT → END</td>
+</tr>
+<tr>
+<td style="text-align:left">CONTINUITY_CHECK</td>
+<td style="text-align:left">两者 → GENERATE_OUTPUT</td>
+<td style="text-align:left">NEEDS_REPAIR → CONVERT_PROMPT</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">→ ERROR_HANDLER</td>
+</tr>
+<tr>
+<td style="text-align:left">HUMAN_INTERVENTION</td>
+<td style="text-align:left">两者 → GENERATE_OUTPUT</td>
+<td style="text-align:left">RETRY → PARSE_SCRIPT；REPAIR → CONVERT_PROMPT</td>
+<td style="text-align:left">自身（继续等待）</td>
+<td style="text-align:left">FAILED → ERROR_HANDLER；ABORT → END</td>
+</tr>
+<tr>
+<td style="text-align:left">ERROR_HANDLER</td>
+<td style="text-align:left">按错误来源节点回退</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">→ HUMAN_INTERVENTION</td>
+<td style="text-align:left">ABORT → END</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>三个值得注意的路由细节</strong>：</p>
+<ol>
+<li class="lvl-3"><strong>质量审查失败不是&quot;重试审查&quot;，而是&quot;回炉重生成提示词&quot;</strong>——AUDIT_QUALITY 的 NEEDS_RETRY / NEEDS_REPAIR 都路由到 CONVERT_PROMPT。因为审查本身是&quot;读&quot;操作，问题出在被审查的提示词上，重跑审查没有意义。</li>
+<li class="lvl-3"><strong>连续性检查的修复目标同样收敛到 CONVERT_PROMPT</strong>——连续性问题大多体现为&quot;提示词描述不一致&quot;，系统采取的是&quot;回炉重写&quot;而非&quot;就地打补丁&quot;的策略。</li>
+<li class="lvl-3"><strong>疑似路由缺口</strong>：<code>decide_after_continuity</code> 在问题严重且可重试时会返回 <code>NEEDS_RETRY</code>，但 CONTINUITY_CHECK 的条件边映射中只有 SUCCESS / VALID / NEEDS_REPAIR / NEEDS_HUMAN / FAILED 五个键，没有 <code>NEEDS_RETRY</code>——这是一个建议读者在自己使用的版本上验证的疑点：若命中该路径，LangGraph 可能因找不到目标节点而报错，而非优雅降级。</li>
+</ol>
+</blockquote>
+<p><strong>循环与重试上限（两级配置）</strong></p>
+<p>很多资料会把&quot;重试次数&quot;简化为一张表，但源码里其实是<strong>两个独立维度</strong>：<code>node_max_loops</code>（节点被循环检查计数的上限）与 <code>stage_max_retries</code>（该阶段的质量重试上限）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">节点</th>
+<th style="text-align:left">node_max_loops</th>
+<th style="text-align:left">stage_max_retries</th>
+<th style="text-align:left">超限后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">PARSE_SCRIPT</td>
+<td style="text-align:left">3</td>
+<td style="text-align:left">3</td>
+<td style="text-align:left">节点超限 → FAILED</td>
+</tr>
+<tr>
+<td style="text-align:left">SEGMENT_SHOT</td>
+<td style="text-align:left">5</td>
+<td style="text-align:left">3</td>
+<td style="text-align:left">节点超限 → NEEDS_HUMAN（等待人工）</td>
+</tr>
+<tr>
+<td style="text-align:left">SPLIT_VIDEO</td>
+<td style="text-align:left">5</td>
+<td style="text-align:left">3</td>
+<td style="text-align:left">节点超限 → NEEDS_HUMAN</td>
+</tr>
+<tr>
+<td style="text-align:left">CONVERT_PROMPT</td>
+<td style="text-align:left">5</td>
+<td style="text-align:left">3</td>
+<td style="text-align:left">节点超限 → FAILED</td>
+</tr>
+<tr>
+<td style="text-align:left">AUDIT_QUALITY</td>
+<td style="text-align:left">3</td>
+<td style="text-align:left">2</td>
+<td style="text-align:left">审查类操作重试成本高，上限更低</td>
+</tr>
+<tr>
+<td style="text-align:left">CONTINUITY_CHECK</td>
+<td style="text-align:left">5</td>
+<td style="text-align:left">2</td>
+<td style="text-align:left">另有 <code>max_continuity_retries=3</code> 控制修复循环</td>
+</tr>
+<tr>
+<td style="text-align:left">ERROR_HANDLER</td>
+<td style="text-align:left">5</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">错误处理自身也有循环上限</td>
+</tr>
+<tr>
+<td style="text-align:left">HUMAN_INTERVENTION</td>
+<td style="text-align:left">1</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">人工干预不参与计数循环</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>重试语义</strong>：两个维度的区别在于&quot;谁在计数&quot;——<code>node_max_loops</code> 由 LOOP_CHECK 节点每次经过时递增，防止流程在图里&quot;打转&quot;；<code>stage_max_retries</code> 只在该阶段产出质量不达标、需要带着修复参数重来时才递增，是质量视角的预算。两者任一超限，都会把流程导向人工干预或错误处理。</p>
+</blockquote>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant User as 用户
+    participant System as 流程编排器
+    participant Parser as 剧本解析智能体
+    participant Splitter as 镜头拆分智能体
+    participant Fragmenter as 视频分段智能体
+    participant Converter as 指令转换智能体
+    participant Auditor as 质量审查智能体
+    participant Guardian as 连续性守护节点
+    participant Error as 错误处理节点
+    participant Human as 人工干预节点
+
+    %% 正常流程
+    User-&gt;&gt;System: 提交剧本
+    System-&gt;&gt;Parser: 开始解析
+
+    %% 剧本解析 + 重试循环
+    loop 最多3次重试
+        Parser-&gt;&gt;Parser: 解析剧本
+        Parser--&gt;&gt;System: 返回结构化剧本
+        System-&gt;&gt;System: 决策:解析结果判断
+        
+        alt 解析成功
+            System-&gt;&gt;Splitter: 开始镜头拆分
+        else 需要重试/修复
+            System-&gt;&gt;Parser: 应用修复参数后重试
+        else 严重失败
+            System-&gt;&gt;Error: 进入错误处理
+        end
+    end
+
+    %% 镜头拆分 + 重试循环
+    loop 最多5次循环（质量重试上限3）
+        Splitter-&gt;&gt;Splitter: 拆分镜头
+        Splitter--&gt;&gt;System: 返回镜头序列
+        System-&gt;&gt;System: 决策:拆分结果判断
+        
+        alt 拆分成功
+            System-&gt;&gt;Fragmenter: 开始视频分段
+        else 需要重试/修复
+            System-&gt;&gt;Splitter: 应用修复参数后重试
+        else 严重失败
+            System-&gt;&gt;Error: 进入错误处理
+        end
+    end
+
+    %% 视频分段 + 重试循环
+    loop 最多5次循环（质量重试上限3）
+        Fragmenter-&gt;&gt;Fragmenter: 5秒智能分段
+        Fragmenter--&gt;&gt;System: 返回片段序列
+        System-&gt;&gt;System: 决策:分段结果判断
+        
+        alt 分段成功
+            System-&gt;&gt;Converter: 生成AI指令
+        else 需要修复(时长问题)
+            System-&gt;&gt;Fragmenter: 应用修复参数后重试
+        else 严重失败
+            System-&gt;&gt;Error: 进入错误处理
+        end
+    end
+
+    %% 指令转换 + 重试循环
+    loop 最多5次循环（质量重试上限3）
+        Converter-&gt;&gt;Converter: 生成提示词
+        Converter--&gt;&gt;System: 返回Prompt序列
+        System-&gt;&gt;System: 决策:生成结果判断
+        
+        alt 生成通过
+            System-&gt;&gt;Auditor: 开始质量审查
+        else 需要重试/修复
+            System-&gt;&gt;Converter: 应用修复参数后重试
+        else 严重失败
+            System-&gt;&gt;Error: 进入错误处理
+        end
+    end
+
+    %% 质量审查 + 修复决策
+    Auditor-&gt;&gt;Auditor: 规则审查
+    Auditor-&gt;&gt;Auditor: LLM深度审查
+    Auditor-&gt;&gt;Auditor: 问题分类+生成修复参数
+    Auditor--&gt;&gt;System: 返回审查报告
+    System-&gt;&gt;System: 决策:审查结果判断
+
+    alt 审查通过
+        System-&gt;&gt;Guardian: 开始连续性检查
+        
+    else 轻微问题(≤3个)
+        System-&gt;&gt;System: 视为有效，直接放行
+        System-&gt;&gt;Guardian: 继续连续性检查
+        
+    else 中等问题
+        System-&gt;&gt;System: 标记需要修复
+        System--&gt;&gt;Converter: 返回到指令转换修复
+        
+    else 严重问题
+        System-&gt;&gt;Error: 进入错误处理
+        
+    else 需要人工干预
+        System-&gt;&gt;Human: 请求人工决策
+        Human--&gt;&gt;System: 返回人工决策
+    end
+
+    %% 连续性检查 + 修复循环
+    loop 最多3次连续性修复
+        Guardian-&gt;&gt;Guardian: 角色连续性检查
+        Guardian-&gt;&gt;Guardian: 场景连续性检查
+        Guardian-&gt;&gt;Guardian: 动作连续性检查
+        Guardian-&gt;&gt;Guardian: 风格连续性检查
+        Guardian-&gt;&gt;Guardian: 时间连续性检查
+        Guardian-&gt;&gt;Guardian: 道具连续性检查
+        Guardian--&gt;&gt;System: 返回连续性问题列表
+        System-&gt;&gt;System: 决策:连续性判断(严重/中等/轻微)
+
+        alt 检查通过(无问题)
+            System-&gt;&gt;User: 返回完整AI指令
+            
+        else 轻微问题
+            System-&gt;&gt;User: 返回AI指令(VALID 放行)
+            
+        else 严重/中等且可重试
+            System-&gt;&gt;Converter: 返回指令转换阶段重生成提示词
+            
+        else 严重问题且不可重试
+            System-&gt;&gt;Human: 请求人工干预
+            Human--&gt;&gt;System: 返回人工决策
+            
+            alt 人工确认继续
+                System-&gt;&gt;User: 返回AI指令(带警告)
+            else 人工要求中止
+                System-&gt;&gt;User: 返回失败信息
+            end
+        end
+    end
+
+    %% 错误处理流程
+    System-&gt;&gt;Error: 进入错误处理
+    Error-&gt;&gt;Error: 错误分类(NETWORK/TIMEOUT/RATE_LIMIT/VALIDATION/CONFIG/BUSINESS/UNKNOWN)
+    Error-&gt;&gt;Error: 按错误来源节点制定恢复策略
+
+    alt 可恢复错误
+        Error-&gt;&gt;Error: 按 last_node 映射回退目标
+        Note over Error,Parser: 审查/连续性失败→指令转换；循环检查失败/未知→剧本解析
+        Error--&gt;&gt;Parser: 回退到映射出的节点重试
+        
+    else 需要人工干预
+        Error-&gt;&gt;Human: 请求人工干预
+        Human--&gt;&gt;Error: 返回人工决策
+        
+        alt 人工继续
+            Error--&gt;&gt;System: 继续执行
+        else 人工中止
+            Error-&gt;&gt;User: 返回失败信息
+        end
+        
+    else 不可恢复错误
+        Error-&gt;&gt;User: 返回失败信息(ABORT)
+    end
+</pre>
+<blockquote>
+<p><strong>审查策略说明</strong>：质量审查采用灰度策略——<code>MINOR_ISSUES</code> 且问题数 ≤3 时直接映射为 <code>VALID</code> <strong>放行</strong>（严格说不是&quot;自动修复&quot;，而是&quot;带病继续&quot;）；问题更多则触发 <code>NEEDS_REPAIR</code> 回退重生成提示词。此外源码还有一个分数兜底：审查状态为 <code>FAILED</code> 但得分 ≥80 分时，同样按 VALID 放行；60~80 分之间重试；更低才进入修复/人工链路——这是对 LLM 审查稳定性的一种工程补偿。</p>
+</blockquote>
+<h4>并发任务流程</h4>
+<p>任务提交后统一进入<strong>优先级队列</strong>（CRITICAL &gt; HIGH &gt; NORMAL &gt; LOW），由异步任务处理器（AsyncTaskProcessor）按优先级拉取出队，受并发信号量约束逐级补位，最大化并发吞吐：</p>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C1 as 客户端1
+    participant C2 as 客户端2
+    participant TF as TaskFactory
+    participant Q as 优先级队列
+    participant P as Processor
+    participant W1 as Worker 1
+    participant W2 as Worker 2
+    participant W3 as Worker N
+
+    C1-&gt;&gt;TF: 1. 提交任务A(优先级HIGH)
+    C2-&gt;&gt;TF: 2. 提交任务B(优先级NORMAL)
+    C1-&gt;&gt;TF: 3. 提交任务C(优先级CRITICAL)
+
+    TF-&gt;&gt;Q: 4. 任务C入队(CRITICAL)
+    TF-&gt;&gt;Q: 5. 任务A入队(HIGH)
+    TF-&gt;&gt;Q: 6. 任务B入队(NORMAL)
+
+    Note over Q: 队列按优先级排序: C → A → B
+
+    loop 并发调度
+        P-&gt;&gt;Q: 7. 获取任务
+        Q--&gt;&gt;P: 8. 返回最高优先级任务
+        
+        alt Worker空闲
+            P-&gt;&gt;W1: 9. 分配任务C
+            W1-&gt;&gt;W1: 10. 执行任务
+            
+            P-&gt;&gt;Q: 11. 获取下一个任务
+            Q--&gt;&gt;P: 12. 返回任务A
+            P-&gt;&gt;W2: 13. 分配任务A
+            W2-&gt;&gt;W2: 14. 执行任务
+        end
+    end
+
+    W1--&gt;&gt;P: 15. 任务C完成
+    P--&gt;&gt;TF: 16. 回调通知
+    TF--&gt;&gt;C1: 17. 返回结果
+
+    W2--&gt;&gt;P: 18. 任务A完成
+    P--&gt;&gt;TF: 19. 回调通知
+    TF--&gt;&gt;C1: 20. 返回结果
+</pre>
+<blockquote>
+<p><strong>适用场景与实现细节</strong>：当多个客户端同时提交分镜任务时，优先级队列确保&quot;重要/紧急&quot;任务优先调度，而不会因先来先服务导致关键任务长时间排队。实现上，队列是一个普通 <code>list</code>——入队时按优先级做有序插入（<code>list.insert</code>），出队时用 <code>_priority_order</code> 映射找最高优先级任务。为什么不用 <code>heapq</code>？因为 <code>cancel_task</code> 需要遍历队列按 task_id 删除元素，<code>list</code> 的定位删除比在堆里维护删除逻辑简单得多（详见《核心实现》一文）。</p>
+</blockquote>
+<h4>状态持久化流程</h4>
+<p>PenShot 的&quot;状态&quot;其实分成<strong>两套独立存储</strong>，分别解决不同问题：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">存储</th>
+<th style="text-align:left">实现</th>
+<th style="text-align:left">存什么</th>
+<th style="text-align:left">降级策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">任务记录</td>
+<td style="text-align:left">TaskRepository：Redis key <code>penshot:tasks:data:{task_id}</code> + 索引集合 <code>penshot:tasks:ids</code>，TTL 默认 86400 秒</td>
+<td style="text-align:left">任务状态 / 阶段 / 进度 / 结果元信息</td>
+<td style="text-align:left">Redis 不可用 → 进程内存字典（重启即丢失）</td>
+</tr>
+<tr>
+<td style="text-align:left">工作流检查点</td>
+<td style="text-align:left">WorkflowCheckpointer：LangGraph SqliteSaver，<code>data/checkpoints/{script_id}/task_{task_id}.db</code></td>
+<td style="text-align:left">图执行到哪一步、各阶段中间状态</td>
+<td style="text-align:left">目录不可写 → 内存模式；<code>langgraph-checkpoint-sqlite</code> 未安装 → 内存模式</td>
+</tr>
+</tbody>
+</table>
+<p>有了这两套存储，崩溃恢复（<code>recover_pending_tasks</code>）才成立——它的完整语义如下：</p>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant Agent as 智能体
+    participant TM as TaskManager
+    participant TR as TaskRepository
+    participant Redis as Redis
+    participant Mem as 内存字典（降级）
+
+    Agent-&gt;&gt;TM: 1. 更新任务进度
+    TM-&gt;&gt;TR: 2. write_task(task_id, record)
+    alt Redis 可用
+        TR-&gt;&gt;Redis: 3. setex(key, TTL 86400s)
+        Redis--&gt;&gt;TR: 4. 写入成功
+    else Redis 不可用/写入异常
+        TR-&gt;&gt;Mem: 3'. 更新进程内存记录
+    end
+    TR--&gt;&gt;TM: 5. 返回写入结果
+    TM--&gt;&gt;Agent: 6. 更新完成
+
+    Note over TM,Redis: 进程重启后的恢复场景
+
+    TM-&gt;&gt;TR: 7. get_pending_tasks(max_age_hours=2)
+    TR-&gt;&gt;Redis: 8. 读取任务索引集合
+    Redis--&gt;&gt;TR: 9. 返回任务列表
+    loop 逐个过滤
+        TR-&gt;&gt;TR: 10. status ∈ {PENDING, PROCESSING} 且在 2 小时内？
+        alt 符合条件
+            TR-&gt;&gt;TR: 11. 加入恢复列表
+        else 超龄或不符
+            TR-&gt;&gt;TR: 12. 静默跳过（不标记、不删除，等待 TTL 过期）
+        end
+    end
+    TR--&gt;&gt;TM: 13. 返回可恢复任务
+    loop 逐个恢复
+        TM-&gt;&gt;TM: 14. 重建 QueuedTask（优先级一律 NORMAL）
+        TM-&gt;&gt;TM: 15. 追加到进程内队列，等待再次执行
+    end
+</pre>
+<blockquote>
+<p><strong>降级要点与边界</strong>：</p>
+<ul class="lvl-1">
+<li class="lvl-2">Redis 不可用时任务仍可&quot;仅内存&quot;运行，服务不至于完全不可用——代价是<strong>进程重启即失忆</strong>，恢复能力归零。</li>
+<li class="lvl-2">&quot;2 小时窗口&quot;的实现是<strong>过滤而非标记</strong>：超龄任务不会被改写状态或主动清理，只是不再被恢复，最终静静等待 TTL（默认 86400 秒）自然过期。</li>
+<li class="lvl-2">恢复时<strong>优先级信息会丢失</strong>——<code>recover_pending_tasks</code> 重建 <code>QueuedTask</code> 时统一使用 <code>TaskPriority.NORMAL</code>，原本的 CRITICAL / HIGH 任务降级为普通优先级，且直接 <code>append</code> 到队列尾部（不走有序插入）。这是一个可以改进的点（队列快照里保存原始优先级即可解决）。</li>
+<li class="lvl-2">另有 <code>recover_task(task_id)</code> 方法用于把单个任务软重置：status → PENDING、stage → “recovered”、progress → 0、清除完成时间。</li>
+</ul>
+</blockquote>
+<h4>架构集成图</h4>
+<pre class="mermaid">flowchart TB
+    subgraph Input[接入层]
+        PAPI[Python API&lt;br/&gt;PenshotFunction]
+        RAPI[REST API&lt;br/&gt;FastAPI Router]
+        MCP[MCP Server]
+        CLI[CLI]
+    end
+
+    subgraph Task[任务层]
+        TF[TaskFactory&lt;br/&gt;任务工厂]
+        ATP[AsyncTaskProcessor&lt;br/&gt;优先级队列 + 并发信号量]
+        TR[TaskRepository&lt;br/&gt;Redis/内存]
+    end
+
+    subgraph Workflow[工作流层]
+        MAP[MultiAgentPipeline&lt;br/&gt;LangGraph 状态图]
+        PD[PipelineDecision&lt;br/&gt;决策函数]
+        CP[WorkflowCheckpointer&lt;br/&gt;SQLite/内存]
+    end
+
+    subgraph Agent[智能体层]
+        AG[六个业务智能体&lt;br/&gt;解析/拆分/分段/转换/审查/守护]
+        LLM[LLM 客户端&lt;br/&gt;OpenAI/Ollama/Qwen/DeepSeek]
+    end
+
+    subgraph Memory[记忆层]
+        SM[ScriptMemory 门面]
+        ST[(短期&lt;br/&gt;Redis/deque)]
+        MT[(中期&lt;br/&gt;磁盘摘要)]
+        LT[(长期&lt;br/&gt;Chroma 向量库)]
+    end
+
+    Input --&gt; Task
+    Task --&gt; Workflow
+    Workflow --&gt; Agent
+    Workflow --&gt; Memory
+    SM --&gt; ST
+    SM --&gt; MT
+    SM --&gt; LT
+    Workflow --&gt; Output[WorkflowOutputFixer&lt;br/&gt;片段序列修复 → JSON]
+</pre>
+<blockquote>
+<p><strong>层面分工</strong>：接入层提供四种调用形态（Python / HTTP / MCP / CLI），全部汇聚到任务层；任务层管调度与持久化；工作流层是状态图本体（节点 + 决策 + 检查点）；智能体层负责生成；记忆层被工作流与智能体双向使用（写入 / 召回）。各层均设计了独立降级：Redis 挂掉→内存、SQLite 不可写→内存、LLM 不可用→规则引擎模式，单点故障不会直接拖垮整条链路。</p>
+</blockquote>
+<h4>三级循环防护：长任务为何不会&quot;打转到死&quot;</h4>
+<p>为避免 LLM 反复失败导致<strong>无限循环</strong>拖垮系统（token 与时间的双重消耗），架构设置了三组互相独立、任一触顶即熔断的计数器：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层级</th>
+<th style="text-align:left">计数器</th>
+<th style="text-align:left">上限来源</th>
+<th style="text-align:left">递增时机</th>
+<th style="text-align:left">触顶后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">节点级</td>
+<td style="text-align:left"><code>node_current_loops</code></td>
+<td style="text-align:left"><code>node_max_loops</code>（3~5，见前表）</td>
+<td style="text-align:left">LOOP_CHECK 每次经过当前节点</td>
+<td style="text-align:left">拆分/分段 → 人工；其他 → FAILED</td>
+</tr>
+<tr>
+<td style="text-align:left">阶段级</td>
+<td style="text-align:left"><code>stage_current_retries</code></td>
+<td style="text-align:left"><code>stage_max_retries</code>（2~3，见前表）</td>
+<td style="text-align:left">该阶段质量不达标、需带修复参数重来</td>
+<td style="text-align:left">不可再重试 → 人工/修复</td>
+</tr>
+<tr>
+<td style="text-align:left">全局级</td>
+<td style="text-align:left"><code>global_current_loops</code></td>
+<td style="text-align:left"><code>max_total_loops × 2</code>（默认 40）</td>
+<td style="text-align:left">每次经过 LOOP_CHECK</td>
+<td style="text-align:left">直接 FAILED</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>防护原理</strong>：三个计数器分别对应&quot;微观节点自旋、中观质量重试、宏观全局预算&quot;三种失控形态。任一超限都强制把流程导向错误处理或人工干预，保证工作流在最坏情况下也有<strong>确定的终止</strong>。</p>
+<p><strong>两个值得注意的实现细节</strong>：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>80% 预警共用标记</strong>：<code>loop_check_node</code> 在节点循环达到上限 80% 时打 Warning 日志，<code>decide_after_loop_check</code> 也会在全局循环达到 80% 时预警——但两者共用同一个 <code>loop_warning_issued</code> 布尔标记，<strong>先触发者会&quot;吃掉&quot;标记</strong>，另一处不再报警。如果想让两级预警都生效，应拆成两个独立标记位。</p>
+</li>
+<li class="lvl-3">
+<p><strong>判定符号不一致</strong>：<code>loop_check_node</code> 用 <code>&gt;</code> 判断节点超限（第 max+1 次才标记），而决策函数 <code>decide_after_loop_check</code> 用 <code>&gt;=</code>（第 max 次即判超限）。同一语义两处口径不同，实际生效的是决策函数的 <code>&gt;=</code>（路由总是发生在 LOOP_CHECK 之后），这属于可以统一清理的代码坏味道。</p>
+</li>
+</ol>
+<p><strong>全局上限的推导</strong>：<code>global_max_loops</code> 的推导注释写&quot;所有节点最大循环次数之和&quot;，但实际赋值是 <code>ShotConfig.max_total_loops × 2</code>（默认 20 × 2 = 40）；而八个节点上限之和为 32，与 20 并不相等——若严格按注释取值应为 64。使用时以运行日志里打印的实际值为准。</p>
+</blockquote>
+<h3>2.3 记忆系统</h3>
+<h4>三层记忆（真实实现）</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">记忆类型</th>
+<th style="text-align:left">用途</th>
+<th style="text-align:left">存储</th>
+<th style="text-align:left">生命周期</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">短期记忆 ShortTermMemory</td>
+<td style="text-align:left">最近 20 条交互（deque maxlen=20）</td>
+<td style="text-align:left">Redis（TTL 3600s）/ 内存 / 文件降级</td>
+<td style="text-align:left">会话级</td>
+</tr>
+<tr>
+<td style="text-align:left">中期记忆 MediumTermMemory</td>
+<td style="text-align:left">滚动融合摘要（DEFAULT_SUMMARY_PROMPT）</td>
+<td style="text-align:left">磁盘 JSON（medium_summary）</td>
+<td style="text-align:left">任务级</td>
+</tr>
+<tr>
+<td style="text-align:left">长期记忆 LongTermMemory</td>
+<td style="text-align:left">向量语义检索（similarity_search_with_score）</td>
+<td style="text-align:left">Chroma（script_{script_id}_memory）</td>
+<td style="text-align:left">长期持久</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>如实说明</strong>：<code>MemoryLevel</code> 枚举定义了四层（EPHEMERAL / SHORT_TERM / MEDIUM_TERM / LONG_TERM），但 EPHEMERAL 在当前版本尚未落地实现——实际生效的是上述三层。<code>ScriptMemory</code> 是统一门面，负责层级自动流转与 <code>MemoryContext</code> 组装。</p>
+</blockquote>
+<h4>记忆组合策略：按层组装，而非加权融合</h4>
+<pre class="hljs"><code><span class="hljs-comment"># 源码节选（script_memory.py）：recall 按层直接组装 MemoryContext</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">recall</span>(<span class="hljs-params">self, query: <span class="hljs-built_in">str</span>, level: <span class="hljs-type">Optional</span>[MemoryLevel] = <span class="hljs-literal">None</span>, k: <span class="hljs-built_in">int</span> = <span class="hljs-number">3</span></span>) -&gt; MemoryContext:
+    context = MemoryContext()
+    <span class="hljs-keyword">if</span> level <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">or</span> level == MemoryLevel.SHORT_TERM:
+        context.short_term = <span class="hljs-variable language_">self</span>.short_term.get_recent(k)
+    <span class="hljs-keyword">if</span> level <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">or</span> level == MemoryLevel.MEDIUM_TERM:
+        context.medium_term = <span class="hljs-variable language_">self</span>.medium_term.get_summary()
+    <span class="hljs-keyword">if</span> (level <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">or</span> level == MemoryLevel.LONG_TERM) <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.long_term:
+        context.long_term = <span class="hljs-variable language_">self</span>.long_term.search(query, k)
+    <span class="hljs-keyword">return</span> context
+</code></pre>
+<blockquote>
+<p><strong>为什么不加权？</strong> 很多记忆系统会给不同层级分配权重（如 0.6/0.3/0.1）做分数融合，但 PenShot 选择<strong>分层拼装</strong>：短期/中期/长期各自是一段独立的提示词文本（由 <code>MemoryContext.to_prompt()</code> 格式化，总预算 2000 token），层与层之间不参与同一排序。原因是三层的语义完全不同——“最近说了什么”“阶段摘要”“语义相关历史”——强行加权反而会把不同性质的信息混进同一分数空间；分层拼装则让模型自行根据段落标题判断信息可信度。</p>
+</blockquote>
+<h4>使用示例（基于真实 API）</h4>
+<pre class="hljs"><code><span class="hljs-comment"># 示例代码（基于 ScriptMemory 真实接口，非源码节选）</span>
+memory = ScriptMemory(script_id=<span class="hljs-string">&quot;script_001&quot;</span>, ...)
+
+<span class="hljs-comment"># 写入：始终进短期；metadata.important 触发向中期流转</span>
+memory.add(input_text=<span class="hljs-string">&quot;林小雨的外貌描述&quot;</span>, output_text=<span class="hljs-string">&quot;20岁，齐肩黑发，米白长裙&quot;</span>,
+           metadata={<span class="hljs-string">&quot;important&quot;</span>: <span class="hljs-literal">True</span>})
+
+<span class="hljs-comment"># 召回：按层组装，可直接喂给提示词</span>
+ctx = memory.recall(<span class="hljs-string">&quot;林小雨的外貌特征&quot;</span>, k=<span class="hljs-number">3</span>)
+prompt_segment = ctx.to_prompt(max_tokens=<span class="hljs-number">2000</span>)
+
+<span class="hljs-comment"># 阶段记忆：写中期 + （important 时）写长期</span>
+memory.add_stage(<span class="hljs-string">&quot;shot_segment&quot;</span>, content=<span class="hljs-string">&quot;...&quot;</span>, metadata={<span class="hljs-string">&quot;important&quot;</span>: <span class="hljs-literal">True</span>})
+</code></pre>
+<blockquote>
+<p>三层记忆的写入水位、Redis 故障语义、Chroma 阈值方向疑点等深入内容见《PenShot 核心实现》一文，此处不再展开。</p>
+</blockquote>
+<h3>2.4 任务池管理</h3>
+<p>支持高并发任务处理、优先级队列和状态持久化。</p>
+<pre class="hljs"><code><span class="hljs-comment"># 示例代码（基于 PenshotFunction 真实签名）</span>
+<span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> create_penshot_agent
+<span class="hljs-keyword">from</span> penshot <span class="hljs-keyword">import</span> ShotLanguage
+
+agent = create_penshot_agent(language=ShotLanguage.ZH, max_concurrent=<span class="hljs-number">10</span>, queue_size=<span class="hljs-number">1000</span>)
+
+<span class="hljs-comment"># 查询队列状态（真实返回 6 个字段）</span>
+status = agent.get_queue_status()
+<span class="hljs-comment"># {&quot;queue_length&quot;: 3, &quot;queue_waiting&quot;: 0, &quot;active_tasks&quot;: 2,</span>
+<span class="hljs-comment">#  &quot;max_concurrent&quot;: 10, &quot;queue_max_size&quot;: 1000, &quot;queue_usage_percent&quot;: 0.3}</span>
+
+<span class="hljs-comment"># 取消任务（正在执行 → asyncio cancel；排队中 → 从队列移除）</span>
+agent.cancel_task(task_id=<span class="hljs-string">&quot;...&quot;</span>)
+</code></pre>
+<blockquote>
+<p><strong>参数语义</strong>：<code>max_concurrent=10</code> 控制同时执行的任务数，避免打爆 LLM 配额；<code>queue_size=1000</code> 是队列入队上限，超出即拒绝新任务。<code>get_queue_status</code> 返回六个字段，其中 <code>queue_usage_percent = queue_length / queue_max_size</code> 最适合直接做监控告警阈值。<code>cancel_task</code> 的真实实现分两路：已在执行的任务调用 <code>task.cancel()</code>，排队中的任务遍历队列按 task_id 删除并回退等待计数。</p>
+</blockquote>
+<h3>2.5 质量保障体系</h3>
+<h4>检测修复策略</h4>
+<p>采用 <strong>“轻前置检测 + 重最终检测”</strong> 的策略：每个业务节点在自身执行中做<strong>轻量基础检测</strong>（格式 / 时长 / 空值等本地规则，产出问题列表），由质量审查节点在<strong>全流程后期</strong>做<strong>统一的深度检测</strong>（规则审查 + LLM 深度审查两层），再将问题分类为修复参数、定向回退修复：</p>
+<pre class="mermaid">flowchart TD
+    A[剧本输入] --&gt; B[剧本解析]
+    B --&gt; C[节点内基础检测]
+    C --发现问题--&gt; B
+
+    C --&gt; D[镜头拆分]
+    D --&gt; E[节点内基础检测]
+    E --发现问题--&gt; D
+
+    E --&gt; F[视频分段]
+    F --&gt; G[节点内基础检测]
+    G --发现问题--&gt; F
+
+    G --&gt; H[指令转换]
+    H --&gt; I[节点内基础检测]
+    I --发现问题--&gt; H
+
+    I --&gt; J[质量审查：规则 + LLM 双层]
+    J --问题分类--&gt; K{按节点生成修复参数}
+    K --NEEDS_REPAIR/RETRY--&gt; H
+
+    J --通过/轻微问题--&gt; L[连续性守护 → 结果生成]
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检测类型</th>
+<th style="text-align:left">检测时机</th>
+<th style="text-align:left">检测内容</th>
+<th style="text-align:left">修复方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>节点内基础检测</strong></td>
+<td style="text-align:left">每个业务节点执行期间</td>
+<td style="text-align:left">格式、时长、空值等本地可分问题</td>
+<td style="text-align:left">节点自己产出问题列表，可随即调整</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>统一深度检测</strong></td>
+<td style="text-align:left">指令转换之后</td>
+<td style="text-align:left">连贯性、一致性、语义等深度问题（规则 + LLM 双层）</td>
+<td style="text-align:left">生成修复参数，回指令转换重生成</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>跨片段一致性</strong></td>
+<td style="text-align:left">连续性守护阶段</td>
+<td style="text-align:left">角色、道具、场景等跨节点 / 跨片段问题</td>
+<td style="text-align:left">分类（严重/中等/轻微）后定向处理</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>设计价值与局限</strong>：把&quot;昂贵的深度 LLM 校验&quot;集中在一处而非每节点各来一遍，可显著节省成本；基础检测前置，让格式类低级错误尽早暴露。代价是修复目标<strong>过度收敛</strong>——所有深度问题的修复都回到指令转换节点重新生成提示词；若问题实际出在更上游（如剧本解析错误），系统没有&quot;溯源到根因节点&quot;的机制，只能多轮回炉。</p>
+</blockquote>
+<h4>修复参数机制</h4>
+<p>质量审查发现问题后，不直接改数据，而是**按来源分类生成&quot;修复参数&quot;**并写入工作流状态，节点重试时读取并应用——形成&quot;检测 → 分类 → 生成修复 → 保存 → 重试应用&quot;的闭环：</p>
+<pre class="mermaid">flowchart LR
+    subgraph Audit[质量审查]
+        A[检测问题] --&gt; B[按来源分类]
+        B --&gt; C[生成修复参数]
+    end
+
+    subgraph Apply[修复应用]
+        D[保存到状态] --&gt; E[节点重试时传入]
+        E --&gt; F[智能体调整策略]
+    end
+
+    subgraph Result[修复结果]
+        G[避免问题重现]
+    end
+
+    Audit --&gt; Apply --&gt; Result
+</pre>
+<p><strong>详细参数传递流程</strong>：</p>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant QA as 质量审查智能体
+    participant Report as 审查报告
+    participant State as 工作流状态
+    participant Node as 工作流节点
+    participant Agent as 业务智能体
+
+    QA-&gt;&gt;QA: 1. 检测问题
+    QA-&gt;&gt;QA: 2. 按来源分类
+    QA-&gt;&gt;Report: 3. 生成修复参数
+    Report--&gt;&gt;QA: 4. 返回RepairParams
+
+    QA-&gt;&gt;State: 5. 保存到state.repair_params
+    State--&gt;&gt;QA: 6. 保存成功
+
+    Note over State,Node: 节点重试时
+
+    Node-&gt;&gt;State: 7. 读取修复参数
+    State--&gt;&gt;Node: 8. 返回repair_params
+
+    alt 有修复参数
+        Node-&gt;&gt;Agent: 9. apply_repair_params()
+        Agent-&gt;&gt;Agent: 10. 更新内部策略
+        
+        Node-&gt;&gt;Agent: 11. process(repair_params)
+        Agent-&gt;&gt;Agent: 12. 使用修复参数生成
+        Agent--&gt;&gt;Node: 13. 返回优化结果
+        
+        Node-&gt;&gt;State: 14. 清除修复参数
+    else 无修复参数
+        Node-&gt;&gt;Agent: 15. process()
+        Agent--&gt;&gt;Node: 16. 返回正常结果
+    end
+</pre>
+<blockquote>
+<p><strong>关键细节</strong>：修复参数按 <code>PipelineNode</code> 键存放在 <code>state.domain.repair_params</code> 字典中，各节点只读取自己的键（<code>repair_params.get(PipelineNode.X)</code>）；节点应用（<code>apply_repair_params</code>）并成功执行后，会调用 <code>clear_repair_params()</code> 与 <code>clear_historical_context()</code> 清理<strong>智能体实例上的临时状态</strong>（state 字典本身保留到任务结束）。这样既防止修复参数被下游节点误用，也保留了完整的修复历史可供审计。</p>
+</blockquote>
+<h4>错误处理与重试</h4>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant Node as 工作流节点
+    participant Decision as 决策函数
+    participant Error as 错误处理节点
+    participant Human as 人工干预节点
+    participant Retry as 重试机制
+
+    Node-&gt;&gt;Decision: 1. 节点执行完成
+    Decision-&gt;&gt;Decision: 2. 判断执行结果
+
+    alt 执行成功
+        Decision--&gt;&gt;Node: 3. 返回SUCCESS
+        Note over Node: 继续下一节点
+
+    else 需要重试
+        Decision-&gt;&gt;Decision: 4. 检查重试次数
+        alt 未超限
+            Decision-&gt;&gt;Retry: 5. 增加重试计数
+            Retry--&gt;&gt;Decision: 6. 返回NEEDS_RETRY
+            Decision--&gt;&gt;Node: 7. 返回NEEDS_RETRY
+            Note over Node: 重新执行当前节点
+        else 已超限
+            Decision-&gt;&gt;Error: 8. 返回FAILED
+        end
+
+    else 需要修复
+        Decision-&gt;&gt;Decision: 9. 生成修复参数
+        Decision--&gt;&gt;Node: 10. 返回NEEDS_REPAIR
+        Note over Node: 应用修复参数后重试
+
+    else 严重错误
+        Decision-&gt;&gt;Error: 11. 返回FAILED
+    end
+
+    Error-&gt;&gt;Error: 12. 错误分类分析
+    Error-&gt;&gt;Error: 13. 制定恢复策略
+
+    alt 可恢复错误
+        Error-&gt;&gt;Retry: 14. 重置重试计数
+        Retry--&gt;&gt;Error: 15. 返回原节点
+        Error--&gt;&gt;Node: 16. 返回NEEDS_RETRY
+
+    else 需要人工干预
+        Error-&gt;&gt;Human: 17. 请求人工干预
+        Human-&gt;&gt;Human: 18. 等待用户决策
+        
+        alt 用户选择继续
+            Human--&gt;&gt;Error: 19. 返回CONTINUE
+            Error--&gt;&gt;Node: 20. 返回SUCCESS
+        else 用户选择重试
+            Human--&gt;&gt;Error: 21. 返回NEEDS_RETRY
+            Error--&gt;&gt;Node: 22. 返回NEEDS_RETRY
+        else 用户选择中止
+            Human--&gt;&gt;Error: 23. 返回ABORT
+            Error--&gt;&gt;Node: 24. 终止流程
+        end
+
+    else 不可恢复错误
+        Error-&gt;&gt;Error: 25. 记录失败
+        Error--&gt;&gt;Node: 26. 返回ABORT
+    end
+</pre>
+<blockquote>
+<p><strong>错误分类观</strong>：<code>workflow_error_handler.py</code> 定义了七类错误（NETWORK / TIMEOUT / RATE_LIMIT / VALIDATION / CONFIG / BUSINESS / UNKNOWN）、四级严重度（LOW~CRITICAL）与六种处理动作（RETRY / DELAY_RETRY / REPAIR / HUMAN / ABORT / IGNORE）；而&quot;回到哪个节点&quot;由 <code>_get_retry_node_based_on_error_source</code> 按错误来源映射决定：审查 / 连续性失败 → 指令转换，循环检查失败或未知来源 → 剧本解析。二者共同构成&quot;分类 + 定位&quot;的恢复机制。</p>
+</blockquote>
+<h4>状态清理分析</h4>
+<pre class="mermaid">flowchart TD
+    subgraph Task[任务执行]
+        A[节点开始] --&gt; B{是否有历史上下文?}
+        B --&gt;|有| C[apply_historical_context]
+        B --&gt;|无| D[跳过]
+        C --&gt; E{是否有修复参数?}
+        D --&gt; E
+        E --&gt;|有| F[apply_repair_params]
+        E --&gt;|无| G[执行节点逻辑]
+        F --&gt; G
+        G --&gt; H{执行成功?}
+        H --&gt;|是| I[节点结束]
+        H --&gt;|否| J[进入错误处理]
+    end
+
+    subgraph Cleanup[清理时机]
+        I --&gt; K{是否还有后续节点?}
+        K --&gt;|是| L[保留状态供下游使用]
+        K --&gt;|否| M[任务完成，清理所有状态]
+        J --&gt; N[保留状态供重试]
+    end
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">是否需要清理</th>
+<th style="text-align:left">原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>节点正常完成</strong></td>
+<td style="text-align:left">需要</td>
+<td style="text-align:left">调用 <code>clear_historical_context()</code> / <code>clear_repair_params()</code>，避免旧上下文影响下次执行</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>节点异常/重试</strong></td>
+<td style="text-align:left">不需要</td>
+<td style="text-align:left">重试需要保留修复参数与历史上下文</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>节点被跳过</strong></td>
+<td style="text-align:left">不需要</td>
+<td style="text-align:left">未执行，无临时状态</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>整个任务完成</strong></td>
+<td style="text-align:left">需要</td>
+<td style="text-align:left">任务结束，释放内存与检查点资源</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>清理策略</strong>：状态清理遵循&quot;按需保留、用毕即删&quot;——重试路径必须保留修复参数，正常推进则清理避免污染下游，整任务完成后整体释放资源。这样在&quot;可恢复性&quot;与&quot;存储占用&quot;之间取得平衡。</p>
+</blockquote>
+<hr>
+<h2>三、故障实战：四个典型异常场景</h2>
+<p>理论上的容错设计，只有在真实故障下才见真章。以下四个场景全部来自 v0.3.x 源码中的真实处理路径或真实缺口。</p>
+<h3>场景 1：工作流超时——&quot;定时器&quot;为何可能掐不断工作流？</h3>
+<p><strong>发生什么</strong>：任务卡在某个 LLM 调用上长时间不返回，超过默认 1800 秒超时。</p>
+<p><strong>系统设计</strong>：<code>_enhanced_workflow_execution</code> 用 <code>asyncio.wait_for(output_fixer.enhanced_workflow_invoke(...), timeout)</code> 包裹执行，超时后返回 <code>workflow_status: &quot;timeout&quot;</code>。</p>
+<p><strong>为什么可能失效</strong>：<code>enhanced_workflow_invoke</code> 内部调用的是<strong>同步</strong> <code>workflow.invoke()</code>——源码注释里写着&quot;注意：这里需要await workflow.ainvoke&quot;但仍使用同步调用。同步调用会阻塞事件循环，<code>asyncio.wait_for</code> 的超时回调没有机会执行；工作流不主动让出控制权，超时定时器就形同虚设。</p>
+<p><strong>如何应对</strong>：真正兜底的是节点内部的 LLM 超时（<code>LLMBaseConfig.timeout=60</code>）与循环上限；生产环境建议额外配合进程级看门狗。这是当前实现的一个<strong>已知边界</strong>，不应当作完备的超时保护依赖。</p>
+<h3>场景 2：Redis 宕机——两套存储、两种命运</h3>
+<p><strong>发生什么</strong>：运行期间 Redis 突然不可用。</p>
+<p><strong>任务层</strong>：<code>TaskRepository.write_task</code> 捕获异常后返回 False 并打 error 日志，任务主流程<strong>不中断</strong>，但状态更新开始丢失；若 Redis 一直不可用，崩溃恢复能力随之丧失（内存字典随进程消失）。</p>
+<p><strong>记忆层</strong>：短期记忆的降级决策发生在<strong>构造时</strong>（3 秒超时 + ping）——构造时 Redis 可用、运行中途挂掉的情况下，缓冲追加与 Redis 写入在同一个 try 块里，异常被吞掉，<strong>本次交互静默丢失</strong>，且没有重连补偿机制。</p>
+<p><strong>如何恢复</strong>：重启进程后任务层会尝试重新连接 Redis；但中途丢失的记忆无法找回（短期记忆的文件降级同样是构造时决定的）。</p>
+<h3>场景 3：Worker 崩溃——恢复窗口的三种静默降级</h3>
+<p><strong>发生什么</strong>：进程崩溃或被重启，队列里的 PENDING / PROCESSING 任务悬空。</p>
+<p><strong>系统处理</strong>：启动时调用 <code>recover_pending_tasks(max_age_hours=2)</code>，把 2 小时内的未完成任务重新入队。</p>
+<p><strong>三种静默降级</strong>：</p>
+<ol>
+<li class="lvl-3">
+<p>超过 2 小时的任务不做标记、不清理，只是不再恢复（等待 Redis TTL 86400 秒自然过期）——没有告警；</p>
+</li>
+<li class="lvl-3">
+<p>恢复的任务优先级统一降为 <code>NORMAL</code>——紧急任务复活后与普通任务同权；</p>
+</li>
+<li class="lvl-3">
+<p>恢复是 <code>append</code> 到队列尾部而非按优先级有序插入。</p>
+</li>
+</ol>
+<p><strong>如何恢复</strong>：任务会从头执行（任务级&quot;重新入队&quot;语义，而非从 SQLite 检查点续跑——检查点与恢复路径没有直接衔接）；要接受&quot;进度可能回退到上一次状态写入点&quot;。</p>
+<h3>场景 4：循环失控——预警、熔断与一个路由缺口</h3>
+<p><strong>发生什么</strong>：某节点反复失败，循环计数不断增长。</p>
+<p><strong>系统处理</strong>：三级计数器（节点 / 阶段 / 全局）任一触顶即熔断——拆分、分段两类节点超限转人工，其余节点超限直接 FAILED；80% 水位会打 Warning 日志。</p>
+<p><strong>两个真实缺口</strong>：</p>
+<ol>
+<li class="lvl-3">
+<p>节点级与全局级的 80% 预警<strong>共用</strong> <code>loop_warning_issued</code> 标记，只有先触发的那一级会报警；</p>
+</li>
+<li class="lvl-3">
+<p><code>decide_after_continuity</code> 可能返回 <code>NEEDS_RETRY</code>，但 CONTINUITY_CHECK 的条件边没有这个键——命中该路径时不是&quot;优雅降级&quot;，而可能是框架级路由错误。建议部署前用单元测试覆盖这条路径，确认所用 LangGraph 版本的实际行为。</p>
+</li>
+</ol>
+<hr>
+<h2>四、总结与建议</h2>
+<p>PenShot 的技术架构体现了多智能体系统设计的几个通行范式：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>以 LangGraph 为骨架</strong>：用图状态机承载&quot;分支、循环、重试、路由&quot;，让复杂的创作流程可编排、可观测、可恢复。</p>
+</li>
+<li class="lvl-3">
+<p><strong>六业务节点 + 四控制节点</strong>：业务节点各司其职；LOOP_CHECK 兼任计数与阶段推进，ERROR_HANDLER / HUMAN_INTERVENTION / GENERATE_OUTPUT 负责兜底与收口。</p>
+</li>
+<li class="lvl-3">
+<p><strong>多级容错</strong>：七态决策路由 + 三级循环防护（节点/阶段/全局）+ 两套持久化（Redis 任务记录 + SQLite 检查点）+ 分层降级（内存/规则引擎），构成完整的鲁棒性体系。</p>
+</li>
+<li class="lvl-3">
+<p><strong>&quot;轻前置 + 重最终&quot;质检</strong>：节点内基础检测随做随修，深度检测集中于收尾，兼顾成本与质量。</p>
+</li>
+<li class="lvl-3">
+<p><strong>工程边界透明</strong>：超时保护对同步阻塞的局限、连续性路由缺口、恢复优先级丢失——这些已知不足同样是架构认知的一部分。</p>
+</li>
+</ol>
+<p><strong>落地建议</strong>：接入时先从最小的&quot;两到三个阶段&quot;流水线起步验证效果，再逐步扩展节点与修复参数机制；配置好三级循环阈值与人工干预触发条件，并为同步阻塞路径补上进程级看门狗，避免长任务在无监督环境下&quot;打转&quot;或&quot;白跑&quot;。</p>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照 · PenShot 文档</title>
+  <meta name="description" content="基于两次真实运行产物的 PenShot 实战复盘：《深夜来电》七元素剧本走完解析、分镜、分段、提示词、质检与连续性六阶段链路，质量分从 5.0 到 90.0 的差异逐项对照，所有数字均可在落盘产物中复核，附违规权重核算、连续性状态判读与五条排坑经验。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/case-study.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照">
+  <meta property="og:description" content="基于两次真实运行产物的 PenShot 实战复盘：《深夜来电》七元素剧本走完解析、分镜、分段、提示词、质检与连续性六阶段链路，质量分从 5.0 到 90.0 的差异逐项对照，所有数字均可在落盘产物中复核，附违规权重核算、连续性状态判读与五条排坑经验。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/case-study.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html" class="active">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-14</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇案例文档。重点是展示完整输入、处理链路、关键中间结果和最终输出，让读者能够复现实验，而不是只给出结论。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够复现案例链路，并知道结果受哪些输入和环境因素影响。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<p>系列前文《快速开始》介绍了安装与最小可运行示例。本文换一个角度：把一个短剧本交给 PenShot，然后把每一次运行的落盘产物拆开，逐阶段对照，看每个环节到底做了什么、留下什么、哪里出了问题，以及一份只有 19 秒的剧本如何走出一条 5.0 分到 90.0 分的质量曲线。</p>
+<blockquote>
+<p><strong>数据口径说明</strong>：本文所有数字来自本地数据目录 <code>data/output/SN1780745829485283341820/</code> 下两次真实任务的落盘文件：<code>TSK17807426061109503223</code>（2026-06-11 运行，简称运行 1）与 <code>TSK17807426072316085190</code>（2026-07-23 运行，简称运行 2）。该目录不随源码发布，但产物字段可对照源码核验；涉及机制解释的部分单独标注源码位置。</p>
+</blockquote>
+<hr>
+<h2>一、案例剧本与两次运行</h2>
+<h3>1.1 《深夜来电》：七个元素的极简短剧</h3>
+<p>《深夜来电》是一个约 19 秒的独幕短剧：深夜 11 点，城市公寓客厅窗外大雨滂沱，林然裹着旧羊毛毯蜷在沙发里，一通显示未知号码的电话打来，电话那头是多年未见的旧识陈默。全剧只有三句台词与一次情绪转折，属于典型的情绪驱动型短剧。</p>
+<p>解析器把它拆成 7 个元素（1 个场景 + 3 个动作 + 3 段对话），两个角色：林然（主角，视觉出场）与陈默（配角，只以电话声音出场——记住这个设定，后文质量审查的主要违规就来自它）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">元素</th>
+<th style="text-align:left">类型</th>
+<th style="text-align:right">时长</th>
+<th style="text-align:left">情绪</th>
+<th style="text-align:left">内容摘要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">elem_001</td>
+<td style="text-align:left">scene</td>
+<td style="text-align:right">5s</td>
+<td style="text-align:left">calm</td>
+<td style="text-align:left">深夜 11 点客厅，大雨、黑白老电影、半杯凉茶、旧相册，林然蜷在沙发</td>
+</tr>
+<tr>
+<td style="text-align:left">elem_002</td>
+<td style="text-align:left">action</td>
+<td style="text-align:right">3s</td>
+<td style="text-align:left">anxious</td>
+<td style="text-align:left">手机震动显示未知号码，指尖悬停后按下接听</td>
+</tr>
+<tr>
+<td style="text-align:left">elem_003</td>
+<td style="text-align:left">dialogue</td>
+<td style="text-align:right">2s</td>
+<td style="text-align:left">tense</td>
+<td style="text-align:left">电话那头：<code>是我。</code></td>
+</tr>
+<tr>
+<td style="text-align:left">elem_004</td>
+<td style="text-align:left">action</td>
+<td style="text-align:right">2s</td>
+<td style="text-align:left">shock</td>
+<td style="text-align:left">林然手指收紧、指节泛白、呼吸停滞</td>
+</tr>
+<tr>
+<td style="text-align:left">elem_005</td>
+<td style="text-align:left">dialogue</td>
+<td style="text-align:right">2s</td>
+<td style="text-align:left">hesitant</td>
+<td style="text-align:left"><code>……陈默？你还好吗？</code></td>
+</tr>
+<tr>
+<td style="text-align:left">elem_006</td>
+<td style="text-align:left">dialogue</td>
+<td style="text-align:right">2s</td>
+<td style="text-align:left">resigned</td>
+<td style="text-align:left"><code>我回来了。</code></td>
+</tr>
+<tr>
+<td style="text-align:left">elem_007</td>
+<td style="text-align:left">action</td>
+<td style="text-align:right">3s</td>
+<td style="text-align:left">emotional</td>
+<td style="text-align:left">猛然坐直、瞳孔收缩、毛毯从肩头滑落</td>
+</tr>
+</tbody>
+</table>
+<p>7 个元素时长合计 19.0 秒，与解析产物 <code>stats.total_duration = 19</code> 一致。</p>
+<h3>1.2 两次运行的信息与端到端耗时</h3>
+<p>同一个 <code>script_id</code>（<code>SN1780745829485283341820</code>）在 6 周内跑了两次，恰好构成一组对照：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">项</th>
+<th style="text-align:left">运行 1（06-11）</th>
+<th style="text-align:left">运行 2（07-23）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">task_id</td>
+<td style="text-align:left">TSK17807426061109503223</td>
+<td style="text-align:left">TSK17807426072316085190</td>
+</tr>
+<tr>
+<td style="text-align:left">产物时间窗</td>
+<td style="text-align:left">09:51:19 → 09:53:05</td>
+<td style="text-align:left">16:09:00 → 16:10:42</td>
+</tr>
+<tr>
+<td style="text-align:left">端到端耗时</td>
+<td style="text-align:left">约 106 秒</td>
+<td style="text-align:left">约 102 秒</td>
+</tr>
+<tr>
+<td style="text-align:left">终审判定</td>
+<td style="text-align:left">major_issues / 5.0 分</td>
+<td style="text-align:left">minor_issues / 90.0 分</td>
+</tr>
+</tbody>
+</table>
+<p>18 倍的终审分数差，来自同一份剧本、同一套六阶段链路。这是本文后半段要拆开的核心问题。</p>
+<h2>二、六阶段链路实录</h2>
+<p>产物目录下每个阶段都有独立的落盘文件，逐份对照如下。六个阶段的保存时间戳也记录在文件 metadata 中，可以还原出阶段级耗时结构。</p>
+<h3>2.1 阶段一：剧本解析</h3>
+<p><code>script_parser_result.json</code> 输出的 stats 在两次运行中完全一致：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">指标</th>
+<th style="text-align:right">运行 1</th>
+<th style="text-align:right">运行 2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">元素总数</td>
+<td style="text-align:right">7</td>
+<td style="text-align:right">7</td>
+</tr>
+<tr>
+<td style="text-align:left">总时长</td>
+<td style="text-align:right">19.0s</td>
+<td style="text-align:right">19.0s</td>
+</tr>
+<tr>
+<td style="text-align:left">对话 / 动作数</td>
+<td style="text-align:right">3 / 3</td>
+<td style="text-align:right">3 / 3</td>
+</tr>
+<tr>
+<td style="text-align:left">完整度评分</td>
+<td style="text-align:right">0.87</td>
+<td style="text-align:right">0.87</td>
+</tr>
+<tr>
+<td style="text-align:left">解析置信度（综合）</td>
+<td style="text-align:right">0.76</td>
+<td style="text-align:right">0.76</td>
+</tr>
+<tr>
+<td style="text-align:left">场景 / 角色 / 对话 / 动作</td>
+<td style="text-align:right">0.6 / 0.75 / 0.67 / 1.0</td>
+<td style="text-align:right">0.6 / 0.75 / 0.67 / 1.0</td>
+</tr>
+<tr>
+<td style="text-align:left">解析尝试次数</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+</tr>
+</tbody>
+</table>
+<p>两次运行的统计口径完全一致，但细节文案仍有可观测的波动：陈默的角色描述，运行 1 是 <code>声音沙哑，低沉，身份为林然的旧识</code>（3 个 key_traits），运行 2 是 <code>沙哑男声，身份为林然的旧识</code>（2 个 key_traits）；场景 <code>weather</code> 字段一次是 <code>大雨</code>、一次是 <code>雨天</code>。LLM 解析在结构层稳定、在措辞层波动的特性，在这两份产物里体现得很清楚。</p>
+<p>另一个值得注意的分布：动作维度置信度 1.0、对话 0.67、场景仅 0.6。结构化程度越高的信息（谁做了什么）提取越稳，而场景包含时间、光线、氛围等需要推断的隐式信息，最容易出现偏差——这也意味着<strong>人工复核的优先级应该放在场景标注上</strong>。</p>
+<h3>2.2 阶段二：镜头拆分</h3>
+<p><code>shot_segmenter_result.json</code> 的两次结果都是 7 个镜头，但景别与时长分配并不相同：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">镜头</th>
+<th style="text-align:left">运行 1 景别 / 时长</th>
+<th style="text-align:left">运行 2 景别 / 时长</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">shot_001</td>
+<td style="text-align:left">wide_shot / 4.63s</td>
+<td style="text-align:left">wide_shot / 4.21s</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_002</td>
+<td style="text-align:left">medium_shot / 2.0s</td>
+<td style="text-align:left">medium_shot / 2.0s</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_003</td>
+<td style="text-align:left">close_up / 3.0s</td>
+<td style="text-align:left">close_up / 3.0s</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_004</td>
+<td style="text-align:left">extreme_close_up / 2.36s</td>
+<td style="text-align:left">close_up / 4.5s</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_005</td>
+<td style="text-align:left">close_up / 4.5s</td>
+<td style="text-align:left">close_up / 4.8s</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_006</td>
+<td style="text-align:left">close_up / 3.0s</td>
+<td style="text-align:left">close_up / 3.0s</td>
+</tr>
+<tr>
+<td style="text-align:left">shot_007</td>
+<td style="text-align:left">medium_shot / 2.4s</td>
+<td style="text-align:left">medium_shot / 2.4s</td>
+</tr>
+<tr>
+<td style="text-align:left">合计</td>
+<td style="text-align:left">21.89s（均值 3.13s）</td>
+<td style="text-align:left">23.91s（均值 3.42s）</td>
+</tr>
+</tbody>
+</table>
+<p>分布上两次都是 <code>1 全景 + 2 中景 + 若干特写</code> 的框架：开场用全景建立空间，情绪推进段全部使用特写。差异出现在中段——运行 1 用了 extreme_close_up（极特写）加一个 2.36 秒的短镜头刻画手指收紧的动作，运行 2 则是 4.5 秒的 close_up。这段是林然接听电话后的情绪爆发点，两次运行给出了不同强度的视觉方案：一次用更近的景别与更短的时长制造压迫感，一次用更长的凝视给情绪留白。两种都说得通，属于 LLM 时长估算与景别选择的正常波动区间。</p>
+<h3>2.3 阶段三：视频分段</h3>
+<p><code>video_splitter_result.json</code> 的 metadata 显示，两次运行的分段方式完全一致：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;split_method&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;llm&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;cutter_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;LLMVideoSplitter&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;ai_split_shots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;rule_split_shots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">7</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;ai_split_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;rule_split_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">7</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;total_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">7</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;average_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.42</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p>这里有一个容易误读的组合：<code>cutter_type</code> 是 <code>LLMVideoSplitter</code>、<code>split_method</code> 是 <code>llm</code>，但 <code>ai_split_count = 0</code>、<code>rule_split_count = 7</code>。原因是分割器的分流阈值——<strong>只有时长超过 5.5 秒的镜头才会交给 LLM 做语义分割，其余镜头按规则直通</strong>（源码 <code>rule_video_splitter.py</code> 中的 <code>duration_split_threshold</code>，默认 5.5）。本剧最长的镜头是 4.8 秒，7 个镜头全部落在直通区间，所以 7 个镜头与 7 个片段一一对应，两次运行都没有触发 AI 分割。</p>
+<p>这解释了为什么小剧本的耗时结构里，分段阶段几乎不花时间（两次运行该阶段都在 5 秒上下）：没有 LLM 调用，纯规则计算。</p>
+<p>分段产物里每个片段还携带了溯源信息与连续性备注，以运行 2 的 frag_001 为例：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;split_by&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;rule&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;is_split&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;original_shot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_001&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;shot_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_001&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_001&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.21</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><code>element_ids</code> 把片段与解析元素挂上了钩，<code>start_time</code> 从 0 开始严格递推——这两项保证了哪怕后续手工微调片段，也能追溯到原始剧本位置。</p>
+<h3>2.4 阶段四：指令转换</h3>
+<p><code>prompt_converter_result.json</code> 记录了每个片段的视觉提示词、负面提示词与音频包。这是成本最高、也是两次运行差异最大的阶段。以 frag_001 为例：</p>
+<p>运行 1 的提示词为纯英文：</p>
+<pre class="hljs"><code>wide shot, late night 11 PM, dim city apartment living room, heavy rain outside window,
+rain muffled by glass, Lin Ran wrapped in gray worn wool blanket curled on gray sofa,
+TV playing silent black-and-white old movie, light and shadows flickering on wall,
+half-drunk cold tea on coffee table with condensation, brown old photo album with worn
+leather cover and faded photos...
+</code></pre>
+<p>运行 2 改为 <code>英文 + 中文回译</code> 的双语结构：</p>
+<pre class="hljs"><code>wide shot, cinematic lighting, late night 11pm, dim city apartment living room, heavy rain
+outside window, rain sound continuous, TV playing silent black-and-white old movie,
+coffee table with half-cup cold tea, open old photo album...
+
+全景镜头：深夜11点，昏暗的城市公寓客厅，窗外大雨滂沱，雨声持续。电视静音播放着
+黑白老电影，茶几上放着半杯凉茶，旁边摊开一本旧相册。
+</code></pre>
+<p>每个片段同时携带音频包 <code>audio</code>，字段结构与视觉提示词同构：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">字段</th>
+<th style="text-align:left">运行 2 的 frag_001 取值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">audio_id</td>
+<td style="text-align:left">audio_001</td>
+</tr>
+<tr>
+<td style="text-align:left">prompt</td>
+<td style="text-align:left">双语的雨声 / 雷声 / 电视静电 / 沙发吱嘎 / 呼吸声描述</td>
+</tr>
+<tr>
+<td style="text-align:left">model_type</td>
+<td style="text-align:left">AudioLDM_3（对话片段自动切换 XTTSv2）</td>
+</tr>
+<tr>
+<td style="text-align:left">voice_type</td>
+<td style="text-align:left">narration</td>
+</tr>
+<tr>
+<td style="text-align:left">voice_character</td>
+<td style="text-align:left">对话片段会填具体角色名（如 frag_002 对应 Lin Ran）</td>
+</tr>
+<tr>
+<td style="text-align:left">negative_prompt</td>
+<td style="text-align:left">noisy, low quality, distorted, robotic, bad audio</td>
+</tr>
+</tbody>
+</table>
+<p>转换阶段两次运行分别耗时约 39 秒与 36 秒（同为 7 个片段），单片段约 5 秒——与《快速开始》中 13 片段示例的结论一致：该阶段耗时接近 <code>片段数 × 单次 LLM 调用延迟</code>。</p>
+<h3>2.5 阶段五：质量审查</h3>
+<p><code>quality_auditor_result.json</code> 是两次运行分歧最大的产物。先看两边相同的部分——5 项规则检查全部通过：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">[</span>
+  <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;片段时长限制检查&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有片段时长符合要求&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;提示词内容检查&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有提示词非空&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;提示词长度检查&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有提示词长度合适&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;片段数量检查&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;共7个片段&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;模型支持检查&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有模型都受支持&quot;</span> <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">]</span>
+</code></pre>
+<p>再看两边不同的部分——违规清单：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">#</th>
+<th style="text-align:left">运行 1：8 条违规</th>
+<th style="text-align:left">运行 2：4 条违规</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">1</td>
+<td style="text-align:left">major · frag_006：出现 Chen Mo 的声音，但该角色从未在视觉上出现</td>
+<td style="text-align:left">warning · frag_005：<code>Chen Mo? Are you okay?</code> 缺少对方回应</td>
+</tr>
+<tr>
+<td style="text-align:left">2</td>
+<td style="text-align:left">major · frag_007：突然切换黑白模式，与此前 ETERNA 彩色风格不一致</td>
+<td style="text-align:left">info · frag_001：半杯茶道具后续未再提及</td>
+</tr>
+<tr>
+<td style="text-align:left">3</td>
+<td style="text-align:left">moderate · frag_006：台词出现在极端特写中，未明确说话人</td>
+<td style="text-align:left">info · frag_002：打开的相册后续未保持连续性</td>
+</tr>
+<tr>
+<td style="text-align:left">4</td>
+<td style="text-align:left">moderate · frag_007：坐直动作在 frag_006 中无铺垫，动作跳跃</td>
+<td style="text-align:left">warning ·（阶段级，无片段归属）</td>
+</tr>
+<tr>
+<td style="text-align:left">5</td>
+<td style="text-align:left">moderate · frag_004：与其前一片段的特写景别和动作顺序矛盾</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">6</td>
+<td style="text-align:left">warning · frag_004：提示词以省略号开头，疑似截断</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">7</td>
+<td style="text-align:left">warning · frag_005：情感描述被省略号截断</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">8</td>
+<td style="text-align:left">warning ·（阶段级，无片段归属）</td>
+<td style="text-align:left"></td>
+</tr>
+</tbody>
+</table>
+<p>运行 1 的结论是 <code>发现 2 个主要问题、3 个中度问题、3 个警告</code>，运行 2 是 <code>发现 2 个警告</code>。结合权重表：critical 扣 40 分、major 扣 25 分、moderate 扣 10 分、warning 扣 5 分、info 不扣分（从 100 分起扣，下限 0）——两边的最终分数可以直接核算出来：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>运行 1：100 − (2×25 + 3×10 + 3×5) = 100 − 95 = <strong>5.0 分</strong></p>
+</li>
+<li class="lvl-2">
+<p>运行 2：100 − (2×5 + 2×0) = 100 − 10 = <strong>90.0 分</strong></p>
+</li>
+</ul>
+<p>两边产物里的 <code>score</code> 字段与按权重表手算的结果完全一致。质量分不是黑盒玄学，而是一张可复盘的扣分账单。</p>
+<h3>2.6 阶段六：连续性检查</h3>
+<p><code>continuity_report.json</code> 的两次结果：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">项</th>
+<th style="text-align:right">运行 1</th>
+<th style="text-align:right">运行 2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">连续性问题数</td>
+<td style="text-align:right">1（moderate）</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td style="text-align:left">continuity_retry_count</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+</tr>
+<tr>
+<td style="text-align:left">continuity_passed</td>
+<td style="text-align:right">false</td>
+<td style="text-align:right">false</td>
+</tr>
+</tbody>
+</table>
+<p>运行 1 报告了 1 个 moderate 级问题并触发了 1 次重试；运行 2 报告 0 个问题——但 <code>continuity_passed</code> 依然是 <code>false</code>。与此同时，片段级产物里的 <code>continuity_notes.continuity_check</code> 在运行 2 中却是 <code>passed</code>。也就是说：<strong>片段级标记与报告级布尔值在语义上没有打通</strong>，0 问题的情况下报告级字段仍固定为 false。这是一个产物级的真实边界，排查连续性状态时不要只看 <code>continuity_passed</code>，要结合问题数一起判断。</p>
+<h2>三、5.0 分与 90.0 分的差异从哪里来</h2>
+<h3>3.1 提示词产出质量的代际差异</h3>
+<p>把两次运行的违规清单对齐看，运行 1 的问题集中在三类，且都在运行 2 中消失或降级：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>截断类</strong>（3 条 warning→ 0 条）：运行 1 的提示词出现以省略号开头、情感描述被截断的情况，运行 2 未复现；</p>
+</li>
+<li class="lvl-2">
+<p><strong>风格类</strong>（1 条 major → 0 条）：运行 1 的 frag_007 意外混入黑白模式描述，与其自身 style 字段声明的 ETERNA 彩色风格冲突；运行 2 的 7 个片段风格字段统一；</p>
+</li>
+<li class="lvl-2">
+<p><strong>动作跳跃类</strong>（1 条 moderate → 0 条）：运行 1 的 frag_007 坐直动作缺少铺垫；运行 2 通过更长的前置镜头（shot_004 由 2.36 秒加长到 4.5 秒）缓解了节奏跳跃。</p>
+</li>
+</ul>
+<h3>3.2 提示词双语化带来的可审查性</h3>
+<p>运行 2 的提示词开始输出中文回译（见 2.4 节），这不是显示层的装饰——质量审查器与人工复核都需要读懂英文提示词里到底写了什么。运行 1 的英文提示词在审查日志里被指出以省略号开头时，人很难第一眼判断截断处的语义，中文回译让这类结构性问题变得直观。审查质量与产出可读性互相促进，这是运行 2 违规数量大幅下降的重要原因之一。</p>
+<h3>3.3 两次运行没有变的东西</h3>
+<p>对照两组产物也要说清楚哪些环节不是分数差异的来源：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>解析统计</strong>完全一致（7 元素 / 19 秒 / 相同置信度分布）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>分段策略</strong>完全一致（规则直通 7 个片段，未触发 LLM 分割）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>角色设定</strong>未变（陈默始终只以声音出场）——运行 1 的视觉未出场 major 违规在运行 2 依然存在，只是降级为 warning 级的对话不完整提示。</p>
+</li>
+</ul>
+<p>换句话说，分数提升主要来自提示词生成质量的提升，而不是链路机制的变化。</p>
+<h2>四、从产物里挖出来的五个坑</h2>
+<p>以下每一条都能在产物文件里找到对应证据，属于跑通链路之后才会遇到的坑。</p>
+<p><strong>坑 1：5 项检查全过，不代表没有质量问题</strong></p>
+<p>两次运行的 <code>stats.pass_rate</code> 都是 1.0（5/5 通过），但违规清单分别是 8 条和 4 条。规则层检查的是时长越界、提示词为空、模型名不受支持这类硬性条件；语义层问题（角色未出场、风格漂移、动作跳跃）只能由 LLM 审查发现。看到检查全绿就放行，会把语义问题带到生成环节。</p>
+<p><strong>坑 2：质量分低不等于整条链路失败</strong></p>
+<p>运行 1 只有 5.0 分，但它的解析、分段、提示词结构、音频包全部产出正常，连续性也只报告了 1 个 moderate 问题。低分来自提示词文本层的瑕疵，而不是流程断裂。处理姿势应该是定向修复违规项，而不是推翻重跑——重跑后新的 LLM 采样可能引入新的问题。</p>
+<p><strong>坑 3：连续性状态要同时看两级字段</strong></p>
+<p><code>continuity_passed = false</code> 在两次运行中都出现，但运行 2 的问题数是 0、片段级标记是 <code>passed</code>。单看报告级布尔值会误判为连续性故障。判断顺序建议：先看问题清单与严重度，再看片段级备注，最后才参考报告级布尔值。</p>
+<p><strong>坑 4：道具与角色的跨片段追踪是违规高发区</strong></p>
+<p>运行 1 的 8 条违规里，5 条与跨片段一致性有关（声音角色未视觉出场、风格切换、动作顺序矛盾、景别跳跃）；运行 2 残留的 4 条里有 2 条是道具追踪（半杯茶、相册）。景别、风格、道具这三类信息在片段间传递时最容易丢失，人工复核时值得优先扫一遍。</p>
+<p><strong>坑 5：阶段统计文本可能被摘要污染</strong></p>
+<p>打开运行 1 的 <code>stage_statistics.json</code> 会看到一件怪事：四个阶段的统计文本完全相同，都是 <code>解析脚本阶段共尝试 1 次……总耗时 19.0 秒</code>——这是解析阶段的摘要被 LLM 复用覆盖到了所有阶段字段。同样的现象也出现在 <code>repair_history.json</code> 与 <code>quality_report.json</code> 的 <code>audit_history</code> 里。这是产物生成链路的真实缺陷：阶段级文本可能互相污染。需要精确的阶段数据时，以各阶段独立产物文件（如 <code>shot_segmenter_result.json</code>、<code>video_splitter_result.json</code>）为准，不要依赖汇总报告里的文本字段。</p>
+<h2>五、总结</h2>
+<p>把两次运行放在一起看，《深夜来电》的复盘给出三条可复用的结论：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>链路是稳的</strong>：解析统计、分段策略、角色设定在两次运行间保持一致，LLM 波动主要发生在措辞与时长估算这类自由度较高的环节；</p>
+</li>
+<li class="lvl-3">
+<p><strong>质量分是可核算的</strong>：100 分起步、按 critical 40 / major 25 / moderate 10 / warning 5 逐项扣减，产物里的分数与手算完全一致，可以用它定位问题而不是只看数字高低；</p>
+</li>
+<li class="lvl-3">
+<p><strong>产物要分两级读</strong>：规则检查与语义审查、片段级备注与报告级状态、独立产物与汇总报告，这三组概念各自有独立的可信度层级，混读会把正常输出误判成故障。</p>
+</li>
+</ol>
+<p>如果你正在把 PenShot 接入自己的生产链路，建议先拿一个小剧本跑两次，对照本文的产物结构把每个文件读一遍——读懂产物，比读懂文档更能预判它上线后的行为。</p>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+</body>
+</html>

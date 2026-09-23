@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 多智能体一致性：七大策略里，哪些真的在跑？ · PenShot 文档</title>
+  <meta name="description" content="PenShot 多智能体一致性体系：三视图为何缺席、连续性锚点与状态快照为何未接线、RAG 模板增强与六项规则检查如何真实运转、质量审计的扣分制与六档门槛长什么样，并给出修复回流断链、模板错配等故障场景与工程边界参考。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/multi-agent-consistency.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 多智能体一致性：七大策略里，哪些真的在跑？">
+  <meta property="og:description" content="PenShot 多智能体一致性体系：三视图为何缺席、连续性锚点与状态快照为何未接线、RAG 模板增强与六项规则检查如何真实运转、质量审计的扣分制与六档门槛长什么样，并给出修复回流断链、模板错配等故障场景与工程边界参考。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/multi-agent-consistency.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html" class="active">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-04-21</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 多智能体一致性：七大策略里，哪些真的在跑？</h1>
+<p>PenShot 相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="index.html">文档</a> | <a href="https://shot.helpenx.com/">官网</a></p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇设计/机制文档。文中会把已经实现的能力与设计推演分开，避免把路线图、示例代码或理论方案误认为当前版本功能。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够区分当前实现、设计方案和未来规划，避免把示例当成现成功能。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>导读</strong>：AI 视频模型能让单个片段足够惊艳，但一致性才是长视频的成败所在。与其泛泛谈论&quot;多智能体协作&quot;，本文换一个更较真的角度：逐个核查 PenShot 一致性体系里的七个核心策略——<strong>哪些真的在运行</strong>（有调用方、有消费方）、<strong>哪些实现了却没接线</strong>（有代码、没通电）、<strong>哪些还停留在设计蓝图</strong>。全文以源码为依据，宁可指出缺口，不做概念堆砌。</p>
+</blockquote>
+<hr>
+<h2>一、概述：问题背景与整体架构</h2>
+<h3>问题背景</h3>
+<p>AI 视频生成模型在单片段生成上已经表现出色，但当需要生成一个完整的、包含多个连续片段的视频时，一致性问题就成为了最大的挑战。角色外貌在不同片段中发生变化、场景细节前后矛盾、道具位置突然改变——这些不一致性会严重破坏观众的沉浸感。</p>
+<p>PenShot 给出的答案是&quot;六节点流水线 + 知识支撑&quot;的多智能体协作：剧本解析提取事实基线，分镜与分段把基线写进结构化字段，指令转换把约束拼进提示词，质量审查与连续性守护负责发现问题。但这套体系里各机制的真实落地程度并不相同——本文按&quot;已接线 / 已实现但未接线 / 规划中&quot;三分组逐项核查，每个结论都给出源码依据。</p>
+<h3>协作链路：六节点分工与知识支撑的真实形态</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Input [输入层]
+        I1[原始剧本]
+    end
+
+    subgraph Core [多智能体协作链路 · 真实六节点]
+        direction TB
+
+        subgraph Stage1 [剧本解析]
+            P1[场景/角色/道具提取]
+            P2[全局元数据 global_metadata]
+        end
+
+        subgraph Stage2 [分镜生成]
+            S1[镜头序列与 main_character]
+            S2[镜头级全局上下文注入]
+        end
+
+        subgraph Stage3 [视频分段]
+            F1[continuity_notes 连续性注释]
+            F2[时长控制与降级切分]
+        end
+
+        subgraph Stage4 [指令转换]
+            C1[四段全剧上下文拼装]
+            C2[知识库模板增强]
+        end
+
+        subgraph Stage5 [质量审查]
+            A1[五项基础规则 + LLM 深度审查]
+            A2[扣分制评分与六档状态]
+        end
+
+        subgraph Stage6 [连续性守护]
+            G1[六项词表规则检查]
+            G2[历史解决方案检索]
+        end
+    end
+
+    subgraph Knowledge [知识支撑层 · 真实形态]
+        K1[PromptTemplateManager&lt;br/&gt;成功提示词模板库]
+        K2[ScriptKnowledgeBase&lt;br/&gt;剧本知识库]
+        K3[WorkflowMemory&lt;br/&gt;审查与修复历史]
+    end
+
+    subgraph Output [输出层]
+        O1[一致性提示词序列]
+    end
+
+    I1 --&gt; Stage1
+    Stage1 --&gt; Stage2
+    Stage2 --&gt; Stage3
+    Stage3 --&gt; Stage4
+    Stage4 --&gt; Stage5
+    Stage5 --&gt; Stage6
+
+    Stage1 -.-&gt;|解析结果入库| K2
+    Stage4 -.-&gt;|模板增强| K1
+    Stage5 -.-&gt;|PASSED 提示词入库| K1
+    Stage6 -.-&gt;|检索历史方案| K2
+    Stage5 -.-&gt;|审查与修复历史| K3
+
+    Stage6 --&gt; O1
+</pre>
+<blockquote>
+<p><strong>阅读口径</strong>：&quot;已接线&quot;指机制在运行时被真实调用且有消费方；&quot;已实现但未接线&quot;指数据结构与算法已落地，但运行时没有调用点（或调用链断裂）；&quot;规划中&quot;指目前只存在于设计文档与本文蓝图章节的思路。三者的具体差异会在后文逐项标注。</p>
+</blockquote>
+<hr>
+<h2>二、一致性的定义与维度</h2>
+<p>在视频分镜中，一致性可以从多个维度来定义和度量。这五个维度是 PenShot 的设计口径，也是后文七个策略的&quot;服务对象&quot;。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Character [角色一致性]
+        C1[外貌特征]
+        C2[服装穿着]
+        C3[体型姿态]
+        C4[面部表情]
+    end
+
+    subgraph Scene [场景一致性]
+        S1[空间布局]
+        S2[陈设道具]
+        S3[色彩基调]
+        S4[光影氛围]
+    end
+
+    subgraph Prop [道具一致性]
+        P1[位置追踪]
+        P2[状态变化]
+        P3[交互方式]
+    end
+
+    subgraph Action [动作一致性]
+        A1[动作连贯性]
+        A2[速度节奏]
+        A3[力度强度]
+    end
+
+    subgraph Style [风格一致性]
+        ST1[视觉风格]
+        ST2[镜头语言]
+        ST3[剪辑节奏]
+    end
+
+    Character --&gt; Style
+    Scene --&gt; Style
+    Prop --&gt; Style
+    Action --&gt; Style
+</pre>
+<p><strong>角色一致性</strong>要求同一个角色在全部片段中外貌、服装、体型保持一致。角色的面部特征不能出现突然变化，服装不能在不同场景中随意更换，除非剧情明确要求换装。</p>
+<p><strong>场景一致性</strong>要求同一个场景的空间布局、陈设道具、色彩基调在各个片段中保持一致。如果某个场景的沙发是红色的，那么所有该场景的片段中沙发都应该是红色的。</p>
+<p><strong>道具一致性</strong>要求关键道具的位置和状态需要连续追踪。角色手中的水杯不能突然消失，桌上的书籍不能改变位置。</p>
+<p><strong>动作一致性</strong>要求角色的动作在片段之间保持连贯。角色从站立到坐下的过程需要合理的中间状态。</p>
+<p><strong>风格一致性</strong>要求整体的视觉风格、镜头语言和剪辑节奏保持统一。不能一个片段是写实风格，下一个片段突然变成卡通风格。</p>
+<p>这些维度如何落地？连续性守护模块给出了当前实现的答案——不是视觉模型比对，而是六项<strong>词表级规则检查</strong>（比设计口径多出&quot;时间&quot;一项）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">设计维度</th>
+<th style="text-align:left">检查器对应方法</th>
+<th style="text-align:left">当前实现方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色一致性</td>
+<td style="text-align:left"><code>check_character_continuity</code></td>
+<td style="text-align:left">外观关键词分类对比（服装 / 发型 / 配饰三类词表）+ 有台词角色无镜头检测</td>
+</tr>
+<tr>
+<td style="text-align:left">场景一致性</td>
+<td style="text-align:left"><code>check_scene_continuity</code></td>
+<td style="text-align:left">相邻镜头场景跳变检测 + 跳变频率阈值（超 30% 镜头数告警）</td>
+</tr>
+<tr>
+<td style="text-align:left">道具一致性</td>
+<td style="text-align:left"><code>check_prop_continuity</code></td>
+<td style="text-align:left">&quot;拿 / 举 / 抱 / 提 / 端 / 持 / 握&quot;七动词变化检测</td>
+</tr>
+<tr>
+<td style="text-align:left">动作一致性</td>
+<td style="text-align:left"><code>check_action_continuity</code></td>
+<td style="text-align:left">动作关键词（走 / 跑 / 跳 / 转身 / 坐下 / 站起 / 拿起 / 放下）变化检测</td>
+</tr>
+<tr>
+<td style="text-align:left">风格一致性</td>
+<td style="text-align:left"><code>check_style_continuity</code></td>
+<td style="text-align:left">片段 <code>style</code> 字段的去重统计（&gt;2 种风格即告警）</td>
+</tr>
+<tr>
+<td style="text-align:left">（时间维度）</td>
+<td style="text-align:left"><code>check_time_continuity</code></td>
+<td style="text-align:left">片段首尾时间的间隙 / 重叠检测（容差 0.1 秒）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>补充说明</strong>：五维并非并列——风格一致性处于最上层，是角色、场景、道具、动作四者&quot;视觉收敛&quot;后的总体观感，后面所有策略本质上都在为这些维度服务。但也要直说：词表级检查只能发现&quot;同类关键词切换&quot;这类显性漂移（例如&quot;穿衬衫&quot;变成&quot;穿裙子&quot;），对语义级的微妙变化（同义改述、方位错误）无能为力——这是当前实现的边界，也是后文规划章节中视觉级校验要补的课。</p>
+</blockquote>
+<hr>
+<h2>三、核心策略一：角色基线——三视图没有进入代码</h2>
+<p>如果只看设计讨论，&quot;角色三视图&quot;一定会排进一致性方案的前三名：为每个角色生成正面、侧面、背面三张标准参考图，任何片段、任何角度都拿这三张图做视觉锚点。</p>
+<p>但先给结论：<strong>在当前代码库中，三视图机制的三个关键环节——三视图生成、三视图库、参考图注入——都不存在</strong>。检索 <code>三视图</code> / <code>tri_view</code> / <code>turnaround</code> / <code>reference_image</code> 等关键词，在所有源码与提示词模板中零命中。这条常被讲述的&quot;核心策略&quot;，目前停留在设计稿阶段。</p>
+<p>那么角色一致性靠什么兜底？当前实现打的是&quot;文本基线 + 模板强约束&quot;两张牌：</p>
+<pre class="mermaid">flowchart LR
+    subgraph Parse [剧本解析]
+        A[ParsedScript.character_outfits&lt;br/&gt;character / color / style / material]
+    end
+
+    subgraph Context [上下文与约束]
+        B[_format_global_context&lt;br/&gt;【角色服装要求】段落]
+        C[三档模板重要约束&lt;br/&gt;服装严格遵循、不可错配]
+    end
+
+    subgraph Consume [真实消费方]
+        D1[split 视频分段提示词]
+        D2[shot 分镜提示词]
+        D3[prompt 指令转换提示词]
+    end
+
+    A --&gt; B
+    A --&gt; C
+    B --&gt; D1 &amp; D2 &amp; D3
+    C --&gt; D1 &amp; D2 &amp; D3
+</pre>
+<p><strong>第一张牌：角色服装的结构化字段</strong>。剧本解析器把每个角色的服装信息提取到 <code>global_metadata.character_outfits</code>（含 <code>character</code> / <code>color</code> / <code>style</code> / <code>material</code> / <code>description</code>），指令转换阶段由 <code>_format_global_context</code> 拼成固定段落（真实源码，<code>base_llm_agent.py</code>）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># base_llm_agent.py L189-196（真实源码）</span>
+<span class="hljs-keyword">if</span> global_metadata.character_outfits:
+    outfits = []
+    <span class="hljs-keyword">for</span> outfit <span class="hljs-keyword">in</span> global_metadata.character_outfits:
+        color_info = <span class="hljs-string">f&quot;<span class="hljs-subst">{outfit.color}</span>色&quot;</span> <span class="hljs-keyword">if</span> outfit.color <span class="hljs-keyword">else</span> <span class="hljs-string">&quot;&quot;</span>
+        style_info = <span class="hljs-string">f&quot;、<span class="hljs-subst">{outfit.style}</span>&quot;</span> <span class="hljs-keyword">if</span> outfit.style <span class="hljs-keyword">else</span> <span class="hljs-string">&quot;&quot;</span>
+        material_info = <span class="hljs-string">f&quot;、<span class="hljs-subst">{outfit.material}</span>&quot;</span> <span class="hljs-keyword">if</span> outfit.material <span class="hljs-keyword">else</span> <span class="hljs-string">&quot;&quot;</span>
+        outfits.append(<span class="hljs-string">f&quot;  - <span class="hljs-subst">{outfit.character}</span>：<span class="hljs-subst">{color_info}</span><span class="hljs-subst">{outfit.description}</span><span class="hljs-subst">{style_info}</span><span class="hljs-subst">{material_info}</span>&quot;</span>)
+    sections.append(<span class="hljs-string">&quot;【角色服装要求】\n&quot;</span> + <span class="hljs-string">&quot;\n&quot;</span>.join(outfits))
+</code></pre>
+<p><strong>第二张牌：模板里的强制约束</strong>。三档提示词模板都写入了针对角色服装的硬性要求（真实模板文案）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模板</th>
+<th style="text-align:left">约束文案（节选）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>video_splitter_prompt.yaml</code></td>
+<td style="text-align:left">“角色服装必须严格遵循【全剧上下文】中的描述，不可将某个角色的服装特征错误地分配给其他角色”</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>shot_segmenter_prompt.yaml</code></td>
+<td style="text-align:left">“角色服装分配：必须严格遵循【全剧上下文】中列出的角色服装要求，不可混淆不同角色的服装特征”</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>prompt_converter_prompt.yaml</code></td>
+<td style="text-align:left">“每个角色的专属视觉特征（服装颜色、材质、款式等）必须准确传达，不可改变……不可将 A 角色的服装特征错误分配给 B 角色”</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>为什么没做三视图？</strong> 这不是能力问题，而是依赖边界的取舍：三视图需要一条&quot;生成参考图 → 存储 → 在视频生成时作为条件图引用&quot;的外部图像链，而当前仓库的边界是&quot;提示词与指令编排&quot;——它不直接调用图像生成模型，自然也无法假定下游模型支持参考图条件输入。相比之下，文本基线零外部依赖、可程序化校验（六项检查器正是基于这些文本做词表比对）、实现成本低。</p>
+<p><strong>代价也要说清楚</strong>：文本描述承载不了精确视觉外观。“黑色长发、白色衬衫&quot;这类描述在不同片段反复生成时仍会有像素级漂移，模板约束只能降低概率，无法锁死。真正要&quot;锁形”，得靠参考图 / 首尾帧条件生成这类能力——那是下游模型集成层的课题，超出本仓库范围。</p>
+</blockquote>
+<hr>
+<h2>四、核心策略二：连续性锚点——实现了，但没有接线</h2>
+<p>连续性锚点的设计意图是：在剧本层面定义关键一致性参照点（某角色在某段时间内必须保持什么状态），并带上生效区间与优先级，让&quot;约束&quot;第一次具备结构化语义，而不是散落的文本字段。</p>
+<p>这套设计的模型类是真实存在的——<code>ContinuityAnchor</code>（<code>continuity_guardian/continuity_guardian_models.py</code>，完整真实源码）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># continuity_guardian_models.py L499-527（真实源码）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ContinuityAnchor</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    <span class="hljs-string">&quot;&quot;&quot;连续性锚点 - 用于约束生成&quot;&quot;&quot;</span>
+
+    anchor_id: <span class="hljs-built_in">str</span> = Field(..., description=<span class="hljs-string">&quot;锚点唯一标识&quot;</span>)
+    anchor_type: <span class="hljs-built_in">str</span> = Field(..., description=<span class="hljs-string">&quot;锚点类型: character, scene, prop, style&quot;</span>)
+
+    <span class="hljs-comment"># 锚点内容</span>
+    name: <span class="hljs-built_in">str</span> = Field(..., description=<span class="hljs-string">&quot;锚点名称&quot;</span>)
+    value: <span class="hljs-type">Any</span> = Field(..., description=<span class="hljs-string">&quot;锚点值&quot;</span>)
+
+    <span class="hljs-comment"># 约束范围</span>
+    start_time: <span class="hljs-built_in">float</span> = Field(default=<span class="hljs-number">0.0</span>, description=<span class="hljs-string">&quot;生效开始时间&quot;</span>)
+    end_time: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">float</span>] = Field(default=<span class="hljs-literal">None</span>, description=<span class="hljs-string">&quot;生效结束时间&quot;</span>)
+    fragment_range: <span class="hljs-type">Optional</span>[<span class="hljs-type">List</span>[<span class="hljs-built_in">int</span>]] = Field(default=<span class="hljs-literal">None</span>, description=<span class="hljs-string">&quot;生效片段范围&quot;</span>)
+
+    <span class="hljs-comment"># 优先级</span>
+    priority: <span class="hljs-built_in">int</span> = Field(default=<span class="hljs-number">1</span>, description=<span class="hljs-string">&quot;优先级（越高越重要）&quot;</span>)
+
+    <span class="hljs-comment"># 元数据</span>
+    metadata: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>] = Field(default_factory=<span class="hljs-built_in">dict</span>, description=<span class="hljs-string">&quot;扩展元数据&quot;</span>)
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">is_active_at</span>(<span class="hljs-params">self, time: <span class="hljs-built_in">float</span></span>) -&gt; <span class="hljs-built_in">bool</span>:
+        <span class="hljs-string">&quot;&quot;&quot;检查锚点是否在指定时间生效&quot;&quot;&quot;</span>
+        <span class="hljs-keyword">if</span> time &lt; <span class="hljs-variable language_">self</span>.start_time:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+        <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.end_time <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-literal">None</span> <span class="hljs-keyword">and</span> time &gt; <span class="hljs-variable language_">self</span>.end_time:
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+</code></pre>
+<p>字段本身就说明了设计意图：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">设计要素</th>
+<th style="text-align:left">字段</th>
+<th style="text-align:left">设计意图</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">锚点类型</td>
+<td style="text-align:left"><code>anchor_type</code></td>
+<td style="text-align:left">角色 / 场景 / 道具 / 风格四类统一建模</td>
+</tr>
+<tr>
+<td style="text-align:left">生效区间</td>
+<td style="text-align:left"><code>start_time</code> / <code>end_time</code> / <code>is_active_at()</code></td>
+<td style="text-align:left">解决&quot;约束从第几秒到第几秒有效&quot;——剧情合理的状态变化不会误报</td>
+</tr>
+<tr>
+<td style="text-align:left">范围限定</td>
+<td style="text-align:left"><code>fragment_range</code></td>
+<td style="text-align:left">限定只在某些片段内生效（如某道具只出现在某几场戏）</td>
+</tr>
+<tr>
+<td style="text-align:left">冲突裁决</td>
+<td style="text-align:left"><code>priority</code></td>
+<td style="text-align:left">多个锚点矛盾时按优先级取舍</td>
+</tr>
+</tbody>
+</table>
+<p><strong>但现实是：这套锚点体系没有通电</strong>。<code>ContinuityAnchor</code> 除定义处外全仓库无任何引用；<code>StateTimeline.continuity_anchors</code> 在等一个不存在的写入方；配套的 <code>GlobalConsistencyContract</code> 契约体系（<code>process_with_contract</code> / <code>check_with_contract</code> / <code>CrossChunkValidator</code>）同样没有调用方。</p>
+<p>那么&quot;锚点&quot;这个概念当前由什么承担？由文本通道代打：</p>
+<blockquote>
+<p><strong>当前替代方案</strong>：<code>global_metadata</code>（整剧级事实基线：道具 / 服装 / 地点）+ <code>continuity_notes</code>（片段级接力字段）。它们的共性是：字段固定、全程传递、检查器可读；差别在于：文本字段没有生效区间，也没有优先级——&quot;林然第 3 场换装后穿红色连衣裙&quot;这种有时效性的约束，目前只能靠提示词模板的&quot;参数矛盾优先采用【全剧上下文】设定&quot;这类模糊规则兜着。</p>
+<p><strong>接线的真实难点</strong>：锚点体系要通电，前提是先有可靠的时间轴与状态语义——而它依赖的状态快照、时间线目前同样未接线（见策略五）。换句话说，锚点不是孤立缺一块拼图，而是&quot;结构化约束&quot;这一层整体待建。</p>
+</blockquote>
+<hr>
+<h2>五、核心策略三：RAG 知识支撑——三条真实链路与一个哑参数</h2>
+<p>“RAG 知识库&quot;在一致性方案里承担记忆与检索的角色，但设计圈里的&quot;锚点快照库”&quot;修复模式库&quot;并不存在。真实的体系是：一个管理器、两个知识库、三条接线中的链路——以及一个值得注意的哑参数。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Manager [PromptTemplateManager · 工作流侧真实实例]
+        M[提示词模板库 PromptTemplateKB]
+        N[剧本知识库 ScriptKnowledgeBase]
+    end
+
+    subgraph Write [真实写入链路]
+        W1[解析结果入库&lt;br/&gt;add_parsed_script]
+        W2[审计 PASSED 后&lt;br/&gt;save_successful_prompt]
+    end
+
+    subgraph Query [真实检索链路]
+        Q1[enhance_prompt&lt;br/&gt;append 模式拼接模板]
+        Q2[search_similar_scene&lt;br/&gt;问题→历史方案 top_k=2]
+    end
+
+    W1 --&gt; N
+    W2 --&gt; M
+    M --&gt; Q1
+    N --&gt; Q2
+</pre>
+<p><strong>链路一：解析结果入库</strong>。剧本解析完成后，<code>script_parser_agent.process</code> 会把 <code>ParsedScript</code> 写入剧本知识库（<code>knowledge_manager.add_parsed_script(parsed_script, script_id)</code>）——这是后续检索的原料层。</p>
+<p><strong>链路二：审计通过 → 成功模板入库</strong>。质量审查判定 <code>PASSED</code> 后，工作流会把每个片段的提示词连同质量分保存为成功模板（真实源码，<code>workflow_nodes.py</code>）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py L770-785（真实源码 · 节选）</span>
+<span class="hljs-keyword">if</span> result.status == AuditStatus.PASSED <span class="hljs-keyword">and</span> state.domain.instructions:
+    <span class="hljs-keyword">for</span> fragment <span class="hljs-keyword">in</span> state.domain.instructions.fragments:
+        <span class="hljs-variable language_">self</span>.knowledge_manager.save_successful_prompt(
+            fragment_id=fragment.fragment_id,
+            prompt_text=fragment.prompt,
+            quality_score=result.score,
+            script_id=state.<span class="hljs-built_in">input</span>.script_id,
+            additional_metadata={<span class="hljs-string">&quot;scene&quot;</span>: ..., <span class="hljs-string">&quot;style&quot;</span>: ..., <span class="hljs-string">&quot;duration&quot;</span>: ...}
+        )
+</code></pre>
+<p><strong>链路三：提示词增强 + 历史方案检索</strong>。此后每次指令转换完成后，片段都会用模板库做一次&quot;模板增强&quot;；连续性检查发现的问题会先检索历史方案再进入分析（真实源码，两处调用）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py L574-582（真实源码 · 节选）：模板增强</span>
+<span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.knowledge_manager <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.knowledge_manager.is_available():
+    <span class="hljs-keyword">for</span> fragment <span class="hljs-keyword">in</span> instructions.fragments:
+        enhanced_prompt = <span class="hljs-variable language_">self</span>.knowledge_manager.enhance_prompt(
+            fragment.prompt, enhancement_mode=<span class="hljs-string">&quot;append&quot;</span>)
+        <span class="hljs-keyword">if</span> enhanced_prompt != fragment.prompt:
+            fragment.prompt = enhanced_prompt
+</code></pre>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_nodes.py L967-977（真实源码 · 节选）：历史方案检索</span>
+<span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>.knowledge_manager <span class="hljs-keyword">and</span> <span class="hljs-variable language_">self</span>.knowledge_manager.is_script_kb_available():
+    <span class="hljs-keyword">for</span> issue <span class="hljs-keyword">in</span> continuity_issues:
+        similar_scenes = <span class="hljs-variable language_">self</span>.knowledge_manager.search_similar_scene(
+            issue_desc, script_id=state.<span class="hljs-built_in">input</span>.script_id, top_k=<span class="hljs-number">2</span>)
+        <span class="hljs-keyword">if</span> similar_scenes <span class="hljs-keyword">and</span> <span class="hljs-built_in">hasattr</span>(issue, <span class="hljs-string">&#x27;historical_solutions&#x27;</span>):
+            issue.historical_solutions = similar_scenes
+</code></pre>
+<p>两条链路的细节参数（真实配置）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">维度</th>
+<th style="text-align:left">真实值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">实例化参数</td>
+<td style="text-align:left"><code>min_similarity_score=0.7</code>、<code>top_k=3</code>（由工作流传入，类默认 0.5）</td>
+</tr>
+<tr>
+<td style="text-align:left">增强模式</td>
+<td style="text-align:left"><code>append</code>——把匹配到的模板原文拼接在原提示词尾部（<code>&quot;{original_prompt}\n\n参考优秀模板:\n{template}&quot;</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">单条匹配入口</td>
+<td style="text-align:left"><code>get_best_match</code>（top_k=1，阈值同上）</td>
+</tr>
+<tr>
+<td style="text-align:left">历史方案检索</td>
+<td style="text-align:left"><code>search_similar_scene(top_k=2)</code>，底层走 <code>ScriptKnowledgeBase.query()</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>值得注意的哑参数</strong>：剧本知识库的 <code>query()</code> 方法签名接收 <code>use_rerank</code>，但方法体内<strong>并未消费它</strong>——检索实际是&quot;手动余弦相似度全量扫描&quot;（遍历向量库逐个计算相似度后排序取 Top-K，见 <code>llama_index_knowledge.py</code>）。调用方传 <code>use_rerank=True</code> 不会真正重排。真正的 rerank（<code>BAAI/bge-reranker-large</code>）实现在另一条 <code>create_retriever_for_script</code> 检索器路径——但该路径目前只被未接线到工作流的 <code>KnowledgeRouter</code> 使用。换句话说：<strong>当前主链路上的检索&quot;没有重排序&quot;，所谓&quot;RAG 重排&quot;是未通电路径上的能力</strong>。</p>
+</blockquote>
+<p><strong>降级行为</strong>（工程上值得肯定的部分）：知识库不可用或未指定 <code>script_id</code> 时，检索入口返回空结果、不抛异常、不阻断工作流；工作流侧以 <code>is_available()</code> / <code>is_script_kb_available()</code> 前置判断——“RAG 坏了，主流程照跑”，这是合理的可用性取舍。</p>
+<blockquote>
+<p><strong>跨剧本复用的边界</strong>：模板库按 <code>script_id</code> 隔离（每个剧本独立索引目录），当前不跨剧本检索——单剧本内&quot;同类场景越跑越准&quot;，但 A 剧的经验帮不到 B 剧。这是&quot;隔离优先&quot;的取舍，也是后续可讨论的增强点。</p>
+</blockquote>
+<hr>
+<h2>六、核心策略四：提示词约束——四段上下文与模板强制</h2>
+<p>提示词是&quot;规划&quot;与&quot;生成&quot;之间的传递介质。PenShot 保证一致性的关键动作，是把事实基线以固定段落拼进提示词——不是自由发挥的文案，而是程序化拼装的&quot;全剧上下文&quot;。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Source [数据源]
+        A[global_metadata&lt;br/&gt;道具 / 服装 / 地点 / 连续性要点]
+        B[continuity_notes 片段级接力字段]
+    end
+
+    subgraph Format [_format_global_context 四段拼装]
+        S1[【本场景关键道具】&lt;br/&gt;按 appears_in 过滤，importance 标星]
+        S2[【角色服装要求】&lt;br/&gt;颜色 + 描述 + 风格 + 材质]
+        S3[【本场景地点】&lt;br/&gt;视觉线索]
+        S4[【特别注意，连续性要求】&lt;br/&gt;原文注入]
+    end
+
+    subgraph Consume [三档消费]
+        C1[split 切分：视频分段]
+        C2[shot 分镜：分镜生成]
+        C3[prompt 转换：指令生成]
+    end
+
+    A --&gt; S1 &amp; S2 &amp; S3 &amp; S4
+    S1 &amp; S2 &amp; S3 &amp; S4 --&gt; C1 &amp; C2 &amp; C3
+    B --&gt; C3
+</pre>
+<blockquote>
+<p>注意两个同名不同物的字段：<code>global_metadata.continuity_notes</code>（剧本级字符串要点，进入四段注入）；<code>VideoFragment.continuity_notes</code>（片段级字典，由分段阶段写给转换阶段直接读取 <code>main_character</code> / <code>location</code> 等键）——后者是分段与转换之间最小化的&quot;接力协议&quot;。</p>
+</blockquote>
+<p><strong>四段格式，各有细节设计</strong>（真实源码，<code>base_llm_agent._format_global_context</code>）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">段落</th>
+<th style="text-align:left">触发条件</th>
+<th style="text-align:left">格式细节与降级逻辑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">【本场景关键道具】</td>
+<td style="text-align:left"><code>key_props</code> 非空</td>
+<td style="text-align:left">传入 <code>scene_id</code> 时按 <code>appears_in</code> 过滤；<strong>无命中时降级为全量【关键道具】</strong>（<code>importance=high</code> 标 ⭐，其余标 📌）</td>
+</tr>
+<tr>
+<td style="text-align:left">【角色服装要求】</td>
+<td style="text-align:left"><code>character_outfits</code> 非空</td>
+<td style="text-align:left">不做场景过滤（全量角色都注入），格式：<code>角色：颜色色 + 描述 + 风格 + 材质</code></td>
+</tr>
+<tr>
+<td style="text-align:left">【本场景地点】</td>
+<td style="text-align:left"><code>key_locations</code> 非空</td>
+<td style="text-align:left">同样按 <code>appears_in</code> 过滤；无命中降级为【主要场景】全量</td>
+</tr>
+<tr>
+<td style="text-align:left">【特别注意，连续性要求】</td>
+<td style="text-align:left"><code>continuity_notes</code> 非空</td>
+<td style="text-align:left">剧本级连续性要点原文注入，不做加工</td>
+</tr>
+</tbody>
+</table>
+<p>为什么要有&quot;降级为全量&quot;的设计？这是防御性取舍：如果解析器没能为某场景标注道具关联，宁可给模型全量道具信息（略带噪音），也不要漏掉关键约束（信息缺口）——<strong>宁冗余、勿缺失</strong>。代价是提示词变长，但在一致性场景下这个 token 成本的权衡是划算的。</p>
+<p><strong>模板侧的强制约束</strong>：四段上下文并非&quot;参考信息&quot;，三档模板都把它定义为必须遵循的硬约束：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>video_splitter_prompt.yaml</code>：【重要约束】“如果本场景涉及【全剧上下文】中的道具，必须在分割后的片段中完整保留”</p>
+</li>
+<li class="lvl-2">
+<p><code>shot_segmenter_prompt.yaml</code>：“道具一致性：必须严格遵循【全剧上下文】中列出的关键道具描述，同一物品在不同镜头中的名称、外观、颜色、文字必须完全相同”</p>
+</li>
+<li class="lvl-2">
+<p><code>prompt_converter_prompt.yaml</code>：“参数矛盾优先采用【全剧上下文】设定”——当镜头描述与全局基线冲突时，以基线为准</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>为什么用固定段落而不是自由文本？</strong> 三个工程理由：① 程序可以逐字段拼装，不依赖 LLM 自由发挥（确定性）；② 检查器可以按段落读取文本做词表比对（可验证）；③ 按场景裁剪减少了无关信息对提示词的稀释（信噪比）。这套设计的边界同样明确：段落是&quot;文本级强约束&quot;，约束力取决于下游模型对提示词的服从程度——它降低了漂移概率，但无法给出图像级的保证。</p>
+</blockquote>
+<hr>
+<h2>七、核心策略五：状态快照——一条未通电的时间线</h2>
+<p>多智能体协作有一个天然的薄弱点：<strong>每个节点只看得到自己那一段输入</strong>。分段阶段不知道转换阶段干了什么，转换阶段也不知道前面片段的最终状态。状态快照就是为这个断点设计的——用时间线保存&quot;每一刻的连续状态&quot;，让任意片段的生成都能回放到它的前驱状态。</p>
+<p>数据结构与算法已经完整落地（<code>continuity_guardian_models.py</code>），核心是两个模型：</p>
+<pre class="hljs"><code><span class="hljs-comment"># continuity_guardian_models.py（真实源码 · 结构摘要，非逐行）</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">StateSnapshot</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    timestamp: <span class="hljs-built_in">float</span>
+    snapshot_id: <span class="hljs-built_in">str</span>            <span class="hljs-comment"># 必填</span>
+    character_states: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, CharacterState]
+    scene_state: <span class="hljs-type">Optional</span>[SceneState]
+    global_state: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]   <span class="hljs-comment"># 默认含 current_scene / time_elapsed / narrative_phase / emotional_tone</span>
+    references: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]     <span class="hljs-comment"># 默认含 fragment_id / shot_id / element_ids</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">StateTimeline</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    snapshots: <span class="hljs-type">List</span>[StateSnapshot]
+    <span class="hljs-comment"># add_snapshot：追加后按时间排序</span>
+    <span class="hljs-comment"># get_snapshot_at_time：按时间查询（语义见下文）</span>
+    <span class="hljs-comment"># get_latest_snapshot / get_character_evolution / record_evolution</span>
+    <span class="hljs-comment"># tolerance_settings：位置 medium / 外观 low / 时间 high / 颜色 medium</span>
+</code></pre>
+<p>检查器还提供了创建入口 <code>take_snapshot</code>——从 <code>parsed_script.characters</code> 构建 <code>CharacterState</code>（外观取角色描述、情绪初始化为 <code>neutral</code>），并挂到时间线上。设计上它应该由工作流在片段完成后调用。</p>
+<p><strong>但这条时间线没有通电</strong>：<code>take_snapshot</code> 没有任何调用点，<code>StateTimeline</code> 实例只活在检查器内部，没有工作流节点读取它，<code>StateSnapshot</code> 也不会出现在任何提示词里。当前片段间的&quot;状态接力&quot;，实际靠的是前文提到的文本通道（<code>continuity_notes</code> + 四段上下文）——它传递的是&quot;设定量&quot;（角色穿什么、道具是什么），而不是&quot;瞬时状态&quot;（角色的姿态、位置、情绪强度）。</p>
+<blockquote>
+<p><strong>接线时要注意的一个语义细节</strong>：<code>get_snapshot_at_time(t)</code> 的返回语义不是&quot;t 时刻之前最近的历史状态&quot;，而是&quot;首个时间戳 ≥ t 的快照&quot;（找不到则兜底返回最后一个）——真实代码如下，注释声称的&quot;二分查找&quot;实为线性扫描：</p>
+<pre class="hljs"><code><span class="hljs-comment"># continuity_guardian_models.py L345-354（真实源码）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_snapshot_at_time</span>(<span class="hljs-params">self, timestamp: <span class="hljs-built_in">float</span></span>) -&gt; <span class="hljs-type">Optional</span>[StateSnapshot]:
+    <span class="hljs-string">&quot;&quot;&quot;获取指定时间的快照&quot;&quot;&quot;</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable language_">self</span>.snapshots:
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">None</span>
+
+    <span class="hljs-comment"># 二分查找最接近的快照</span>
+    <span class="hljs-keyword">for</span> i, snapshot <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(<span class="hljs-variable language_">self</span>.snapshots):
+        <span class="hljs-keyword">if</span> snapshot.timestamp &gt;= timestamp:
+            <span class="hljs-keyword">return</span> snapshot
+    <span class="hljs-keyword">return</span> <span class="hljs-variable language_">self</span>.snapshots[-<span class="hljs-number">1</span>]
+</code></pre>
+<p>这类细节在快照真正参与生成前需要先澄清，否则&quot;回放前驱状态&quot;可能取到未来状态。</p>
+<p><strong>为什么值得补课</strong>：快照是三件事的共同前提——锚点的生效区间判定、连续性检查的时间对齐、以及&quot;片段 N 承接片段 N-1 结束状态&quot;的提示词注入。没有它，多智能体的&quot;共享状态&quot;始终缺一块黑板。</p>
+</blockquote>
+<hr>
+<h2>八、核心策略六：连续性守护——六项词表检查与修复回流的断点</h2>
+<p>连续性守护是链路上的最后一道关卡：所有片段生成完成、质量审查之后，它对整个片段序列做一轮跨片段检查。它的检查方式是<strong>六项词表级规则</strong>（真实源码 <code>check_all_continuity</code>）——逐镜头 / 逐片段扫描比对，而不是视觉模型或语义模型分析。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Input [检查输入 context]
+        I1[parsed_script 剧本]
+        I2[shot_sequence 镜头序列]
+        I3[fragment_sequence 片段序列]
+        I4[instructions 提示词]
+    end
+
+    subgraph Check [六项规则检查]
+        C1[角色连续性&lt;br/&gt;缺镜头 / 外观词变化]
+        C2[场景连续性&lt;br/&gt;场景跳变 / 跳变频率]
+        C3[动作连续性&lt;br/&gt;动作词变化]
+        C4[风格连续性&lt;br/&gt;style 字段统计]
+        C5[时间连续性&lt;br/&gt;间隙 / 重叠]
+        C6[道具连续性&lt;br/&gt;持拿动词变化]
+    end
+
+    subgraph Decision [判定与处置]
+        D1{passed 且 total_issues 为 0}
+        D2[检索历史方案&lt;br/&gt;historical_solutions]
+        D3[生成修复参数&lt;br/&gt;按来源节点分组]
+        D4{重试次数超限}
+        D5[转人工复核&lt;br/&gt;needs_human_review]
+    end
+
+    I1 &amp; I2 &amp; I3 &amp; I4 --&gt; Check
+    Check --&gt; D1
+    D1 --&gt;|通过| O1[放行]
+    D1 --&gt;|有问题| D2 --&gt; D3 --&gt; D4
+    D4 --&gt;|未超限| O2[意图：回流上游修复]
+    D4 --&gt;|超限| D5
+</pre>
+<p>每项检查的触发条件、严重级与&quot;归因节点&quot;（真实源码）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查项</th>
+<th style="text-align:left">触发条件（节选）</th>
+<th style="text-align:left">问题类型 / 严重级</th>
+<th style="text-align:left"><code>source_stage</code> 归因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色连续性</td>
+<td style="text-align:left">剧中带台词角色无对应镜头；外观词类别（服装 / 发型 / 配饰）与上一片段不同</td>
+<td style="text-align:left"><code>CHARACTER_MISSING</code> / MAJOR；<code>CHARACTER_APPEARANCE_CHANGE</code> / WARNING</td>
+<td style="text-align:left">SEGMENT_SHOT；CONVERT_PROMPT</td>
+</tr>
+<tr>
+<td style="text-align:left">场景连续性</td>
+<td style="text-align:left">相邻镜头场景跳变且切换前后镜型相同；跳变数超过镜头数 30%</td>
+<td style="text-align:left"><code>SCENE_JUMP</code> / WARNING；<code>SCENE_TOO_FREQUENT</code> / MODERATE</td>
+<td style="text-align:left">SEGMENT_SHOT</td>
+</tr>
+<tr>
+<td style="text-align:left">动作连续性</td>
+<td style="text-align:left">角色动作关键词（走 / 跑 / 跳 / 转身 / 坐下 / 站起 / 拿起 / 放下）与上一镜头不同</td>
+<td style="text-align:left"><code>ACTION_BREAK</code> / MODERATE</td>
+<td style="text-align:left">SEGMENT_SHOT</td>
+</tr>
+<tr>
+<td style="text-align:left">风格连续性</td>
+<td style="text-align:left">片段 <code>style</code> 去重后超过 2 种</td>
+<td style="text-align:left"><code>STYLE_INCONSISTENT</code> / MODERATE</td>
+<td style="text-align:left">CONVERT_PROMPT</td>
+</tr>
+<tr>
+<td style="text-align:left">时间连续性</td>
+<td style="text-align:left">相邻片段首尾时间差超过 0.1 秒（间隙 MAJOR / 重叠 ERROR）</td>
+<td style="text-align:left"><code>TIME_GAP</code> / <code>TIME_OVERLAP</code></td>
+<td style="text-align:left">SPLIT_VIDEO</td>
+</tr>
+<tr>
+<td style="text-align:left">道具连续性</td>
+<td style="text-align:left">角色持拿动词（拿 / 举 / 抱 / 提 / 端 / 持 / 握）前后变化</td>
+<td style="text-align:left"><code>PROP_CHANGE</code> / WARNING</td>
+<td style="text-align:left">PARSE_SCRIPT</td>
+</tr>
+</tbody>
+</table>
+<p>几个值得注意的工程细节（均来自真实源码）：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>问题去重靠签名</strong>：<code>issue_type + fragment_id + scene_id + severity + position + description[:100]</code> 组成唯一签名，同一问题不重复上报；问题描述统一截断到 500 字符。</p>
+</li>
+<li class="lvl-2">
+<p><strong>历史方案只是附加信息</strong>：检查出问题后，若剧本知识库可用，会按问题描述检索 <code>top_k=2</code> 的历史方案并挂到 <code>issue.historical_solutions</code>——它不参与通过与否的判定。</p>
+</li>
+<li class="lvl-2">
+<p><strong>放行条件是双口径</strong>：工作流侧要求 <code>check_result.passed</code> 与 <code>total_issues == 0</code> <strong>同时满足</strong>才放行；<code>passed</code> 由检查器内部计数决定（critical &gt; 0 或 major &gt; 3 时为 False）。两处口径的设计并不完全重合，这是实现上的历史痕迹。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>修复回流：全链路上最值得知道的断点</strong>。发现问题后，守护节点确实做了完整的三步动作：① 按问题类型生成修复参数并写入 <code>state.domain.repair_params[节点]</code>；② 置 <code>needs_continuity_repair = True</code>；③ 调 <code>_route_to_fix_stage</code> 试图把 <code>current_node</code> 改写回上游四节点之一。四个上游节点（PARSE / SEGMENT / SPLIT / CONVERT）的开头也确实写好了消费逻辑（读本阶段修复参数 → <code>apply_repair_params</code>）。</p>
+<p>但图边的决策函数 <code>decide_after_continuity</code> 读取的是 <code>state.continuity_issues</code>——而问题实际写在 <code>state.domain.continuity_issues</code>，顶层属性不存在，<code>getattr(..., [])</code> 静默取到空列表，决策恒为 SUCCESS，流程直接进入输出阶段。<strong>这意味着：检查报告了问题、生成了修复参数、标记了&quot;需要修复&quot;，但工作流不会真的回到上游重跑——修复意图在最后一步没有接通</strong>。（修法方向：修正读取路径 + 为图映射补 <code>NEEDS_RETRY</code> 键。）</p>
+<p>另一条兜底路径是通的：重试计数超过 <code>max_continuity_retries</code> 时置 <code>needs_human_review = True</code>，交给人工干预节点（<code>HumanIntervention</code>，默认 180 秒超时——超时会记录&quot;人工输入超时，使用默认继续决策&quot;并放行，而不是卡死流水线）。</p>
+</blockquote>
+<hr>
+<h2>九、核心策略七：质量审计——扣分制评分与&quot;三套口径&quot;考证</h2>
+<p>关于质量审计，先纠正一个常见传言：PenShot 并没有&quot;角色 25% + 场景 25% + 道具 20% + 动作 15% + 风格 15%&quot;这样的维度加权模型，也没有 <code>&gt;=80 通过 / &gt;=60 警告 / &lt;60 失败</code>的三档阈值。真实机制是<strong>按问题严重级扣分的百分制 + 按最严重问题存在性判定的六档状态</strong>。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Review [双审查器]
+        R1[规则审查&lt;br/&gt;五项基础规则]
+        R2[LLM 深度审查&lt;br/&gt;语义级问题]
+    end
+
+    subgraph Merge [合并与后处理]
+        M1[去重合并&lt;br/&gt;含各阶段上报问题]
+        M2[扣分制评分&lt;br/&gt;100 减严重级权重]
+        M3[存在性判定状态&lt;br/&gt;按最严重问题分档]
+    end
+
+    subgraph Gate [工作流闸门映射]
+        G1[PASSED 到 SUCCESS]
+        G2[MINOR 到 VALID]
+        G3[MODERATE / MAJOR 到 NEEDS_REPAIR]
+        G4[CRITICAL 到重试或人工]
+    end
+
+    R1 &amp; R2 --&gt; M1 --&gt; M2 --&gt; M3 --&gt; Gate
+</pre>
+<p><strong>双审查器结构</strong>：审计节点先跑规则审查，再跑 LLM 深度审查（<code>enable_llm</code> 默认开启），两份报告与各阶段上报的问题合并去重：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">审查器</th>
+<th style="text-align:left">检查内容</th>
+<th style="text-align:left">实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">规则审查（rule_quality_auditor）</td>
+<td style="text-align:left">五项基础规则：片段时长、提示词非空、提示词长度、片段数量、模型支持</td>
+<td style="text-align:left">纯代码规则</td>
+</tr>
+<tr>
+<td style="text-align:left">LLM 深度审查（llm_quality_auditor）</td>
+<td style="text-align:left">语义级问题：描述矛盾、风格漂移、指令可执行性等</td>
+<td style="text-align:left">LLM 逐片段分析（可关闭）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>评分与状态判定（实际生效口径的真实源码）</strong>：</p>
+<pre class="hljs"><code><span class="hljs-comment"># quality_auditor_agent.py L77-84（真实源码）：严重级扣分权重</span>
+<span class="hljs-variable language_">self</span>.severity_weights = {
+    SeverityLevel.INFO: <span class="hljs-number">0</span>, SeverityLevel.WARNING: <span class="hljs-number">5</span>, SeverityLevel.MODERATE: <span class="hljs-number">10</span>,
+    SeverityLevel.MAJOR: <span class="hljs-number">25</span>, SeverityLevel.CRITICAL: <span class="hljs-number">40</span>, SeverityLevel.ERROR: <span class="hljs-number">60</span>,
+}
+
+<span class="hljs-comment"># quality_auditor_agent.py L503-530（真实源码 · 节选）：后处理重算分数与状态</span>
+base_score = <span class="hljs-number">100.0</span>
+<span class="hljs-keyword">for</span> violation <span class="hljs-keyword">in</span> report.violations:
+    penalty = <span class="hljs-variable language_">self</span>.severity_weights.get(severity_str, <span class="hljs-number">5</span>)
+    base_score -= penalty
+report.score = <span class="hljs-built_in">max</span>(<span class="hljs-number">0.0</span>, <span class="hljs-built_in">min</span>(<span class="hljs-number">100.0</span>, base_score))
+
+<span class="hljs-keyword">if</span> error_count &gt; <span class="hljs-number">0</span>:
+    report.status = AuditStatus.FAILED
+<span class="hljs-keyword">elif</span> critical_count &gt; <span class="hljs-number">0</span>:
+    report.status = AuditStatus.CRITICAL_ISSUES
+<span class="hljs-keyword">elif</span> major_count &gt; <span class="hljs-number">0</span>:
+    report.status = AuditStatus.MAJOR_ISSUES
+<span class="hljs-keyword">elif</span> moderate_count &gt; <span class="hljs-number">0</span>:
+    report.status = AuditStatus.MODERATE_ISSUES
+<span class="hljs-keyword">elif</span> warning_count &gt; <span class="hljs-number">0</span>:
+    report.status = AuditStatus.MINOR_ISSUES
+<span class="hljs-keyword">else</span>:
+    report.status = AuditStatus.PASSED
+</code></pre>
+<p>工作流侧的闸门映射（真实源码，<code>workflow_decision.py</code> L459-469）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">审计状态</th>
+<th style="text-align:left">工作流决策</th>
+<th style="text-align:left">附带动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">PASSED</td>
+<td style="text-align:left">SUCCESS</td>
+<td style="text-align:left">片段放行 + 成功提示词入库</td>
+</tr>
+<tr>
+<td style="text-align:left">MINOR_ISSUES</td>
+<td style="text-align:left">VALID</td>
+<td style="text-align:left">继续，但建议关注</td>
+</tr>
+<tr>
+<td style="text-align:left">MODERATE_ISSUES / MAJOR_ISSUES</td>
+<td style="text-align:left">NEEDS_REPAIR</td>
+<td style="text-align:left">回流修复</td>
+</tr>
+<tr>
+<td style="text-align:left">CRITICAL_ISSUES</td>
+<td style="text-align:left">NEEDS_RETRY 或 NEEDS_HUMAN</td>
+<td style="text-align:left">按重试次数决定</td>
+</tr>
+<tr>
+<td style="text-align:left">NEEDS_HUMAN</td>
+<td style="text-align:left">NEEDS_HUMAN</td>
+<td style="text-align:left">auto 模式自动转为 NEEDS_RETRY</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>一个需要提醒读者的源码考证</strong>：项目里同一个&quot;评分 / 状态&quot;职责存在<strong>三套实现</strong>，阅读时极易看错——</p>
+<ol>
+<li class="lvl-3"><strong>内部审计器一套</strong>（<code>base_quality_auditor.py</code>）：<code>pass_rate</code> 制评分（0-1）+ 八级优先序状态判定，写进中间报告；</li>
+<li class="lvl-3"><strong>模型层一套</strong>（<code>quality_auditor_models.py</code>）：<code>calculate_weighted_score</code>（扣分制，与上面权重一致）+ <code>determine_status_from_score</code>（<code>≥90 / ≥75 / ≥60 / ≥40 / ≥20</code> 六档分数阈值）——但它<strong>没有任何调用方</strong>，属于未接线方法；</li>
+<li class="lvl-3"><strong>实际生效一套</strong>（<code>quality_auditor_agent.py</code> 后处理）：扣分制评分 + <strong>存在性判定</strong>（有 major 问题就判 MAJOR_ISSUES，不看分数阈值）。</li>
+</ol>
+<p>最终生效的是第三套（第四套 <code>_calculate_weighted_score</code> 方法在 agent 内也未被调用）。这是快速演化期的典型痕迹：口径分裂在三处代码里，值得在后续重构中收敛到单一真源。</p>
+</blockquote>
+<p><strong>异常兜底（fail-safe 的保守选择）</strong>：若审计过程本身抛异常（如 LLM 调用失败），<code>qa_process</code> 返回回退报告：状态 FAILED、分数 0.0、结论&quot;质量审查失败，请检查系统状态后重试&quot;。这是<strong>保守失败</strong>而不是静默放行——审计器故障时宁可让工作流走失败路径，也不输出未经审查的结果。这个选择与 RAG 的&quot;坏了就降级&quot;形成对照：知识库是可选增强，可以降级；质量闸门是最后防线，不能。</p>
+<hr>
+<h2>十、规划蓝图：渐进式生成与双向约束——为什么它们进不了当前代码</h2>
+<blockquote>
+<p><strong>重要声明</strong>：从本章开始，内容性质发生变化——<strong>前九章的七个策略都能在源码中找到落点（无论是否通电），本章与下一章的机制在源码中零命中</strong>（检索 <code>情绪曲线|双向约束|关键帧锁定|运动插值|构图模板|镜头语法|对抗生成</code> 等关键词，<code>video-shot-agent</code> 全仓库无任何匹配）。它们是项目演进规划中的候选方向，不是现状描述。本文保留它们，是因为&quot;设计为什么暂时落不了地&quot;本身有工程参考价值——但读者不应期待任何一条已在运行。</p>
+</blockquote>
+<h3>渐进式生成：一个被成本否决的优化</h3>
+<p>渐进式生成的设计意图是：先锁定关键帧（情绪高潮、动作转折、出场/退场），再以关键帧为锚点向时间轴两侧扩展生成过渡片段，让最重要的片段优先定型，次要片段围绕它们调整。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Keyframe[关键帧生成]
+        K1[情绪高潮帧]
+        K2[动作转折帧]
+        K3[出场/退场帧]
+    end
+
+    subgraph Expand[向两侧扩展]
+        E1[从前一关键帧生成过渡]
+        E2[向后一关键帧生成过渡]
+        E3[填补中间空白]
+    end
+
+    Keyframe --&gt; Expand
+</pre>
+<p>这个思路本身是成熟的（视频编码、动画分镜都这么干），但把它搬到 LLM 分镜流水线上有硬性障碍：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>关键帧识别没有可靠信号源</strong>。要判断哪一帧是&quot;情绪高潮&quot;，需要情绪曲线或叙事张力评分——代码里两者都不存在，剧本解析产出的是结构化事实（角色、场景、道具、对白），不含任何量化情绪信号。</p>
+</li>
+<li class="lvl-3">
+<p><strong>多处生成会放大 token 成本</strong>。渐进式生成意味着同一批片段要经历&quot;先关键帧、再过渡、再回填&quot;的多轮 LLM 调用，而当前设计是<strong>一次分镜 + 一次分段 + 一次转换</strong>的线性管线，成本可控性优先于生成顺序优化。</p>
+</li>
+<li class="lvl-3">
+<p><strong>收益兑现依赖下游能力</strong>。即便生成了顺序更优的片段，最终成片一致性仍取决于视频生成模型本身——而工具侧能做的是把约束写清楚，顺序优化的边际收益不明确。</p>
+</li>
+</ol>
+<p>当前代码的真实做法是：分镜阶段由 LLM 一次性产出完整镜头列表，时长分配在 <code>llm_video_splitter</code> 中按规则计算（见《核心实现》中分段逻辑），没有关键帧优先级的概念。这不是偷懒，而是在&quot;线性成本 + 可预测性&quot;与&quot;顺序优化 + 成本翻倍&quot;之间选了前者。</p>
+<h3>双向约束：当前实现其实是&quot;单向向后看&quot;</h3>
+<p>双向约束的设计意图是：生成片段 N 时同时加载 N-1 与 N+1 的约束，要求片段 N 始于前一状态、止于可衔接后一状态，消除&quot;往返不一致&quot;。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Past[过去约束]
+        P1[前一帧的角色位置]
+        P2[前一帧的服装状态]
+        P3[前一帧的光影参数]
+    end
+
+    subgraph Future[未来约束]
+        F1[后一帧的角色位置]
+        F2[后一帧的服装状态]
+        F3[后一帧的光影参数]
+    end
+
+    subgraph Current[当前生成]
+        C1[同时满足]
+        C2[位置在合理路径上]
+        C3[状态连续变化]
+    end
+
+    Past --&gt; Current
+    Future --&gt; Current
+</pre>
+<p>仔细对照当前实现，会发现真实约束模式是<strong>单向的</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>约束方向</th>
+<th>规划口径</th>
+<th>当前实现的真实情况</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>向后看（片段 N-1）</td>
+<td>加载前一状态</td>
+<td>部分具备：<code>global_metadata</code> 全剧上下文与模板约束对每个片段生效，但<strong>不携带片段级的前一状态</strong>（如&quot;上一镜角色停在哪里&quot;）</td>
+</tr>
+<tr>
+<td>向前看（片段 N+1）</td>
+<td>加载后一状态</td>
+<td><strong>完全不具备</strong>：提示词转换器逐片段独立处理，拿不到&quot;下一片段开始状态&quot;的结构化输入</td>
+</tr>
+<tr>
+<td>状态交接</td>
+<td>片段间显式传递</td>
+<td>依赖 LLM 在生成提示词时自行从上下文推断，无程序化交接</td>
+</tr>
+</tbody>
+</table>
+<p>为什么向前看这么难？因为它要求管线从&quot;逐片段流式处理&quot;改为&quot;全片协同规划&quot;——每个片段的生成都要等待邻接片段的约束就绪，这会让管线从线性变成图状调度，复杂度和重试成本都上一个台阶。而修复手段（连续性守护 + 回流）本质上是在为&quot;单向约束&quot;兜底：允许先把片段生成出来，再用规则检查发现断裂并回流修复。<strong>“事后检查 + 回流&quot;替代&quot;事前双向约束”，是当前架构最核心的工程妥协</strong>。</p>
+<h3>策略时序协同：一张依赖未通电零件的地图</h3>
+<p>原规划还给过一张五阶段策略协同图（剧本/规划/生成/后处理/验证），其中标注的交互是：三视图 → 光照锚点、连续性锚点 → 双向约束、情绪曲线 → 提示词生成、快照机制 → 运动插值。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Timing[规划中的五阶段策略时序]
+        TI1[剧本阶段&lt;br/&gt;情绪曲线 因果链 色彩管理]
+        TI2[规划阶段&lt;br/&gt;构图模板 镜头语法 景别序列]
+        TI3[生成阶段&lt;br/&gt;双向约束 关键帧锁定 光照锚点]
+        TI4[后处理阶段&lt;br/&gt;运动插值 色彩匹配 阴影统一]
+        TI5[验证阶段&lt;br/&gt;对抗生成 渐进验证 一致性投票]
+    end
+
+    subgraph Interaction[规划中的策略交互]
+        IN1[三视图 → 光照锚点]
+        IN2[连续性锚点 → 双向约束]
+        IN3[情绪曲线 → 提示词生成]
+        IN4[快照机制 → 运动插值]
+    end
+
+    Timing --&gt; Interaction
+</pre>
+<p>对照前九章的考证，这张图有一个需要点破的问题：<strong>它的四条交互边里，三条的上游零件本身没有通电</strong>——三视图零命中（策略一）、连续性锚点零引用（策略二）、快照机制零调用（策略五）。用未实现的机制去支撑另一批未实现的机制，是技术规划阶段常见的&quot;蓝图嵌套&quot;，看着完备，实则地基悬空。</p>
+<p>如果未来重启这些方向，合理的接线顺序应该是自底向上：先让快照机制真正被调用（它是几乎所有时间轴类策略的前置）、再补时间语义与锚点生效逻辑、最后才是渐进式生成与双向约束这类改变管线拓扑的重构。跳过底层直接做上层优化，只会得到更多&quot;实现了但没接线&quot;的代码。</p>
+<hr>
+<h2>十一、规划蓝图：十五个候选机制与落地障碍评估</h2>
+<p>原设计还列过一份&quot;补充策略&quot;清单，按视觉/时序/语义/结构/优化五个维度，给出十五个一致性增强候选机制。与第十章同理，这些机制在源码中同样<strong>零命中</strong>——但比一句&quot;未实现&quot;更有用的，是逐类评估它们<strong>为什么停在了规划阶段</strong>：哪些缺数据（关键帧识别没有信号源）、哪些缺硬件（帧级插值/画质处理不在工具层）、哪些缺基础设施（时间语义未接线）、哪些其实已经被现有机制以粗糙方式部分覆盖。</p>
+<p>先看这份规划的全景图（注意：这是规划蓝图，不是现状——图中七个&quot;已有策略&quot;里，三视图、锚点、快照三项在前文已考证为未落地或未接线）：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Existing [七个核心策略（真实落地度不一）]
+        E1[三视图机制]
+        E2[连续性锚点]
+        E3[RAG知识库]
+        E4[结构化提示词]
+        E5[快照机制]
+        E6[质量审计]
+        E7[连续性守护]
+    end
+
+    subgraph Additional [补充策略（全部规划中）]
+        direction TB
+        subgraph Visual [视觉一致性]
+            V1[色彩管理策略]
+            V2[光照锚点策略]
+            V3[构图模板策略]
+        end
+        subgraph Temporal [时序一致性]
+            T1[运动插值策略]
+            T2[关键帧锁定策略]
+            T3[时间线对齐策略]
+        end
+        subgraph Semantic [语义一致性]
+            S1[情绪曲线策略]
+            S2[节奏图谱策略]
+            S3[因果链追踪策略]
+        end
+        subgraph Structural [结构一致性]
+            ST1[镜头语法策略]
+            ST2[转场规范策略]
+            ST3[景别序列策略]
+        end
+        subgraph Optimization [优化策略]
+            O1[对抗生成策略]
+            O2[渐进式生成策略]
+            O3[双向约束策略]
+        end
+    end
+
+    Existing --&gt; Additional
+</pre>
+<h3>视觉一致性组：色彩管理、光照锚点、构图模板</h3>
+<p>三个机制的设计意图高度相似：把&quot;色彩/光照/构图&quot;从 LLM 的自由发挥转为<strong>显式锚点或模板</strong>。色彩管理要建立场景色彩锚点（主色调、辅助色、色温、饱和度），在生成时写入提示词；光照锚点要记录光源方向、强度、类型，并响应剧本里的时间推进（午后→傍晚）；构图模板要为过肩、正反打、全景、特写等镜头类型预定义角色位置比例、视线留白、景深范围。</p>
+<p>对照当前实现，能给出一个精确的评估：</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>现有最接近的落点</th>
+<th>真实缺口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>色彩管理</td>
+<td>提示词与场景/道具字段中的色彩描述词（如 <code>color</code> 字段）</td>
+<td>无结构化色彩参数（色温/饱和度不参与任何校验）；无后处理色彩直方图匹配——工具链到&quot;生成提示词&quot;为止，不触碰视频帧</td>
+</tr>
+<tr>
+<td>光照锚点</td>
+<td><code>global_metadata</code> 与场景描述中的光照文本（如&quot;午后阳光&quot;）</td>
+<td>参数化光照（方向/强度）无数据来源：剧本解析产出自然语言，不产参数</td>
+</tr>
+</tbody>
+</table>
+<p>| 构图模板 | 分镜提示词模板中的景别/镜头角度约束文案 | 无模板库、无参数化构图（比例/留白/景深）；模板是文本约束，不是可执行规范 |</p>
+<p>共同障碍就一条：<strong>这三个机制都要求&quot;结构化视觉参数&quot;在管线中流转，而当前管线全程是自然语言描述</strong>。加字段容易，但参数的来源（从剧本里推色温？从场景描述里推光源角度？）和消费者（谁按参数校验？）都不存在。这是典型的&quot;表示能力先行、推理能力缺失&quot;——先把参数格式定下来，反而增加了无意义的维护面。</p>
+<h3>时序一致性组：运动插值、关键帧锁定、时间线对齐</h3>
+<p>时序组的三个机制都指向&quot;时间轴上的状态连续&quot;：运动插值要识别片段间的动作断裂并补中间状态；关键帧锁定要对重要画面（首次出场、道具特写）做特征向量约束与相似度验证；时间线对齐要让全片共享统一时间语义。</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>现有最接近的落点</th>
+<th>真实缺口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运动插值</td>
+<td>连续性守护的 ACTION_BREAK 检查（八词表识别&quot;跑跳转身坐下站起拿起放下&quot;的动作断裂并回流）</td>
+<td>词表匹配只能发现&quot;动作词缺失&quot;，不做帧级姿态衔接；工具层不产生中间帧</td>
+</tr>
+</tbody>
+</table>
+<p>| 关键帧锁定 | 无 | 需要对生成画面做特征提取与相似度计算——依赖视觉模型接入；角色外观基线（策略一）已在同一障碍上搁浅 |<br>
+| 时间线对齐 | 片段 duration 字段 + TIME_GAP/TIME_OVERLAP 检查（容差 0.1 秒） | 时间语义只有时长级校验，没有状态快照做底（快照时间线未接线，见策略五） |</p>
+<p>时序组暴露的是一个层次问题：<strong>词表级检查（已实现）→ 状态级交接（未实现）→ 帧级处理（不在工具层）</strong>。ACTION_BREAK 检查证明了&quot;发现问题&quot;可以做得很轻，但&quot;修复问题&quot;需要的能力超出了提示词工具链的边界——它能改写文本，不能合成画面。</p>
+<h3>语义一致性组：情绪曲线、节奏图谱、因果链追踪</h3>
+<p>原设计对这三个机制的描述最具体：情绪曲线要从剧本标注 0-10 的情绪强度并写入提示词；节奏图谱要用快慢分布指导片段时长；因果链要提取&quot;敲门→开门&quot;式的事件链并检测断裂。</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>现有最接近的落点</th>
+<th>真实缺口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>情绪曲线</td>
+<td>风格一致性检查（STYLE_INCONSISTENT，风格去重＞2 报 MODERATE）覆盖了&quot;情绪氛围&quot;的一部分</td>
+<td>剧本解析无情绪量化信号；&quot;上一秒悲伤下一秒大笑&quot;这类跳跃在词表层面无法判定</td>
+</tr>
+</tbody>
+</table>
+<p>| 节奏图谱 | 片段时长由 <code>llm_video_splitter</code> 按规则计算与分配 | 无法判定&quot;紧张场景应短切&quot;的语义级节奏；剪辑点对齐属于后期软件职责，不在管线内 |</p>
+<p>| 因果链追踪 | 无 | 事件图建模超出当前解析粒度（场景/角色/动作/对白），无法检测&quot;只有敲门没有开门&quot; |</p>
+<p>语义组的困境是<strong>信号源缺失</strong>：三个机制都需要比&quot;结构化事实&quot;更高一层的理解——情绪强度、叙事节奏、因果图，而剧本解析的产出不含任何一项。要补这一层，要么让解析阶段调用 LLM 做二次标注（成本与一致性的新问题），要么引入专门的叙事分析模型（超出项目边界）。</p>
+<h3>结构一致性组：镜头语法、转场规范、景别序列</h3>
+<p>结构组管的是&quot;电影语言&quot;层面的规范：180 度轴线、视线匹配、动作连贯（镜头语法），片段间的转场方式（转场规范），景别的变化规律（景别序列）。</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>现有最接近的落点</th>
+<th>真实缺口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>镜头语法</td>
+<td>分镜提示词模板对镜头角度/景别的约束文案</td>
+<td>180 度轴线与视线匹配的空间判定需要镜头间空间推理；LLM 文本校验做不到可靠的空间一致性判断</td>
+</tr>
+</tbody>
+</table>
+<p>| 转场规范 | 无显式实现；片段衔接依赖生成模型自身的连续性 | 转场信息在视频生成模型端，提示词只能描述不能控制 |<br>
+| 景别序列 | 连续性守护的 SCENE_JUMP 检查（前后镜型相同报 WARNING） | 检查防的是&quot;重复&quot;，不是&quot;跨度&quot;——&quot;全景→中景→特写&quot;这类序列规律未建模 |</p>
+<p>其中景别序列的现状值得多说一句：SCENE_JUMP 检查其实已经是&quot;景别序列&quot;的雏形——它用镜头类型字段做序列级判定，只是判据是&quot;重复罚&quot;而不是&quot;跳变罚&quot;。要升级为完整机制，只需把判据从&quot;相邻相同&quot;扩展为&quot;相邻跨度过大&quot;，<strong>这是十五个机制里改造成本最低的一个</strong>。</p>
+<h3>优化组：提示词向后兼容、对抗生成（与第十章的两个机制）</h3>
+<p>优化组在原规划全景图里列了三项：对抗生成、渐进式生成、双向约束。后两项已在第十章分析过（成本否决与管线拓扑约束），这里补充另外两项。</p>
+<p><strong>提示词向后兼容策略</strong>：设计意图是&quot;导演决定让角色换装，系统自动把变更传播到之后的所有片段，并在提示词中生效&quot;。这个方向是原蓝图里唯一不需要新硬件、不需要新模型的候选机制——片段之间的依赖关系理论上可以从数据结构恢复（片段属于镜头、镜头属于场景、场景共享角色）。但真实的缺口不在传播，而在<strong>失效重算</strong>：当前对某个片段 prompt 的人工修改，不会自动刷新后续片段的提示词；修改后重跑修复，靠的是节点重试与回流，而不是依赖图驱动的精准失效。知识库侧同理：现有接口只有&quot;新增与检索&quot;，库中已入库的历史模板不会随上游修改退出检索，也没有失效标记机制。</p>
+<p><strong>对抗生成策略</strong>：设计意图是同一片段用多个模型或参数版本生成，取一致性最高的结果。以当前成本结构（一集短剧十几个片段、每片段多次调用），多模型投票会把生成成本翻倍，而项目连&quot;单模型生成结果的质量评估&quot;都还停留在提示词层面（没有画面级评估），投票所需的特征相似度计算无从谈起。这条机制的搁置原因最直白：<strong>收益无法度量，成本却可即时计量</strong>。</p>
+<h3>规划章节的诚实总结</h3>
+<p>把两章的规划内容合起来看，可以给出一个&quot;落地成本分级&quot;（另有一个可核对的细节：原规划图列出 15 项机制，但正文只展开了 12 项——“时间线对齐”&quot;转场规范&quot;有图无文，而&quot;提示词向后兼容&quot;有文无图；本文按 16 项口径合并整理）：</p>
+<table>
+<thead>
+<tr>
+<th>分级</th>
+<th>机制</th>
+<th>判断依据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>改造成本低（值得优先）</td>
+<td>景别序列检查、提示词失效重算</td>
+<td>数据与检查框架已存在，只需扩展判据/增加依赖追踪</td>
+</tr>
+<tr>
+<td>等基础设施</td>
+<td>时间线对齐、快照驱动类机制</td>
+<td>前置依赖：快照机制先接线</td>
+</tr>
+<tr>
+<td>等模型能力</td>
+<td>关键帧锁定、对抗生成、视觉级校验</td>
+<td>前置依赖：视觉特征提取/多模型接入</td>
+</tr>
+<tr>
+<td>等数据/信号源</td>
+<td>情绪曲线、因果链追踪、运动插值</td>
+<td>前置依赖：叙事分析信号或帧级处理能力</td>
+</tr>
+<tr>
+<td>纯蓝图</td>
+<td>色彩/光照/构图的参数化、镜头语法、转场规范</td>
+<td>需要重构提示词管线的表示层，当前无此规划</td>
+</tr>
+</tbody>
+</table>
+<p>这份分级本身也是本文的一个立场：<strong>规划不是问题，&quot;把规划当现状&quot;才是问题</strong>。一份可信的技术方案，应该能让读者一眼分清哪些在跑、哪些在等什么条件——而不是笼统地宣称&quot;层层设防、高可靠性保证体系&quot;。</p>
+<hr>
+<h2>十二、故障实战：七个真实断点与降级场景</h2>
+<p>前文的考证如果只落成一句&quot;有些机制没接线&quot;，就浪费了。本节把七个最有代表性的场景按&quot;发生什么 → 为什么 → 系统如何处理 → 如何恢复&quot;展开。它们分为三类：<strong>断链型</strong>（零件齐了、电线错位）、<strong>降级型</strong>（设计上主动选择放行或失败）、<strong>口径型</strong>（同一职责存在多套实现）。所有场景均来自源码级考证，非设想。</p>
+<h3>故障一：连续性检查报了问题，修复却没有发生</h3>
+<p><strong>发生什么</strong>：某次运行中，连续性守护在分段阶段检出 MAJOR 级问题（如&quot;角色在片段 3 消失&quot;），日志里问题记录完整，但最终输出仍带着这些问题——没有修复，也没有失败，悄无声息。</p>
+<p><strong>为什么</strong>：守护节点的修复准备动作其实全都做了——把修复参数写进 <code>state.domain.repair_params</code>、置位 <code>needs_continuity_repair</code>、把 <code>current_node</code> 改写为上游修复节点，四个上游节点也有对应的 <code>apply_repair_params</code> 消费逻辑。断点在图的条件边上：<code>decide_after_continuity</code> 读取的是顶层 <code>state.continuity_issues</code>，而数据实际挂在 <code>state.domain.continuity_issues</code> 下，取出来恒为空列表，永远判 SUCCESS 直达输出；即便字段读对，该决策返回的 <code>NEEDS_RETRY</code> 在图的边映射里也没有对应键（双重缺口）。</p>
+<p><strong>系统如何处理</strong>：当前表现是&quot;静默跳过&quot;——检查结果仍在状态与日志中，但路由不触发修复。</p>
+<p><strong>如何恢复</strong>：临时方案是人工核对日志、手动重跑受影响阶段；代码修复需两处：条件边改读 <code>state.domain.continuity_issues</code>，并补齐 <code>NEEDS_RETRY</code> 的图边映射。这也说明&quot;已实现&quot;的验收标准应包含&quot;接线验证&quot;，否则零件越全，越容易误判可用。</p>
+<h3>故障二：知识库悄悄降级</h3>
+<p><strong>发生什么</strong>：RAG 增强整体失效——生成提示词里不再出现&quot;参考优秀模板&quot;段，但整个工作流照常成功，没有任何报错。</p>
+<p><strong>为什么</strong>：当检索无命中（知识库为空、索引未建、相似度低于 <code>min_similarity_score=0.7</code> 阈值）时，查询返回空结果，调用方对空模板直接跳过拼接。这意味着&quot;增强链路坏掉&quot;与&quot;增强链路正常但恰好无命中&quot;，在流程输出上几乎无法区分。</p>
+<p><strong>系统如何处理</strong>：静默继续。这是有意的 fail-open 选择：知识库是可选增强，不能因为增强失效阻断主流程。</p>
+<p><strong>如何恢复</strong>：排查靠检索相关日志；恢复靠重建/重灌索引。注意：验证 RAG 是否工作，只看流程成功与否是无效的——必须核对提示词里是否真的出现了参考模板段。</p>
+<h3>故障三：参考模板错配——append 拼接没有归属校验</h3>
+<p><strong>发生什么</strong>：某片段的提示词尾部被拼接了一段&quot;参考优秀模板&quot;，但模板描述的是另一部剧本的场景与服装，与当前片段直接矛盾。</p>
+<p><strong>为什么</strong>：<code>enhance_prompt</code> 在转换节点以 <code>append</code> 模式直接把检索到的模板拼到提示词尾部（真实格式是 <code>f&quot;{original_prompt}\n\n参考优秀模板:\n{template}&quot;</code>），且调用时不传 <code>script_id</code>——检索范围是全库，跨剧本命中是允许的。而 append 只是文本拼接：模板里若包含具体角色、服装、地点特征，没有任何机制校验它属于当前片段。有意思的是，提示词转换模板里明确写着&quot;不可将 A 角色的服装特征错误分配给 B 角色&quot;——说明团队意识到了这类风险，但那条约束管的是 LLM 生成过程，管不到知识库拼接这一步。</p>
+<p><strong>系统如何处理</strong>：<code>get_best_match(top_k=1)</code> 先找最相似的一条成功模板，低于相似度阈值就不拼接；但&quot;高于阈值的错配&quot;没有防线。</p>
+<p><strong>如何恢复</strong>：人工审查被 append 的模板段，错配就删除或重生成片段；根治方向是给 <code>enhance_prompt</code> 传入 <code>script_id</code> 收窄检索范围，并在模板入库时打上来源与角色标签。</p>
+<h3>故障四：“分数很高，状态却要修复”——审计口径的分裂</h3>
+<p><strong>发生什么</strong>：审计报告显示 90 分，状态却是 <code>MODERATE_ISSUES</code> 并被送进修复流程——使用者第一反应是&quot;90 分都不及格？&quot;</p>
+<p><strong>为什么</strong>：实际生效的判定是&quot;存在性判定&quot;：只要有一个 MODERATE 违规，状态就是 <code>MODERATE_ISSUES</code>，与分数无关；而分数是 100 减去严重度权重（<code>{WARNING:5, MODERATE:10, MAJOR:25, CRITICAL:40, ERROR:60}</code>）的连续扣分值。一个 MODERATE 违规扣 10 分，于是&quot;90 分 + MODERATE_ISSUES&quot;完全可能。更绕的是项目里同一职责存在三套实现（内部审计器的 pass_rate 制、模型层未接线的六档阈值、agent 生效的扣分制+存在性判定），新人读代码极易混淆。</p>
+<p><strong>系统如何处理</strong>：决策只看状态（<code>decision_map</code>），分数只记录、不参与路由。</p>
+<p><strong>如何恢复</strong>：排查时以&quot;状态的来源违规列表&quot;为准，不要只看分数；长期应把三套口径收敛为单一真源。另一个值得注意的数据口径差异：知识库回写成功案例时的 <code>quality_score</code> 取自 <code>stats.completeness_score</code>（缺省 85.0），与审计报告分数根本不是同一来源——做数据分析时不能把两者当成一个指标。</p>
+<h3>故障五：审计器自己挂了——fail-closed 的保守失败</h3>
+<p><strong>发生什么</strong>：LLM 审查器调用失败（超时、限流）时，整个审计不是&quot;跳过检查&quot;，而是直接 FAILED。</p>
+<p><strong>为什么</strong>：<code>qa_process</code> 捕获异常后返回兜底报告：状态 FAILED、分数 0.0、结论&quot;质量审查失败，请检查系统状态后重试&quot;。</p>
+<p><strong>系统如何处理</strong>：保守失败——宁可让工作流走失败/重试路径，也不放行未经审查的结果。这与故障二的静默降级形成有意对照：<strong>知识库是可选增强，可以 fail-open；质量闸门是最后防线，必须 fail-closed</strong>。</p>
+<p><strong>如何恢复</strong>：临时性故障直接重试工作流；持续性故障检查模型配置。auto 模式下反复失败会走重试上限逻辑，最终转入人工或失败退出。</p>
+<h3>故障六：传了 <code>use_rerank=True</code>，什么都没发生</h3>
+<p><strong>发生什么</strong>：调用方按签名传 <code>use_rerank=True</code>，期望检索结果被重排序，实际返回顺序就是余弦相似度排序。</p>
+<p><strong>为什么</strong>：<code>ScriptKnowledgeBase.query()</code> 的签名接收 <code>use_rerank</code>，但方法体未消费该参数（检索实现是手动余弦相似度全量扫描）；真正的 rerank（<code>BAAI/bge-reranker-large</code>）在另一条 <code>create_retriever_for_script</code> 路径上，而那条路径只被未接线的 <code>KnowledgeRouter</code> 使用。</p>
+<p><strong>系统如何处理</strong>：无感知——参数被静默忽略，检索照常返回（质量略低但没有报错）。这是最难排查的一类故障：没有错误日志，没有异常路径。</p>
+<p><strong>如何恢复</strong>：短期不要指望该参数；要真 rerank 需走 retriever 路径。根治是二选一：真正接线，或删除哑参数并修正文档——“参数存在 ≠ 功能存在”，配置与文档必须以调用链为准。</p>
+<h3>故障七：180 秒没人理，系统&quot;默认继续&quot;</h3>
+<p><strong>发生什么</strong>：交互模式下系统弹出人工决策请求；夜间批量运行时机器前没有人，180 秒后系统自动以&quot;默认继续决策&quot;放行。</p>
+<p><strong>为什么</strong>：<code>HumanInputHandler(timeout_seconds=180)</code> 的超时行为被设计为&quot;使用默认继续决策&quot;——不卡死是首要目标。</p>
+<p><strong>系统如何处理</strong>：超时放行。这在无人值守场景意味着&quot;需要人工把关的片段被默认放行&quot;。</p>
+<p><strong>如何恢复</strong>：无人值守场景建议改用 auto 模式（<code>NEEDS_HUMAN</code> 自动转 <code>NEEDS_RETRY</code>），或调大超时并接告警。另外系统有兜底保证&quot;一定会终止&quot;：修复/审计重试有上限，超限后转人工或失败退出，不会无限循环。</p>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p>回到开头的问题：PenShot 的多智能体一致性体系，究竟哪些在跑？</p>
+<p><strong>真实在跑的（有调用链证据）</strong>：结构化提示词管线——<code>global_metadata</code> 的四段上下文注入（道具/服装/地点/连续性要求）+ 三档模板的强制约束文案；连续性守护的六项词表检查（角色/场景/动作/风格/时间/道具）与签名去重；质量审计的双审查器合并、扣分制评分、存在性判定与闸门映射（含故障五的 fail-closed 兜底）；RAG 的三条检索链路（解析入库、审计通过后回写、转换时检索增强，其中 rerank 参数为哑参数）。这套组合的实质，是<strong>把一致性从&quot;祈祷模型发挥稳定&quot;变成&quot;结构化约束 + 规则检查 + 回流修复&quot;的工程流程</strong>。</p>
+<p><strong>已实现但未接线的（有代码、无通电）</strong>：<code>ContinuityAnchor</code> 锚点体系与 <code>CrossChunkValidator</code>、<code>StateTimeline</code> 状态快照（<code>take_snapshot</code> 零调用）、知识路由 <code>KnowledgeRouter</code>（含真 rerank 路径）、修复回流的条件边（双重缺口，见故障一）、<code>KnowledgeManager</code> 工厂。这批代码的共同特征是&quot;契约完整、调用方缺位&quot;。</p>
+<p><strong>规划中的（零命中）</strong>：三视图等价物（当前只有 <code>character_outfits</code> 字段与模板文字约束）、渐进式生成、双向约束，以及第十一章的十五项补充机制。</p>
+<p>如果只记三件工程经验：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>fail-open 与 fail-closed 按组件定位选择</strong>：可选增强（知识库）故障时降级让路，质量闸门（审计）故障时保守失败。PenShot 在这一点上方向正确，可以直接借鉴。</p>
+</li>
+<li class="lvl-3">
+<p><strong>&quot;已实现&quot;与&quot;已接线&quot;是两回事</strong>：本项目最贵的教训是&quot;零件齐、没通电&quot;（锚点、快照、回流边、哑参数）。评审时把&quot;调用方是否存在、消费方是否读取&quot;作为独立验收项；本文的考证方法（从定义出发检索调用点）可以直接复用。</p>
+</li>
+<li class="lvl-3">
+<p><strong>词表级检查值得做，但要认清边界</strong>：它能低成本抓住&quot;显性漂移&quot;（服装/发型/配饰词切换、镜型重复、时间重叠），抓不住语义级变化。知道边界比堆机制重要——这也是本文对两章规划机制给出&quot;落地成本分级&quot;的原因。</p>
+</li>
+</ol>
+<p>如果你的团队要接手或二开这个项目，建议的动作顺序：先修断链（<code>decide_after_continuity</code> 读对字段、补 <code>NEEDS_RETRY</code> 图边）→ 让快照时间线通电（时间轴类机制的前置）→ 收敛审计三套口径为单一真源 → 处理哑参数（接线或删除）→ 再评估规划章候选机制。共同原则只有一条：<strong>先把已有资产用起来，再扩张版图</strong>。</p>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

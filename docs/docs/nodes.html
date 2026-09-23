@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 节点详解：六大智能体的源码实现与规则逻辑 · PenShot 文档</title>
+  <meta name="description" content="逐节点拆解 PenShot 六大智能体的实现：剧本解析的格式识别与五维评分、镜头拆分的时长估算器与合并规则、视频分段的双实现与降级策略、指令转换的双语拼装与音频同生成、质量审查的加权扣分、连续性守护的词表与去重；示例对照源码核校。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/nodes.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 节点详解：六大智能体的源码实现与规则逻辑">
+  <meta property="og:description" content="逐节点拆解 PenShot 六大智能体的实现：剧本解析的格式识别与五维评分、镜头拆分的时长估算器与合并规则、视频分段的双实现与降级策略、指令转换的双语拼装与音频同生成、质量审查的加权扣分、连续性守护的词表与去重；示例对照源码核校。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/nodes.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html" class="active">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-02-12</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 节点详解：六大智能体的源码实现与规则逻辑</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="mcp.html">MCP Server</a> · <a href="recall.html">召回策略</a> · <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>一、预先准备：节点体系概览</h2>
+<p>PenShot 将一个完整的分镜任务抽象为<strong>六个顺序执行的智能体节点</strong>，由 LangGraph 负责端到端的协调与调度。理解这套节点体系，是读懂后续 JSON 数据模型与修复机制的前提。每个节点遵循统一的模式：<strong>接收输入 → 调用 LLM 或规则实现 → 结果判定（经决策函数路由）→ 进入下一节点或触发修复</strong>。</p>
+<blockquote>
+<p><strong>核对说明</strong>：本文的节点输入输出、检查项名称、提示词规则、字段名等均与 story-shot-agent v0.3.x 源码逐一核对（<code>agent/script_parser/</code>、<code>agent/shot_segmenter/</code>、<code>agent/video_splitter/</code>、<code>agent/prompt_converter/</code>、<code>agent/quality_auditor/</code>、<code>agent/continuity_guardian/</code>）。示例 JSON 标注为&quot;示例数据&quot;，字段结构对照真实 Pydantic 模型核校；凡属推测或实现不足，都会明确标注。</p>
+</blockquote>
+<h3>节点流程编排</h3>
+<pre class="mermaid">graph TD
+    Start[开始/剧本输入] --&gt; Parse[剧本解析]
+    
+    Parse --&gt; Decision1{解析结果判断}
+    Decision1 --&gt;|SUCCESS| Split[镜头拆分]
+    Decision1 --&gt;|NEEDS_RETRY| Parse
+    Decision1 --&gt;|NEEDS_HUMAN| Human[人工干预]
+    Decision1 --&gt;|FAILED| Error[错误处理]
+    
+    Split --&gt; Decision2{拆分结果判断}
+    Decision2 --&gt;|SUCCESS| Loop{循环检查&lt;br/&gt;LOOP_CHECK}
+    Decision2 --&gt;|NEEDS_RETRY| Split
+    Decision2 --&gt;|NEEDS_REPAIR| Split
+    Decision2 --&gt;|FAILED| Error
+    
+    Loop --&gt;|阶段推进| Fragment[视频分段]
+    
+    Fragment --&gt; Decision3{分段结果判断}
+    Decision3 --&gt;|SUCCESS| Loop
+    Decision3 --&gt;|NEEDS_RETRY| Fragment
+    Decision3 --&gt;|NEEDS_REPAIR| Fragment
+    Decision3 --&gt;|NEEDS_HUMAN| Human
+    Decision3 --&gt;|FAILED| Error
+    
+    Loop --&gt;|阶段推进| Prompt[提示词生成]
+    
+    Prompt --&gt; DecisionP{生成结果判断}
+    DecisionP --&gt;|SUCCESS| Loop
+    DecisionP --&gt;|NEEDS_RETRY| Prompt
+    DecisionP --&gt;|NEEDS_REPAIR| Prompt
+    DecisionP --&gt;|FAILED| Error
+    
+    Loop --&gt;|阶段推进| Audit[质量审查]
+    
+    Audit --&gt; Decision4{审查结果判断}
+    Decision4 --&gt;|SUCCESS| Continuity[连续性检查]
+    Decision4 --&gt;|VALID| Continuity
+    Decision4 --&gt;|NEEDS_RETRY| Prompt
+    Decision4 --&gt;|NEEDS_REPAIR| Prompt
+    Decision4 --&gt;|NEEDS_HUMAN| Human
+    Decision4 --&gt;|FAILED| Error
+    
+    Continuity --&gt; Decision5{连续性判断}
+    Decision5 --&gt;|SUCCESS| Output[生成输出]
+    Decision5 --&gt;|VALID| Output
+    Decision5 --&gt;|NEEDS_REPAIR| Prompt
+    Decision5 --&gt;|NEEDS_HUMAN| Human
+    Decision5 --&gt;|FAILED| Error
+    
+    Output --&gt; End[工作流完成]
+    
+    Error --&gt; DecisionE{错误处理判断}
+    DecisionE --&gt;|VALID| Parse
+    DecisionE --&gt;|NEEDS_RETRY| Parse
+    DecisionE --&gt;|NEEDS_REPAIR| Prompt
+    DecisionE --&gt;|NEEDS_HUMAN| Human
+    DecisionE --&gt;|ABORT| End
+    DecisionE --&gt;|FAILED| End
+    
+    Human --&gt; DecisionH{人工决策判断}
+    DecisionH --&gt;|SUCCESS| Output
+    DecisionH --&gt;|VALID| Output
+    DecisionH --&gt;|NEEDS_RETRY| Parse
+    DecisionH --&gt;|NEEDS_REPAIR| Prompt
+    DecisionH --&gt;|NEEDS_HUMAN| Human
+    DecisionH --&gt;|ABORT| End
+    DecisionH --&gt;|FAILED| Error
+    
+    %% 样式定义
+    style Start fill:#4CAF50,color:white
+    style End fill:#F44336,color:white
+    style Human fill:#FF9800,color:black
+    style Error fill:#9E9E9E,color:white
+    style Loop fill:#FFEB3B,color:black
+    style Parse fill:#2196F3,color:white
+    style Split fill:#2196F3,color:white
+    style Fragment fill:#2196F3,color:white
+    style Prompt fill:#2196F3,color:white
+    style Audit fill:#2196F3,color:white
+    style Continuity fill:#2196F3,color:white
+    style Output fill:#4CAF50,color:white
+    
+    %% 决策节点样式
+    style Decision1 fill:#FFEB3B,color:black
+    style Decision2 fill:#FFEB3B,color:black
+    style Decision3 fill:#FFEB3B,color:black
+    style DecisionP fill:#FFEB3B,color:black
+    style Decision4 fill:#FFEB3B,color:black
+    style Decision5 fill:#FFEB3B,color:black
+    style DecisionE fill:#FFEB3B,color:black
+    style DecisionH fill:#FFEB3B,color:black
+</pre>
+<blockquote>
+<p><strong>读图提示</strong>：图中每个决策节点（黄色菱形）都对应一组可枚举的结果——<code>SUCCESS / VALID</code> 放行，<code>NEEDS_RETRY / NEEDS_REPAIR</code> 回退到对应节点，<code>NEEDS_HUMAN</code> 转人工，<code>FAILED</code> 进错误处理。特别地，拆分 / 分段 / 转换三个阶段成功后并不直接进入下一节点，而是先经过<strong>循环检查节点（LOOP_CHECK）</strong>：它负责&quot;计数器递增、上限检查、阶段推进&quot;三项职责（详见 <a href="architecture.html">技术架构</a> 的决策路由映射）。<code>Error</code> 与 <code>Human</code> 作为全局兜底节点，可把流程重新路由回解析或直接中止。</p>
+</blockquote>
+<hr>
+<h2>二、节点输入输出总表</h2>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>输入</th>
+<th>输出</th>
+<th>关键处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>剧本解析</td>
+<td>原始文本</td>
+<td>结构化剧本</td>
+<td>格式自动识别 + LLM 提取场景/角色/元素 + 五维完整性评分</td>
+</tr>
+<tr>
+<td>镜头拆分</td>
+<td>结构化剧本</td>
+<td>镜头序列</td>
+<td>元素分组（对话合并规则）+ 三类时长估算器</td>
+</tr>
+<tr>
+<td>视频分段</td>
+<td>镜头序列</td>
+<td>视频片段</td>
+<td>超阈值镜头 LLM 语义切分 / 规则均分，保持连续性</td>
+</tr>
+<tr>
+<td>指令转换</td>
+<td>视频片段</td>
+<td>Prompt指令</td>
+<td>LLM 生成双语提示词 + 音频提示词 + 负面词</td>
+</tr>
+<tr>
+<td>质量审查</td>
+<td>Prompt指令</td>
+<td>审查报告</td>
+<td>五项硬性检查 + 严重度加权扣分</td>
+</tr>
+<tr>
+<td>连续性检查</td>
+<td>全阶段输出</td>
+<td>问题列表</td>
+<td>六维关键词规则检查 + 签名去重</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>上表为 T 型摘要，每一行的真实实现机制都在第三节展开；各节点的输入输出模型（如 <code>ParsedScript</code>、<code>ShotSequence</code>、<code>FragmentSequence</code>、<code>AIVideoInstructions</code>、<code>QualityAuditReport</code>）均为 Pydantic 模型，字段级核对见后文。</p>
+</blockquote>
+<h3>智能体节点流程协作</h3>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant User as 用户
+    participant System as 流程编排器
+    participant Parser as 剧本解析
+    participant Splitter as 镜头拆分
+    participant Fragmenter as 视频分段
+    participant Converter as 指令转换
+    participant Auditor as 质量审查
+    participant Guardian as 连续性守护
+    
+    User-&gt;&gt;System: 提交剧本
+    
+    %% 阶段1-4: 顺序执行
+    System-&gt;&gt;Parser: 解析剧本
+    Parser--&gt;&gt;System: 结构化剧本
+    
+    System-&gt;&gt;Splitter: 镜头拆分
+    Splitter--&gt;&gt;System: 镜头序列
+    
+    System-&gt;&gt;Fragmenter: 视频分段
+    Fragmenter--&gt;&gt;System: 片段序列
+    
+    System-&gt;&gt;Converter: 生成指令
+    Converter--&gt;&gt;System: Prompt序列
+    
+    %% 阶段5: 质量审查
+    System-&gt;&gt;Auditor: 质量审查
+    Auditor--&gt;&gt;System: 审查报告
+    
+    alt 审查不通过
+        System--&gt;&gt;Converter: 返回修复
+        Note over Converter,Auditor: 修复后重新审查
+    end
+    
+    %% 阶段6: 连续性检查
+    System-&gt;&gt;Guardian: 连续性检查
+    Guardian--&gt;&gt;System: 检查结果
+    
+    alt 发现严重连续性问题
+        System--&gt;&gt;Converter: 返回修复
+        Note over Converter,Guardian: 修复后重新检查
+    end
+    
+    %% 最终输出
+    System-&gt;&gt;User: 返回AI指令
+</pre>
+<blockquote>
+<p><strong>阅读提示</strong>：该时序图是理想化的主流程视角，省略了 LOOP_CHECK 循环检查、TaskRepository 任务状态更新与记忆读写等旁路交互（详见技术架构）。连续性问题的修复路径需要特别留意：图边映射中 <code>decide_after_continuity</code> 的修复目标确实指向<strong>指令转换（Converter）</strong>，但检查节点内部还有一层按问题来源细分的四阶段路由（<code>_route_to_fix_stage</code>）——两条线当前并未完全接通，考证见 3.6 末尾。</p>
+</blockquote>
+<p><strong>决策分支说明</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查点</th>
+<th style="text-align:left">通过</th>
+<th style="text-align:left">不通过</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本解析</td>
+<td style="text-align:left">进入镜头拆分</td>
+<td style="text-align:left">重试/错误处理</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头拆分</td>
+<td style="text-align:left">进入视频分段</td>
+<td style="text-align:left">重试/修复</td>
+</tr>
+<tr>
+<td style="text-align:left">视频分段</td>
+<td style="text-align:left">进入指令转换</td>
+<td style="text-align:left">修复后重试</td>
+</tr>
+<tr>
+<td style="text-align:left">指令转换</td>
+<td style="text-align:left">进入质量审查</td>
+<td style="text-align:left">重试/修复</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审查</td>
+<td style="text-align:left">进入连续性检查</td>
+<td style="text-align:left">返回指令转换（回炉重生成）</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性检查</td>
+<td style="text-align:left">输出结果</td>
+<td style="text-align:left">四阶段修复路由/人工（当前未接通，见 3.6）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>关于&quot;修复目标&quot;的两套设计</strong>：质量审查失败后的修复确实收敛到指令转换——<code>decide_after_audit</code> 返回 <code>NEEDS_REPAIR</code> 时，图映射把它指向 <code>CONVERT_PROMPT</code>，从最靠后的&quot;可修复层&quot;重生成提示词，比全链重跑更省 Token 与时间。连续性检查则是另一套：节点内部按问题来源把修复路由到解析/拆分/分段/转换四个阶段中最早的命中者，意图&quot;哪错回哪&quot;。注意两套路由的当前实现状态不同——连续性修复的&quot;重试回流&quot;存在未接通的缺口，详见 3.6。</p>
+</blockquote>
+<hr>
+<h2>三、核心节点详解</h2>
+<h3>3.1 剧本解析智能体</h3>
+<p><strong>核心目标</strong>：将任意格式剧本转换为<strong>统一的结构化中间表示</strong>，执行剧本的格式转换和语义提取。这是&quot;六格式分流&quot;的第一道关口。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[原始剧本文本]
+    end
+
+    subgraph Process[解析流程]
+        B[格式识别&lt;br/&gt;正则规则] --&gt; C[匹配对应系统提示词&lt;br/&gt;六种格式分流]
+        C --&gt; D[LLM语义解析]
+        D --&gt; E[构建Pydantic模型&lt;br/&gt;ID生成/字段补全]
+        E --&gt; F[五维完整性评分]
+    end
+
+    subgraph Output
+        G[结构化剧本&lt;br/&gt;ParsedScript]
+    end
+
+    A --&gt; B --&gt; G
+</pre>
+<p><strong>格式识别是真实现的，不是概念</strong>。<code>script_parser_agent.py</code> 中的 <code>_detect_script_format</code> 用一组正则规则对原文分类，命中即返回对应的 <code>ScriptType</code>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">优先级</th>
+<th style="text-align:left">判定规则（正则要点）</th>
+<th style="text-align:left">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">1</td>
+<td style="text-align:left"><code>INT.</code> / <code>EXT.</code> / <code>内景</code> / <code>外景</code> / <code>场景N：</code></td>
+<td style="text-align:left"><code>STANDARD_SCRIPT</code> 标准剧本</td>
+</tr>
+<tr>
+<td style="text-align:left">2</td>
+<td style="text-align:left"><code>镜头N</code> / <code>shot N</code> / <code>分镜N</code> / <code>画面描述：</code></td>
+<td style="text-align:left"><code>AI_STORYBOARD</code> AI 分镜脚本</td>
+</tr>
+<tr>
+<td style="text-align:left">3</td>
+<td style="text-align:left"><code>场景：</code> / <code>地点：</code> / <code>时间：</code> / <code>角色：</code></td>
+<td style="text-align:left"><code>STRUCTURED_SCENE</code> 结构化场景</td>
+</tr>
+<tr>
+<td style="text-align:left">4</td>
+<td style="text-align:left"><code>角色：台词</code> 行数占比 &gt; 70%</td>
+<td style="text-align:left"><code>DIALOGUE_ONLY</code> 纯对话</td>
+</tr>
+<tr>
+<td style="text-align:left">5</td>
+<td style="text-align:left">句号/感叹号/问号数量 &gt; 冒号/引号数量</td>
+<td style="text-align:left"><code>NATURAL_LANGUAGE</code> 自然语言</td>
+</tr>
+<tr>
+<td style="text-align:left">6</td>
+<td style="text-align:left">以上均不命中</td>
+<td style="text-align:left"><code>MIXED_FORMAT</code> 混合格式</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>为什么先做&quot;格式识别&quot;</strong>：<code>LLMScriptParser</code> 为每种格式准备了<strong>独立的系统提示词</strong>（<code>ScriptType.NATURAL_LANGUAGE</code> / <code>STANDARD_SCRIPT</code> / <code>AI_STORYBOARD</code> / <code>STRUCTURED_SCENE</code> / <code>DIALOGUE_ONLY</code> 各一份，加一个 default 兜底），识别格式后路由到对应提示词，避免&quot;一套提示词硬吃所有格式&quot;。代价是规则法只能识别典型特征——正则漏判时会退回 <code>MIXED_FORMAT</code> 通用提示词，而非报错。</p>
+</blockquote>
+<h4>质量评估维度：五维加权评分</h4>
+<p>解析完成后，<code>_evaluate_completeness</code> 对结果做五维评分（权重为源码真实值）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">维度</th>
+<th style="text-align:left">权重</th>
+<th style="text-align:left">评分逻辑（简）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">场景完整性</td>
+<td style="text-align:left">0.25</td>
+<td style="text-align:left">场景数量（3 个封顶）+ 描述长度 &gt; 10 字符占比，取均值</td>
+</tr>
+<tr>
+<td style="text-align:left">角色完整性</td>
+<td style="text-align:left">0.25</td>
+<td style="text-align:left">角色数量（2 个封顶）+ 描述长度 &gt; 5 字符占比，取均值</td>
+</tr>
+<tr>
+<td style="text-align:left">对话提取质量</td>
+<td style="text-align:left">0.20</td>
+<td style="text-align:left">原文有对话标记但未提取→ 0.3；否则提取数/预期数</td>
+</tr>
+<tr>
+<td style="text-align:left">动作提取质量</td>
+<td style="text-align:left">0.20</td>
+<td style="text-align:left">提取动作数 / (原文动作动词表命中数 × 0.5)</td>
+</tr>
+<tr>
+<td style="text-align:left">总体覆盖率</td>
+<td style="text-align:left">0.10</td>
+<td style="text-align:left">提取内容字符量 / 原文字符量 × 2（封顶 1.0）</td>
+</tr>
+</tbody>
+</table>
+<p>评分还带一道&quot;问题惩罚&quot;：<code>completeness_score -= min(0.2, 问题数 × 0.05)</code>——即发现 4 个及以上问题项时，最多额外扣 0.2 分。此外 <code>_calculate_confidence</code> 会分别计算场景/角色/对话/动作置信度与 overall 均值，供下游节点与决策函数参考。</p>
+<pre class="mermaid">graph TD
+    A[原始剧本文本] --&gt; B(LLM解析)
+    B --&gt; C{解析成功?}
+    C --&gt;|是| D[结构化JSON]
+    C --&gt;|否| E[错误处理]
+    D --&gt; F[添加元数据]
+    F --&gt; G[输出结构化剧本]
+    E --&gt; H[返回错误信息]
+</pre>
+<blockquote>
+<ol>
+<li class="lvl-3">
+<p>自动识别输入格式，根据不同的剧本做不同处理</p>
+</li>
+<li class="lvl-3">
+<p>使用LLM解析，通过剧本复杂度、类型、解析置信度</p>
+</li>
+<li class="lvl-3">
+<p>提取语义元素（角色、动作、对话、场景）</p>
+</li>
+<li class="lvl-3">
+<p>转换为统一数据结构</p>
+</li>
+<li class="lvl-3">
+<p>保持原始语义，不添加时间信息</p>
+</li>
+</ol>
+</blockquote>
+<blockquote>
+<p><strong>设计要点</strong>：本节点<strong>刻意不添加时间信息</strong>（只输出结构化序列），把&quot;时长&quot;这件事完全交给下游的镜头拆分节点处理——职责单一化让每个节点的输入输出更可预期。</p>
+</blockquote>
+<pre class="mermaid">sequenceDiagram
+    participant User as 用户
+    participant API as 流程编排器
+    participant Parser as 剧本解析智能体
+    participant LLM as LLM服务
+    
+    User-&gt;&gt;API: POST 接口 {text: &quot;剧本文本&quot;}
+    API-&gt;&gt;Parser: 调用解析任务
+    Parser-&gt;&gt;LLM: 发送解析请求
+    Note over Parser,LLM: 使用提示词让LLM提取&lt;br/&gt;场景、角色、对话、动作
+    LLM--&gt;&gt;Parser: 返回结构化JSON
+    Parser-&gt;&gt;Parser: 添加元数据
+    Parser--&gt;&gt;API: 返回解析结果
+    API--&gt;&gt;User: 返回结构化剧本
+</pre>
+<h4>输出示例</h4>
+<p>以下 JSON 为<strong>示例数据</strong>（结构对照 <code>ParsedScript</code> 模型核校）：顶层为 <code>metadata / title / characters / scenes / global_metadata / stats</code>。每个场景（scene）内含多个 <code>elements</code>，元素类型包括 <code>ACTION</code>（动作）、<code>DIALOGUE</code>（对话）、<code>SCENE</code>（环境交代），并带有 <code>sequence</code>（顺序）、<code>duration</code>（估时）、<code>confidence</code>（置信度）、<code>intensity</code>（强度）、<code>emotion</code>（情绪）等字段：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;parsed_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:30:00Z&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;parser_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;LLMScriptParser&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;深夜对话&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;characters&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;gender&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;男&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;主角&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;中年男性，神情紧张&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;key_traits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;穿灰色夹克&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;声音低沉&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;性格谨慎&quot;</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;gender&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;女&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;配角&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;年轻女性，警觉性高&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;key_traits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;长发&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;穿黑色外套&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;敏锐观察力&quot;</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;scenes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;scene_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;location&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;客厅&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;昏暗的客厅，只有一盏台灯亮着&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;time_of_day&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;night&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;elements&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;elem_001&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ACTION&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.9</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;环顾四周&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;target_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三紧张地环顾客厅四周&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;intensity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.7</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fear&quot;</span>
+        <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;elem_002&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;DIALOGUE&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.95</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;你听到了吗？&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;target_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三压低声音询问李四&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;intensity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.6</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fear&quot;</span>
+        <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;elem_003&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ACTION&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.85</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;走向窗边&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;target_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四小心翼翼地走向窗边查看&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;intensity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.8</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;neutral&quot;</span>
+        <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;elem_004&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SCENE&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.5</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.8</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;窗外传来微弱声响&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;target_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;窗外传来微弱的、类似树枝摩擦的声音&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;intensity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.4</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;neutral&quot;</span>
+        <span class="hljs-punctuation">}</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;scene_002&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;location&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;客厅窗边&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;窗帘微动，月光从缝隙透入&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;time_of_day&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;night&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;elements&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;elem_005&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;DIALOGUE&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.9</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;外面好像有人...&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;target_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四压低声音，语气紧张&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;intensity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.7</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fear&quot;</span>
+        <span class="hljs-punctuation">}</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;total_elements&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">14.5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;dialogue_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;action_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;completeness_score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.78</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h4>被低估的 <code>global_metadata</code>：贯穿全剧的&quot;连续性账本&quot;</h4>
+<p>顶层模型里最容易被忽略的是 <code>global_metadata</code>——它专门存放<strong>跨场景必须保持一致的元素</strong>，由解析阶段一次性抽取，供后续所有节点引用：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">字段</th>
+<th style="text-align:left">含义</th>
+<th style="text-align:left">消费方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>key_props</code></td>
+<td style="text-align:left">关键道具（名称/颜色/出现场景）</td>
+<td style="text-align:left">拆分、分段、转换（道具一致性约束）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>character_outfits</code></td>
+<td style="text-align:left">角色服装（颜色/款式/材质）</td>
+<td style="text-align:left">转换节点（服装描述逐字复用）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>key_locations</code></td>
+<td style="text-align:left">关键地点（视觉特征）</td>
+<td style="text-align:left">拆分、转换（场景视觉锚点）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>continuity_notes</code></td>
+<td style="text-align:left">需要特别注意的连续性要点</td>
+<td style="text-align:left">全链路</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>audio_atmosphere</code> / <code>recurring_sounds</code></td>
+<td style="text-align:left">全局音频氛围 / 重复出现的声音</td>
+<td style="text-align:left">音频提示词生成</td>
+</tr>
+</tbody>
+</table>
+<p>这不是装饰性字段：分段提示词的【重要约束】会直接引用它（“角色服装必须严格遵循【全剧上下文】中的描述，不可将某个角色的服装特征错误地分配给其他角色”），把一致性要求从&quot;事后检查&quot;前移到&quot;生成时约束&quot;。</p>
+<h4>顺序与完整性保障：两级事后校验</h4>
+<p><code>decide_after_parsing</code> 的决策依据来自解析结果的结构化校验，而不是&quot;位置回溯&quot;。真实的校验手段有两个：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>顺序连续性校验</strong>（<code>validate_parsed_result</code>）：汇总所有场景的元素后，检查 <code>sequence</code> 是否构成 1…N 的连续序列——不连续时记录 warning 日志，<strong>不阻断流程</strong>。</p>
+</li>
+<li class="lvl-3">
+<p><strong>ID 兜底生成</strong>：LLM 返回的 <code>id</code> 优先采用；缺失时由 <code>_generate_element_id</code> 按 <code>elem_{场景序号}_{元素序号}</code> 规则补全（如 <code>elem_001_002</code>），保证下游引用链不断。</p>
+</li>
+</ol>
+<pre class="hljs"><code><span class="hljs-comment"># 源码节选：base_script_parser.py（简化排版，逻辑未改）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">validate_parsed_result</span>(<span class="hljs-params">self, parsed_script: ParsedScript</span>) -&gt; <span class="hljs-built_in">bool</span>:
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> parsed_script.scenes:
+        error(<span class="hljs-string">&quot;解析结果为空：没有找到任何场景&quot;</span>)
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+
+    all_elements = []
+    <span class="hljs-keyword">for</span> scene <span class="hljs-keyword">in</span> parsed_script.scenes:
+        all_elements.extend(scene.elements)
+
+    <span class="hljs-keyword">if</span> all_elements:
+        sequences = [elem.sequence <span class="hljs-keyword">for</span> elem <span class="hljs-keyword">in</span> all_elements]
+        <span class="hljs-keyword">if</span> <span class="hljs-built_in">sorted</span>(sequences) != <span class="hljs-built_in">list</span>(<span class="hljs-built_in">range</span>(<span class="hljs-number">1</span>, <span class="hljs-built_in">len</span>(sequences) + <span class="hljs-number">1</span>)):
+            warning(<span class="hljs-string">f&quot;元素顺序不连续: <span class="hljs-subst">{sequences}</span>&quot;</span>)
+
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+</code></pre>
+<blockquote>
+<p><strong>实现边界（如实标注）</strong>：该校验只能发现&quot;编号不连续&quot;，无法发现&quot;编号连续但内容顺序错误&quot;的情况；同样也没有原文偏移量（offset）回溯机制——<code>sequence</code> 的正确性完全依赖 LLM 输出质量。兜底手段是解析结果为空或完整性评分过低时，由 <code>decide_after_parsing</code> 路由回 PARSE_SCRIPT 重试。</p>
+</blockquote>
+<hr>
+<h3>3.2 镜头拆分智能体</h3>
+<p><strong>核心目标</strong>：将结构化剧本拆分为视觉上独立的镜头单元，考虑情感节奏和时长合理性。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[结构化剧本]
+    end
+
+    subgraph Process[拆分流程]
+        B[场景遍历] --&gt; C[元素序列分组]
+        C --&gt; D{合并判断}
+        D --&gt;|连续对话且同角色| E[合并进当前镜头]
+        D --&gt;|连续动作(默认不合并)| F[创建新镜头]
+        D --&gt;|对话后短动作&lt;3秒| E
+        E --&gt; G[镜头类型判定]
+        F --&gt; G
+        G --&gt; H[时长估算器覆写]
+        H --&gt; I[增强器后处理]
+    end
+
+    subgraph Output
+        J[镜头序列JSON]
+    end
+
+    A --&gt; B --&gt; J
+</pre>
+<h4>拆分规则：两种实现共享同一套输出模型</h4>
+<p>镜头拆分有 LLM 与规则两种实现（<code>ShotSegmenterFactory</code> 按 <code>config.enable_llm</code> 选择）。<strong>规则模式的合并逻辑</strong>（<code>RuleShotSegmenter._should_merge_elements</code>）只有三条：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">判断</th>
+<th style="text-align:left">条件</th>
+<th style="text-align:left">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">连续对话</td>
+<td style="text-align:left">两个 DIALOGUE 且角色相同</td>
+<td style="text-align:left">合并进同一镜头</td>
+</tr>
+<tr>
+<td style="text-align:left">连续动作</td>
+<td style="text-align:left">两个 ACTION 且角色相同</td>
+<td style="text-align:left">默认<strong>不合并</strong>（<code>merge_consecutive_actions=False</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">对话后短动作</td>
+<td style="text-align:left">DIALOGUE 后紧跟 &lt;3.0 秒的 ACTION</td>
+<td style="text-align:left">合并（视为对话的延续）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>镜头类型判定</strong>（规则模式）同样只有三条硬规则：组内含对话 → 特写（<code>close_up</code>）；含场景描述 → 全景（<code>wide_shot</code>）；其余 → 中景（<code>medium_shot</code>）。镜头描述优先取组内首元素内容，对话追加说话者前缀（<code>角色: 台词</code>），并支持 <code>max_description_length</code> 配置截断。LLM 模式的拆分粒度由提示词约束（如&quot;避免过度分割，保持镜头的视觉和叙事连贯性&quot;“对话元素必须在镜头描述中完整逐字呈现”），灵活性高于规则，但每次调用都消耗 Token。</p>
+<p><strong>镜头类型选择</strong>（提示词【镜头选择规则】的真实对应）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">推荐镜头</th>
+<th style="text-align:left">提示词中的原始定位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">对话+情感高潮</td>
+<td style="text-align:left">特写（close_up / extreme_close_up）</td>
+<td style="text-align:left">聚焦面部表情，展现情绪变化</td>
+</tr>
+<tr>
+<td style="text-align:left">对话+环境交代</td>
+<td style="text-align:left">中景（medium_shot）</td>
+<td style="text-align:left">最常用的对话和叙事镜头</td>
+</tr>
+<tr>
+<td style="text-align:left">动作+多人互动</td>
+<td style="text-align:left">中景 / 双人（two_shot）</td>
+<td style="text-align:left">展现人物上半身和动作 / 关系展示</td>
+</tr>
+<tr>
+<td style="text-align:left">场景建立</td>
+<td style="text-align:left">全景（wide_shot / long_shot）</td>
+<td style="text-align:left">展现场景全貌，适合开场</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>为何按类型选镜头</strong>：镜头类型（景别）直接决定观众获得的视觉信息量与情绪浓度——情感高潮用特写放大情绪、场景建立用全景交代空间、互动用中景兼顾人物与环境。<code>ShotType</code> 枚举共 13 种（含过肩、主观视角、跟拍、摇摄等），提示词中明确列出 8 种的使用场景，供 LLM 选择。</p>
+</blockquote>
+<h4>时长估算：LLM 建议只是草稿，估算器才是最终裁决</h4>
+<p>提示词中给出的时长建议表（LLM 模式下作为参考；<code>shot_segmenter_prompt.yaml</code> 原文）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">内容类型</th>
+<th style="text-align:left">建议时长</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">快节奏动作/突发事件</td>
+<td style="text-align:left">1.5-2.5秒</td>
+</tr>
+<tr>
+<td style="text-align:left">对话/表情反应</td>
+<td style="text-align:left">2.5-4秒</td>
+</tr>
+<tr>
+<td style="text-align:left">风景/环境建立</td>
+<td style="text-align:left">3-5秒</td>
+</tr>
+<tr>
+<td style="text-align:left">情感高潮/重要台词</td>
+<td style="text-align:left">4-6秒</td>
+</tr>
+</tbody>
+</table>
+<p>但更关键的机制是：<strong>无论 LLM 还是规则模式，拆分完成后 <code>estimator_factory.estimate_sequence()</code> 都会重新计算每个镜头的时长并覆写 <code>shot.duration</code></strong>——LLM 给出的时长只是&quot;草稿&quot;。估算器按镜头类型分发到三个实现类（<code>CLOSE_UP → DialogueDurationEstimator</code>、<code>WIDE_SHOT → SceneDurationEstimator</code>、其余 → <code>ActionDurationEstimator</code>），以动作估算器为例，计算链路是：</p>
+<ol>
+<li class="lvl-3">
+<p>按镜头类型取基准时长（中景 base=2.8 秒）；</p>
+</li>
+<li class="lvl-3">
+<p>叠加<strong>复杂度因子</strong>（描述 &gt;20 字 ×1.3，≤10 字 ×0.8）；</p>
+</li>
+<li class="lvl-3">
+<p>速度关键词调整（“猛地”&quot;快速&quot;×0.8，&quot;缓缓&quot;×1.3）；</p>
+</li>
+<li class="lvl-3">
+<p>场景情绪调整（紧张 ×0.9，悲伤 ×1.2）；</p>
+</li>
+<li class="lvl-3">
+<p>角色特征调整（老幼角色 ×1.2 / ×0.9）；</p>
+</li>
+<li class="lvl-3">
+<p>与动作时长工具（<code>ActionDurationEstimatorTool</code>）的结果<strong>按 0.4 : 0.6 加权平均</strong>；</p>
+</li>
+<li class="lvl-3">
+<p>最后 clamp 回该镜头类型的 [min, max] 区间。</p>
+</li>
+</ol>
+<p>之后集中到增强器 <code>DurationEnhancer</code> 做整体校准：把超范围时长拉回边界（如中景 2.0~5.0 秒）、情感特写至少 3.0 秒、开场/结尾镜头 ×1.2，并防止连续同型镜头时长雷同（差值 &lt;0.3 秒时改为前者 +0.3 秒错开）。</p>
+<blockquote>
+<p><strong>设计取舍</strong>：把时长交给独立估算器而不是信任 LLM 输出，换来的是&quot;时长可控、可测试、可复现&quot;——同一份输入，时长结果不受 LLM 随机性影响；代价是估算器本质上仍是关键词匹配 + 固定系数的规则，对&quot;缓慢而有力量地攥紧拳头&quot;这类语义微妙的描述识别能力有限。另需注意：增强器中为 climax / transition 预留的节奏系数（1.3 / 0.8）在 <code>_enhance_shot</code> 中<strong>并未被引用</strong>——当前只有 opening / ending 两条生效。</p>
+</blockquote>
+<h4>输出示例</h4>
+<p>每个镜头记录 <code>scene_id</code>（归属场景）、<code>start_time</code>（起始时间）、<code>duration</code>（时长）、<code>shot_type</code>（景别）、<code>main_character</code>（主角色）、<code>element_ids</code>（来源元素引用），并带格式 <code>id</code> 前缀 <code>shot_</code>：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;generated_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:35:00Z&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;parser_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_splitter_v1&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;script_reference&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;深夜对话&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_elements&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;original_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">14.5</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;shots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;scene_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;scene_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三紧张地环顾客厅四周&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;shot_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;medium_shot&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_001&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fear&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.8</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_002&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;scene_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;scene_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三压低声音询问李四&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;shot_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;close_up&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_002&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.9</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_003&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;scene_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;scene_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四小心翼翼地走向窗边查看&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;shot_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;medium_shot&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_003&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;confidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.8</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;shot_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">9.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;avg_shot_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;close_up_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;wide_shot_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h4>当前实现的局限与工程提示</h4>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>时长估算不感知语义内容</strong>：复杂度因子基于描述字符数（&gt;20 字 → ×1.3），速度/情绪/角色因子均为关键词命中；没有情感分类模型或机器学习校准。估算器与增强器的所有参数都是<strong>固定常量</strong>，不会从生成反馈中自适应调整——&quot;30% 误差逐步收窄到 10%&quot;之类的演进路线并不存在于当前代码，属于合理的未来方向而非既成事实。</p>
+</li>
+<li class="lvl-2">
+<p><strong>规则模式的镜头类型判定偏保守</strong>：含对话即特写、含场景描述即全景，没有&quot;对话+环境交代 → 中景&quot;这类更细的分支；中间景别的选择基本交给 LLM 模式或人工调整。</p>
+</li>
+<li class="lvl-2">
+<p><strong>合并逻辑的适用边界</strong>：<code>merge_consecutive_actions=False</code> 意味着&quot;转身 → 走向窗边&quot;这类连续动作会被拆成两个镜头，再交下游分段阶段处理——拆得碎但保真；若希望动作连贯成镜，需改用 LLM 模式或调整 <code>ShotConfig</code>。</p>
+</li>
+</ul>
+<hr>
+<h3>3.3 视频分段智能体</h3>
+<p><strong>核心目标</strong>：将镜头序列按5秒粒度切分，确保每个片段符合AI视频模型限制。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[镜头序列]
+    end
+
+    subgraph Process[分段流程]
+        B[镜头遍历] --&gt; C{时长判断}
+        C --&gt;|≤阈值5.5秒| D[直接成段]
+        C --&gt;|&gt;阈值 且 LLM模式| E[LLM语义切分]
+        C --&gt;|&gt;阈值 且 规则模式| F[数学均分&lt;br/&gt;最多3段]
+        E --&gt; G[校验与时长微调]
+        F --&gt; G
+        D --&gt; H[连续性注解]
+        G --&gt; H
+    end
+
+    subgraph Output
+        I[片段序列JSON]
+    end
+
+    A --&gt; B --&gt; I
+</pre>
+<blockquote>
+<p><strong>为什么是 5 秒，以及&quot;阈值 ≠ 上限&quot;的区别</strong>：主流文生视频模型对单段生成时长有硬性上限，而系统里与 5 秒相关的其实是三个不同的值——<code>duration_split_threshold</code>（默认 <strong>5.5 秒</strong>，超过才触发切分，留出 0.5 秒容差避免临界镜头被无谓切割）、<code>max_fragment_duration</code>（默认 <strong>5.0 秒</strong>，单片段的目标上限）、<code>min_fragment_duration</code>（默认 1.0 秒，提示词中进一步要求不低于 1.5 秒保证可读性）。&quot;≤5.5 秒直接成段&quot;这个设计让大部分镜头零开销通过，只有真正超长的镜头才进入智能切分。</p>
+</blockquote>
+<h4>连续性挑战</h4>
+<p>把长镜头切开的最大风险是&quot;切断连续性&quot;，系统从四个维度规避：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">挑战</th>
+<th style="text-align:left">示例说明</th>
+<th style="text-align:left">解决方案（对齐源码实现）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">动作中断</td>
+<td style="text-align:left">在动作中间切分导致视觉跳跃</td>
+<td style="text-align:left">提示词要求在动作自然停顿处分割</td>
+</tr>
+<tr>
+<td style="text-align:left">状态不一致</td>
+<td style="text-align:left">片段边界状态不匹配</td>
+<td style="text-align:left"><code>continuity_notes</code> 携带主角色/场景/主动作逐段传递</td>
+</tr>
+<tr>
+<td style="text-align:left">时空不连续</td>
+<td style="text-align:left">位置、服装、道具突然变化</td>
+<td style="text-align:left">全剧上下文（<code>global_metadata</code>）约束服装/道具描述</td>
+</tr>
+<tr>
+<td style="text-align:left">情绪断裂</td>
+<td style="text-align:left">情绪变化不符合时间逻辑</td>
+<td style="text-align:left">提示词要求&quot;避免在分割点出现情感突变&quot;</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>切分选点（提示词原文）</strong>：动作分割点＝动作完成后的瞬间 / 转身前 / 视线转移时；对话分割点＝句号、省略号后 / 情绪转折处；情感分割点＝呼吸停顿处 / 表情变化前。切点落在语义自然停顿处，再把边界状态通过 <code>continuity_notes</code> 交给下一片段。</p>
+</blockquote>
+<h4>两种实现：规则均分与 LLM 语义切分</h4>
+<p>分段节点同样有双实现（<code>VideoSplitterFactory</code> 按 <code>AgentMode</code> 选择）：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>规则模式</strong>（<code>RuleVideoSplitter</code>）：超过阈值即按公式均分——<code>num_segments = min(3, int(时长 / 2.5) + 1)</code>，每段时长 = 总时长 / 段数。纯数学、零 Token、确定性输出；代价是切点&quot;不会读剧本&quot;，可能在动作中途下刀。</p>
+</li>
+<li class="lvl-2">
+<p><strong>LLM 模式</strong>（<code>LLMVideoSplitter</code>）：超阈值镜头逐镜送给 LLM，按提示词给出语义化的 <code>segments</code>（每段含 description / key_frames / continuity_hints），再由 <code>_validate_and_adjust_fragments</code> 校验并微调时长。</p>
+</li>
+</ul>
+<p><strong>谁负责选路</strong>：<code>_should_use_llm_split(shot)</code>——镜头时长 ≤ 阈值直接走规则，超阈值走 LLM：</p>
+<pre class="hljs"><code><span class="hljs-comment"># 源码节选：llm_video_splitter.py（简化排版，逻辑未改）</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_should_use_llm_split</span>(<span class="hljs-params">self, shot: ShotInfo</span>) -&gt; <span class="hljs-built_in">bool</span>:
+    <span class="hljs-string">&quot;&quot;&quot;判断是否应该使用AI分割&quot;&quot;&quot;</span>
+    <span class="hljs-keyword">if</span> shot.duration &lt;= <span class="hljs-variable language_">self</span>.split_threshold:
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>
+
+    complex_shots = [<span class="hljs-string">&quot;ACTION&quot;</span>, <span class="hljs-string">&quot;MOVING&quot;</span>, <span class="hljs-string">&quot;PANORAMA&quot;</span>, <span class="hljs-string">&quot;ZOOM&quot;</span>]
+    <span class="hljs-keyword">if</span> shot.shot_type <span class="hljs-keyword">in</span> complex_shots:
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+
+    <span class="hljs-keyword">if</span> shot.description <span class="hljs-keyword">and</span> <span class="hljs-built_in">any</span>(keyword <span class="hljs-keyword">in</span> shot.description.lower()
+                                <span class="hljs-keyword">for</span> keyword <span class="hljs-keyword">in</span> [<span class="hljs-string">&quot;对话&quot;</span>, <span class="hljs-string">&quot;交谈&quot;</span>, <span class="hljs-string">&quot;讨论&quot;</span>, <span class="hljs-string">&quot;talk&quot;</span>, <span class="hljs-string">&quot;conversation&quot;</span>]):
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">True</span>
+</code></pre>
+<blockquote>
+<p><strong>实现细节（如实指出）</strong>：该函数最后一行是无条件 <code>return True</code>，导致上面 <code>complex_shots</code> 与对话关键词两个分支实际上是<strong>死代码</strong>——只要超过阈值就必然走 LLM。从代码意图看，作者可能想为&quot;复杂镜头才走 LLM、简单超长镜头走规则均分&quot;留余地，但没有实现完整。这不影响结果正确性，但会让读者误以为存在更细的路由策略。</p>
+</blockquote>
+<blockquote>
+<p><strong>LLM 切分失败怎么办</strong>：<code>cut()</code> 主循环把每个镜头包在 try/except 里——LLM 切分抛异常时记录错误日志并<strong>自动降级为规则均分</strong>（<code>warning(&quot;镜头{id}降级到简单规则分割&quot;)</code>）。这是一条真实的&quot;优雅降级&quot;路径：宁可切得粗糙，不可卡死整个工作流。</p>
+</blockquote>
+<p><strong>LLM 模式的切分约束来自提示词</strong>（<code>video_splitter_prompt.yaml</code> 摘录）：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>12 条分割规则</strong>：动作连贯性 / 对话完整性 / 场景一致性 / 角色连续性 / 视觉元素连贯性 / 情感连贯性 / 转场合理性 / 叙事连贯性 / 视觉风格一致性 / 节奏控制 / 信息完整性 / 道具一致性；</p>
+</li>
+<li class="lvl-2">
+<p><strong>多片段（&gt;2 段）时长分配</strong>：建立状态 30% → 发展变化 40% → 收束情感 30%；</p>
+</li>
+<li class="lvl-2">
+<p><strong>音频同步</strong>：台词结束点必须与视频片段结束点对齐，环境音可跨片段延续；</p>
+</li>
+<li class="lvl-2">
+<p><strong>硬约束</strong>：对话不可在句子中间分割；分割后各段描述合并必须覆盖原始描述的全部关键信息（含完整台词与道具细节）。</p>
+</li>
+</ul>
+<h4>输出示例</h4>
+<p>每个片段携带 <code>continuity_notes</code>（连续性注释：主角色、场景、主动作、<code>split_type</code> 分割标记），为下游提示词转换提供连贯上下文——注意 <code>location</code> 字段的格式是 <code>&quot;场景{scene_id}&quot;</code>，下游转换器正是靠它反查场景的音频上下文；<code>stats</code> 中 <code>fragments_split / split_ratio</code> 反映被切分的片段数量与比例：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;generated_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:40:00Z&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;max_fragment_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5.0</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;source_info&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;shot_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;original_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">9.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;深夜对话&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;shot_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_001&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;中景：张三紧张地环顾四周&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;continuity_notes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;location&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;场景scene_001&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;main_action&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三紧张地环顾四周&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;split_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;none&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;shot_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_002&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_002&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;特写：张三低声询问&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;continuity_notes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;location&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;场景scene_001&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;main_action&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三压低声音询问李四&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;split_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;none&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_003&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;shot_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;shot_003&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;element_ids&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;elem_003&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;start_time&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;中景：李四小心翼翼地走向窗边查看&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;continuity_notes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;location&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;场景scene_001&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;main_action&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四小心翼翼地走向窗边查看&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;split_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;none&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;fragment_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">9.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;avg_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;fragments_under_5s&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;fragments_split&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;split_ratio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.0</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<hr>
+<h3>3.4 指令转换智能体</h3>
+<p><strong>核心目标</strong>：将片段序列转换为高质量、模型特定的 AI 视频生成提示词。本节点是全链路中<strong>唯一直接面向生成模型的一层</strong>，也是&quot;单次 LLM 调用同时产出视频提示词与音频提示词&quot;的合并设计。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[片段序列]
+    end
+
+    subgraph Process[转换流程]
+        B[组装上下文&lt;br/&gt;全局元数据/场景/角色JSON/音频语境] --&gt; C[注入修复与历史提示&lt;br/&gt;repair_hint / history_hint]
+        C --&gt; D[LLM 单次调用&lt;br/&gt;视频 + 音频同批生成]
+        D --&gt; E[双语拼装&lt;br/&gt;英文提示词 + 原语言提示词]
+        E --&gt; F[构造 AIVideoPrompt&lt;br/&gt;挂载关联音频对象]
+    end
+
+    subgraph Output
+        G[AI视频指令 JSON]
+    end
+
+    A --&gt; B --&gt; G
+</pre>
+<p><strong>&quot;模型特定&quot;是怎么实现的</strong>：源码里并没有&quot;加载模型模板&quot;这种机制——真实做法是把目标模型名注入提示词模板（<code>user_prompt_template.format(dm_model=self.config.video_model, ...)</code>），由 LLM 按该模型的偏好组织描述，最后把 <code>model</code> 字段写入每个 <code>AIVideoPrompt</code>。模型白名单由质量审查节点把关（runway_gen2 / sora / pika），转换阶段本身不做格式强校验——这是一处轻量取舍：适配灵活性交给 LLM，合规性交给下游审查。</p>
+<p><strong>输出内容与真实拼装方式</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>视频提示词（双语拼装）</strong>：LLM 返回 <code>prompt</code>（英文）与 <code>original_prompt</code>（原语言）两个字段，代码拼接为 <code>combined_prompt = f&quot;{english_prompt}\n\n{original_prompt}&quot;</code> 存入 <code>AIVideoPrompt.prompt</code>——即&quot;英文在前、原语言在后&quot;的<strong>单字段结构</strong>，而非两个独立字段；</p>
+</li>
+<li class="lvl-2">
+<p><strong>负面提示词</strong>：取 LLM 返回的 <code>negative_prompt</code>，缺失时回退到配置默认值（模型默认 <code>blurry, distorted, low quality, cartoonish, bad anatomy</code>）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>音频提示词（同批生成）</strong>：<code>_build_audio_prompt_from_llm_result()</code> 从同一次 LLM 返回中解析音频字段，构造 <code>AIAudioPrompt</code>（默认模型 <code>XTTSv2</code> 用于台词/旁白，背景声可用 <code>AudioLDM_3</code>），挂载在 <code>AIVideoPrompt.audio</code> 上，并用 <code>previous_audio_id</code> 串联音色连续性；</p>
+</li>
+<li class="lvl-2">
+<p><strong>技术参数</strong>：<code>duration</code> 沿用片段时长、<code>model</code> 取配置的 <code>video_model</code>、<code>style</code> 取 LLM 返回的 <code>style_hint</code>；</p>
+</li>
+<li class="lvl-2">
+<p><strong>执行建议</strong>：<code>AIVideoInstructions.execution_suggestions</code> 三条默认建议（顺序生成 / 保持种子 / 检查衔接）。</p>
+</li>
+</ul>
+<p>以下 JSON 为<strong>示例数据</strong>（结构对照 <code>AIVideoInstructions</code> / <code>AIVideoPrompt</code> / <code>AIAudioPrompt</code> 模型核校）：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;generated_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:45:00Z&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;video_model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;audio_model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XTTSv2&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;project_info&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;深夜对话&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">9.0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;source_fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;frag_003&quot;</span><span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;fragments&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_001&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Zhang San, medium shot: looking around nervously, cinematic style, dramatic lighting\n\n张三，中景：紧张地环顾四周，电影感风格，戏剧性光线&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blurry, distorted, low quality, cartoonish, bad anatomy&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cinematic, suspense&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;audio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Zhang San, close-up: asking in a low voice, detailed facial expression\n\n张三，特写：压低声音询问，面部表情细腻&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blurry, distorted, low quality, cartoonish, bad anatomy&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cinematic&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;audio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;audio_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_002&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;怎么了？你听说了什么？&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;model_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XTTSv2&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;voice_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;character_dialogue&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;voice_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;张三&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;emotion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;whisper&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;speed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1.0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;sample_rate&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">24000</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;fragment_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frag_003&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Li Si, medium shot: walking carefully to the window to check outside, suspenseful atmosphere\n\n李四，中景：小心翼翼地走向窗边查看，悬疑氛围&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;blurry, distorted, low quality, cartoonish, bad anatomy&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;main_character&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;李四&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;model&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;runway_gen2&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;style&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cinematic, suspense&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;requires_special_attention&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;audio&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">null</span></span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;global_settings&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;style_consistency&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;use_common_negative_prompt&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;execution_suggestions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;按顺序生成片段&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;保持相同种子值以获得一致性&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;生成后检查片段衔接&quot;</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>负面提示词与全局设置</strong>：统一负面提示词（<code>blurry, distorted...</code>）用于排除常见劣质成像；<code>global_settings.use_common_negative_prompt=true</code> 表示各片段复用同一负面词库。<code>execution_suggestions</code> 把&quot;保持相同种子值&quot;这类跨片段一致性要约显式下发给下游渲染——但要注意它只是&quot;建议&quot;，执行一致性最终取决于渲染侧是否落实。</p>
+<p><strong>可如实指出的缺陷</strong>：<code>AIAudioPrompt</code> 的字段名是 <code>voice_character</code>，但 <code>get_model_specific_config()</code> 中引用了并不存在的 <code>voice_id</code>。一旦下游真正调用该方法提取语音模型配置，会抛 <code>AttributeError</code>——这是一处&quot;定义与消费尚未对齐&quot;的隐患，也提醒人：预留字段要打通调用链才算数。</p>
+</blockquote>
+<hr>
+<h3>3.5 质量审查智能体</h3>
+<p><strong>核心目标</strong>：在生成前做最后一道程序化把关——五项硬性规则检查、按严重度加权扣分，决定&quot;放行 / 修复 / 人工干预&quot;三种走向。规则版实现为 <code>RuleQualityAuditor</code>（报告 <code>metadata.auditor_type = &quot;basic&quot;</code>）。</p>
+<pre class="mermaid">flowchart TD
+    A[AI指令序列] --&gt; B[逐项执行五项检查]
+    B --&gt; C[片段时长限制检查]
+    B --&gt; D[提示词内容检查]
+    B --&gt; E[提示词长度检查]
+    B --&gt; F[片段数量检查]
+    B --&gt; G[模型支持检查]
+    C --&gt; H[违规项记入 violations&lt;br/&gt;按严重度加权扣分]
+    D --&gt; H
+    E --&gt; H
+    F --&gt; H
+    G --&gt; H
+    H --&gt; I{score 分档}
+    I --&gt;|≥90| J[PASSED 放行]
+    I --&gt;|≥75| K[MINOR_ISSUES]
+    I --&gt;|≥60| L[MODERATE_ISSUES 修复]
+    I --&gt;|≥40| M[MAJOR_ISSUES 修复]
+    I --&gt;|≥20| N[CRITICAL_ISSUES 重试/人工]
+    I --&gt;|低于20| O[FAILED 重试/人工]
+</pre>
+<blockquote>
+<p><strong>&quot;只检查硬性规则&quot;的取舍</strong>：五项检查全部是可被程序化判定的是非问题（时长、空值、长度、数量、模型白名单），不做风格/情绪这类主观评判——留给下游连续性守护节点。代价是&quot;合规但平庸&quot;的提示词能通过审查，产出质量的上限依赖指令转换节点。</p>
+</blockquote>
+<h4>五项检查与判级（<code>rule_quality_auditor.py</code>）</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查项</th>
+<th style="text-align:left">判定条件</th>
+<th style="text-align:left">严重度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">片段时长限制检查</td>
+<td style="text-align:left">时长 &gt; 5.5s（<code>duration_split_threshold</code>）</td>
+<td style="text-align:left">ERROR（建议调回 ≤5.5s）</td>
+</tr>
+<tr>
+<td style="text-align:left">片段时长限制检查</td>
+<td style="text-align:left">时长 &lt; 1.0s（<code>min_fragment_duration</code>）</td>
+<td style="text-align:left">WARNING（建议调回 ≥1.0s）</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词内容检查</td>
+<td style="text-align:left">提示词为空</td>
+<td style="text-align:left">ERROR（<code>PROMPT_EMPTY</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词长度检查</td>
+<td style="text-align:left">超出 <code>max_prompt_length</code> / 低于 <code>min_prompt_length</code></td>
+<td style="text-align:left">WARNING</td>
+</tr>
+<tr>
+<td style="text-align:left">片段数量检查</td>
+<td style="text-align:left">无任何片段</td>
+<td style="text-align:left">ERROR（<code>FRAGMENT_MISSING</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">模型支持检查</td>
+<td style="text-align:left">模型不在 runway_gen2 / sora / pika 白名单</td>
+<td style="text-align:left">WARNING（附替换建议）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意&quot;5.5 秒&quot;在链路中出现两次但口径不同：分段节点用它作<strong>触发切分的阈值</strong>，审查节点用它作<strong>违规红线</strong>，两者读的是同一个配置项 <code>duration_split_threshold</code>。这带来一个已知的工程摩擦——只要分段环节因任何原因漏切，下一个环节就会立刻拦下报 ERROR。</p>
+</blockquote>
+<h4>输出示例</h4>
+<p>审查结果以结构化&quot;检查项 + 状态 + 违规列表 + 建议&quot;的形式输出，<code>status = &quot;passed&quot;</code> 时直接放行。以下 JSON 为<strong>示例数据</strong>（对照 <code>QualityAuditReport</code> 模型核校）：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;audited_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:50:00Z&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;mvp_1.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;auditor_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;basic&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;project_info&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;深夜对话&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;fragment_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;total_duration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">9.0</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;checks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;片段时长限制检查&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有片段时长符合要求&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;checked_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:50:01Z&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;提示词内容检查&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有提示词非空&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;checked_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:50:01Z&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;提示词长度检查&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有提示词长度合适&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;checked_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:50:01Z&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;片段数量检查&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;共3个片段&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;checked_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:50:01Z&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;模型支持检查&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;passed&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;details&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;所有模型都受支持&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;checked_at&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2024-01-20T10:50:01Z&quot;</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;violations&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;total_checks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;passed_checks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;warning&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;error&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;fragments_checked&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">100.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;suggestions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;检查所有片段时长是否≤5秒&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;确保没有空提示词&quot;</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;conclusion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;审查通过，可以开始视频生成&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<blockquote>
+<p><strong>评分、状态与决策的三层链路</strong>：① <code>calculate_weighted_score()</code> 按违规严重度扣分——warning 5 / moderate 10 / major 25 / critical 40 / error 60，从 100 起扣、下限 0；② <code>determine_status_from_score()</code> 把分数映射为状态（≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES、否则 FAILED）；③ 工作流 <code>decide_after_audit()</code> 按状态路由——PASSED 放行，MINOR_ISSUES 默认&quot;有轻微问题但可继续&quot;（违规数超过 3 个才转修复），MODERATE / MAJOR 进入修复，CRITICAL 重试或转人工。另有一处务实的&quot;后门&quot;：即使状态是 FAILED，只要分数 ≥ 80 仍视为可继续——状态机不想让阈值边缘的案例白白重跑。</p>
+<p><strong>排查建议</strong>：若审查未通过，优先看 <code>violations</code>（违规明细）与 <code>stats</code> 中 <code>warning</code> / <code>error</code> 计数（注意是单数键名）定位问题面；<code>suggestions</code> 给出可直接执行的修复方向。</p>
+</blockquote>
+<hr>
+<h3>3.6 连续性守护节点</h3>
+<p><strong>核心目标</strong>：跨阶段检查角色、场景、动作、风格、时间、道具六类连续性问题。<strong>先明确实现性质：这是关键词与数值规则实现（<code>ContinuityGuardianChecker</code>），不是 LLM 语义审查</strong>——六个 <code>check_*_continuity</code> 方法各自基于词表匹配和数值差判定。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[解析/拆分/分段/指令&lt;br/&gt;各阶段产物]
+    end
+
+    subgraph Process[六项检查]
+        B[角色连续性&lt;br/&gt;出现对照+外观词表] --&gt; C[场景连续性&lt;br/&gt;跳转次数占比]
+        C --&gt; D[动作连续性&lt;br/&gt;动作词表]
+        D --&gt; E[风格连续性&lt;br/&gt;风格种类数]
+        E --&gt; F[时间连续性&lt;br/&gt;起止时间差]
+        F --&gt; G[道具连续性&lt;br/&gt;道具动词表]
+    end
+
+    subgraph Dedup[后处理]
+        H[签名去重] --&gt; I[描述截断 500 字符]
+    end
+
+    subgraph Output
+        J[问题列表&lt;br/&gt;含严重度+可修复标记]
+    end
+
+    A --&gt; B --&gt; H --&gt; J
+</pre>
+<h4>六项检查的规则实现</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查</th>
+<th style="text-align:left">实现方式（源码要点）</th>
+<th style="text-align:left">触发条件与严重度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色</td>
+<td style="text-align:left">对照 <code>ParsedScript.characters</code> 与镜头 <code>main_character</code>；外观对比三类词表——服装（穿/戴/着/衣服/裙子/裤子/衬衫）、发型（长发/短发/马尾/卷发/直发）、配饰（眼镜/帽子/围巾/项链/耳环）</td>
+<td style="text-align:left">有对话但无镜头 → <code>CHARACTER_MISSING</code>（MAJOR）；同类外观词变化 → <code>CHARACTER_APPEARANCE_CHANGE</code>（WARNING）</td>
+</tr>
+<tr>
+<td style="text-align:left">场景</td>
+<td style="text-align:left">相邻镜头 <code>scene_id</code> 变化且前后镜头类型相同</td>
+<td style="text-align:left">单次跳变 → <code>SCENE_JUMP</code>（WARNING）；跳变计数 &gt; 镜头数 × 30% → <code>SCENE_TOO_FREQUENT</code>（MODERATE）</td>
+</tr>
+<tr>
+<td style="text-align:left">动作</td>
+<td style="text-align:left">动作词表（走/跑/跳/转身/坐下/站起/拿起/放下）按角色追踪首个命中词</td>
+<td style="text-align:left">同角色相邻动作词变化 → <code>ACTION_BREAK</code>（MODERATE）</td>
+</tr>
+<tr>
+<td style="text-align:left">风格</td>
+<td style="text-align:left">统计 <code>AIVideoPrompt.style</code> 去重种类数</td>
+<td style="text-align:left">种类数 &gt; 2 → <code>STYLE_INCONSISTENT</code>（MODERATE）</td>
+</tr>
+<tr>
+<td style="text-align:left">时间</td>
+<td style="text-align:left">比对片段 <code>start_time</code> 与&quot;前段起始 + 时长&quot;的差值</td>
+<td style="text-align:left">差值 &gt; 0.1s：正差 → <code>TIME_GAP</code>（MAJOR）；负差 → <code>TIME_OVERLAP</code>（ERROR）</td>
+</tr>
+<tr>
+<td style="text-align:left">道具</td>
+<td style="text-align:left">道具动词表（拿/举/抱/提/端/持/握）按角色统计相邻变化</td>
+<td style="text-align:left">同角色道具动词变化 → <code>PROP_CHANGE</code>（WARNING）</td>
+</tr>
+</tbody>
+</table>
+<h4>去重、截断与 auto_fixable</h4>
+<p><code>_create_issue()</code> 为每个问题生成去重签名：<code>{type}_{fragment_id}_{scene_id}_{severity}_{position}_{description[:100]}</code>——同一位置、同一级别的同类问题只报一次；超过 500 字符的描述截断为&quot;497 字符 + …“。多数问题带 <code>auto_fixable=True</code> 标记与 <code>suggestion</code>（如&quot;为角色添加镜头”“添加过渡镜头”），供修复流程直接消费；<code>source_stage</code> 记录问题归属阶段（解析 / 拆分 / 分段 / 转换）——由检查器创建问题时按问题类型直接填充，工作流端另有 <code>_infer_issue_source</code> 类型映射表兜底。</p>
+<blockquote>
+<p><strong>局限性与工程提示（如实指出）</strong>：关键词规则能低成本兜住&quot;机械性断裂&quot;，但误报/漏报是必然的——“转头&quot;不会被动作词表命中（表里只有&quot;转身”），“拿手机&quot;到&quot;握手机&quot;会被判为道具变化，同义改写与近义动作就是词表法的边界。此外六项检查对 <code>parsed_script / shot_sequence / fragment_sequence / instructions</code> 各类上下文是&quot;有则查、无则跳过”（每个方法开头都有判空返回），上下文喂得不全会直接降低检查覆盖面。需要真正的语义级连贯判定时，仍需 LLM 审查或人工复核补位。</p>
+</blockquote>
+<h4>修复路由与&quot;未接通&quot;的缺口（源码考证）</h4>
+<p>连续性检查发现问题后的&quot;修复回流&quot;设计了三步：① 按 <code>source_stage</code> 把问题分组到四个阶段（<code>_analyze_continuity_issues</code>，字段缺失时用问题类型映射表兜底）；② 用 <code>ContinuityRepairGenerator</code> 为每个阶段生成 <code>QualityRepairParams</code> 并写入 <code>state.domain.repair_params[stage]</code>（8 种问题类型各有对应修复建议文案）；③ <code>_route_to_fix_stage</code> 按&quot;解析 → 拆分 → 分段 → 转换&quot;优先级改写 <code>state.execution.current_node</code>，意图&quot;哪错回哪&quot;。四个上游节点开头也都有配套的消费逻辑——读 <code>repair_params[自己]</code> 并调用 <code>apply_repair_params</code>。</p>
+<p>但图边的决策函数 <code>decide_after_continuity</code> 读取的是 <code>state.continuity_issues</code>——这是组合状态重构前的顶层属性写法；<code>WorkflowState</code> 由 <code>input / domain / execution</code> 等子状态组合而成，问题实际写在 <code>state.domain.continuity_issues</code>，顶层属性并不存在，<code>getattr(..., [])</code> 静默取到空列表，决策<strong>恒为 SUCCESS</strong>，流程直接进入结果生成。净效果：修复参数被生成、路由目标被改写，但本次运行不会回流到上游节点去消费它们（重试超限转人工的分支也因此不可达）。另外，即便修正读取路径，决策返回的是 <code>NEEDS_RETRY</code>，而图映射只声明了 <code>NEEDS_REPAIR</code> 等键——路由键同样需要补齐。这是&quot;连续性修复闭环&quot;当前未真正接通的根因，也是接入前值得优先处理的两处小改动。</p>
+<hr>
+<h2>四、常见排坑提示</h2>
+<ol>
+<li class="lvl-3">
+<p><strong>顺序错乱</strong>：解析后如果场景/元素的 <code>sequence</code> 不连续，<code>validate_parsed_result()</code> 会给出警告但<strong>不阻断</strong>（只记问题项）。因此顺序问题的兜底在于复核 <code>scenes[].elements[].sequence</code> 是否符合预期；确认是解析质量问题时，走解析节点的重试路径（<code>NEEDS_RETRY</code>）。</p>
+</li>
+<li class="lvl-3">
+<p><strong>时长超标</strong>：确认分段节点是否走了降级路径——LLM 切分抛异常时会静默降级为规则均分（日志出现&quot;降级到简单规则分割&quot;）。规则均分最多切 3 段，超长镜头均分后单段仍可能超过 5.5 秒红线；根治手段是在上游把镜头拆得更细（更细的元素分组），而不是在审查环节反复重试。</p>
+</li>
+<li class="lvl-3">
+<p><strong>连续跳变</strong>：提示词生成后仍出现角色服装/道具突变，通常是 <code>continuity_notes</code> 没传对——确认上游片段已填充 <code>main_character / location / main_action / split_type</code>，并且 <code>global_metadata</code> 中的 <code>character_outfits</code>、<code>key_props</code> 已被解析出来（转换节点的提示词模板直接引用它们）。</p>
+</li>
+<li class="lvl-3">
+<p><strong>检查误报</strong>：质量审查与连续性守护都是<strong>机械判定</strong>（硬性规则 + 词表匹配），&quot;拿手机→握手机&quot;被判道具变化这类误报属于已知边界——不要把它们的结论当语义金标准，高价值内容建议人工复核一次。</p>
+</li>
+</ol>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

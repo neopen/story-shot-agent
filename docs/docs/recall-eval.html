@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 召回评测：三层记忆真机实测、静默失效与评测方法论 · PenShot 文档</title>
+  <meta name="description" content="以源码与真机数据为准绳考证 PenShot 召回链路：拆解三层记忆的写入分发、Redis 降级与摘要持久化机制，澄清嵌入模型与向量库的选型误传，并实测记录长期记忆空库与评测脚本哑参数两类静默失效边界，附一套可复现的召回评测方法论与排查清单。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/recall-eval.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 召回评测：三层记忆真机实测、静默失效与评测方法论">
+  <meta property="og:description" content="以源码与真机数据为准绳考证 PenShot 召回链路：拆解三层记忆的写入分发、Redis 降级与摘要持久化机制，澄清嵌入模型与向量库的选型误传，并实测记录长期记忆空库与评测脚本哑参数两类静默失效边界，附一套可复现的召回评测方法论与排查清单。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/recall-eval.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html" class="active">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-21</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 召回评测：三层记忆真机实测、静默失效与评测方法论</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<hr>
+<h2>评测概述：从评测报告到源码考证</h2>
+<h3>为什么要评测召回系统</h3>
+<p>召回系统是 PenShot 智能增强层的核心组件，负责从历史成功案例和知识库中检索相关信息，以增强当前任务的处理质量。它的好坏直接决定了提示词增强与连续性验证的成效。本文围绕三个核心能力展开考察：向量检索的实现与效率边界、重排序对检索结果的优化效果、以及三层记忆系统在不同查询场景下的表现。</p>
+<p><strong>写在前面：本文的三条考察纪律</strong></p>
+<p>先说明本文的性质：这是一篇&quot;源码考证 + 真机数据实测&quot;文章，而非一份跑过完整基准的评测报告。项目当前没有积累任何真实的召回评测数据（原因见后文），因此本文坚持三条纪律：所有代码结论以源码为准、可回查；所有数据要么可复现、要么明确标注属性，真机证据与理论分析分开陈述；宁可指出项目当前实现的不足，也不为了&quot;显得高级&quot;而堆砌概念。</p>
+<p><strong>三个真实发现（先给结论，细节见下文）</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>选型长期被误传</strong>：真机日志与 <code>.env</code> 显示，PenShot 的嵌入模型是阿里云 DashScope 的 <code>text-embedding-v4</code>（1536 维），备用链路为本地 Ollama 的 <code>bge-large-zh-v1.5</code>——并非配置模型类里那个从未生效的默认值；</p>
+</li>
+<li class="lvl-2">
+<p><strong>长期记忆真机空库</strong>：三个真实剧本的 Chroma 集合文档数均为 0——长期记忆的写入需要穿过&quot;成功案例判定&quot;门槛，现有样本尚未积累起可检索数据；</p>
+</li>
+<li class="lvl-2">
+<p><strong>评测脚本自带哑参数</strong>：项目内唯一的&quot;重排序对照测试&quot;传入的 <code>use_rerank</code> 参数从未被实现读取，无论怎么调都会输出&quot;重排序无效&quot;——直接照搬会得出完全错误的结论。</p>
+</li>
+</ul>
+<h3>真机环境与真实配置</h3>
+<p>与其罗列一套虚构的测试参数，不如直接呈现项目的真机环境。以下信息全部可回查：模型配置来自项目根目录的 <code>.env</code>，运行证据来自 <code>logs/</code> 下的 13 份真实日志（2026-05-04 至 2026-09-06），存储形态来自 <code>data/memory/</code> 与 <code>data/embedding/</code> 目录快照。</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>真实配置</th>
+<th>证据来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLM</td>
+<td>DeepSeek <code>deepseek-chat</code>，备用本地 Ollama <code>qwen3:4b</code></td>
+<td><code>.env</code> + 05-05 日志</td>
+</tr>
+<tr>
+<td>嵌入模型</td>
+<td>DashScope <code>text-embedding-v4</code>（配置维度 1536）</td>
+<td><code>.env</code> + 05-05 日志</td>
+</tr>
+<tr>
+<td>嵌入备用链路</td>
+<td>Ollama <code>bge-large-zh-v1.5</code>（原生 1024 维，CPU）</td>
+<td><code>.env</code></td>
+</tr>
+<tr>
+<td>重排序模型</td>
+<td><code>BAAI/bge-reranker-large</code>（约 2.1 GB，未接线）</td>
+<td><code>.env</code> + <code>data/models/</code></td>
+</tr>
+<tr>
+<td>脚本知识库</td>
+<td>LlamaIndex SimpleVectorStore（JSON 全量加载）</td>
+<td><code>data/embedding/script_kb/</code></td>
+</tr>
+<tr>
+<td>长期记忆</td>
+<td>Chroma（langchain_chroma，SQLite + HNSW）</td>
+<td><code>data/memory/{id}/chroma.sqlite3</code></td>
+</tr>
+<tr>
+<td>短期记忆</td>
+<td>Redis（6379 端口的 db 1）</td>
+<td>日志&quot;Redis 连接成功&quot;</td>
+</tr>
+</tbody>
+</table>
+<p>有两个被广泛误传的点需要纠正：</p>
+<p>1）<strong>嵌入模型不是 <code>bge-small-en</code></strong>。日志给出了直接证据——<code>使用AI提供商: ClientType.QWEN, 嵌入模型: text-embedding-v4</code>；&quot;768 维&quot;的说法同样无从谈起。而且这里还埋着一个更有意思的偏差：<code>.env</code> 中配置的维度是 <strong>1536</strong>，但真机向量存储里实测落盘的维度是 <strong>1024</strong>。对照阿里云官方文档可知，1024 恰好是 <code>text-embedding-v4</code> 的<strong>默认输出维度</strong>（该模型支持 2048/1536/1024 多档）——也就是说，<strong>配置里的 dimensions 参数并没有生效，模型按自己的默认值输出了 1024 维</strong>。这个偏差不会报任何错，却是一个真实隐患：任何按&quot;1536 维&quot;假设处理数据的代码都会错位，未来若按配置重建索引，新旧向量也无法混用。</p>
+<p>2）<strong>重排序模型不是任何&quot;base&quot;版本</strong>。真机下载的是 <code>BAAI/bge-reranker-large</code>（<code>data/models/bge-reranker-large/</code>，权重文件约 2.1 GB），且它当前<strong>并未接入检索链路</strong>（详见《重排序》专题考证，此处不展开）。</p>
+<p>真机数据的真实规模也值得如实记录：脚本知识库中，样本剧本 <code>SN1780745829485283341820</code>（下称样本 A）的向量存储有 <strong>12 条记录</strong>（4 个场景 + 8 个角色），<code>SN4017625628127455555807</code>（样本 B）只有 <strong>2 条</strong>（1 场景 + 1 角色）；提示词模板库分别为 <strong>31 条</strong>与 <strong>2 条</strong>。这是典型的&quot;单剧本小索引&quot;场景——任何脱离&quot;十几条文档&quot;规模去谈毫秒级延迟或召回率提升的说法，都值得打一个问号。</p>
+<pre class="mermaid">graph TB
+    subgraph RealEnv[&quot;真机环境（全部可回查）&quot;]
+        LLM[DeepSeek deepseek-chat&lt;br/&gt;备用 Ollama qwen3:4b]
+        Embed[DashScope text-embedding-v4&lt;br/&gt;配置 1536 维 · 实测落盘 1024 维]
+        Rerank[BAAI/bge-reranker-large&lt;br/&gt;约 2.1GB · 未接线]
+        Store1[(Redis 6379 db1&lt;br/&gt;短期记忆)]
+        Store2[(Chroma&lt;br/&gt;长期记忆)]
+        Store3[(SimpleVectorStore&lt;br/&gt;脚本知识库)]
+    end
+</pre>
+<h3>召回链路真实接线图</h3>
+<p>原图把&quot;知识路由器&quot;画成中央调度、把 Chroma 画成统一的&quot;向量数据库&quot;——这与源码事实不符。按当前代码的真实调用关系重画如下：</p>
+<pre class="mermaid">graph TB
+    subgraph Prod[&quot;生产链路（已接线）&quot;]
+        N[工作流节点&lt;br/&gt;parse_script / segment_shot / split_video / convert_prompt]
+        N --&gt; WM[WorkflowMemory.after_stage_completion]
+        WM --&gt; MM[MemoryManager → ScriptMemory.add]
+        MM --&gt; ST[短期记忆&lt;br/&gt;Redis · 20 条滑动窗口]
+        MM --&gt; MTF[中期记忆&lt;br/&gt;LLM 摘要 + JSON 持久化]
+        MM --&gt; LT[长期记忆&lt;br/&gt;Chroma · score ≥ 0.7]
+        N --&gt; PTM[PromptTemplateManager]
+        PTM --&gt; SS[search_similar / get_best_match&lt;br/&gt;SimpleVectorStore 余弦检索]
+        PTM --&gt; EP[enhance_prompt&lt;br/&gt;模板增强]
+    end
+
+    subgraph Stand[&quot;已实现 · 未接线（全仓库无生产调用方）&quot;]
+        KR[KnowledgeRouter._hybrid_search&lt;br/&gt;三源合并去重]
+        CR[create_retriever_for_script&lt;br/&gt;BGE 重排序装配]
+        DR[DocumentRetriever&lt;br/&gt;&quot;混合检索&quot;简化版]
+    end
+
+    KR -.-&gt; CR
+    DR -.-&gt; KR
+    SS -.-&gt;|生产路径无重排序| CR
+</pre>
+<p>三条事实要点：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>记忆链路是三套存储分工</strong>：短期走 Redis、中期走 JSON 摘要、长期走 Chroma——不是单一&quot;文件系统&quot;；</p>
+</li>
+<li class="lvl-2">
+<p><strong>脚本知识库检索不经过 Chroma</strong>：<code>search_similar</code> 直接用 LlamaIndex 的 SimpleVectorStore 余弦检索（<code>as_retriever</code> + <code>min_score</code> 过滤），Chroma 只服务长期记忆；</p>
+</li>
+<li class="lvl-2">
+<p><strong>&quot;知识路由器&quot;没有接线</strong>：<code>KnowledgeRouter</code> 的全部引用都位于它自己的文件内，全仓库没有任何生产代码实例化它——图中用虚线标出的三条&quot;高级能力&quot;（混合检索、重排序装配、文档检索器）都处于&quot;已实现、未接线&quot;状态。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>真机数据实况</strong>：<code>data/embedding/</code> 下实际只有两份脚本知识库（12 条与 2 条记录），<code>data/memory/</code> 下有三个剧本的记忆目录——其中长期记忆 Chroma 集合的文档数经 SQLite 核验全部为 0，中期摘要则有 2026-05-05 至 07-23 期间的多份按小时快照。&quot;数千个向量文档&quot;的评测口径在真机数据中并不存在，这也是本文无法给出真实召回率指标的根本原因。</p>
+</blockquote>
+<hr>
+<h2>关键要点拆解（一）：向量检索的实现与边界</h2>
+<h3>相似度检索</h3>
+<p>先给出源码层面的结论：PenShot 里的&quot;相似度检索&quot;存在两条实现路径，理解它们的差异比任何跑分数字都重要。</p>
+<p><strong>生产路径一：<code>search_similar</code>（提示词模板检索）</strong>。走标准 LlamaIndex 检索：<code>as_retriever(similarity_top_k=top_k, retriever_mode=&quot;similarity&quot;)</code> 取回结果后，用 <code>score &lt; min_score</code> 过滤低分项，再用 <code>metadata.type == &quot;prompt_template&quot;</code> 过滤类型。<code>min_score</code> 的默认值来自构造参数——<code>workflow_nodes.py</code> 实例化模板管理器时传入了 <code>min_similarity_score=0.7, top_k=3</code>，即生产环境的&quot;及格线&quot;是余弦相似度 0.7。</p>
+<p><strong>生产路径二：<code>query()</code>（场景相似检索）</strong>。这条路径没有走 LlamaIndex 的检索器，而是手动实现余弦相似度：查询文本嵌入后，遍历向量存储内的全部文档向量逐一计算、排序、截取 Top-K。源码摘录：</p>
+<pre class="hljs"><code><span class="hljs-comment"># llama_index_knowledge.py L517-522：手动遍历全量向量计算余弦相似度</span>
+<span class="hljs-keyword">for</span> doc_id, embedding <span class="hljs-keyword">in</span> vector_store._data.embedding_dict.items():
+    dot = np.dot(query_embedding, embedding)
+    norm_q = np.linalg.norm(query_embedding)
+    norm_d = np.linalg.norm(embedding)
+    similarity = dot / (norm_q * norm_d) <span class="hljs-keyword">if</span> norm_q &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">and</span> norm_d &gt; <span class="hljs-number">0</span> <span class="hljs-keyword">else</span> <span class="hljs-number">0</span>
+</code></pre>
+<p>这段实现有两个值得指出的细节：其一，<strong>每次查询都是 O(N) 全量线性扫描</strong>，没有 HNSW 等 ANN 索引加速，文档量增长到数万条时延迟将随文档数线性增长；其二，<code>norm_q = np.linalg.norm(query_embedding)</code>（查询向量模长）写在了循环体内——每次迭代都重复计算同一个恒定值。12 条记录时这些都无感，但它精确暴露了这段代码的定位：<strong>为单剧本小索引写的最简实现，而非可扩展的检索基础设施</strong>。</p>
+<p>还有一处口径差异：<code>search_similar</code> 有 <code>min_score</code> 及格线过滤，而 <code>query()</code> <strong>没有</strong>——只做 Top-K 截取，哪怕全库相似度都不高，也会照常返回最&quot;像&quot;的几条。<code>search_similar_scene</code> 的返回会直接被赋给连续性问题的 <code>historical_solutions</code> 字段（<code>workflow_nodes.py</code> 连续性检查节点），全程没有分数校验环节——这是接线上一个可改进点。</p>
+<p>这里补充一条原理说明：余弦相似度衡量的是两个向量在高维空间中的<strong>夹角</strong>而非距离，取值范围在 -1 到 1 之间，越接近 1 表示方向越一致、语义越接近。相比关键词检索只能做字面命中，余弦相似度通过向量语义匹配，能够理解同义词与改写表达，这正是向量检索&quot;语义召回&quot;能力的基础。</p>
+<pre class="mermaid">flowchart LR
+    subgraph Query[&quot;查询处理&quot;]
+        QT[查询文本] --&gt; Embed[嵌入模型]
+        Embed --&gt; QV[查询向量]
+    end
+    
+    subgraph Index[&quot;向量索引&quot;]
+        direction TB
+        V1[(文档向量1)]
+        V2[(文档向量2)]
+        V3[(文档向量...)]
+        VN[(文档向量N)]
+    end
+    
+    subgraph Search[&quot;相似度计算&quot;]
+        QV --&gt; Cosine[余弦相似度]
+        Cosine --&gt; V1
+        Cosine --&gt; V2
+        Cosine --&gt; V3
+        Cosine --&gt; VN
+    end
+    
+    subgraph Result[&quot;结果排序&quot;]
+        Sorted[按分数排序] --&gt; Top[Top-K结果]
+    end
+</pre>
+<p>延迟性能方面，本文只能给出基于代码结构的拆解（属性：理论分析，非实测）。一次检索的开销分两段：查询文本的嵌入编码——真机走 DashScope 云端 API，包含网络往返；向量比对计算——纯本地 numpy 运算，1024 维向量单次余弦计算仅数千次浮点乘加，即便数万条文档的线性扫描也在十毫秒量级。换句话说，<strong>当前链路真正的延迟大头大概率是嵌入 API 的网络往返，而非向量计算</strong>——这与&quot;向量检索慢在计算&quot;的直觉恰好相反，也解释了为什么这类在线嵌入架构需要本地模型缓存或批量嵌入优化。</p>
+<p>原始版本中&quot;检索延迟分布&quot;“绝大多数查询在 100 毫秒内完成”&quot;亚秒级响应&quot;之类的描述，在项目日志与代码中找不到任何测量依据——真机索引只有 12 条记录，代码中也没有延迟埋点。这些数字在此撤回。</p>
+<blockquote>
+<p><strong>真机数据实况</strong>：脚本知识库的真实规模让&quot;召回率&quot;暂时失去比较意义——样本 A 全库 12 条（4 场景 + 8 角色），样本 B 仅 2 条。在这种规模下查询&quot;角色&quot;主题，返回结果里出现多个角色文档几乎是结构性必然，任何准确率百分比都会被样本量淹没。项目内也不存在标注数据集或评测产物，&quot;角色查询准确率最高、动作序列最低&quot;之类的分类型对比没有数据来源——这也是本文把重心放在机制考证而非指标罗列的根本原因。</p>
+</blockquote>
+<h3>MMR检索</h3>
+<p>MMR 检索在相似度基础上增加了多样性惩罚因子，避免返回语义冗余的结果。但必须先给出它在 PenShot 里的真实状态：<strong>已实现装配逻辑、未接线生效</strong>。<code>create_retriever_for_script</code> 中存在完整的分支：</p>
+<pre class="hljs"><code><span class="hljs-comment"># llama_index_knowledge.py L588-593：MMR 分支</span>
+<span class="hljs-keyword">if</span> search_type == <span class="hljs-string">&quot;mmr&quot;</span>:
+    retriever = index.as_retriever(
+        similarity_top_k=similarity_top_k,
+        vector_store_query_mode=<span class="hljs-string">&quot;mmr&quot;</span>,
+        mmr_threshold=<span class="hljs-number">0.6</span>
+    )
+</code></pre>
+<p>两层断裂让它无法生效：其一，<code>create_retriever_for_script</code> 的全部触达路径都没有生产调用方（详见前文接线图的&quot;未接线区&quot;）；其二，生产路径中的 <code>query()</code> 虽然签名带 <code>search_type</code> 参数，函数体却从未读取它——内部只有一条手动余弦相似度的代码路径。<strong>因此真机上从未有过一次 MMR 检索真正执行</strong>。下文保留原理与调参分析，是因为这个分支一旦接线就会用到；但请把&quot;原理成立&quot;与&quot;已生效&quot;分开看待。</p>
+<p>关于 MMR 的公式：它实现在候选集 $D$ 中迭代选取文档，使目标函数</p>
+<p><img src="/imgs/math/image-20260914175909622.png" alt="image-20260914175909622"></p>
+<p>最大化，其中 $S$ 是已选集合。即每一步都在&quot;更贴近查询&quot;与&quot;与已选内容更不重合&quot;之间按 $\lambda$ 权衡，从而既保相关又添多样。</p>
+<pre class="mermaid">graph LR
+    subgraph MMR[&quot;MMR检索原理&quot;]
+        R[候选结果集] --&gt; Score[相似度计算]
+        Score --&gt; Div[多样性计算]
+        Div --&gt; Combine[加权组合]
+        Combine --&gt; Select[选择最优]
+        Select --&gt; Update[更新已选集]
+        Update -.-&gt;|循环| Score
+    end
+    
+    subgraph Formula[&quot;计算公式&quot;]
+        F[&quot;MMR = argmax[ λ·Sim(Q,D) - (1-λ)·max Sim(D, D_j) ]&quot;]
+    end
+</pre>
+<p>代码中把 MMR 的权衡参数硬编码为 <code>mmr_threshold=0.6</code>——在 LlamaIndex 中该参数即 MMR 公式里的 $\lambda$（相似度与多样性的权衡系数），没有对外开放配置。也就是说，一旦接线启用，系统将固定以偏相关一侧的 0.6 运行。这个取值对提示词模板检索场景是否合适，项目尚无对照数据可依。</p>
+<p>从设计意图看，这个能力对提示词模板检索确有价值：若 Top-K 结果全部集中在同一类情感场景（比如全是&quot;愤怒&quot;类模板），融合生成的提示词就容易风格固化；MMR 的多样性惩罚能把不同情绪类型的处理方式纳入候选。但必须再次标注属性：<strong>这是设计推演，不是实测结论</strong>——项目既没有 MMR 开/关的对照实验，也没有&quot;多样性&quot;指标的定义与测量代码。</p>
+<blockquote>
+<p>排坑提示：MMR 的效果高度依赖 $\lambda$（本项目中即 <code>mmr_threshold</code>）。$\lambda$ 过大会退化成普通相似度检索，$\lambda$ 过小则会牺牲相关性、招回大量低质结果。若业务更看重&quot;覆盖多种方案&quot;，可将 $\lambda$ 适当调低；若追求&quot;精准命中&quot;，应保持较高的 $\lambda$。另外提醒：接线启用 MMR 时建议同步暴露参数配置——硬编码值迟早会遇到&quot;某个场景想调却调不了&quot;的困境。</p>
+</blockquote>
+<hr>
+<h2>关键要点拆解（二）：重排序原理与未接线真相</h2>
+<p>重排序使用专门的模型对初步检索结果进行精细排序：它基于交叉编码器架构，能捕捉查询与文档之间的深层语义交互——这是设计初衷。但在 PenShot 里，它当前并未接入生产链路。先看原理，再看真实状态。</p>
+<p>补充架构说明：向量检索使用<strong>双编码器（BiEncoder）</strong>——查询与文档分别独立编码后再算余弦相似度，速度快但缺乏交互；重排序使用<strong>交叉编码器（CrossEncoder）</strong>——查询与文档拼接后联合编码，注意力机制让两者 token 相互&quot;看见&quot;对方，精度高但速度慢。因此业界普遍采用&quot;先粗排后精排&quot;的两阶段策略：</p>
+<pre class="mermaid">flowchart TB
+    subgraph TwoStage[&quot;两阶段检索策略&quot;]
+        subgraph Stage1[&quot;第一阶段: 向量检索&quot;]
+            Q1[查询] --&gt; E1[嵌入]
+            E1 --&gt; S1[相似度计算]
+            S1 --&gt; R1[Top-20候选]
+        end
+        
+        subgraph Stage2[&quot;第二阶段: 重排序&quot;]
+            R1 --&gt; P[构建查询-文档对]
+            P --&gt; CE[交叉编码器]
+            CE --&gt; S2[精细相关性分]
+            S2 --&gt; R2[Top-3结果]
+        end
+    end
+</pre>
+<h3>真实状态：装配完整，但未接线</h3>
+<p><code>create_retriever_for_script</code> 中的重排序装配代码是完整的，三个关键事实逐一考证：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>模型路径解析</strong>：优先读配置项的 <code>rerank_model_local_path</code>（真机值为 <code>data/models/bge-reranker-large</code> 完整子目录），相对路径自动拼到项目根目录；路径不存在时输出警告并降级为模型名——这可能在不知不觉中触发从 HuggingFace 联网下载约 2.1 GB 权重，而日志里只有一行 warning；</p>
+</li>
+<li class="lvl-2">
+<p><strong>重排序器参数</strong>：<code>SentenceTransformerRerank(model=model_to_use, top_n=min(3, similarity_top_k))</code> 挂入 <code>node_postprocessors</code>——重排序后最多保留 3 条结果，这是硬上限；</p>
+</li>
+<li class="lvl-2">
+<p><strong>日志埋点齐全</strong>：成功有 <code>info(&quot;重排序已启用...&quot;)</code>、失败有 <code>warning(&quot;重排序初始化失败...&quot;)</code>。</p>
+</li>
+</ul>
+<p>2026-05-21 的日志里确实出现过&quot;重排序已启用&quot;的记录，但复核全链路后发现，那是当天的调试脚本触发的——<strong>生产代码中没有任何路径会走到这段装配</strong>，<code>RERANK_ENABLED=false</code> 也一直是真机默认（完整考证见《重排序》专题）。</p>
+<blockquote>
+<p><strong>数据撤回</strong>：原文声称&quot;重排序后 top-1 准确率由 68% 提升至 86%&quot;，该数字没有任何来源——项目既无重排序实测（模型未接线），也无准确率埋点。同理，“单次重排序耗时是向量检索数倍”“重排序对查询长度敏感”&quot;边界案例改进明显&quot;等描述均无实测依据，一并撤回。</p>
+</blockquote>
+<h3>接线前值得审视的设计点</h3>
+<p>装配代码里还有几个细节，在接线启用前值得提前审视：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>候选数扩大不等于输出数扩大</strong>：<code>top_n=min(3, similarity_top_k)</code> 把输出硬限制为 3 条。即便未来把召回候选扩到 10 条，最终仍只留 3 条——扩容只提升&quot;选出好 3 条&quot;的概率；</p>
+</li>
+<li class="lvl-3">
+<p><strong>两级降级链是静默的</strong>：路径不存在→模型名→联网下载，每一级都在不报错的情况下悄悄改变行为；</p>
+</li>
+<li class="lvl-3">
+<p><strong>模型构造在检索器创建函数内部</strong>：每次为该剧本重建检索器都会重新走一遍加载路径。单剧本场景无碍，多剧本高频重建时应考虑模型复用。</p>
+</li>
+</ol>
+<hr>
+<h2>关键要点拆解（三）：三层记忆真实机制与失效边界</h2>
+<h3>短期记忆</h3>
+<p>短期记忆的真实结构是&quot;Redis 优先、内存降级&quot;的双轨制。源码层面的关键事实：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>存储选择</strong>：初始化时尝试 Redis（<code>RedisChatMessageHistory</code>，key 为 <code>penshot:memory:{session_id}</code>，TTL 3600 秒）；Redis 不可用时降级为带文件持久化的进程内消息历史——2026-05-20 的提交&quot;短期记忆文件持久化（Redis 不可用时）&quot;为此新增了 <code>short_term.json</code> 落盘；</p>
+</li>
+<li class="lvl-2">
+<p><strong>窗口机制</strong>：<code>deque(maxlen=20)</code> 滑动窗口，超过 20 条自动淘汰最旧消息；</p>
+</li>
+<li class="lvl-2">
+<p><strong>会话隔离</strong>：<code>session_id = f&quot;short_term_{script_id[2:]}&quot;</code>（去掉剧本 ID 的 <code>SN</code> 前缀）。日志考古显示这个方案经历过一次演进：早期日志（5-05）还是 <code>penshot_short_term_{md5}</code> 的全局共享会话，5-15 之后变为&quot;一个剧本一个会话&quot;——隔离粒度从项目级细化到了剧本级；</p>
+</li>
+<li class="lvl-2">
+<p><strong>真机证据</strong>：Redis 6379 端口探测可达（db 1），日志有&quot;Redis 连接成功&quot;记录，且 <code>data/memory/</code> 下不存在 <code>short_term.json</code>——说明真机一直走 Redis 主路径，文件降级通道备而未用。</p>
+</li>
+</ul>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 空闲
+    
+    空闲 --&gt; 写入: 添加记忆
+    写入 --&gt; 活跃: 存储成功
+    
+    活跃 --&gt; 读取: 检索记忆
+    读取 --&gt; 活跃: 返回结果
+    
+    活跃 --&gt; 淘汰: 超过窗口大小
+    淘汰 --&gt; 活跃: 移除旧记录
+    
+    活跃 --&gt; 过期: TTL超时
+    过期 --&gt; 空闲: 自动清理
+    
+    活跃 --&gt; 清空: 任务完成
+    清空 --&gt; 空闲: 释放资源
+</pre>
+<p>从&quot;评测&quot;视角看短期记忆，有两个值得记录的工程细节：</p>
+<p>其一，<strong>降级链的兑现条件</strong>：<code>redis_utils.py</code> 的 <code>RedisClient</code> 在建立连接时会 ping 一次，<strong>ping 失败直接抛异常</strong>。也就是说，&quot;Redis 不可用时降级文件&quot;并不是自动生效——它依赖调用方捕获初始化异常并切换到文件存储；同时 <code>get_redis_url()</code> 带了 <code>lru_cache(maxsize=1)</code>，运行期修改环境变量不会重新解析 URL（需清缓存或重启进程）。</p>
+<p>其二，<strong>没有&quot;任务完成即清空&quot;</strong>：代码中不存在基于任务完成钩子的清理逻辑，短期窗口只靠两个机制自然滚动——<code>deque</code> 的 20 条上限与 Redis 的 1 小时 TTL。一小时内连续跑多个剧本时，会话残留属于设计内行为；隔离依赖 session_id 的剧本粒度，而不是&quot;用完即清&quot;。</p>
+<h3>中期记忆</h3>
+<p>中期记忆基于 LangChain 的摘要链（LLM 摘要 + 中文摘要提示词），把长对话浓缩为摘要后持久化为 JSON。源码层面有两个机制值得细看——一个是设计，一个是缺陷。</p>
+<p><strong>设计：滚动摘要的触发逻辑</strong>。积压的对话字符数超过阈值（<code>max_token_limit * 4</code>，默认 500 → 2000 字符）时，把新增对话交给 LLM 生成摘要，替换掉原始消息；摘要自身超过另一阈值（<code>max_token_limit * 2</code> → 1000 字符）时截断。此外，工作流写入层还有一个独立的统计摘要（<code>_calculate_medium_term_summary</code>）：对数值字段计算 avg/min/max/count，并对 <code>completeness_score</code> 做 improving/declining/stable 趋势判定——这不是文本压缩，而是质量仪表盘。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Trigger[&quot;触发判断（每次写入时）&quot;]
+        NEW[新增对话] --&gt; CHK{积压字符数超过&lt;br/&gt;max_token_limit × 4 ?}
+        CHK --&gt;|否| WAIT[继续积压]
+        CHK --&gt;|是| LLM[调用 LLM 生成摘要]
+    end
+
+    subgraph Persist[&quot;持久化（按小时分文件）&quot;]
+        LLM --&gt; CAP{摘要超长?&lt;br/&gt;超过 max_token_limit × 2}
+        CAP --&gt;|是| TRUNC[截断至 1000 字符]
+        CAP --&gt;|否| KEEP[原样保留]
+        TRUNC --&gt; FILE[(JSON 快照文件&lt;br/&gt;medium_summary 按小时命名)]
+        KEEP --&gt; FILE
+    end
+</pre>
+<p><strong>缺陷：读写文件名不一致</strong>。这是本次考证中最值得记录的一处静默失效：<code>_persist_to_file</code> 写出的文件名是 <code>medium_summary_{YYYYMMDDHH}.json</code>（按小时分文件），而 <code>_load_from_file</code> 与 <code>clear</code> 操作的却是固定名 <code>medium_summary.json</code>——写入与读取指向两个不同的路径。后果是：<strong>中期摘要每次进程重启后都加载不回来</strong>，历史摘要永远在磁盘上&quot;沉睡&quot;。真机数据恰好两个面都印证了：<code>data/memory/</code> 下堆积着 2026-05-05 至 07-23 期间多份按小时快照（写入一直在正常跑），但没有一份会被读取逻辑认领。</p>
+<p>顺带记录一个精度问题：<code>len(text) * 4</code> 的&quot;字符当 token&quot;近似是英文经验的移植（约 4 字符 ≈ 1 token）。中文里 1 个汉字就能折合 1 个以上 token，这个近似会<strong>系统性低估中文的 token 数</strong>——配置里&quot;500 token 上限&quot;的语义在中文场景下是失真的。功能上无害（照样压缩），但参数的含义与文档声明不符。</p>
+<blockquote>
+<p>排坑提示：两句话——其一，<strong>持久化的读路径和写路径必须使用同一个文件名约定</strong>。这类不一致不会报错、不会告警，只会在重启后表现为&quot;记忆凭空消失&quot;，排查成本极高；其二，中期记忆的 token 上限本质是信息取舍。若任务需要长时间保留细节（如跨幕伏笔），建议引入分层摘要或主题聚类，避免单一摘要&quot;压过头&quot;丢掉关键决策点。</p>
+</blockquote>
+<p>此外，原文称&quot;异步保存、不阻塞主流程&quot;——源码中 <code>save_json_result</code> 是同步调用，没有异步包装。&quot;阶段完成后即时触发写入&quot;这句是准确的，但&quot;异步&quot;属于美化，一并纠正。</p>
+<h3>长期记忆</h3>
+<p>长期记忆基于 Chroma（<code>langchain_chroma</code>，每剧本一个 collection，SQLite + HNSW 落地）。<strong>但真机数据给出了本次考证最意外的一个事实：三个真实剧本的长期记忆集合，文档数全部为 0。</strong></p>
+<p>写入路径的机制是这样的：工作流每个阶段完成后，<code>WorkflowMemory.after_stage_completion</code> 会评估该阶段结果是否构成&quot;成功案例&quot;（<code>_is_successful_case</code>——如 <code>parse_script</code> 阶段要求 <code>completeness_score &gt;= 0.8</code>），通过才生成长期记忆条目（格式为&quot;[阶段] 执行完成 + 统计 + 场景/角色/镜头摘要&quot;，限 2000 字符、保留最近 30 条成功模式），经增强文本后写入 Chroma。检索侧用 <code>similarity_search_with_score</code> 并按 <code>score &gt;= 0.7</code> 过滤、<code>long_term_k=3</code> 取前 3 条。</p>
+<p>也就是说，长期记忆是一个&quot;全靠成功样本喂养&quot;的冷启动系统：<strong>样本不够成功，它就一直是空的</strong>。空库状态下的检索不会报错——它安静地返回零条结果，任何依赖&quot;历史经验&quot;增强的逻辑都会静默退化为&quot;没有经验可用&quot;。这类失效没有任何告警，是记忆系统最需要监控的指标（本仓库中没有任何此类监控）。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Write[&quot;写入路径（真机实测文档数：0）&quot;]
+        N[工作流阶段完成] --&gt; W1[WorkflowMemory 评估成功案例]
+        W1 --&gt;|completeness ≥ 0.8 等门槛| W2[生成记忆条目&lt;br/&gt;限 2000 字符 · 保留 30 条]
+        W1 --&gt;|未达标| SKIP[跳过写入]
+        W2 --&gt; CH[(Chroma collection&lt;br/&gt;每剧本独立)]
+    end
+
+    subgraph Read[&quot;检索路径&quot;]
+        Q[查询文本] --&gt; EMB[嵌入]
+        EMB --&gt; S[similarity_search_with_score]
+        S --&gt; F[score ≥ 0.7 过滤 · 取前 3]
+        F --&gt; OUT[注入提示词上下文]
+    end
+</pre>
+<p>原始版本中的两段&quot;检索测试&quot;描述——“成功召回相似角色的服装描述和位置轨迹”“镜头时长超限问题的多种分割策略”——在空库事实下全部不成立，予以撤回。这两个场景在机制上确实存在（长期记忆按 0.7 阈值检索后注入上下文），但真机数据里没有任何一条记录支撑&quot;成功召回&quot;。</p>
+<p>真正值得记录的是空库的成因链条：写入需要穿过成功案例判定，而判定依赖 <code>completeness_score</code> 等质量指标；如果运行中的任务尚未积累出达标样本，或者达标阶段的写入链条存在断点，库就会长期为空。<strong>验证方法很简单</strong>——直接查 <code>chroma.sqlite3</code> 的 embeddings 计数（本文的核验就是这样做的），而不是看代码里&quot;有没有写入逻辑&quot;。</p>
+<p>另外，&quot;批量索引策略&quot;的描述也与源码不符：长期记忆写入是<strong>阶段完成即触发</strong>的单条即时写入（<code>add</code> 逐条落库），没有任何批处理队列。真实存在的规模约束是两个裁剪上限——写入中期记忆时统计摘要最多 20 条、写入长期记忆时成功模式最多 30 条（<code>patterns[-30:]</code>）——它们约束的是写入内容的规模，而非写入时机。</p>
+<blockquote>
+<p>排坑提示：长期记忆有两个&quot;不报警的坑&quot;。其一，<strong>查询与写入必须使用同一套嵌入模型与维度</strong>，否则召回静默失效——真机正是这个风险的活例：配置声明 1536 维、实际落盘 1024 维，任何按配置硬编码维度的处理代码都会错位；其二，<strong>空库不是错误</strong>：写入门槛未达标时系统一切&quot;正常&quot;，检索只是安静地返回零结果。给长期记忆加一个&quot;集合文档数&quot;监控，比任何检索日志都更能提前暴露问题。</p>
+</blockquote>
+<hr>
+<h2>关键要点拆解（四）：混合检索与缓存真相</h2>
+<h3>混合检索策略</h3>
+<p>原始版本把混合检索描述成&quot;加权合并&quot;——源码里并非如此。真实的实现位于 <code>llama_index_router.py</code> 的 <code>_hybrid_search</code>：把向量检索、记忆检索、结构化查询三路结果<strong>直接合并</strong>，按各自的 <code>score</code> 排序，再用&quot;前 100 字符&quot;作去重键过滤，最后截取 <code>top_k</code>。全程<strong>没有任何权重系数</strong>——流传的 0.6/0.4/0.3 权重在代码里不存在。</p>
+<p>三个来自源码的细节值得记录：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>去重键的颗粒度很粗</strong>：<code>content[:100]</code> 前 100 字符相同即视为重复——对结构相似的模板文本可能误判；</p>
+</li>
+<li class="lvl-2">
+<p><strong>结构化结果的分数是硬编码的 0.9</strong>（写死），在按分排序的合并里会恒定压制大多数真实分值的向量结果（余弦相似度通常落在 0.5-0.8 区间）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>作者自己标注了简化</strong>：<code>create_hybrid_retriever</code> 的注释写着&quot;目前简化实现……未来可以扩展支持真正的混合索引&quot;。</p>
+</li>
+</ul>
+<pre class="mermaid">flowchart TB
+    subgraph Sources[&quot;三路召回（无加权）&quot;]
+        V[向量检索]
+        M[记忆检索]
+        S[&quot;结构化查询&lt;br/&gt;score 硬编码 0.9&quot;]
+    end
+
+    subgraph Merge[&quot;_hybrid_search 合并逻辑&quot;]
+        A[三路结果直接合并] --&gt; B[按 score 排序]
+        B --&gt; C[&quot;前 100 字符去重&quot;]
+        C --&gt; D[截取 top_k]
+    end
+
+    V --&gt; A
+    M --&gt; A
+    S --&gt; A
+</pre>
+<p>更关键的是接线状态：整个 <code>KnowledgeRouter</code> 在生产代码里没有任何实例化点——它的全部引用都位于自己的文件内，&quot;混合检索同时从多源获取信息、质量评分更高&quot;之类的结论既无接线支撑、也无评测数据支撑，一并撤回。真正在生产链路上执行提示词增强的是 <code>enhance_prompt → search_similar</code> 这条链（见下一节的影响链考证）。</p>
+<blockquote>
+<p>排坑提示：混合检索最容易被忽视的不是&quot;权重调不好&quot;，而是<strong>分数量纲不统一</strong>——本实现干脆放弃了加权，直接按原始分排序。当三路分数量纲差异大（余弦分数 0.5-0.8 vs 硬编码 0.9 vs 记忆侧分数）时，“排序&quot;实际上是对结构化结果的无条件优先。若要真正启用这套混合检索，第一步应该是给三路分数做归一化或引入可配置权重，而不是照搬某个&quot;经验权重表”。</p>
+</blockquote>
+<p>原始版本关于&quot;查询延迟是各来源最大值 + 融合开销&quot;的描述属于推测性美化——融合逻辑本身就是内存里的列表合并与排序，开销可忽略；真正的成本大头仍是各路的嵌入/检索调用。但必须强调：这段逻辑当前没有任何生产流量，讨论其延迟没有实测意义。</p>
+<h3>缓存机制的真实形态</h3>
+<p>先把结论放前面：<strong>PenShot 没有任何检索结果缓存</strong>。真机代码里能找到的缓存只有两处，都与&quot;加速检索&quot;无关：</p>
+<table>
+<thead>
+<tr>
+<th>缓存</th>
+<th>位置</th>
+<th>默认状态</th>
+<th>真实作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模板列表缓存</td>
+<td><code>PromptTemplateManager._caches</code></td>
+<td>启用（上限 200）</td>
+<td>服务模板去重（hash + 文本比对），不是检索加速</td>
+</tr>
+<tr>
+<td>LLM 响应缓存</td>
+<td><code>base_llm_agent</code></td>
+<td><strong>默认关闭</strong></td>
+<td>相同提示词的 LLM 调用复用（TTL 300 秒），需显式开启</td>
+</tr>
+</tbody>
+</table>
+<p>原始版本中&quot;缓存 TTL 设置为合理值&quot;这类描述无从对应——唯一的 TTL 属于默认关闭的 LLM 缓存。</p>
+<p>为什么没做检索缓存？从工程角度看，理由可能是充分且诚实的（作者分析，非项目声明）：当前真机索引只有 2-12 条文档、单剧本场景下每次检索的向量计算开销极小，缓存收益有限；而模板库每次 <code>add_template</code> 都在变化，缓存与写入的一致性成本远高于检索本身的成本。<strong>当规模小到不值得缓存时，&quot;没有缓存&quot;就是正确的工程决策</strong>——真正需要改变的是这个前提（规模），而不是先堆一个缓存。</p>
+<p>反过来说，如果未来要给检索加缓存，最需要注意的不是 LRU 算法选择，而是缓存键的设计：检索依赖&quot;查询文本 + 嵌入模型版本 + 索引内容版本&quot;三者，漏掉任何一项都会产生&quot;更新了数据却命中旧结果&quot;的静默错误——这与前文的中期记忆文件名缺陷、维度偏差属于同一类问题：<strong>不报错的错误，才是最贵的错误</strong>。</p>
+<p><strong>检索缓存不存在，“命中率”&quot;LRU 淘汰&quot;等描述自然无从谈起，一并撤回。</strong> 值得校准的是对&quot;缓存&quot;的整体印象：PenShot 并非没有缓存，而是缓存全部集中在<strong>写入侧的成本规避</strong>（模板去重、LLM 复用），没有放在<strong>读取侧的延迟优化</strong>——这个取向与其&quot;单剧本小索引&quot;的规模前提是自洽的。技术讨论中常把&quot;缓存命中率&quot;当作系统先进性的指标，但这个案例展示了更朴素的判断标准：<strong>缓存收益必须大于一致性成本，否则&quot;不做缓存&quot;就是正确答案</strong>。</p>
+<hr>
+<h2>关键要点拆解（五）：召回对输出的真实影响链</h2>
+<p>先问一个比指标更重要的问题：召回结果究竟以什么路径影响最终输出？逐条复核调用链后，答案是&quot;两通、一断&quot;。</p>
+<p><strong>链路一：提示词增强（已接线）</strong>。<code>convert_prompt</code> 节点对每个片段调用 <code>enhance_prompt(fragment.prompt, enhancement_mode=&quot;append&quot;)</code>（<code>workflow_nodes.py</code> L574-582），内部走 <code>get_best_match → search_similar</code>（top_k=1、min_score=0.7、仅模板类型），命中就把匹配模板拼接进原提示词。<strong>这是&quot;召回质量直接影响生成输入&quot;的实链路</strong>——它只有一个质量闸门（0.7 分数阈值），过了闸门的内容直接进入提示词。</p>
+<p><strong>链路二：连续性检查（已接线）</strong>。<code>search_similar_scene</code> 为每个连续性问题检索历史场景方案（<code>top_k=2</code>），填充 <code>historical_solutions</code>。前文已指出这条链没有分数门槛——低质结果也可能被当作&quot;历史方案&quot;。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Live[&quot;已接线：真实影响输出的两条链&quot;]
+        E1[convert_prompt 节点] --&gt; E2[&quot;enhance_prompt → get_best_match → search_similar&lt;br/&gt;0.7 分数闸门 · 仅模板类型&quot;]
+        E2 --&gt; E3[命中则 append 进提示词]
+        C1[连续性检查节点] --&gt; C2[&quot;search_similar_scene → query()&lt;br/&gt;无分数闸门&quot;]
+        C2 --&gt; C3[填充 historical_solutions]
+    end
+
+    subgraph Broken[&quot;未接线：设计存在、链路断路&quot;]
+        M1[&quot;get_context_for_llm&lt;br/&gt;记忆语义读取&quot;]
+        M2[&quot;restore_context_for_stage&lt;br/&gt;阶段上下文恢复&quot;]
+    end
+</pre>
+<p><strong>断点值得单独强调</strong>：<code>MemoryManager.recall → MemoryContext.to_prompt</code>（对外封装为 <code>get_context_for_llm</code>）与 <code>WorkflowMemory.restore_context_for_stage</code> 这两条&quot;把记忆读回来注入上下文&quot;的设计链路，全仓库没有生产调用方——记忆的语义检索能力完整实现、却从未接上消费端；真正执行的读取只有初始化时的 <code>_load_common_patterns</code>（把全局模式读出来只打了日志）。这意味着&quot;三层记忆影响生成质量&quot;在真机上尚未成立：<strong>写入侧持续运转，读取侧只有键值查询，语义读取是断的。</strong></p>
+<p>原始版本还声称&quot;连续性问题的检出率显著提升&quot;，同样没有数据支撑——检索返回的确被用于填充 <code>historical_solutions</code>，但&quot;提升多少&quot;从未被测量，撤回。</p>
+<p>原始版本说&quot;召回失败时系统回退到基于规则的默认处理&quot;——源码里没有这样的显式降级分支。真实的&quot;失败形态&quot;是静默的：<code>search_similar</code> 查不到就返回空列表、增强环节原样保留提示词；<code>query()</code> 甚至不会返回空（无分数门槛，永远给出&quot;最像的&quot;几条）。换句话说，<strong>召回系统不会报错，它只会安静地少做事或做错事</strong>——这也解释了为什么&quot;召回质量&quot;在这类系统里最不容易被及时发现，最需要评测体系来兜底。</p>
+<hr>
+<h2>从零开始：一套可复现的召回评测方法论</h2>
+<p>本文反复指出&quot;项目没有任何评测数据&quot;。但发现缺失只是第一步，把评测做起来才是终点。基于本文考证出的真实架构，一套最小可行的评测流程如下——不需要新框架，用项目内现成能力即可：</p>
+<p><strong>第一步：构造最小评测集</strong>。按查询类型分层取样：角色查询（如&quot;主角是谁&quot;）、场景查询（如&quot;雨夜街道&quot;）、模板查询（如&quot;愤怒情绪的提示词&quot;），每类 10 条，人工标注期望命中的文档。真机索引只有 2-12 条文档，评测集的价值不在于统计显著性，而在于建立<strong>可重复的回归基线</strong>——更换嵌入模型或阈值后，同一套评测跑出的差异才是可解释的。</p>
+<p><strong>第二步：指标分为&quot;健康度&quot;与&quot;效果&quot;两层</strong>。健康度优先：空结果率、长期记忆集合文档数、嵌入维度一致性断言——这三项能第一时间暴露前文那类静默失效；效果层再跟上：命中率@K、MRR、首条命中分数分布。</p>
+<p><strong>第三步：先验证开关，再做对照</strong>。本文最大的教训是&quot;哑参数&quot;——<code>use_rerank</code>/<code>search_type</code> 传了等于没传。任何 A/B 实验开始前，先跑一次&quot;开关有效性验证&quot;：变更参数后打印最终生效的配置（或断言参数被读取），确认旋钮真的连着线。</p>
+<p><strong>第四步：从小索引的现实出发设计结论</strong>。2-12 条文档的召回实验只能回答&quot;链路是否通&quot;，回答不了&quot;准确率多少&quot;。要得到有价值的数字，需要先灌入几十上百条剧本构建有统计意义的索引——这是评测的前置工程量，无法绕过。</p>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>总结与建议</h2>
+<p>把全文考证压缩成一张&quot;三口径&quot;清单——这是本文最诚实的产出：</p>
+<p><strong>已接线（真实生产行为）</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>相似度检索两条路径：<code>search_similar</code>（0.7 及格线 + 模板类型过滤，经 <code>enhance_prompt</code> 进入生成）与 <code>query()</code>（手写余弦、无分数门槛，用于连续性检查）；</p>
+</li>
+<li class="lvl-2">
+<p>三层记忆写入：短期 Redis（20 条窗口 + 3600s TTL，剧本级 session）、中期 JSON 摘要（写入正常但重启读不回）、长期 Chroma（真机 0 文档）；</p>
+</li>
+<li class="lvl-2">
+<p>提示词增强与连续性检查均在 <code>convert_prompt</code> / 连续性检查节点中真实执行。</p>
+</li>
+</ul>
+<p><strong>已实现未接线（代码完整、无生产调用方）</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>重排序装配（BGE-reranker-large）、MMR 分支、KnowledgeRouter 混合检索、记忆语义读取（<code>get_context_for_llm</code> / <code>restore_context_for_stage</code>）。</p>
+</li>
+</ul>
+<p><strong>静默失效清单（不报错但行为偏离预期）</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>长期记忆空库：检索安静返回零结果；</p>
+</li>
+<li class="lvl-2">
+<p>中期摘要读写文件名不一致：重启即&quot;失忆&quot;；</p>
+</li>
+<li class="lvl-2">
+<p>嵌入维度偏差：配置 1536、落盘 1024；</p>
+</li>
+<li class="lvl-2">
+<p>哑参数与无分数门槛：传了不生效、查了不过滤。</p>
+</li>
+</ul>
+<p><strong>三条来自实战的工程建议</strong></p>
+<ol>
+<li class="lvl-3">
+<p><strong>先建测量，再谈指标</strong>。“毫秒级”&quot;68%→86%&quot;这类数字之所以能被轻易写下，是因为系统里没有任何测量体系。上召回系统前，先给延迟、空结果率、命中率留好埋点；</p>
+</li>
+<li class="lvl-3">
+<p><strong>把静默失效当一等公民</strong>。空库、维度偏差、文件名不一致、哑参数——这四类问题都不抛异常。为它们建监控（哪怕只是文档计数日志），收益远超调参；</p>
+</li>
+<li class="lvl-3">
+<p><strong>接一根线、验一根线</strong>。重排序、MMR、混合检索、记忆读取都是&quot;看起来有、实际没有&quot;的能力。每次声称&quot;已支持&quot;，用一条端到端调用链测试来证明它。</p>
+</li>
+</ol>
+<hr>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>

@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？ · PenShot 文档</title>
+  <meta name="description" content="PenShot 工作流检查点：双模式设计与自动降级链、SQLite 库表的真实结构、异步接口排坑现场，并揭示一个被忽视的关键缺口——检查点写入虽已通电，用于断点续传的稳定线程标识却从未被真正使用，任务失败后依然从头再跑。">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/checkpoint.html">
+  <meta property="og:site_name" content="PenShot 文档">
+  <meta property="og:title" content="PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？">
+  <meta property="og:description" content="PenShot 工作流检查点：双模式设计与自动降级链、SQLite 库表的真实结构、异步接口排坑现场，并揭示一个被忽视的关键缺口——检查点写入虽已通电，用于断点续传的稳定线程标识却从未被真正使用，任务失败后依然从头再跑。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/checkpoint.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
+  <style>
+:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
+.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
+.topbar nav{display:flex;gap:20px;font-size:14.5px}
+.topbar nav a{color:var(--muted);font-weight:500}
+.topbar nav a:hover{color:var(--brand)}
+.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
+.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
+.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
+.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
+.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
+.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
+.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
+.sidebar a.active{background:var(--brand);color:#fff}
+.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
+.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.toc-mobile a{display:block;padding:3px 0;font-size:14px}
+.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
+.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.article h3{font-size:1.22em;margin:1.5em 0 .6em}
+.article h4{font-size:1.08em;margin:1.3em 0 .5em}
+.article p{margin:.85em 0}
+.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
+.article li{margin:.35em 0}
+.article img{max-width:100%;height:auto;border-radius:8px}
+.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
+.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+.article th{background:var(--bg);font-weight:600}
+.article tr:nth-child(even) td{background:#fbfdff}
+.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
+.article blockquote p{margin:.3em 0}
+.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
+.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
+.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
+.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
+.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
+.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
+.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
+.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
+.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
+.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
+.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
+.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
+.doc-nav a{font-weight:600}
+footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
+footer a{color:var(--muted);margin:0 10px}
+footer a:hover{color:var(--brand)}
+@media (max-width:960px){
+  .sidebar{display:none}
+  .toc-mobile{display:block}
+  .content{padding:20px 6px 50px}
+  .topbar nav{gap:12px}
+}
+</style>
+  <style>
+.hljs{color:#24292e;background:#f6f8fa}
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
+.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
+.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
+.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
+.hljs-section{color:#005cc5;font-weight:700}
+.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
+    <nav>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <aside class="sidebar">
+      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
+      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html" class="active">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
+<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a>
+<h4>技术分析</h4><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a>
+<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
+<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
+<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
+<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
+<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
+<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
+<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
+    </aside>
+    <main class="content">
+      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a><a href="multi-agent-consistency.html">PenShot 多智能体一致性：七大策略里，哪些真的在跑？</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong><a href="review.html">PenShot 源码级测评：分镜 Agent 的架构成色、工程短板与演进路线</a></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
+      <article class="article">
+        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-14</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
+        <h1>PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</h1>
+<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
+<blockquote>
+<p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
+<strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
+<strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
+<strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
+</blockquote>
+<h2>读完本文后，你应该知道什么</h2>
+<p>在基于 LangGraph 的多智能体工作流系统里，检查点（Checkpoint）往往被当作&quot;配好就万事大吉&quot;的基础设施：<code>compile(checkpointer=saver)</code> 一挂，状态似乎就会自动落盘。本文对 PenShot 的检查点实现做一次完整的源码考证：双模式设计与自动降级链、SQLite 中真实的库表结构、一个留下了注释痕迹的 <code>ainvoke</code> 排坑现场；以及一个更值得正视的缺口——<strong>检查点写入已经通电，但用于续传的稳定 <code>thread_id</code> 从未真正被使用</strong>。</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>能够从源码入口追踪到核心状态变化，并知道异常/边界在哪里。</p>
+</li>
+<li class="lvl-2">
+<p>哪些内容属于当前版本的实现，哪些内容需要以仓库最新代码重新核对。</p>
+</li>
+<li class="lvl-2">
+<p>遇到行为与本文不一致时，应该优先检查版本、配置和源码，而不是继续沿用旧结论。</p>
+</li>
+</ul>
+<hr>
+<h2>一、背景问题：长剧本处理为什么离不开检查点</h2>
+<p>工作流检查点（Checkpoint）的核心作用是在工作流执行的特定时刻保存完整的运行状态，以便在系统故障、任务中断或需要回溯时能够精确恢复。对于 PenShot 这样的剧本分镜系统，一个任务通常需要处理数万字的剧本，经过剧本解析、镜头拆分、视频分割、提示词转换、质量审查等多个阶段，整个流程可能耗时数十秒甚至数分钟。</p>
+<pre class="mermaid">flowchart LR
+    direction LR %% 强制全局从左到右
+    subgraph Without[&quot;无检查点的工作流&quot;]
+        direction LR %% 强制子图内部从左到右
+        A1[开始] --&gt; B1[阶段1] --&gt; C1[阶段2] --&gt; D1[阶段3] --&gt; E1[阶段4] --&gt; F1[完成]
+        C1 -.-&gt;|故障| X1[从头开始]
+        X1 -.-&gt; A1
+    end
+
+    subgraph With[&quot;有检查点的工作流&quot;]
+        direction LR %% 强制子图内部从左到右
+        A2[开始] --&gt; B2[阶段1] --&gt; C2[阶段2] --&gt; D2[阶段3] --&gt; E2[阶段4] --&gt; F2[完成]
+        C2 -.-&gt;|故障| R2[从最近检查点恢复]
+        R2 -.-&gt; D2
+    end
+</pre>
+<p>在没有检查点机制的情况下，任何阶段的失败都意味着整个任务需要从头执行，这对于长剧本处理场景是不可接受的。检查点机制的价值体现在三个维度：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>断点续传</strong>：当工作流执行到某个阶段时发生异常，可以从最近保存的检查点恢复，避免重复计算。这对于依赖外部 LLM API 的场景尤为重要，因为网络波动或 API 限流是常见问题。</p>
+</li>
+<li class="lvl-2">
+<p><strong>状态调试</strong>：开发人员可以保存工作流在不同阶段的快照，用于问题复现和调试。当某个片段生成质量不佳时，可以回溯到该片段生成前的状态进行分析。</p>
+</li>
+<li class="lvl-2">
+<p><strong>任务迁移</strong>：在分布式部署场景下，检查点理论上允许任务在不同节点间迁移，实现负载均衡和故障转移。不过 PenShot 当前采用的是单机 SQLite 方案（见第四章），这一条属于能力方向而非现状描述。</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>补充原理</strong>：检查点的本质是&quot;状态可重放&quot;。LangGraph 会在每个 super-step（一或数个节点构成的执行步）边界，把完整状态快照（state snapshot）写入 saver，配合<strong>稳定的</strong> <code>thread_id</code> 即可实现&quot;从最近的检查点继续执行&quot;，而无需重跑此前已稳定的阶段。这也意味着检查点保存的是<strong>过程态</strong>而非仅结果态，这正是它能支撑断点续传与回溯调试的根本原因。注意其中两个前提——快照要真的写得进去，续传要能用同一个 <code>thread_id</code> 读得出来。本文后半程的考证将表明：PenShot 做到了前者，卡在了后者。</p>
+</blockquote>
+<hr>
+<h2>二、代码与实现：LangGraph 检查点机制原理</h2>
+<p>在进入 PenShot 的具体实现之前，先厘清 LangGraph 检查点机制的基本概念。需要说明的是：本节描述的是 <strong>LangGraph 框架的原生能力面</strong>，其中读路径（恢复）在 PenShot 中并未接线，具体考证见第五章。</p>
+<pre class="mermaid">flowchart TB
+    subgraph CheckpointArchitecture[&quot;检查点架构&quot;]
+        direction TB
+        
+        subgraph GraphLayer[&quot;工作流层&quot;]
+            G[LangGraph 工作流]
+            N1[节点A] --&gt; N2[节点B] --&gt; N3[节点C]
+        end
+        
+        subgraph CheckpointLayer[&quot;检查点层&quot;]
+            C[Checkpointer 接口]
+            M[MemorySaver]
+            S[SqliteSaver]
+            P[PostgresSaver]
+        end
+        
+        subgraph StorageLayer[&quot;存储层&quot;]
+            RAM[内存]
+            DB[(SQLite/PostgreSQL)]
+        end
+        
+        G --&gt; C
+        C --&gt; M --&gt; RAM
+        C --&gt; S --&gt; DB
+        C --&gt; P --&gt; DB
+    end
+</pre>
+<h3>状态快照机制</h3>
+<p>LangGraph 的检查点核心是 <code>BaseCheckpointSaver</code> 抽象类，它定义了保存与恢复工作流状态的标准接口。工作流在每个 super-step 结束后，LangGraph 会自动调用 saver 写入检查点：同步 API（<code>invoke</code>）走 <code>put</code> / <code>get_tuple</code>，异步 API（<code>ainvoke</code>）走对应的 <code>aput</code> / <code>aget_tuple</code>——<strong>这一对同步/异步接口的分野，正是第三章&quot;排坑现场&quot;的直接起因</strong>。</p>
+<pre class="mermaid">sequenceDiagram
+    participant User as 用户
+    participant Workflow as LangGraph工作流
+    participant Saver as CheckpointSaver
+    participant Storage as 存储后端
+    
+    User-&gt;&gt;Workflow: 启动任务 (thread_id)
+    Workflow-&gt;&gt;Saver: 检查是否存在历史检查点
+    Saver-&gt;&gt;Storage: 查询 thread_id 对应的状态
+    
+    alt 存在检查点
+        Storage--&gt;&gt;Saver: 返回保存的状态
+        Saver--&gt;&gt;Workflow: 恢复状态
+        Workflow--&gt;&gt;User: 从断点继续执行
+    else 不存在检查点
+        Workflow-&gt;&gt;Workflow: 从头执行
+    end
+    
+    loop 每个节点执行后
+        Workflow-&gt;&gt;Saver: 保存状态快照
+        Saver-&gt;&gt;Storage: 持久化存储
+    end
+    
+    Workflow--&gt;&gt;User: 任务完成
+</pre>
+<h3>Thread ID 隔离机制</h3>
+<blockquote>
+<p>前面这张时序图描述的是 LangGraph 的<strong>完整</strong>读写路径：查历史、恢复、逐节点保存。PenShot 当前只走了其中的&quot;写&quot;一半——&quot;查历史检查点→恢复状态&quot;这段流程在代码中没有任何调用入口，第五章会展开考证。</p>
+</blockquote>
+<p>LangGraph 使用 <code>thread_id</code> 作为不同任务状态的隔离标识：每个独立任务拥有自己的 <code>thread_id</code>，检查点按此维度隔离，不同任务的状态互不覆盖。<code>SqliteSaver</code> 的类文档同时给出了一个重要的边界警告——它面向<strong>轻量、同步</strong>的使用场景（demos and small projects），并不以多线程扩展为目标；这一点在第四章结合 PenShot 的连接配置再展开。</p>
+<blockquote>
+<p><strong>补充原理</strong>：<code>thread_id</code> 相当于检查点记录的<strong>主键第一维</strong>。LangGraph 的检查点记录以 <code>(thread_id, checkpoint_ns, checkpoint_id)</code> 作为联合主键写库：<code>checkpoint_ns</code> 是子图命名空间（顶层图默认为空字符串），<code>checkpoint_id</code> 按执行顺序递增。因此同一 <code>thread_id</code> 下天然保留一份完整的历史轨迹，查询时可精确回放到任意节点——而这也解释了下文的关键缺口：<strong>换了 <code>thread_id</code>，就等于换了一条全新的时间线</strong>。</p>
+</blockquote>
+<h3>SQLite 落盘后的真实表结构</h3>
+<p>很多介绍文章会把检查点表画成&quot;业务字段表&quot;（比如带 script_id / task_id 列），但真实数据库中长什么样，应以 <code>langgraph-checkpoint-sqlite</code> 的 <code>SqliteSaver.setup()</code> 为准——它只会建两张表：</p>
+<pre class="hljs"><code><span class="hljs-keyword">CREATE TABLE</span> IF <span class="hljs-keyword">NOT</span> <span class="hljs-keyword">EXISTS</span> checkpoints (
+    thread_id TEXT <span class="hljs-keyword">NOT NULL</span>,
+    checkpoint_ns TEXT <span class="hljs-keyword">NOT NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-string">&#x27;&#x27;</span>,
+    checkpoint_id TEXT <span class="hljs-keyword">NOT NULL</span>,
+    parent_checkpoint_id TEXT,
+    type TEXT,
+    checkpoint <span class="hljs-type">BLOB</span>,
+    metadata <span class="hljs-type">BLOB</span>,
+    <span class="hljs-keyword">PRIMARY KEY</span> (thread_id, checkpoint_ns, checkpoint_id)
+);
+<span class="hljs-keyword">CREATE TABLE</span> IF <span class="hljs-keyword">NOT</span> <span class="hljs-keyword">EXISTS</span> writes (
+    thread_id TEXT <span class="hljs-keyword">NOT NULL</span>,
+    checkpoint_ns TEXT <span class="hljs-keyword">NOT NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-string">&#x27;&#x27;</span>,
+    checkpoint_id TEXT <span class="hljs-keyword">NOT NULL</span>,
+    task_id TEXT <span class="hljs-keyword">NOT NULL</span>,
+    idx <span class="hljs-type">INTEGER</span> <span class="hljs-keyword">NOT NULL</span>,
+    channel TEXT <span class="hljs-keyword">NOT NULL</span>,
+    type TEXT,
+    <span class="hljs-keyword">value</span> <span class="hljs-type">BLOB</span>,
+    <span class="hljs-keyword">PRIMARY KEY</span> (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
+);
+</code></pre>
+<p>两个细节值得注意：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>没有业务字段</strong>：<code>script_id</code> / <code>task_id</code> 从未进入表结构，它们只存在于文件系统路径与 <code>thread_id</code> 的拼装里（详见第四章）。状态数据本身被序列化进 <code>checkpoint</code> / <code>metadata</code> 两个 BLOB 列，这是 LangGraph 让 saver 与业务解耦的设计。</p>
+</li>
+<li class="lvl-2">
+<p><strong>两张表分工</strong>：<code>checkpoints</code> 存状态快照（每个 super-step 一条），<code>writes</code> 存待写入通道的中间数据（pending writes，用于崩溃恢复与任务重放）。<code>setup()</code> 里还会顺带执行 <code>PRAGMA journal_mode=WAL</code>——与 PenShot 连接时主动设置的配置互为双保险。</p>
+</li>
+</ul>
+<hr>
+<h2>三、排坑现场：从 ainvoke 报错到同步执行</h2>
+<p>先说一个需要纠正的流行说法：不少介绍会把 PenShot 的检查点描述为&quot;MemorySaver → SqliteSaver → 同步版&quot;的三版本演进。但翻遍 <code>workflow_checkpointer.py</code>，找不到任何版本演进的技术证据——文件头注释写的是&quot;<strong>简化版（仅同步）</strong>&quot;，代码里保留的是<strong>两个并存的模式</strong>（内存 / SQLite），而不是递进的三代实现。更接近事实的表述是：这是一套&quot;双模式 + 一次排坑&quot;的最终形态，而演进痕迹只能从配置字段的残留物里推断（见第四章）。</p>
+<p>真正值得复盘的技术现场是下面这个：项目一度以异步方式执行工作流，并在 <code>SqliteSaver</code> 上撞出了一个经典错误。</p>
+<pre class="mermaid">flowchart TB
+    subgraph ActualArchitecture[&quot;PenShot 实际检查点架构&quot;]
+        direction TB
+        
+        subgraph WorkflowLayer[&quot;工作流层&quot;]
+            WF[LangGraph 工作流]
+            WF --&gt;|invoke 同步调用| N1[节点1] --&gt; N2[节点2] --&gt; N3[节点3]
+        end
+        
+        subgraph CheckpointLayer[&quot;检查点层&quot;]
+            CP[WorkflowCheckpointer]
+            CP --&gt;|get_saver| MS[MemorySaver]
+            CP --&gt;|get_saver| SS[SqliteSaver]
+        end
+        
+        subgraph StorageLayer[&quot;存储层&quot;]
+            RAM[进程内存]
+            DB[(SQLite .db文件)]
+        end
+        
+        MS --&gt; RAM
+        SS --&gt; DB
+    end
+</pre>
+<h3>双模式一：MemorySaver，零依赖的验证路径</h3>
+<p><code>WorkflowCheckpointer</code> 的第一种模式是 LangGraph 内置的 <code>MemorySaver</code>：所有状态保存在进程内存中。在这个实现里它身兼两职——既可以由 <code>checkpoint_mode='memory'</code> 显式启用，又会在两条降级链里自动接管（SQLite 目录不可写、SQLite 依赖未安装，详见第四章）。</p>
+<pre class="mermaid">flowchart LR
+    subgraph MemoryMode[&quot;MemorySaver 模式&quot;]
+        Worker[PenShot Worker] --&gt; RAM[进程内存]
+        RAM --&gt;|存储| CP1[检查点1]
+        RAM --&gt;|存储| CP2[检查点2]
+        RAM --&gt;|存储| CP3[检查点3]
+        
+        Worker -.-&gt;|进程重启| X[所有检查点丢失]
+    end
+</pre>
+<blockquote>
+<p>这种方式的优点是零配置、零依赖、性能最高，但致命缺陷是进程重启后所有检查点丢失，无法实现真正的断点续传。仅适合本地开发和单元测试场景。</p>
+</blockquote>
+<h3>双模式二：SqliteSaver，单文件持久化</h3>
+<p>第二种模式使用 LangGraph 官方提供的同步版 SQLite 检查点实现，把状态写入每个任务独立的 <code>.db</code> 文件：</p>
+<pre class="mermaid">flowchart TB
+    subgraph SQLiteMode[&quot;SqliteSaver 模式&quot;]
+        direction TB
+        
+        Worker[PenShot Worker] --&gt; Conn[SQLite连接&lt;br/&gt;check_same_thread=False]
+        Conn --&gt; DB[(task_xxx.db)]
+        
+        subgraph Storage[&quot;表结构（LangGraph 内建）&quot;]
+            T1[(checkpoints表&lt;br/&gt;thread_id, checkpoint_ns, checkpoint_id&lt;br/&gt;状态快照与元数据BLOB)]
+            T2[(writes表&lt;br/&gt;thread_id, checkpoint_id, task_id&lt;br/&gt;中间数据value BLOB)]
+        end
+        
+        DB --&gt; Storage
+    end
+</pre>
+<blockquote>
+<p>每个任务独立的数据库文件实现了任务级数据隔离；连接建立时还会执行 <code>PRAGMA journal_mode=WAL</code> 与 <code>PRAGMA synchronous=NORMAL</code>，用写前日志换取更好的读写并发与吞吐。不过要认清两层边界：其一，<code>SqliteSaver</code> 官方定位是<strong>轻量同步场景，不面向多线程扩展</strong>；其二，WAL 优化的是单文件内的读写并发，解决不了&quot;检查点能否被读回来&quot;的问题——后者取决于 <code>thread_id</code> 是否稳定（第五章）。</p>
+</blockquote>
+<h3>排坑现场：ainvoke 与同步 Saver 的正面冲突</h3>
+<p>代码里留下了两处&quot;考古证据&quot;：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>workflow_pipeline.py</code> 的回退执行路径中，一行 <code># raw_state = await self.workflow.ainvoke(</code> 被注释掉，紧接着是同步的 <code>self.workflow.invoke(...)</code>；</p>
+</li>
+<li class="lvl-2">
+<p><code>workflow_output_fixer.py</code> 中更直白：<code># 注意：这里需要await workflow.ainvoke</code> 的注释下面，同样换成了 <code>workflow.invoke(...)</code>。</p>
+</li>
+</ul>
+<p>这两处注释说明：项目一度以 <code>ainvoke</code> 异步方式执行工作流，随后撞上了 <code>SqliteSaver</code> 的异步接口缺失，最终整体切回同步执行。用 <code>ainvoke</code> 时 LangGraph 会调用 saver 的 <code>aput</code> / <code>aget_tuple</code> / <code>alist</code>，而同步版 <code>SqliteSaver</code> 对这几个异步方法一律直接抛错，报错原文（摘自 langgraph-checkpoint-sqlite 源码的 <code>_AIO_ERROR_MSG</code>）：</p>
+<pre class="hljs"><code>The SqliteSaver does not support async methods. Consider using AsyncSqliteSaver instead.
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+Note: AsyncSqliteSaver requires the aiosqlite package to use.
+</code></pre>
+<pre class="mermaid">flowchart LR
+    direction LR %% 强制主画布从左到右
+    subgraph SyncSaver[&quot;同步 Saver 问题&quot;]
+        direction LR %% 强制子图1内部从左到右
+        A[async def run] --&gt;|ainvoke| W[异步工作流]
+        W --&gt;|调用| S[SqliteSaver]
+        S -.-&gt;|不支持异步方法| E[NotImplementedError]
+    end
+
+    subgraph AsyncSaver[&quot;异步 Saver 方案&quot;]
+        direction LR %% 强制子图2内部从左到右
+        A2[async def run] --&gt;|ainvoke| W2[异步工作流]
+        W2 --&gt;|调用| AS[AsyncSqliteSaver]
+        AS --&gt;|await| DB2[(SQLite)]
+    end
+</pre>
+<blockquote>
+<p>当时的解决方案有两个方向：把 saver 换成 <code>AsyncSqliteSaver</code>（引入 <code>aiosqlite</code> 依赖，异步链路全改造），或者把工作流切回同步 <code>graph.invoke</code>。PenShot 选择了后者——以稳定性优先、改动面最小，代价是放弃了原生协程调度的并发能力。</p>
+</blockquote>
+<p><strong>为什么选择同步而非异步</strong>？</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">考量因素</th>
+<th style="text-align:left">同步模式</th>
+<th style="text-align:left">异步模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">代码复杂度</td>
+<td style="text-align:left">低</td>
+<td style="text-align:left">高（需要 aiosqlite）</td>
+</tr>
+<tr>
+<td style="text-align:left">依赖数量</td>
+<td style="text-align:left">langgraph-checkpoint-sqlite</td>
+<td style="text-align:left">另需 aiosqlite</td>
+</tr>
+<tr>
+<td style="text-align:left">调试难度</td>
+<td style="text-align:left">简单</td>
+<td style="text-align:left">复杂（事件循环问题）</td>
+</tr>
+<tr>
+<td style="text-align:left">并发处理</td>
+<td style="text-align:left">调用方线程内执行</td>
+<td style="text-align:left">原生协程调度</td>
+</tr>
+<tr>
+<td style="text-align:left">适用场景</td>
+<td style="text-align:left">单机顺序处理</td>
+<td style="text-align:left">高并发 Web 服务</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>对于 PenShot 的剧本分镜场景，任务以顺序执行为主，同步模式完全够用，代码也更简洁易维护。这个选择与 <code>SqliteSaver</code> 的官方定位（轻量、同步、小项目）刚好匹配；但代价会在任务量增长时显现——SQLite 的单写者模型、以及下一章将看到的连接与线程配置，都会成为后续优化的发力点。</p>
+</blockquote>
+<hr>
+<h2>四、实现剖析：WorkflowCheckpointer 与它的降级链</h2>
+<p><code>WorkflowCheckpointer</code> 是这个模块的门面类，职责可以概括为一句话：<strong>把模式选择、存储路径、连接管理三件事封装好，对外交出两样东西——一个给 LangGraph 用的 saver，一份带 <code>thread_id</code> 的运行配置</strong>。它的整体设计如下：</p>
+<pre class="mermaid">flowchart TB
+    subgraph CheckpointerDesign[&quot;WorkflowCheckpointer 实际设计&quot;]
+        direction TB
+        
+        subgraph PublicAPI[&quot;公共接口&quot;]
+            get_saver[get_saver 获取原生Saver]
+            get_config[get_config 获取运行配置]
+            cleanup[cleanup_old_checkpoints 清理旧文件]
+            get_stats[get_stats 获取统计信息]
+            close[close 关闭资源]
+        end
+        
+        subgraph Internal[&quot;内部组件&quot;]
+            mode_detect[_determine_mode 模式自动检测]
+            storage_setup[_setup_storage 存储路径管理]
+        end
+        
+        subgraph StorageModes[&quot;支持的存储模式&quot;]
+            memory[MemorySaver&lt;br/&gt;开发测试/降级兜底]
+            sqlite[SqliteSaver&lt;br/&gt;单机持久化]
+        end
+        
+        PublicAPI --&gt; Internal
+        Internal --&gt; StorageModes
+    end
+</pre>
+<h3>模式选择：两种模式，与一个&quot;注释里的第三种&quot;</h3>
+<p>一个必须澄清的点：<strong>运行时的存储模式只有两种</strong>。<code>CheckpointMode</code> 枚举里只有 <code>MEMORY</code> 和 <code>SQLITE</code> 两个成员，<code>postgres</code> 从未进入实现。但在配置层能看到它的三处&quot;残留物&quot;：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><code>ShotConfig.checkpoint_mode</code> 的注释写着 “auto, memory, sqlite, postgres”；</p>
+</li>
+<li class="lvl-2">
+<p><code>ShotConfig.postgres_uri: str = None</code> 字段保留，但全仓库无任何消费方；</p>
+</li>
+<li class="lvl-2">
+<p><code>_determine_mode</code> 的 <code>else</code> 分支注释只有 “auto 或其他”——意味着即便传入 <code>checkpoint_mode='postgres'</code>，也会静默落入 auto 分支、按 SQLite 逻辑处理，而不会报错。</p>
+</li>
+</ul>
+<p>这些残留物暗示：早期规划中可能包含 Postgres 模式（面向分布式部署），后来简化为同步双模式（与文件头&quot;简化版（仅同步）&quot;的注释吻合）。这是&quot;规划未落地&quot;的又一个典型样本：<strong>配置字段存在，不代表能力存在</strong>。</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">_determine_mode</span>(<span class="hljs-params">self</span>) -&gt; CheckpointMode:
+    mode = <span class="hljs-built_in">getattr</span>(<span class="hljs-variable language_">self</span>.config, <span class="hljs-string">&#x27;checkpoint_mode&#x27;</span>, <span class="hljs-string">&#x27;auto&#x27;</span>)
+    
+    <span class="hljs-keyword">if</span> mode == <span class="hljs-string">&#x27;memory&#x27;</span>:
+        <span class="hljs-keyword">return</span> CheckpointMode.MEMORY
+    <span class="hljs-keyword">elif</span> mode == <span class="hljs-string">&#x27;sqlite&#x27;</span>:
+        <span class="hljs-keyword">return</span> CheckpointMode.SQLITE
+    <span class="hljs-keyword">else</span>:  <span class="hljs-comment"># auto 模式</span>
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-comment"># 检查 SQLite 是否可写</span>
+            checkpoint_dir = <span class="hljs-built_in">getattr</span>(<span class="hljs-variable language_">self</span>.config, <span class="hljs-string">&#x27;checkpoint_dir&#x27;</span>, <span class="hljs-string">&#x27;data/checkpoints&#x27;</span>)
+            os.makedirs(checkpoint_dir, exist_ok=<span class="hljs-literal">True</span>)
+            test_path = os.path.join(checkpoint_dir, <span class="hljs-string">&#x27;.write_test&#x27;</span>)
+            <span class="hljs-keyword">with</span> <span class="hljs-built_in">open</span>(test_path, <span class="hljs-string">&#x27;w&#x27;</span>) <span class="hljs-keyword">as</span> f:
+                f.write(<span class="hljs-string">&#x27;test&#x27;</span>)
+            os.remove(test_path)
+            <span class="hljs-keyword">return</span> CheckpointMode.SQLITE
+        <span class="hljs-keyword">except</span> Exception:
+            warning(<span class="hljs-string">&quot;SQLite 不可用，降级到内存模式&quot;</span>)
+            <span class="hljs-keyword">return</span> CheckpointMode.MEMORY
+</code></pre>
+<blockquote>
+<p><code>auto</code> 模式的探测方式很&quot;土&quot;但有效：直接在目标目录写一个 <code>.write_test</code> 文件再删掉，用&quot;能不能写&quot;代替&quot;猜环境&quot;。配合模块导入层的 <code>try/except ImportError</code>（<code>langgraph-checkpoint-sqlite</code> 未安装时 <code>SqliteSaver = None</code>），这个类实际上布下了<strong>两条降级链</strong>：</p>
+<ol>
+<li class="lvl-3"><strong>导入期降级</strong>：依赖缺失 → <code>get_saver()</code> 时打 warning 并回退 <code>MemorySaver</code>；</li>
+<li class="lvl-3"><strong>运行期降级</strong>：目录不可写 → <code>_determine_mode</code> 阶段直接落回 <code>MEMORY</code>。</li>
+</ol>
+<p>换句话说，“任何环境下都能把图跑起来&quot;是被优先保证的；被牺牲的是持久性——所有降级路径的共同终点都是&quot;进程重启即丢失”。两处都只打了 <code>warning</code> 级别日志，属于<strong>静默降级</strong>：流程照常成功，没有人会被叫醒。</p>
+</blockquote>
+<h3>任务数据隔离</h3>
+<p>每个剧本处理任务拥有独立的数据存储路径：</p>
+<blockquote>
+<ul class="lvl-1">
+<li class="lvl-2">
+<p>按 <code>script_id</code> 创建子目录</p>
+</li>
+<li class="lvl-2">
+<p>按 <code>task_id</code> 创建独立的数据库文件</p>
+</li>
+<li class="lvl-2">
+<p>支持按剧本维度清理历史检查点</p>
+</li>
+</ul>
+</blockquote>
+<pre class="hljs"><code>data/checkpoints/
+├── script_001/           # 按剧本ID隔离
+│   ├── task_001.db       # 按任务ID隔离
+│   └── task_002.db
+└── script_002/
+    └── task_003.db
+</code></pre>
+<p>这种设计确保了多任务并发执行时数据不会相互干扰，同时也便于按剧本维度进行数据管理。有一个容易误解的点值得指出：<strong>隔离靠的是文件路径字符串拼装</strong>（<code>os.path.join(checkpoint_dir, script_id)</code> 加 <code>f&quot;task_{task_id}.db&quot;</code>），而不是数据库 schema——<code>script_id</code> / <code>task_id</code> 从未写进表字段（见第二章的真实表结构）。</p>
+<blockquote>
+<p><strong>补充说明</strong>：之所以用 <code>script_id</code> 与 <code>task_id</code> 双层目录隔离，是因为一个剧本可能对应多个任务（如多版本重跑）。这样既能在&quot;剧本维度&quot;统一清理旧数据，又能在&quot;任务维度&quot;避免同剧本并发任务的检查点互相覆盖。</p>
+</blockquote>
+<h3>工厂模式管理实例</h3>
+<p>通过 <code>CheckpointerFactory</code> 避免重复创建相同任务的检查点实例：</p>
+<pre class="hljs"><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">CheckpointerFactory</span>:
+    _instances: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, WorkflowCheckpointer] = {}
+    _lock = threading.RLock()
+    
+<span class="hljs-meta">    @classmethod</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">get_or_create</span>(<span class="hljs-params">cls, script_id: <span class="hljs-built_in">str</span>, task_id: <span class="hljs-built_in">str</span>, config: ShotConfig</span>):
+        key = <span class="hljs-string">f&quot;<span class="hljs-subst">{script_id}</span>_<span class="hljs-subst">{task_id}</span>&quot;</span>
+        <span class="hljs-keyword">with</span> cls._lock:
+            <span class="hljs-keyword">if</span> key <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> cls._instances:
+                cls._instances[key] = WorkflowCheckpointer(script_id, task_id, config)
+            <span class="hljs-keyword">return</span> cls._instances[key]
+</code></pre>
+<blockquote>
+<p><strong>补充说明</strong>：工厂模式的引入是为了避免为同一任务重复创建 Sqlite 连接。<code>SqliteSaver</code> 本质上是对一个 sqlite3 连接加锁封装，重复 new 会造成连接泄漏与锁竞争。用 <code>script_id_task_id</code> 作为缓存键，在并发场景下借助 <code>threading.RLock</code> 保证线程安全。</p>
+<p>但这里有一处需要注意的接线缺口：工厂提供了 <code>close_all()</code> / <code>get_stats()</code>，<code>WorkflowCheckpointer</code> 也提供了 <code>close()</code>，但<strong>全仓库找不到它们的调用方</strong>——<code>_instances</code> 缓存里的实例在整个进程生命周期内不会被主动释放。配合下一小节将看到的 <code>close()</code> 的 async 细节，资源回收链实际上只画了一半。</p>
+</blockquote>
+<h3>旧检查点自动清理：实现了，但没有接线</h3>
+<p><code>cleanup_old_checkpoints(keep_count=10)</code> 是类里最&quot;重&quot;的一个方法，真实逻辑分四步：glob 出同剧本目录下所有 <code>task_*.db</code> → 按修改时间降序 → 保留前 <code>keep_count</code> 个 → 逐个 <code>os.remove</code>（跳过当前实例正在使用的 <code>db_path</code>，删除失败仅 warning）。</p>
+<p>需要澄清原描述的几处偏差：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>没有&quot;检测文件是否被占用&quot;</strong>：代码只判断&quot;是不是当前实例自己的 db_path&quot;，不检测其他进程是否正在写入该文件；</p>
+</li>
+<li class="lvl-2">
+<p><strong>没有异步清理</strong>：方法是同步的，删除是串行 <code>os.remove</code>；</p>
+</li>
+<li class="lvl-2">
+<p><strong>最关键的是：它从未被调用</strong>。全仓库没有 <code>cleanup_old_checkpoints</code> 的调用方，<code>ShotConfig.max_checkpoints_per_script</code>（默认 10）也从未被读取——保留策略的旋钮和清理的执行器都在，但中间那根线没接。</p>
+</li>
+</ul>
+<p>真实后果是：同一 <code>script_id</code> 下的 <code>.db</code> 文件只增不减，长跑场景下磁盘占用会随任务次数线性增长（配置里预留的 <code>checkpoint_max_connections</code>、<code>checkpoint_idle_timeout</code> 同样无消费方——六个检查点配置字段里，真正被读取的只有 <code>checkpoint_mode</code> 和 <code>checkpoint_dir</code> 两个）。</p>
+<h3>资源释放的两个坑：async close 与逃逸的 close_all</h3>
+<p>翻看类的收尾部分，有两处与资源释放相关的细节值得记录。先看 <code>close()</code> 与上下文管理器的矛盾组合：</p>
+<pre class="hljs"><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">close</span>(<span class="hljs-params">self</span>):
+    <span class="hljs-string">&quot;&quot;&quot;关闭检查点，释放资源&quot;&quot;&quot;</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-variable language_">self</span>._conn:
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-variable language_">self</span>._conn.close()
+        <span class="hljs-keyword">except</span> Exception:
+            <span class="hljs-keyword">pass</span>
+        <span class="hljs-variable language_">self</span>._conn = <span class="hljs-literal">None</span>
+    <span class="hljs-variable language_">self</span>._saver = <span class="hljs-literal">None</span>
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">__exit__</span>(<span class="hljs-params">self, exc_type, exc_val, exc_tb</span>):
+    <span class="hljs-string">&quot;&quot;&quot;上下文管理器出口&quot;&quot;&quot;</span>
+    <span class="hljs-variable language_">self</span>.close()   <span class="hljs-comment"># 这里没有 await</span>
+</code></pre>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>坑一</strong>：<code>close()</code> 是 <code>async def</code>，而类又同时提供了同步的 <code>with</code> 支持。<code>__exit__</code> 里直接调用 <code>self.close()</code> 只会创建一个协程对象，<strong>连接不会被真正关闭</strong>，日志里还会留下 <code>coroutine 'close' was never awaited</code> 的 RuntimeWarning。同步模式的场景下，最自然的两种释放形式（<code>with</code> 退出、直接调用）都拿不到预期的资源释放行为；</p>
+</li>
+<li class="lvl-2">
+<p><strong>坑二</strong>：<code>CheckpointerFactory.close_all()</code> 没有任何调用方，配合工厂的全局缓存 <code>_instances</code>，单个进程中累积的 saver 与 SQLite 连接会一直存活到进程退出。</p>
+</li>
+</ul>
+<p>这两处都属于&quot;不影响功能、但影响长跑稳定性&quot;的问题：在短生命周期的测试里几乎无感，在长期运行的服务进程里则会转化为文件句柄与内存的缓慢滞留。</p>
+<hr>
+<h2>五、集成考证：真实调用链与从未生效的 thread_id</h2>
+<h3>基础配置</h3>
+<p><code>ShotConfig</code> 中与检查点相关的字段共六个（以下为源码实际定义）：</p>
+<pre class="hljs"><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">ShotConfig</span>():
+    checkpoint_mode: <span class="hljs-built_in">str</span> = <span class="hljs-string">&quot;auto&quot;</span>   <span class="hljs-comment"># 检查点模式: auto, memory, sqlite, postgres</span>
+    checkpoint_dir: <span class="hljs-built_in">str</span> = settings.get_data_paths().get(<span class="hljs-string">&#x27;data_checkpoint&#x27;</span>)
+    postgres_uri: <span class="hljs-built_in">str</span> = <span class="hljs-literal">None</span>    <span class="hljs-comment"># PostgreSQL URI</span>
+    max_checkpoints_per_script: <span class="hljs-built_in">int</span> = <span class="hljs-number">10</span>    <span class="hljs-comment"># 每脚本最多保存的检查点数量</span>
+    checkpoint_max_connections: <span class="hljs-built_in">int</span> = <span class="hljs-number">5</span>     <span class="hljs-comment"># 检查点最大连接数</span>
+    checkpoint_idle_timeout: <span class="hljs-built_in">int</span> = <span class="hljs-number">600</span>      <span class="hljs-comment"># 检查点空闲超时时间（秒）</span>
+</code></pre>
+<p><code>checkpoint_dir</code> 的默认值并非硬编码字符串，而是从项目的 <code>settings.get_data_paths()</code> 读取（配置模型侧的默认值为 <code>data/checkpoints</code>）。另需如实说明：除 <code>checkpoint_mode</code> 与 <code>checkpoint_dir</code> 外，其余四个字段（含 <code>postgres_uri</code>）在源码中<strong>没有任何读取方</strong>，属于预留字段——它们描述的是理想中的能力（保留份数、连接池、空闲回收、Postgres 支持），而不是当前实际具备的行为。</p>
+<h3>真实调用链：三处接线，与一个断点</h3>
+<p>PenShot 在 <code>MultiAgentPipeline</code> 中的真实接线路径如下（摘自源码，而非示例）：</p>
+<pre class="hljs"><code><span class="hljs-comment"># workflow_pipeline.py —— 初始化时创建管理器</span>
+<span class="hljs-variable language_">self</span>.checkpointer = create_checkpointer(<span class="hljs-variable language_">self</span>.script_id, <span class="hljs-variable language_">self</span>.task_id, config)
+
+<span class="hljs-comment"># workflow_pipeline.py —— 构建图时把 saver 交给 LangGraph</span>
+saver = <span class="hljs-variable language_">self</span>.checkpointer.get_saver()
+compiled_graph = orchestrator.graph.<span class="hljs-built_in">compile</span>(checkpointer=saver)
+
+<span class="hljs-comment"># workflow_output_fixer.py —— 执行时传入 thread_id 配置</span>
+final_state = workflow.invoke(
+    initial_state,
+    config={<span class="hljs-string">&quot;configurable&quot;</span>: {<span class="hljs-string">&quot;thread_id&quot;</span>: <span class="hljs-string">f&quot;process_<span class="hljs-subst">{<span class="hljs-built_in">id</span>(initial_state)}</span>&quot;</span>}}
+)
+</code></pre>
+<p>前两处接线都正确：管理器接入管道、saver 接入编译。<strong>问题出在第三处</strong>：<code>thread_id</code> 不是 <code>WorkflowCheckpointer.get_config()</code> 返回的 <code>f&quot;{script_id}_{task_id}&quot;</code>，而是 <code>f&quot;process_{id(initial_state)}&quot;</code>——<code>id()</code> 是 CPython 对象的<strong>内存地址标识</strong>，同一个任务每次运行都会得到全新的值。</p>
+<p>这意味着两件事同时发生：</p>
+<ol>
+<li class="lvl-3">
+<p><code>get_config()</code> / <code>get_thread_id()</code> 这两个专门为&quot;稳定标识&quot;准备的方法，<strong>全仓库没有任何调用方</strong>；</p>
+</li>
+<li class="lvl-3">
+<p>每次执行都等于向 SQLite 写入一条<strong>全新 thread 的时间线</strong>——上一轮运行存的检查点永远不可能被下一轮命中。</p>
+</li>
+</ol>
+<h3>缺口的影响：检查点&quot;只写不读&quot;</h3>
+<p>结合第二章的机制原理，这个缺口的后果可以做一次完整推演：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">环节</th>
+<th style="text-align:left">设计意图</th>
+<th style="text-align:left">当前实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">写入</td>
+<td style="text-align:left">每个 super-step 落盘状态快照</td>
+<td style="text-align:left">真实执行（saver 已接入编译）</td>
+</tr>
+<tr>
+<td style="text-align:left">标识</td>
+<td style="text-align:left">同一任务固定 <code>thread_id</code>，可跨进程命中</td>
+<td style="text-align:left">每次运行随机新 ID（对象内存地址）</td>
+</tr>
+<tr>
+<td style="text-align:left">读取</td>
+<td style="text-align:left">复用 <code>thread_id</code> 查询历史、恢复执行</td>
+<td style="text-align:left">无任何读取入口（无 <code>get_state</code> 调用）</td>
+</tr>
+<tr>
+<td style="text-align:left">清理</td>
+<td style="text-align:left">定期删除旧检查点</td>
+<td style="text-align:left"><code>cleanup_old_checkpoints</code> 无调用方</td>
+</tr>
+<tr>
+<td style="text-align:left">释放</td>
+<td style="text-align:left">任务结束关闭连接</td>
+<td style="text-align:left"><code>close()</code> / <code>close_all()</code> 无调用方，且 <code>close()</code> 自身有 async 陷阱</td>
+</tr>
+</tbody>
+</table>
+<p>也就是说：<strong>当前检查点是一本只进不出的账</strong>。它写入的数据是真实、完整、可回溯的（开发者可以手动打开 <code>.db</code> 文件复盘状态），但&quot;断点续传&quot;这条产品级能力并没有被接通——它在版本演进路线图里归属于 v1.5&quot;分布式调度&quot;阶段的规划项。所以现状可以准确概括为：<strong>状态每次都在落盘，任务失败后依然从头再跑</strong>。根因就藏在这一处 <code>thread_id</code> 的生成方式里。</p>
+<hr>
+<h2>六、效果与收益：写入侧的确定性，续传侧的空缺</h2>
+<p>对&quot;效果&quot;部分做一次口径校准：凡依赖&quot;从检查点恢复&quot;的收益，在当前实现下都还不能兑现；能确认的收益，都在&quot;写入侧&quot;。</p>
+<p><strong>已真实获得（写入侧）</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>过程态可回溯</strong>：每个 super-step 的状态快照都会完整落盘，<code>.db</code> 文件自带一条完整时间线。出现异常片段时，可以离线打开数据库逐条复盘哪些阶段已经完成——这是当前确定的调试价值；</p>
+</li>
+<li class="lvl-2">
+<p><strong>故障不丢现场</strong>：在没有持久化检查点的场景里，任务失败意味着现场随进程一起消失；现在即使服务崩溃，SQLite 里的历史记录依然可用于事后分析（尽管不能自动续跑）。</p>
+</li>
+</ul>
+<p><strong>设计目标中、但当前尚未兑现（续传侧）</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>断点续传 / 任务恢复</strong>：受第五章考证的 <code>thread_id</code> 缺口影响，任务失败后依然从头执行，这部分收益目前为零；</p>
+</li>
+<li class="lvl-2">
+<p><strong>避免重复 LLM 调用</strong>：同上——没有恢复入口，就没有&quot;跳过已稳定阶段&quot;的能力；</p>
+</li>
+<li class="lvl-2">
+<p><strong>任务迁移</strong>：属于分布式方案的规划能力，当前单机 SQLite 未涉及。</p>
+</li>
+</ul>
+<p>需要坦诚说明的是：检查点机制当前<strong>没有公开的性能基准</strong>。&quot;恢复能节省多少时间/成本&quot;取决于剧本规模、LLM 调用分布与故障点位置，在没有可复现基准的情况下，任何具体数字都不应被当作结论——本文也据此不提供估算值。</p>
+<hr>
+<h2>七、故障实战：五个运行期场景与恢复路径</h2>
+<p>以下场景均能在当前源码中找到确切依据，按&quot;发生什么→为什么→系统如何处理→如何恢复&quot;四段式整理。</p>
+<h3>故障一：服务重启后，检查点&quot;全丢&quot;</h3>
+<p><strong>发生什么</strong>：重启服务后，部署目录下的 <code>data_checkpoint/</code> 里没有任何新写入，甚至目录本身都没被创建。</p>
+<p><strong>为什么</strong>：两条降级链之一被触发——①运行环境未安装 <code>langgraph-checkpoint-sqlite</code>（导入期降级）；②部署目录只读或权限不足（运行期降级）。两者都会静默切换到 MemorySaver：工作流照常成功，但状态只活在本进程内存里。</p>
+<p><strong>系统如何处理</strong>：静默降级——不中断、不重试、不告警，只留下一条 <code>warning</code> 级日志。</p>
+<p><strong>如何恢复与避免</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>排查顺序：先查启动日志中有无&quot;langgraph-checkpoint-sqlite 未安装&quot;或&quot;SQLite 不可用，降级到内存模式&quot;两条 warning；</p>
+</li>
+<li class="lvl-2">
+<p>部署检查清单里加入&quot;<code>data_checkpoint</code> 目录存在且可写&quot;，并把这两条 warning 接入告警；</p>
+</li>
+<li class="lvl-2">
+<p>需要强持久化保证的场景，把 <code>checkpoint_mode</code> 显式设为 <code>sqlite</code>——显式模式下目录不可写会在初始化 <code>os.makedirs</code> 时直接报错（更吵，但更早暴露）。</p>
+</li>
+</ul>
+<h3>故障二：任务失败重跑，&quot;恢复&quot;从未发生</h3>
+<p><strong>发生什么</strong>：长剧本任务在质量审查阶段崩溃，重启任务后从头重新调用 LLM——所有已落盘的检查点数据视而不见。</p>
+<p><strong>为什么</strong>：第五章考证的 <code>thread_id</code> 缺口——主执行路径使用 <code>f&quot;process_{id(initial_state)}&quot;</code>（对象内存地址），每轮运行都是新时间线，历史检查点永不可命中。</p>
+<p><strong>系统如何处理</strong>：无感知——旧检查点继续留库，新时间线照写一份。</p>
+<p><strong>如何恢复</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>第一步修复只需要一行：把执行路径的 config 换成 <code>self.checkpointer.get_config()</code>（返回稳定的 <code>{script_id}_{task_id}</code>）；</p>
+</li>
+<li class="lvl-2">
+<p>真正的续跑还需要补恢复入口：LangGraph 支持以 <code>None</code> 为输入、复用同一 <code>thread_id</code> 从最近检查点继续执行——这是 v1.5 的完整工作量，修标识只是第一步；</p>
+</li>
+<li class="lvl-2">
+<p>验证方法：打开任意任务 <code>.db</code> 执行 <code>SELECT thread_id, COUNT(*) FROM checkpoints GROUP BY thread_id;</code>——若同一任务下 <code>thread_id</code> 种类随运行次数增长，即证明本故障存在。</p>
+</li>
+</ul>
+<h3>故障三：磁盘只增不减</h3>
+<p><strong>发生什么</strong>：定时任务连续运行一周后，<code>data_checkpoint/</code> 目录占用从几 MB 涨到数百 MB 甚至 GB 级。</p>
+<p><strong>为什么</strong>：两个因素叠加——①<code>cleanup_old_checkpoints</code> 没有任何调用方；②<code>thread_id</code> 漂移让同一个 <code>.db</code> 只增不减（每次运行写入新时间线，而写入本身是每个 super-step 一条记录）。</p>
+<p><strong>系统如何处理</strong>：无任何自动清理。</p>
+<p><strong>如何恢复</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>短期：手动调用 <code>cleanup_old_checkpoints(keep_count=N)</code>，或在运维层按目录维度归档/清理旧 <code>task_*.db</code>；</p>
+</li>
+<li class="lvl-2">
+<p>中期：把清理接入任务收尾流程（<code>finally</code> 块或定时任务），并让 <code>max_checkpoints_per_script</code> 配置真正生效；</p>
+</li>
+<li class="lvl-2">
+<p>注意：当前实现只跳过&quot;当前实例自己的 db_path&quot;，不检测其他进程是否正在写入——多进程部署下直接调用可能误删活跃文件，建议先确认无并发任务再执行清理。</p>
+</li>
+</ul>
+<h3>故障四：切回异步后，检查点写入集体报错</h3>
+<p><strong>发生什么</strong>：团队把执行链路改回 <code>ainvoke</code>（期待更好的并发），运行后每个任务都在 saver 处抛出 <code>NotImplementedError: The SqliteSaver does not support async methods...</code>。</p>
+<p><strong>为什么</strong>：同步版 <code>SqliteSaver</code> 的 <code>aput</code> / <code>aget_tuple</code> / <code>alist</code> 三个异步方法一律直接报错（第三章的排坑现场就是这个问题的第一次发生）。</p>
+<p><strong>系统如何处理</strong>：异常向上抛出——图执行失败，任务显式报错（这个故障反而属于&quot;吵得早&quot;的类型）。</p>
+<p><strong>如何恢复</strong>：安装 <code>aiosqlite</code> 并切换为 <code>AsyncSqliteSaver</code>（<code>from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver</code>），连接生命周期用 <code>async with</code> 管理。不要尝试&quot;异步工作流 + 同步 Saver&quot;的混搭，这是本故障的唯一正确姿势。</p>
+<h3>故障五：日志反复出现 coroutine was never awaited</h3>
+<p><strong>发生什么</strong>：任务收尾阶段日志出现 <code>RuntimeWarning: coroutine 'WorkflowCheckpointer.close' was never awaited</code>，SQLite 文件句柄缓慢累积。</p>
+<p><strong>为什么</strong>：<code>close()</code> 是 <code>async def</code>，但 <code>__exit__</code> 按同步方式调用它（第四章&quot;资源释放的两个坑&quot;）——协程对象被创建后直接丢弃，连接从未真正关闭。</p>
+<p><strong>系统如何处理</strong>：静默——除了 RuntimeWarning，没有任何报错；功能不受影响，但资源持续滞留。</p>
+<p><strong>如何恢复</strong>：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p>方向一：把 <code>close()</code> 改成同步方法——它内部只是 <code>conn.close()</code> 加置空，本就不需要 async；</p>
+</li>
+<li class="lvl-2">
+<p>方向二：保留异步签名，但补齐调用链（<code>await checkpointer.close()</code>），并在服务关闭钩子里调用 <code>CheckpointerFactory.close_all()</code>；</p>
+</li>
+<li class="lvl-2">
+<p>验证：修复后确认日志中 RuntimeWarning 消失，进程正常退出后 <code>.db</code> 文件不再被句柄占用（如 <code>lsof</code> / 资源监视器确认）。</p>
+</li>
+</ul>
+<h3>五个故障的共性</h3>
+<p>除故障四外，其余四个的共同特征是：<strong>系统都不会大声报错</strong>。降级是静默的、缺口是静默的、资源滞留也是静默的——它们全部属于&quot;看起来一切正常、但能力没生效&quot;的类别。对这类问题的防御，不能靠盯盘，而应把&quot;接了什么线、验证过哪条路径&quot;写进发布检查清单。</p>
+<hr>
+<h2>八、最佳实践总结</h2>
+<p>基于全文考证，工作流检查点落地的关键经验可以收敛为七条：</p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><strong>开发测试用 MemorySaver，单机部署用 SqliteSaver</strong>：这是项目当前双模式的定位；注意 SqliteSaver 的官方级别是&quot;轻量同步&quot;，不要按高并发数据库去期待它；</p>
+</li>
+<li class="lvl-2">
+<p><strong><code>thread_id</code> 必须稳定且可复现</strong>：用 <code>{script_id}_{task_id}</code> 这类业务标识，绝不要用对象内存地址或随机数——否则检查点只写不读（本文最重要的教训）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>saver 接入编译、config 接入执行</strong>：<code>compile(checkpointer=saver)</code> 与 <code>invoke(..., config=...)</code> 缺一不可；</p>
+</li>
+<li class="lvl-2">
+<p><strong>验证写入真的发生</strong>：部署后打开 <code>.db</code> 执行 <code>SELECT COUNT(*) FROM checkpoints;</code>——比相信日志更可靠；</p>
+</li>
+<li class="lvl-2">
+<p><strong>清理与释放都要显式接线</strong>：保留策略、连接关闭、工厂清理不会自己生效（见第四章的两个资源坑）；</p>
+</li>
+<li class="lvl-2">
+<p><strong>异步链路用异步 Saver</strong>：<code>ainvoke</code> 必须搭配 <code>AsyncSqliteSaver</code>（另装 <code>aiosqlite</code>）；同步链路用 <code>invoke</code> + <code>SqliteSaver</code>，不要混搭；</p>
+</li>
+<li class="lvl-2">
+<p><strong>降级必须可见</strong>：auto 模式的两条降级链只打 warning，生产环境务必接入监控，否则&quot;持久化&quot;会静默退化为&quot;内存态&quot;。</p>
+</li>
+</ul>
+<hr>
+<h2>九、扩展方向与最小修复路径</h2>
+<p>如果要把当前实现推进到&quot;真正的断点续传&quot;，最小修复路径大致是三步：</p>
+<ol>
+<li class="lvl-3">
+<p><strong>修 <code>thread_id</code></strong>：执行路径改用 <code>checkpointer.get_config()</code>（一行改动），让同一任务的检查点跨运行可命中；</p>
+</li>
+<li class="lvl-3">
+<p><strong>补恢复入口</strong>：任务启动时复用同一 <code>thread_id</code>、以 <code>None</code> 为输入续跑，把&quot;从头跑&quot;改成&quot;从断点续跑&quot;；</p>
+</li>
+<li class="lvl-3">
+<p><strong>接清理与释放</strong>：把 <code>cleanup_old_checkpoints</code> 接入任务收尾，把 <code>close_all</code> 接入服务关闭钩子（顺手修掉 <code>close()</code> 的 async 问题）。</p>
+</li>
+</ol>
+<p>在此之上，更远的方向是：分布式部署时切换 <code>AsyncSqliteSaver</code>（异步链路），或引入 Postgres / Redis 存储（对应 <code>postgres_uri</code> 这个预留字段的初衷）；同步探索检查点压缩与增量落盘，控制单文件体积的增长速度。这些都属于 v1.5&quot;分布式调度 / 断点续传&quot;阶段的工作量。</p>
+<hr>
+<h2>版本与验证说明</h2>
+<p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
+<ol>
+<li class="lvl-3">
+<p>项目版本升级，尤其是公开 API、配置模型、存储实现和工作流发生变化；</p>
+</li>
+<li class="lvl-3">
+<p>本文中的默认值、性能数据或示例依赖外部服务版本；</p>
+</li>
+<li class="lvl-3">
+<p>运行环境与本文案例不同，例如 Python 版本、Redis/数据库版本、模型供应商或操作系统不同。</p>
+</li>
+</ol>
+<p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
+<h2>相关链接</h2>
+<p><strong>核心文档</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="architecture.html">PenShot 技术架构与设计</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="integration.html">PenShot 集成使用指南</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="core-implementation.html">PenShot 核心实现详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="evolution.html">PenShot 版本功能演进</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="nodes.html">PenShot 工作流节点详解</a></p>
+</li>
+</ul>
+<p><strong>技术专题</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="checkpoint.html">工作流检查点</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="consistency.html">全局一致性策略</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="mcp.html">MCP 协议详解</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rag-knowledge-base.html">RAG 知识库增强</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="recall.html">召回策略方案</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="rerank.html">召回重排序</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="dev-guide.html">开发者指南</a></p>
+</li>
+</ul>
+<p><strong>外部链接</strong></p>
+<ul class="lvl-0">
+<li class="lvl-2">
+<p><a href="https://github.com/neopen/story-shot-agent">PenShot GitHub</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="index.html">PenShot 文档</a></p>
+</li>
+<li class="lvl-2">
+<p><a href="https://shot.helpenx.com">PenShot 官网</a></p>
+</li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+  <footer>
+    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
+    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
+    <a href="index.html">文档中心</a>
+    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
+  </footer>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>
