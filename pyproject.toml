@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "penshot"
-version = "0.3.7"
+version = "0.3.8"
 description = "剧本分镜,动漫分镜,电影分镜,短剧分镜,视频分镜,剧本解析,文生视频提示词。AI agent that converts screenplays to consistent Text-to-Video prompts. Supports Sora, Runway, Kling, Veo via LangGraph & LLMs."
 
 keywords = [
@@ -50,23 +50,19 @@ dependencies = [
     # 核心AI/LLM
     "langchain>=1.2.14",
     "langchain-community",
-    "langchain-ollama>=1.0.0",
+    "langchain-openai>=1.0.0",
     "langchain-chroma>=1.0.0",
     "langgraph>=1.1.4",
-
-    # "langchain-deepseek>=0.1.0",
-    # "dashscope==1.23.9",
+    "langgraph-checkpoint-sqlite",
 
     # RAG/向量存储
     "chromadb>=1.5.6",
     "llama-index-core>=0.14.20",
-    "llama-index-embeddings-langchain>=0.4.0",
 
-    # "llama-index-embeddings-openai>=0.1.0",
-    # "llama-index-embeddings-huggingface>=0.1.0",
-    # "llama-index-embeddings-ollama>=0.1.0",
-
-    "langgraph-checkpoint-sqlite",
+    # HTTP 客户端
+    "httpx>=0.25.0",
+    "aiohttp>=3.9.0",
+    "requests>=2.31.0",
 
     # 配置与数据验证
     "pydantic>=2.11.10",
@@ -84,7 +80,6 @@ dependencies = [
     "redis",
 
     # 工具库
-    "tiktoken>=0.5.0",
     "colorama",
 ]
 
@@ -92,85 +87,28 @@ dependencies = [
 # 可选依赖分组
 # ============================================================================
 
-# 开发工具
+# 开发工具（pytest + pre-commit 实际使用的 lint/类型检查工具）
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.11.0",
-    "flake8>=6.1.0",
+    "ruff>=0.9.10",
     "mypy>=1.7.0",
-    "isort>=5.12.0",
+    "flake8>=6.1.0",
     "pre-commit>=3.5.0",
 ]
 
-# 测试依赖
-test = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "httpx>=0.25.0",
-]
-
-# 视频处理
-video = [
-    "opencv-python>=4.8.0",
-    "moviepy>=1.0.3",
-    "pillow>=10.0.0",
-]
-
-# 文档生成
-docs = [
-    "mkdocs>=1.5.0",
-    "mkdocs-material>=9.4.0",
-    "mkdocstrings[python]>=0.24.0",
-]
-
-# API服务
-api = [
-    "fastapi>=0.104.0",
-    "aiofiles>=23.2.0",
-    "httpx>=0.25.0",
-]
-
-# 异步数据库支持
-async_db = [
-    "aiosqlite>=0.19.0",
-    "asyncpg>=0.29.0",
-]
-
-# 多LLM提供商
-llm-providers = [
-    "langchain-deepseek>=0.1.0",
-    "langchain-openai>=1.0.0",
-    "dashscope>=1.0.0",
-]
-
 # ============================================================================
-# full：完整运行时依赖集合
+# full：核心依赖之外的可选能力（可选 LLM provider + 本地重排序）
+# 均由代码内的 _check_packages / try-except 做能力探测，缺失时降级而非报错
 # ============================================================================
 full = [
-    # API服务
-    "fastapi>=0.104.0",
-    "aiofiles>=23.2.0",
-
-    # 异步数据库
-    "aiosqlite>=0.19.0",
-    "asyncpg>=0.29.0",
-
-    # 多LLM提供商
-    "langchain-deepseek>=0.1.0",
-    "langchain-openai>=1.0.0",
+    # 可选 LLM provider
     "dashscope>=1.0.0",
+    "langchain-ollama>=1.0.0",
 
-    # 视频处理
-    "opencv-python>=4.8.0",
-    "moviepy>=1.0.3",
-    "pillow>=10.0.0",
-
-    # HTTP客户端
-    "httpx>=0.25.0",
+    # 本地重排序模型（rerank_enabled 默认关闭；体积较大，故不进入核心依赖）
+    "sentence-transformers>=2.2.0",
 ]
 
 [project.urls]
@@ -220,7 +158,7 @@ target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
-line_length = 88
+line_length = 120
 multi_line_output = 3
 
 [tool.mypy]
