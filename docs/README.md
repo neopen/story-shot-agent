@@ -568,8 +568,8 @@ class StoryboardWorkflowNodes:
 ## 相关链接
 
 - [GitHub 仓库](https://github.com/neopen/story-shot-agent)
-- [详细文档](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
-- [示例代码](https://github.com/neopen/story-shot-agent/tree/main/example)
+- [详细文档](https://shot.helpenx.com/docs/)
+- [示例代码](https://github.com/neopen/story-shot-agent/tree/main/examples)
 
 
 
