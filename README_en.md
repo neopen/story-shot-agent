@@ -424,7 +424,9 @@ Copyright (c) 2025 HiPeng (NeoPen)
 
 ## Contact
 
-- Project Homepage: https://github.com/neopen/story-shot-agent
+- Homepage: https://github.com/neopen/story-shot-agent
 - Documentation: https://shot.helpenx.com/docs/
+- Blog: https://pengline.cn/
+- Tool: https://helpoke.com/
 
 Special thanks to LangChain, LangGraph, Chroma, Ollama, and the open-source community for their technical support. If this project has been helpful to your work, please consider starring the repository and sharing your feedback.

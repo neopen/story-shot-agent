@@ -522,6 +522,8 @@ pytest tests/
 - GitHub：https://github.com/neopen/story-shot-agent
 - 邮箱：helpenx@gmail.com
 - 文档：https://shot.helpenx.com/docs/
+- 博客：https://pengline.cn/
+- 工具：https://helpoke.com/
 
 
 
