@@ -25,11 +25,11 @@ llm:
     base_url: "https://api.openai.com/v1"
     api_key: ""
     model_name: "gpt-4o"
-    timeout: 60
+    timeout: 10
     response_format: "json_object"
     temperature: 0.1
     max_tokens: 5000
-    max_retries: 3
+    max_retries: 2
     retry_delay: 1
 
   # 备用llm模型配置
@@ -38,10 +38,10 @@ llm:
     api_key: ""
     model_name: "qwen3:8b"
     response_format: "json_object"
-    timeout: 60
+    timeout: 20
     temperature: 0.1
     max_tokens: 5000
-    max_retries: 3
+    max_retries: 2
     retry_delay: 1
 
 #################### 嵌入模型配置 #####################
@@ -53,8 +53,8 @@ embed:
     device: "gpu"
     normalize_embeddings: true
     dimensions: 1536
-    timeout: 60
-    max_retries: 3
+    timeout: 10
+    max_retries: 2
 
   # 备用嵌入模型配置
   fallback:
@@ -62,8 +62,8 @@ embed:
     api_key: ""
     model_name: "qllama/bge-small-zh-v1.5"
     device: "gpu"
-    timeout: 60
-    max_retries: 3
+    timeout: 20
+    max_retries: 2
 
 #################### 分镜配置 #####################
 storyboard:

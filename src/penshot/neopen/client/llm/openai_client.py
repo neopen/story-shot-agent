@@ -14,6 +14,8 @@ import os
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseLanguageModel
 
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
 from penshot.neopen.client.base_client import BaseClient
 from penshot.neopen.client.client_config import AIConfig
 
@@ -31,7 +33,6 @@ class OpenAIClient(BaseClient):
         return self._check_packages((("langchain_openai", "langchain-openai"),))
 
     def llm_model(self) -> BaseLanguageModel:
-        from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             model=self.llm_config.model_name,
             temperature=self.llm_config.temperature,
@@ -43,7 +44,6 @@ class OpenAIClient(BaseClient):
         )
 
     def llm_embed(self) -> Embeddings:
-        from langchain_openai import OpenAIEmbeddings
         return OpenAIEmbeddings(
             model=self.embed_config.model_name,
             api_key=self.embed_config.api_key,

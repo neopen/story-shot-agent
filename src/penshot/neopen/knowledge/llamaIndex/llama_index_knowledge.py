@@ -886,7 +886,7 @@ class ScriptKnowledgeBase:
             self._save_storage(script_id)
 
         except Exception as e:
-            error(f"添加文档到索引失败: {script_id}, {e}")
+            error(f"添加文档到索引失败: {script_id}, {str(e)}")
             raise
 
     def _save_vector_storage(self, script_id: str):
