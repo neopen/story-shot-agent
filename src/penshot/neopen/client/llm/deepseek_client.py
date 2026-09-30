@@ -14,6 +14,8 @@ import os
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseLanguageModel
 
+from langchain_openai import ChatOpenAI
+
 from penshot.neopen.client.base_client import BaseClient
 from penshot.neopen.client.client_config import AIConfig
 
@@ -23,8 +25,8 @@ class DeepSeekClient(BaseClient):
 
     def __init__(self, config: AIConfig):
         super().__init__(config)
-        # self.base_url = self.llm_config.base_url or "https://api.deepseek.com/v1/chat/completions"
         self.base_url = self.llm_config.base_url or "https://api.deepseek.com"
+        self.model_name = self.llm_config.model_name or "deepseek-flash"
         os.environ["DEEPSEEK_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
     def check_package(self) -> bool:
@@ -32,16 +34,23 @@ class DeepSeekClient(BaseClient):
         return self._check_packages((("langchain_openai", "langchain-openai"),))
 
     def llm_model(self) -> BaseLanguageModel:
-        from langchain_openai import ChatOpenAI
         return ChatOpenAI(
-            model=self.llm_config.model_name,
+            model=self.model_name,
             temperature=self.llm_config.temperature,
             api_key=self.llm_config.api_key,
             base_url=self.base_url,
             timeout=self.llm_config.timeout,
             max_retries=self.llm_config.max_retries,
             max_tokens=self.llm_config.max_tokens,
+            model_kwargs=self._get_model_kwargs(),
         )
+
+
+    def _get_model_kwargs(self):
+        """返回模型参数字典"""
+        model_kwargs = {
+        }
+        return model_kwargs
 
     def llm_embed(self) -> Embeddings:
         raise NotImplementedError("DeepSeek does not provide an embedding API. Consider using OpenAI, Ollama, or Qwen for embeddings.")

@@ -14,8 +14,6 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional, Any, Dict, List
 
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_chroma import Chroma
 
 from penshot.logger import error, debug
@@ -27,6 +25,15 @@ _VECTORSTORE_EXECUTOR = ThreadPoolExecutor(
     max_workers=2,
     thread_name_prefix="vectorstore-init"
 )
+
+
+def _relevance_from_distance(distance: float) -> float:
+    """把向量库返回的距离换算成 [0, 1] 的相关度（越大越相关）
+
+    Chroma 的 l2 距离是平方欧氏距离，对单位化向量有 ``距离 = 2 - 2 * 余弦相似度``，
+    因此 ``1 - 距离 / 2`` 即余弦相似度；该配置默认用 OpenAI embeddings，向量是单位化的。
+    """
+    return max(0.0, min(1.0, 1.0 - distance / 2.0))
 
 
 class LongTermMemory:
@@ -47,12 +54,6 @@ class LongTermMemory:
         self._vectorstore_future: Future = _VECTORSTORE_EXECUTOR.submit(
             self._init_vectorstore
         )
-
-        # 会话历史存储
-        self._session_histories: Dict[str, ChatMessageHistory] = {}
-
-        # 创建带记忆的链
-        self.memory = self._create_memory_chain()
 
         debug(
             f"初始化长期记忆: "
@@ -124,43 +125,6 @@ class LongTermMemory:
         """判断向量数据库是否初始化完成"""
         return self.vectorstore is not None
 
-    def _get_session_history(
-        self,
-        session_id: str
-    ) -> ChatMessageHistory:
-        """获取或创建会话历史"""
-        if session_id not in self._session_histories:
-            self._session_histories[session_id] = ChatMessageHistory()
-
-        return self._session_histories[session_id]
-
-    def _create_memory_chain(self):
-        """创建带记忆的链"""
-        from langchain_core.runnables import RunnableLambda
-
-        def retrieve_memories(input_dict):
-            """检索相关记忆"""
-            query = input_dict.get("input", "")
-
-            if query:
-                memories = self.search(query)
-
-                if memories:
-                    return "\n".join(
-                        m["content"] for m in memories
-                    )
-
-            return ""
-
-        retrieval_chain = RunnableLambda(retrieve_memories)
-
-        return RunnableWithMessageHistory(
-            retrieval_chain,
-            self._get_session_history,
-            input_messages_key="input",
-            history_messages_key="history"
-        )
-
     def add(
         self,
         text: str,
@@ -211,25 +175,25 @@ class LongTermMemory:
         try:
             if filter_dict:
                 results = vectorstore.similarity_search_with_score(
-                    query,
-                    k=k,
-                    filter=filter_dict
+                    query, k=k, filter=filter_dict
                 )
             else:
-                results = vectorstore.similarity_search_with_score(
-                    query,
-                    k=k
+                results = vectorstore.similarity_search_with_score(query, k=k)
+
+            memories = []
+            for doc, distance in results:
+                relevance = _relevance_from_distance(distance)
+                if relevance < self.config.long_term_score_threshold:
+                    continue
+                memories.append(
+                    {
+                        "content": doc.page_content,
+                        "score": relevance,
+                        "metadata": doc.metadata,
+                    }
                 )
 
-            return [
-                {
-                    "content": doc.page_content,
-                    "score": score,
-                    "metadata": doc.metadata
-                }
-                for doc, score in results
-                if score >= self.config.long_term_score_threshold
-            ]
+            return memories
 
         except Exception as e:
             error(f"长期记忆搜索失败: {e}")
@@ -301,12 +265,6 @@ class LongTermMemory:
                     "score_threshold": self.config.long_term_score_threshold
                 }
             )
-
-            # 清空会话历史
-            self._session_histories.clear()
-
-            # 重新创建 memory chain
-            self.memory = self._create_memory_chain()
 
             debug(
                 f"长期记忆已清空: script={self.script_id}"

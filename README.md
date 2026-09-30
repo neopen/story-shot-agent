@@ -32,11 +32,11 @@ ____  _____ _   _ ____  _  _  ___  _____
 
 <p align="center">
     <a href="./README.md">English</a> •
-    <a href="https://shot.helpenx.com/">官网演示</a> •
-    <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/">官方文档</a> •
-    <a href="https://pengline.cn/2026/02/df16e7d36e5d41d2ad9d7934b28f94e4/">集成指南</a> •
-    <a href="https://pengline.cn/2026/02/b027d930c0b84ba6abd24bbef7d78afc/">MCP 服务</a> •
-    <a href="https://pypi.org/project/penshot/">PyPI</a>
+    <a href="https://shot.helpenx.com/" target="_blank">官网演示</a> •
+    <a href="https://shot.helpenx.com/docs/" target="_blank">官方文档</a> •
+    <a href="https://shot.helpenx.com/docs/integration.html" target="_blank">集成指南</a> •
+    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP 服务</a> •
+    <a href="https://pypi.org/project/penshot/" target="_blank">PyPI</a>
 </p>
 
 ---
@@ -150,7 +150,7 @@ flowchart TD
 
 </details>
 
-该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《架构设计与实现》](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
+该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《架构设计与实现》](https://shot.helpenx.com/docs/)
 
 
 
@@ -521,7 +521,9 @@ pytest tests/
 
 - GitHub：https://github.com/neopen/story-shot-agent
 - 邮箱：helpenx@gmail.com
-- 文档：https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/
+- 文档：https://shot.helpenx.com/docs/
+- 博客：https://pengline.cn/
+- 工具：https://helpoke.com/
 
 
 

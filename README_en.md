@@ -23,10 +23,10 @@
   
   <p align="center">
     <a href="./README.md">中文文档</a> •
-    <a href="https://shot.helpenx.com">WebSite</a> •
-    <a href="https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/">Documentation</a> • 
-    <a href="https://pengline.cn/2026/02/b027d930c0b84ba6abd24bbef7d78afc/">MCP Service</a> •
-    <a href="https://pypi.org/project/penshot/">PyPI</a>
+    <a href="https://shot.helpenx.com" target="_blank">WebSite</a> •
+    <a href="https://shot.helpenx.com/docs/" target="_blank">Documentation</a> • 
+    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP Service</a> •
+    <a href="https://pypi.org/project/penshot/" target="_blank">PyPI</a>
   </p>
 
 
@@ -82,7 +82,7 @@ A multi-agent collaborative screenplay storyboarding system built on **LangChain
 
 </details>
 
-> 💡 For in-depth architectural design, memory management, and continuity algorithms, please refer to our [Architecture Documentation](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/).
+> 💡 For in-depth architectural design, memory management, and continuity algorithms, please refer to our [Architecture Documentation](https://shot.helpenx.com/docs/).
 
 
 
@@ -424,7 +424,9 @@ Copyright (c) 2025 HiPeng (NeoPen)
 
 ## Contact
 
-- Project Homepage: https://github.com/neopen/story-shot-agent
-- Documentation: https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/
+- Homepage: https://github.com/neopen/story-shot-agent
+- Documentation: https://shot.helpenx.com/docs/
+- Blog: https://pengline.cn/
+- Tool: https://helpoke.com/
 
 Special thanks to LangChain, LangGraph, Chroma, Ollama, and the open-source community for their technical support. If this project has been helpful to your work, please consider starring the repository and sharing your feedback.

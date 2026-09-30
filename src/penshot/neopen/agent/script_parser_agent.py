@@ -142,8 +142,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         info(f"识别格式: {format_type.value}")
 
         # 步骤2：AI深度解析（如果提供了修复参数，传递给LLM）
-        debug(" 调用AI进行深度解析...")
+        # debug(" 调用AI进行深度解析...")
         try:
+            info(f"通过 LLM 进行深度解析...")
             parsed_script = self.script_parser.get(AgentMode.LLM).parser(
                 script_text, format_type, self.current_repair_params, self.current_historical_context
             )

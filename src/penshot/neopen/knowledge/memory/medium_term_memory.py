@@ -16,8 +16,6 @@ from typing import Optional, Any, Dict
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableLambda
-from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from penshot.logger import debug, info, error
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
@@ -63,9 +61,6 @@ class MediumTermMemory:
             self._load_from_file()  # 启动时加载
             self.storage = create_result_storage(base_output_dir=config.term_persist_path)
 
-        # 创建带记忆的链
-        self.memory = self._create_memory_chain()
-
         debug(f"初始化中期记忆: script={script_id}, max_tokens={config.medium_term_max_tokens}, "
               f"persist={self.persist_path is not None}")
 
@@ -75,43 +70,24 @@ class MediumTermMemory:
             self._session_histories[session_id] = ChatMessageHistory()
         return self._session_histories[session_id]
 
-    def _create_summary_chain(self):
-        """创建摘要链"""
+    def _summarize(self, summary: str, new_lines: str) -> str:
+        """把新内容并入既有摘要，返回更新后的摘要"""
+        # 检查内容长度，如果超过限制则先截断
+        if len(new_lines) > self.max_token_limit * 4:
+            new_lines = new_lines[:self.max_token_limit * 4]
 
-        def summarize(input_dict):
-            """生成摘要"""
-            summary = input_dict.get("summary", "")
-            new_lines = input_dict.get("new_lines", "")
+        # 使用提示词生成更新后的摘要
+        prompt = self.config.medium_term_summary_prompt or self.DEFAULT_SUMMARY_PROMPT.template
+        formatted_prompt = prompt.format(summary=summary, new_lines=new_lines)
 
-            # 检查内容长度，如果超过限制则先截断
-            if len(new_lines) > self.max_token_limit * 4:
-                new_lines = new_lines[:self.max_token_limit * 4]
+        response = self.llm.invoke(formatted_prompt)
+        new_summary = response.content if hasattr(response, 'content') else str(response)
 
-            # 使用提示词生成更新后的摘要
-            prompt = self.config.medium_term_summary_prompt or self.DEFAULT_SUMMARY_PROMPT.template
-            formatted_prompt = prompt.format(summary=summary, new_lines=new_lines)
+        # 如果摘要过长，进行截断
+        if len(new_summary) > self.max_token_limit * 2:
+            new_summary = new_summary[:self.max_token_limit * 2] + "..."
 
-            response = self.llm.invoke(formatted_prompt)
-            new_summary = response.content if hasattr(response, 'content') else str(response)
-
-            # 如果摘要过长，进行截断
-            if len(new_summary) > self.max_token_limit * 2:
-                new_summary = new_summary[:self.max_token_limit * 2] + "..."
-
-            return new_summary
-
-        return RunnableLambda(summarize)
-
-    def _create_memory_chain(self):
-        """创建带记忆的链"""
-        summary_chain = self._create_summary_chain()
-
-        return RunnableWithMessageHistory(
-            summary_chain,
-            self._get_session_history,
-            input_messages_key="input",
-            history_messages_key="history"
-        )
+        return new_summary
 
     def add(self, stage_name: str, content: str, metadata: Optional[Dict] = None):
         """添加阶段内容"""
@@ -119,15 +95,14 @@ class MediumTermMemory:
         if len(content) > self.max_token_limit * 4:
             content = content[:self.max_token_limit * 4]
 
-        # 获取当前摘要
+        # 先读取既有摘要，再写入本次历史，否则会读到刚加入的内容
         current_summary = self.get_summary()
 
-        # 保存到摘要链
-        session_id = f"stage_{stage_name}"
-        self.memory.invoke(
-            {"summary": current_summary, "new_lines": content, "input": content},
-            config={"configurable": {"session_id": session_id}}
-        )
+        # 会话历史中最后一条消息即最新摘要
+        history = self._get_session_history(f"stage_{stage_name}")
+        new_summary = self._summarize(current_summary, content)
+        history.add_user_message(content)
+        history.add_ai_message(new_summary)
 
         # 缓存阶段摘要
         if metadata and metadata.get("keep_full"):
@@ -160,9 +135,6 @@ class MediumTermMemory:
         """清空摘要"""
         self._session_histories.clear()
         self._stage_summaries.clear()
-
-        # 重新创建记忆链
-        self.memory = self._create_memory_chain()
 
         # 删除持久化文件
         if self.persist_path:

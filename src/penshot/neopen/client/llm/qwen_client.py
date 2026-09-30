@@ -11,10 +11,10 @@ See LICENSE File For Details.
 """
 import os
 
-from langchain_community.chat_models import ChatTongyi  # Qwen via Tongyi
-from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseLanguageModel
+
+from langchain_openai import ChatOpenAI
 
 from penshot.neopen.client.base_client import BaseClient
 from penshot.neopen.client.client_config import AIConfig
@@ -25,7 +25,8 @@ class QwenClient(BaseClient):
 
     def __init__(self, config: AIConfig):
         super().__init__(config)
-        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        self.base_url = self.llm_config.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        self.model_name = self.llm_config.model_name or "qwen3.8-max"
         os.environ["DASHSCOPE_API_KEY"] = self.llm_config.api_key.get_secret_value()
 
     def check_package(self) -> bool:
@@ -33,20 +34,24 @@ class QwenClient(BaseClient):
         return self._check_packages(
             (
                 ("langchain_community", "langchain-community"),
-                ("dashscope", "dashscope"),
+                # ("dashscope", "dashscope"),
             )
         )
 
     def llm_model(self) -> BaseLanguageModel:
-        return ChatTongyi(
-            model=self.llm_config.model_name,
-            model_kwargs=self._get_model_kwargs(),
+        return ChatOpenAI(
+            model=self.model_name,
+            base_url=self.base_url,
             api_key=self.llm_config.api_key,
+            timeout=self.llm_config.timeout,
+            temperature=self.llm_config.temperature,
             max_retries=self.llm_config.max_retries,
-            streaming=False,
+            max_tokens=self.llm_config.max_tokens,
+            model_kwargs=self._get_model_kwargs(),
         )
 
     def llm_embed(self) -> Embeddings:
+        from langchain_community.embeddings import DashScopeEmbeddings
         return DashScopeEmbeddings(
             model=self.embed_config.model_name,
             max_retries=self.embed_config.max_retries,
@@ -56,11 +61,5 @@ class QwenClient(BaseClient):
     def _get_model_kwargs(self):
         """返回模型参数字典"""
         model_kwargs = {
-            "temperature": self.llm_config.temperature,
-            "timeout": self.llm_config.timeout,
-            # "top_p": config.top_p,
-            # "presence_penalty": config.presence_penalty,
-            # "frequency_penalty": config.frequency_penalty,
-            "max_tokens": self.llm_config.max_tokens,
         }
         return model_kwargs
