@@ -7,6 +7,13 @@
 
 ---
 
+## [0.3.9](https://github.com/neopen/story-shot-agent/compare/v0.3.8...v0.3.9) (2026-09-30)
+
+
+### 🔧 Other Changes (其他变更)
+
+* 优化LLM客户端，支持OpenAI兼容-Chat，修改默认配置 ([#63](https://github.com/neopen/story-shot-agent/issues/63)) ([ec74762](https://github.com/neopen/story-shot-agent/commit/ec7476276ebceb198d79f33da45dc0707b56463c))
+
 ## [0.3.8](https://github.com/neopen/story-shot-agent/compare/v0.3.7...v0.3.8) (2026-09-19)
 
 
