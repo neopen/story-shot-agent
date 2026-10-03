@@ -2,7 +2,7 @@
 
 一个基于多智能体协作的剧本分镜系统，能够将多种格式的剧本拆分为符合 AI 文生视频时长的脚本单元，输出高质量分镜片段描述，并保证叙事连续性。系统基于 LangChain + LangGraph 构建，通过 LLM 将任意格式剧本解析转换为符合主流模型的“Text to Video”提示词片段，支持任务池优先级排队、多层级记忆管理与 Chroma 向量检索。
 
-中文 | [English](./docs/README-en.md) | [文档](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/) | [PyPI](https://pypi.org/project/penshot/)
+中文 | [English](./docs/README-en.md) | [文档](https://shot.helpenx.com/docs/) | [PyPI](https://pypi.org/project/penshot/)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![LangGraph](https://img.shields.io/badge/built_with-LangGraph-purple)](https://langchain-ai.github.io/langgraph/) [![PyPI](https://img.shields.io/pypi/v/penshot.svg)](https://pypi.org/project/penshot/) [![Downloads](https://static.pepy.tech/badge/penshot)](https://pepy.tech/project/penshot) ![GitHub stars](https://img.shields.io/github/stars/neopen/story-shot-agent)
 
@@ -85,7 +85,7 @@ flowchart TD
     O3 --> D1
 ```
 
-该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《剧本分镜智能体架构设计与实现》](https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/)
+该系统为典型的自然语言处理（NLP）应用场景，通过多智能体协作与记忆机制实现端到端的分镜转码。详细架构设计、记忆池实现与一致性保障机制请参考：[《剧本分镜智能体架构设计与实现》](https://shot.helpenx.com/docs/)
 
 ------
 
@@ -324,7 +324,7 @@ pytest tests/
 
 - GitHub：https://github.com/neopen/story-shot-agent
 - 邮箱：helpenx@gmail.com
-- 文档：https://pengline.cn/2026/02/7e6cd67dd5ee45248f2276ac145555f5/
+- 文档：https://shot.helpenx.com/docs/
 
 
 
