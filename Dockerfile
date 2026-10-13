@@ -17,9 +17,9 @@ RUN apt-get update \
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-# 🎯 核心修改：在 '.' 后面加上 '[full]'，强行构建 pyproject.toml 中 full 组的所有依赖包
+# 🎯 核心修改：在 '.' 后面加上 '[docker]'，强行构建 pyproject.toml 中 docker 组的所有依赖包
 RUN python -m pip install --upgrade pip setuptools build \
-    && pip wheel --no-cache-dir --wheel-dir /app/wheels .[full]
+    && pip wheel --no-cache-dir --wheel-dir /app/wheels .[docker]
 
 
 # ==========================================
