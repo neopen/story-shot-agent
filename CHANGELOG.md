@@ -7,6 +7,13 @@
 
 ---
 
+## [0.3.10](https://github.com/neopen/story-shot-agent/compare/v0.3.9...v0.3.10) (2026-10-13)
+
+
+### ♻️ Code Refactoring (代码重构)
+
+* Docker 配置 ([#67](https://github.com/neopen/story-shot-agent/issues/67)) ([d00c0b0](https://github.com/neopen/story-shot-agent/commit/d00c0b0cc7841b7298bb36e98aeec20ae4c9b4e3))
+
 ## [0.3.9](https://github.com/neopen/story-shot-agent/compare/v0.3.8...v0.3.9) (2026-10-13)
 
 
