@@ -23,6 +23,8 @@ dist/
 logs/
 data/
 docs/
+assets/
+examples/
 tests/
 *.log
 

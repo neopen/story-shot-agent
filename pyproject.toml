@@ -98,6 +98,12 @@ dev = [
     "pre-commit>=3.5.0",
 ]
 
+docker = [
+    # 可选 LLM provider
+    "langchain-ollama>=1.0.0",
+]
+
+
 # ============================================================================
 # full：核心依赖之外的可选能力（可选 LLM provider + 本地重排序）
 # 均由代码内的 _check_packages / try-except 做能力探测，缺失时降级而非报错
