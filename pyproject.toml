@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "penshot"
-version = "0.3.8"
+version = "0.3.9"
 description = "剧本分镜,动漫分镜,电影分镜,短剧分镜,视频分镜,剧本解析,文生视频提示词。AI agent that converts screenplays to consistent Text-to-Video prompts. Supports Sora, Runway, Kling, Veo via LangGraph & LLMs."
 
 keywords = [
@@ -102,6 +102,7 @@ docker = [
     # 可选 LLM provider
     "langchain-ollama>=1.0.0",
 ]
+
 
 # ============================================================================
 # full：核心依赖之外的可选能力（可选 LLM provider + 本地重排序）
