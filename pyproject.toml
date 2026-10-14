@@ -90,6 +90,8 @@ dependencies = [
 # 开发工具（pytest + pre-commit 实际使用的 lint/类型检查工具）
 [project.optional-dependencies]
 dev = [
+    "dashscope>=1.0.0",
+    "langchain-ollama>=1.0.0",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "ruff>=0.9.10",
@@ -101,6 +103,7 @@ dev = [
 docker = [
     # 可选 LLM provider
     "langchain-ollama>=1.0.0",
+    "dashscope>=1.0.0",
 ]
 
 

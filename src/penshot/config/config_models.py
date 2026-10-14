@@ -80,7 +80,7 @@ class LLMConfig(BaseModel):
 class EmbeddingConfig(BaseModel):
     """嵌入模型主配置"""
     default: EmbeddingBaseConfig = Field(default_factory=EmbeddingBaseConfig)
-    fallback: EmbeddingBaseConfig = Field(default_factory=EmbeddingBaseConfig)
+    fallback: Optional[EmbeddingBaseConfig] = Field(default_factory=EmbeddingBaseConfig)
 
 
 class RetrieverConfig(BaseModel):

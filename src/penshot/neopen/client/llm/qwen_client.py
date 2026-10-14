@@ -13,11 +13,11 @@ import os
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseLanguageModel
-
 from langchain_openai import ChatOpenAI
-
 from penshot.neopen.client.base_client import BaseClient
 from penshot.neopen.client.client_config import AIConfig
+
+from penshot.logger import info
 
 
 class QwenClient(BaseClient):
@@ -34,21 +34,47 @@ class QwenClient(BaseClient):
         return self._check_packages(
             (
                 ("langchain_community", "langchain-community"),
-                # ("dashscope", "dashscope"),
+                ("dashscope", "dashscope"),
             )
         )
 
     def llm_model(self) -> BaseLanguageModel:
-        return ChatOpenAI(
-            model=self.model_name,
-            base_url=self.base_url,
-            api_key=self.llm_config.api_key,
-            timeout=self.llm_config.timeout,
-            temperature=self.llm_config.temperature,
-            max_retries=self.llm_config.max_retries,
-            max_tokens=self.llm_config.max_tokens,
-            model_kwargs=self._get_model_kwargs(),
-        )
+
+        return self.create_chat_model()
+
+    def create_chat_model(self):
+        """
+        根据 base_url 的路径尾部选择合适的 Chat 模型。
+
+        - 路径尾部包含 compatible-mode/v1  -> ChatOpenAI
+        - 路径尾部包含 api/v1             -> ChatTongyi
+        """
+        # 去掉末尾的斜杠，便于统一判断
+        normalized = self.base_url.rstrip("/")
+
+        if "compatible-mode" in normalized:
+            info("QwenClient -> OpenAI")
+            return ChatOpenAI(
+                model=self.model_name,
+                base_url=self.base_url,
+                api_key=self.llm_config.api_key,
+                timeout=self.llm_config.timeout,
+                temperature=self.llm_config.temperature,
+                max_retries=self.llm_config.max_retries,
+                max_tokens=self.llm_config.max_tokens,
+            )
+
+        # elif normalized.endswith("api/v1"):
+        else:
+            from langchain_community.chat_models import ChatTongyi  # Qwen via Tongyi
+            info("QwenClient -> DashScope")
+            return ChatTongyi(
+                model=self.llm_config.model_name,
+                model_kwargs=self._get_model_kwargs(),
+                api_key=self.llm_config.api_key,
+                max_retries=self.llm_config.max_retries,
+                streaming=False,
+            )
 
     def llm_embed(self) -> Embeddings:
         from langchain_community.embeddings import DashScopeEmbeddings
@@ -61,5 +87,11 @@ class QwenClient(BaseClient):
     def _get_model_kwargs(self):
         """返回模型参数字典"""
         model_kwargs = {
+            "temperature": self.llm_config.temperature,
+            "timeout": self.llm_config.timeout,
+            # "top_p": config.top_p,
+            # "presence_penalty": config.presence_penalty,
+            # "frequency_penalty": config.frequency_penalty,
+            "max_tokens": self.llm_config.max_tokens,
         }
         return model_kwargs
