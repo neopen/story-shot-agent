@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v7
         with:
           # 传入 GitHub 自动生成的 Token 用于 API 授权
           sync-token: "${{ secrets.GITHUB_TOKEN }}"
