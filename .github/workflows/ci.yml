@@ -42,7 +42,7 @@ jobs:
     steps:
       # 第一步：检出仓库代码到运行器中
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 第二步：配置指定版本的 Python 环境
       - name: Set up Python

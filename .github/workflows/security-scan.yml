@@ -29,7 +29,7 @@ jobs:
     steps:
       # 1. 检出代码
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 2. 初始化 CodeQL 引擎
       - name: Initialize CodeQL
@@ -57,7 +57,7 @@ jobs:
     steps:
       # 1. 检出仓库代码
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 2. 检查 PR 引入的依赖变更
       - name: Dependency Review

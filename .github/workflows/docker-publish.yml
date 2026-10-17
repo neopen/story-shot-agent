@@ -28,7 +28,7 @@ jobs:
     steps:
       # 1. 检出代码
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 2. 配置 Docker Buildx 环境
       - name: Set up Docker Buildx
