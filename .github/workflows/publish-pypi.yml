@@ -28,7 +28,7 @@ jobs:
     steps:
       # 1. 检出 Release 对应的源码
       - name: Checkout release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
