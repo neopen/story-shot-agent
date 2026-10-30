@@ -1,0 +1,448 @@
+<p>PenShot 的核心实现围绕五个基础件展开：可插拔 LLM 客户端、版本化 YAML 提示词、调用重试与循环控制、任务池调度、上下文窗口约束。它们共同决定一条剧本能否稳定跑完并产出可用的分镜提示词。</p>
+<blockquote>
+<p><strong>事实边界</strong>：本页对应 v0.3.x 源码。三层记忆已移至 <a href="memory.html">记忆系统</a>；连续性锚点、质量修复与全局风格开关见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
+</blockquote>
+<h2>模块划分</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模块</th>
+<th style="text-align:left">主要文件</th>
+<th style="text-align:left">职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">LLM 客户端</td>
+<td style="text-align:left"><code>clients/</code>、<code>client_factory.py</code></td>
+<td style="text-align:left">统一厂商接口、模型构建、三级降级</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词</td>
+<td style="text-align:left"><code>prompts/</code>、<code>prompt_load_manager.py</code></td>
+<td style="text-align:left">按版本与语言加载 YAML、缓存与匹配</td>
+</tr>
+<tr>
+<td style="text-align:left">循环控制</td>
+<td style="text-align:left"><code>workflow_decision.py</code>、<code>workflow_state_types.py</code></td>
+<td style="text-align:left">硬限制、软限制、全局上限与决策状态</td>
+</tr>
+<tr>
+<td style="text-align:left">任务池</td>
+<td style="text-align:left"><code>task/</code>、<code>task_processor.py</code></td>
+<td style="text-align:left">优先级队列、并发执行、状态持久化</td>
+</tr>
+<tr>
+<td style="text-align:left">上下文约束</td>
+<td style="text-align:left"><code>memory_context.py</code>、<code>shot_config.py</code></td>
+<td style="text-align:left">组装截断与提示词长度审计</td>
+</tr>
+</tbody>
+</table>
+<h2>LLM 客户端</h2>
+<p>所有客户端继承 <code>BaseClient</code>，只实现 <code>llm_model()</code> 与 <code>llm_embed()</code>。上层智能体依赖 LangChain 的 <code>BaseLanguageModel</code> / <code>Embeddings</code> 抽象，不感知厂商差异。配置分两级：配置文件与环境变量提供默认值，代码参数实时覆盖。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">厂商</th>
+<th style="text-align:left">默认 <code>base_url</code></th>
+<th style="text-align:left">关键参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">OpenAI</td>
+<td style="text-align:left"><code>https://api.openai.com/v1</code></td>
+<td style="text-align:left"><code>timeout=60</code>、<code>max_retries=3</code>；嵌入默认 <code>text-embedding-3-small</code>、1536 维</td>
+</tr>
+<tr>
+<td style="text-align:left">Ollama</td>
+<td style="text-align:left"><code>http://localhost:11434</code></td>
+<td style="text-align:left"><code>num_predict=max_tokens*4</code>、<code>keep_alive=timeout*5</code>、<code>num_thread=8</code></td>
+</tr>
+<tr>
+<td style="text-align:left">Qwen</td>
+<td style="text-align:left"><code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></td>
+<td style="text-align:left"><code>ChatTongyi</code>，<code>streaming=False</code>，采样参数经 <code>model_kwargs</code> 透传</td>
+</tr>
+</tbody>
+</table>
+<p>厂商由 <code>detect_ai_provider_by_url()</code> 按域名探测：<code>openai.com</code> → OpenAI，<code>aliyuncs.com</code> → Qwen，<code>deepseek.com</code> → DeepSeek，其余兜底 Ollama。新增厂商只需注册到 <code>CLIENT_REGISTRY</code>，不必改动节点代码。</p>
+<h3>降级链</h3>
+<p>LLM 在 PenShot 中是增强项而非必需项。工厂按“默认配置 → fallback 备用配置 → 返回 <code>None</code>”三级尝试；上层拿到 <code>None</code> 后转入规则引擎路径，例如视频切分降级为规则切分，任务不会因 AI 服务不可用而整体失败。</p>
+<pre class="mermaid">flowchart TB
+    A[get_default_llm] --&gt; B{默认配置可用?}
+    B --&gt;|是| C[构建 BaseClient]
+    B --&gt;|否| D{fallback 配置可用?}
+    D --&gt;|是| C
+    D --&gt;|否| E[返回 None]
+    E --&gt; F[上层转入规则引擎]
+    C --&gt; G[detect_ai_provider_by_url]
+    G --&gt; H[OpenAI / Ollama / Qwen / DeepSeek]
+</pre>
+<p>降级只写 <code>error</code> 日志，不重试、不中断。代价是规则路径的输出质量上限较低，且调用方需要自行监控降级事件。</p>
+<p>配置优先级为：代码显式参数 &gt; 环境变量 &gt; 配置文件默认值。模型名、温度、超时与重试次数都可按调用覆盖，密钥只从配置或环境读取。切换厂商时至少要核对 <code>max_tokens</code> 的计量口径、嵌入维度与结构化输出支持，否则会出现“配置没变、行为变了”。</p>
+<h3>已知副作用</h3>
+<ul>
+<li>OpenAI / Qwen 客户端在构造时写入 <code>os.environ</code>（<code>OPENAI_API_KEY</code>、<code>DASHSCOPE_API_KEY</code>），同进程多实例会互相覆盖。</li>
+<li>“max tokens”语义不一致：Ollama 的 <code>num_predict</code> 按生成 token 计数，代码乘 4 留余量；Qwen 的 <code>temperature</code> / <code>timeout</code> 只能经 <code>model_kwargs</code> 传入。</li>
+<li><code>LLMBaseConfig.seed</code> 仅 Ollama 客户端向下传递；OpenAI / Qwen 不接收该参数。</li>
+</ul>
+<h2>提示词管理</h2>
+<p>提示词以 YAML 维护，目录结构为 <code>prompts/{version}/{language}/</code>，每个智能体一个或多个模板键。切换版本或语言即切换目录，便于并行调试与灰度。</p>
+<h3>模板结构</h3>
+<p>文件顶部记录 <code>version</code> 与 <code>changelog</code>，正文按 <code>system</code> / <code>user</code> 拆分。以 <code>shot_segmenter</code>（version 1.3）为例，用户模板包含以下占位符：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">占位符</th>
+<th style="text-align:left">来源</th>
+<th style="text-align:left">用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>{location}</code>、<code>{time_of_day}</code>、<code>{weather}</code>、<code>{description}</code></td>
+<td style="text-align:left">当前场景</td>
+<td style="text-align:left">限定空间、时间与氛围</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>{elements_list}</code></td>
+<td style="text-align:left">场景元素列表</td>
+<td style="text-align:left">逐元素分配镜头</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>{global_context}</code></td>
+<td style="text-align:left">全剧上下文</td>
+<td style="text-align:left">角色服装、关键道具等跨场景约束</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>{repair_hint}</code></td>
+<td style="text-align:left">质量审计</td>
+<td style="text-align:left">上一轮问题的定向修复建议</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>{history_hint}</code></td>
+<td style="text-align:left">记忆系统</td>
+<td style="text-align:left">历史常见问题与质量等级提示</td>
+</tr>
+</tbody>
+</table>
+<p>模板用“规则约束 + 拆分规则 + 镜头衔接 + 转场 + 置信度 + one-shot 示例”组织，并要求直接返回合法 JSON。台词完整性被反复强调，因为省略台词会直接破坏叙事。</p>
+<h3>加载与匹配</h3>
+<p><code>PromptManager</code>（<code>prompt_load_manager.py</code>）负责加载与缓存。首次调用 <code>get_all_prompts()</code> 时遍历目录下全部 YAML，用 <code>_all_prompts_loaded</code> 标志位保证只全量加载一次；缓存上限 1024 条，超出后保留最新部分。</p>
+<pre class="mermaid">flowchart LR
+    A[get_prompt name] --&gt; B{缓存命中?}
+    B --&gt;|是| C[返回 template]
+    B --&gt;|否| D[get_all_prompts 懒加载]
+    D --&gt; E[遍历 YAML 键名]
+    E --&gt; F{键名或 name 字段匹配?}
+    F --&gt;|是| C
+    F --&gt;|否| G[尝试去掉 _prompt 后缀]
+    G --&gt; H{仍无匹配?}
+    H --&gt;|是| I[抛出 KeyError]
+    H --&gt;|否| C
+</pre>
+<p>匹配顺序为“缓存 → 键名 → <code>name</code> 字段 → 去 <code>_prompt</code> 后缀”。docstring 列出了五条策略，实现层实际落地的是上述路径。另有一处历史残留：<code>get_all_prompts()</code> 中处理旧格式的 <code>elif isinstance(data, dict)</code> 分支不可达，因为前一个 <code>if</code> 已捕获所有字典。两者都不影响主流程。</p>
+<p>模板按 <code>version + language</code> 目录隔离，升级提示词不需要改代码，回滚只需切回旧目录。缓存以进程为界，多进程部署各自维护一份；模板文件更新后需要重启进程或重建管理器才会生效。</p>
+<h2>调用重试</h2>
+<p>智能体通过 <code>_call_llm_chat_with_retry()</code> 调用模型：组装 system / user 两条消息，交给 <code>llm_chat_complete()</code>，后者调用 <code>llm.invoke()</code> 并返回 <code>response.content</code>。异常时 <code>sleep(1)</code> 后重试，默认 <code>max_retries=2</code>；最后一次仍失败则显式上抛，交给节点层与循环控制处理。</p>
+<pre class="mermaid">sequenceDiagram
+    participant A as 智能体
+    participant F as llm_chat_complete
+    participant L as LLM
+
+    A-&gt;&gt;F: system + user 消息
+    F-&gt;&gt;L: invoke
+    L--&gt;&gt;F: response
+    F--&gt;&gt;A: content 字符串
+    Note over A: 异常时 sleep(1) 后重试
+    A-&gt;&gt;A: 最多 2 次，仍失败上抛
+</pre>
+<p>重试间隔写死为 1 秒，没有读取 <code>retry_delay</code> 配置；也没有区分可重试与不可重试错误，参数类 4xx 同样会重试两次。这是以延迟换实现简单的取舍。</p>
+<h2>循环控制</h2>
+<p>多阶段工作流容易在单节点自旋。PenShot 用三套计数器兜底：硬限制按节点累计、永不重置；软限制只在 <code>NEEDS_RETRY</code> 时累加、成功即归零；全局计数所有节点共享，作为最后防线。</p>
+<pre class="mermaid">graph TB
+    subgraph &quot;重试控制流程&quot;
+        A[节点开始] --&gt; B{硬限制检查&lt;br/&gt;_check_and_increment_node_loop}
+        B --&gt;|超限| C[返回 FAILED/NEEDS_HUMAN]
+        B --&gt;|通过| D[执行节点逻辑]
+        
+        D --&gt; E{执行成功?}
+        E --&gt;|异常| F[进入 Error Handler]
+        E --&gt;|成功| G[调用决策函数]
+        
+        G --&gt; H{决策结果}
+        H --&gt;|SUCCESS/VALID| I[重置软限制计数]
+        I --&gt; J[继续下一节点]
+        
+        H --&gt;|NEEDS_RETRY| K{软限制检查&lt;br/&gt;_can_retry_stage}
+        K --&gt;|未超限| L[重试计数+1]
+        L --&gt; A
+        
+        K --&gt;|已超限| M[降级为 NEEDS_REPAIR]
+        M --&gt; N[应用修复参数]
+        N --&gt; A
+    end
+    
+    subgraph &quot;计数器说明&quot;
+        O[&quot;硬限制计数器 (node_current_loops)&lt;br/&gt;• 每次进入 +1&lt;br/&gt;• 永不重置&lt;br/&gt;• 防止死循环&quot;]
+        P[&quot;软限制计数器 (stage_current_retries)&lt;br/&gt;• 仅 NEEDS_RETRY 时 +1&lt;br/&gt;• 成功时重置&lt;br/&gt;• 控制质量重试&quot;]
+        Q[&quot;全局计数器 (global_current_loops)&lt;br/&gt;• 每次节点进入 +1&lt;br/&gt;• 所有节点共享&lt;br/&gt;• 最后防线&quot;]
+    end
+    
+    style B fill:#FF5722,color:white
+    style K fill:#FF9800,color:black
+    style H fill:#FFEB3B,color:black
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">机制</th>
+<th style="text-align:left">计数器</th>
+<th style="text-align:left">默认值</th>
+<th style="text-align:left">重置条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">硬限制</td>
+<td style="text-align:left"><code>node_current_loops</code></td>
+<td style="text-align:left">按节点配置，3 至 5</td>
+<td style="text-align:left">永不重置</td>
+</tr>
+<tr>
+<td style="text-align:left">软限制</td>
+<td style="text-align:left"><code>stage_current_retries</code></td>
+<td style="text-align:left">多为 3；审计与连续性检查为 2</td>
+<td style="text-align:left">决策为 <code>SUCCESS</code> / <code>VALID</code> 时归零</td>
+</tr>
+<tr>
+<td style="text-align:left">全局上限</td>
+<td style="text-align:left"><code>global_current_loops</code></td>
+<td style="text-align:left"><code>global_max_loops=30</code></td>
+<td style="text-align:left">永不重置</td>
+</tr>
+</tbody>
+</table>
+<p>节点硬限制的源码默认值：<code>PARSE_SCRIPT=3</code>、<code>SEGMENT_SHOT=5</code>、<code>SPLIT_VIDEO=5</code>、<code>AUDIT_QUALITY=3</code>、<code>HUMAN_INTERVENTION=1</code>。全局上限在工作流启动时按“所有节点最大循环次数之和 × 2”推导，配置中的 30 只是兜底默认值。全局计数达到 80% 时发出一次 warning，由 <code>loop_warning_issued</code> 保证不重复。</p>
+<p>软限制超限后降级为 <code>NEEDS_REPAIR</code> 而不是直接失败，修复参数随状态传递，节点带参重跑。无法恢复的错误才进入 <code>NEEDS_HUMAN</code> 或 <code>FAILED</code>。</p>
+<p>修复参数由质量审计生成，经 <code>apply_repair_params()</code> 在节点下一次执行前注入，智能体再把它渲染成 <code>{repair_hint}</code>。审计未覆盖的问题不会产生修复建议，因此重试只能收敛到审计规则的覆盖范围之内。</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; 节点执行
+    
+    节点执行 --&gt; 成功: 业务逻辑成功
+    节点执行 --&gt; 异常: 抛出异常
+    
+    成功 --&gt; 决策函数
+    异常 --&gt; 错误处理
+    
+    决策函数 --&gt; SUCCESS: 无质量问题
+    决策函数 --&gt; VALID: 轻微问题，可接受
+    决策函数 --&gt; NEEDS_RETRY: 有问题，可重试
+    决策函数 --&gt; NEEDS_REPAIR: 需修复后重试
+    决策函数 --&gt; NEEDS_HUMAN: 需人工干预
+    决策函数 --&gt; FAILED: 严重失败
+    
+    NEEDS_RETRY --&gt; 检查软限制
+    
+    检查软限制 --&gt; 节点执行: 未超限 (current &lt; max)
+    检查软限制 --&gt; NEEDS_REPAIR: 已超限
+    
+    NEEDS_REPAIR --&gt; 节点执行: 应用修复参数后重试
+    
+    SUCCESS --&gt; [*]: 重置软限制，继续流程
+    VALID --&gt; [*]: 重置软限制，继续流程
+    NEEDS_HUMAN --&gt; [*]: 等待人工决策
+    FAILED --&gt; [*]: 进入错误处理
+    
+    错误处理 --&gt; 节点执行: 可恢复错误，重新开始
+    错误处理 --&gt; NEEDS_HUMAN: 不可恢复
+    错误处理 --&gt; [*]: 中止流程
+</pre>
+<p>排查瓶颈时应优先看软限制，因为硬限制与全局计数只在失控时触发；软限制反映的是质量重试频率。</p>
+<h2>任务池</h2>
+<p>接入层（REST、MCP、Python SDK）统一经 <code>TaskFactory</code> 进入队列，<code>AsyncTaskProcessor</code> 按并发度调度 Worker，<code>TaskManager</code> 负责状态持久化。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Client[客户端层]
+        A1[API请求]
+        A2[MCP调用]
+        A3[Python库]
+    end
+
+    subgraph TaskPool[任务池层]
+        B1[TaskFactory&lt;br/&gt;任务工厂]
+        B2[有序任务队列&lt;br/&gt;按优先级插入的列表]
+        B3[AsyncTaskProcessor&lt;br/&gt;异步处理器]
+        B4[TaskManager&lt;br/&gt;状态持久化]
+    end
+
+    subgraph Storage[存储层]
+        C1[Redis&lt;br/&gt;任务状态]
+        C2[内存缓存&lt;br/&gt;工作流实例]
+    end
+
+    subgraph Executor[执行层]
+        D1[Worker Pool&lt;br/&gt;工作线程池]
+        D2[MultiAgentPipeline&lt;br/&gt;智能体流程]
+    end
+
+    A1 --&gt; B1
+    A2 --&gt; B1
+    A3 --&gt; B1
+    B1 --&gt;|创建并登记任务| B4
+    B1 --&gt;|按优先级入队| B2
+    B2 --&gt;|出队| B3
+    B3 --&gt; D1
+    D1 --&gt; D2
+    B4 --&gt; C1
+    B4 --&gt; C2
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">组件</th>
+<th style="text-align:left">行为</th>
+<th style="text-align:left">默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>TaskFactory</code></td>
+<td style="text-align:left">同步 / 异步提交、回调、批量提交</td>
+<td style="text-align:left">—</td>
+</tr>
+<tr>
+<td style="text-align:left">有序队列</td>
+<td style="text-align:left">四级优先级、有序插入、满队拒绝</td>
+<td style="text-align:left"><code>queue_size=1000</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>AsyncTaskProcessor</code></td>
+<td style="text-align:left">并发控制、队列统计、待恢复任务重启</td>
+<td style="text-align:left"><code>max_concurrent=10</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>TaskManager</code></td>
+<td style="text-align:left">Redis / 内存双后端、TTL 过期</td>
+<td style="text-align:left">按配置</td>
+</tr>
+</tbody>
+</table>
+<p>优先级枚举为 <code>LOW=1</code>、<code>NORMAL=2</code>、<code>HIGH=3</code>、<code>CRITICAL=4</code>。入队使用 <code>list.insert</code> 从头找到第一个排序键更大的任务并插入，最坏 O(n)。不用 <code>heapq</code> 的原因是需要支持按 <code>task_id</code> 遍历与移除（取消任务），堆的延迟删除反而更难维护；队列上限 1000 也不构成瓶颈。</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: 创建任务
+    PENDING --&gt; PROCESSING: 开始处理
+    PROCESSING --&gt; SUCCESS: 处理成功
+    PROCESSING --&gt; FAILED: 处理失败
+    PROCESSING --&gt; CANCELLED: 用户取消
+    PENDING --&gt; CANCELLED: 用户取消
+    SUCCESS --&gt; [*]
+    FAILED --&gt; [*]
+    CANCELLED --&gt; [*]
+</pre>
+<p><code>recover_pending_tasks(max_age_hours=2)</code> 会在进程重启后把两小时内未完成的任务重新入队，用于 Worker 宕机或进程崩溃后的恢复。边界是：重新入队一律使用 <code>NORMAL</code> 优先级，原优先级丢失；超过 2 小时的任务不会自动恢复。</p>
+<p><code>get_stats()</code> 在累计计数之外附带队列状态与活跃任务明细；<code>cancel_task()</code> 区分执行中取消与队列中移除。任务状态写入 Redis 或进程内存，跨进程查询依赖 Redis 可用。</p>
+<pre class="hljs"><code>from penshot.api import create_penshot_agent
+
+agent = create_penshot_agent(
+    max_concurrent=10,
+    queue_size=1000
+)
+
+task_id = agent.breakdown_script_async(script_text)
+status = agent.get_queue_status()
+# {&quot;queue_length&quot;, &quot;queue_waiting&quot;, &quot;active_tasks&quot;,
+#  &quot;max_concurrent&quot;, &quot;queue_max_size&quot;, &quot;queue_usage_percent&quot;}
+agent.cancel_task(task_id)
+</code></pre>
+<h2>上下文窗口</h2>
+<p>PenShot 没有独立的 <code>ContextWindowManager</code>，也不做重要度评分或相似度去重。实际落地的是四条确定性规则：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">规则</th>
+<th style="text-align:left">位置</th>
+<th style="text-align:left">行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">滑动窗口</td>
+<td style="text-align:left"><code>ShortTermMemory</code></td>
+<td style="text-align:left"><code>deque(maxlen=20)</code>，超出自动丢弃最旧条目</td>
+</tr>
+<tr>
+<td style="text-align:left">过期回收</td>
+<td style="text-align:left">Redis 会话历史</td>
+<td style="text-align:left"><code>ttl=3600</code> 秒；内存模式无自动过期</td>
+</tr>
+<tr>
+<td style="text-align:left">组装截断</td>
+<td style="text-align:left"><code>MemoryContext.to_prompt()</code></td>
+<td style="text-align:left"><code>max_tokens=2000</code>，按 1 token ≈ 2 字符估算</td>
+</tr>
+<tr>
+<td style="text-align:left">长度审计</td>
+<td style="text-align:left"><code>ShotConfig</code></td>
+<td style="text-align:left"><code>max_prompt_length=200</code> 单词，超限触发 <code>PROMPT_TOO_LONG</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">flowchart TB
+    subgraph 短期记忆层
+        C1[全量交互] --&gt; W[deque maxlen=20&lt;br/&gt;滑动窗口]
+        W --&gt; T[Redis TTL 3600s&lt;br/&gt;过期回收]
+    end
+
+    subgraph 提示词层
+        W --&gt; P[MemoryContext.to_prompt&lt;br/&gt;分层组装]
+        P --&gt; TR[_truncate&lt;br/&gt;1 token ≈ 2 字符&lt;br/&gt;+ 句边界回退]
+        TR --&gt; F[最终上下文&lt;br/&gt; ≤2000 tokens]
+    end
+
+    subgraph 质量层
+        G[生成的视频提示词] --&gt; R{长度检查&lt;br/&gt;200单词±阈值}
+        R --&gt;|超长| FIX[PROMPT_TOO_LONG&lt;br/&gt;触发修复循环]
+        R --&gt;|正常| PASS[通过审计]
+    end
+</pre>
+<p>截断用字符估算而非精确分词：这里只需要一个不超窗的安全上界，引入分词器会给每次组装增加依赖与计算。截断点优先回退到最近的句号或换行，若落在后 30% 之外则保持硬截断，并追加 <code>[上下文已截断]</code> 标记。</p>
+<p>字符估算对中文偏保守：一个汉字通常折合一个以上 token，而实现按两个字符折一个 token，因此 2000 token 的实际中文容量可能低于预期。需要精确计费或硬限流时应替换为分词器。</p>
+<p>跨场景一致性靠提示词的 <code>global_context</code> 占位符，而不是把完整剧本塞进每次调用。长剧本的分块发生在场景与镜头拆分阶段：<code>shot_segmenter</code> 逐场景处理，<code>video_splitter</code> 逐镜头处理，每个单元只携带本场景信息与全局约束。全剧摘要压缩属于后续方向，当前没有对应实现。</p>
+<h2>实现边界</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">边界</th>
+<th style="text-align:left">现状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">LLM 降级</td>
+<td style="text-align:left">三级链路只写日志；降级后输出质量由规则保证</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词缓存</td>
+<td style="text-align:left">全量加载一次，1024 条上限；存在不可达分支</td>
+</tr>
+<tr>
+<td style="text-align:left">调用重试</td>
+<td style="text-align:left">固定 1 秒间隔，不区分错误类型</td>
+</tr>
+<tr>
+<td style="text-align:left">循环上限</td>
+<td style="text-align:left">硬限制与全局计数不可重置，软限制成功归零</td>
+</tr>
+<tr>
+<td style="text-align:left">任务恢复</td>
+<td style="text-align:left">仅恢复两小时内任务，优先级退化为 <code>NORMAL</code></td>
+</tr>
+<tr>
+<td style="text-align:left">上下文管理</td>
+<td style="text-align:left">窗口 + 截断 + 长度审计，无动态淘汰</td>
+</tr>
+</tbody>
+</table>
+<p>记忆层的写入分发、召回组装与存储降级见 <a href="memory.html">记忆系统</a>；检查点只写不读的现状见 <a href="checkpoint.html">检查点与恢复</a>。</p>

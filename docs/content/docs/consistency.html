@@ -1,0 +1,422 @@
+<p>PenShot 的一致性依赖五条已接线的通道：全局元数据传递、连续性注释、提示词约束、规则检查与检索增强；快照回滚、修复参数回流与固定种子尚未接通。</p>
+
+<p>这些通道都在主链内部完成，不额外引入生成模型：元数据与注释是文本透传，规则检查是确定性判定，检索只读取已有向量库。因此一致性保障的边际成本主要是提示词长度，而不是额外推理调用。</p>
+
+<h2>策略构成</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">通道</th>
+<th style="text-align:left">实现位置</th>
+<th style="text-align:left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">全局元数据</td>
+<td style="text-align:left">PARSE_SCRIPT → CONVERT_PROMPT</td>
+<td style="text-align:left">跨场景传递道具、服装、地点、声音</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性注释</td>
+<td style="text-align:left">SPLIT_VIDEO 写入 <code>continuity_notes</code></td>
+<td style="text-align:left">记录片段的主角、地点、动作与切分原因</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词约束</td>
+<td style="text-align:left">CONVERT_PROMPT <code>_format_global_context</code></td>
+<td style="text-align:left">把元数据与注释拼入每个片段的提示词</td>
+</tr>
+<tr>
+<td style="text-align:left">规则检查</td>
+<td style="text-align:left">AUDIT_QUALITY、CONTINUITY_CHECK</td>
+<td style="text-align:left">程序化发现时长、角色、场景等违规</td>
+</tr>
+<tr>
+<td style="text-align:left">检索增强</td>
+<td style="text-align:left">KnowledgeManager 两个知识库</td>
+<td style="text-align:left">复用成功模板与历史解决方案</td>
+</tr>
+<tr>
+<td style="text-align:left">种子建议</td>
+<td style="text-align:left"><code>execution_suggestions</code></td>
+<td style="text-align:left">提示执行层固定随机种子</td>
+</tr>
+</tbody>
+</table>
+
+<pre class="mermaid">flowchart LR
+    subgraph Parse[剧本解析节点]
+        P1[提取 global_metadata&lt;br/&gt;character_outfits / key_props / key_locations]
+        P2[角色与场景清单] 
+        P3[检索剧本知识库&lt;br/&gt;ScriptKnowledgeBase]
+    end
+
+    subgraph Segment[分镜生成节点]
+        S1[镜头序列与 main_character]
+        S2[分镜提示词模板&lt;br/&gt;shot 格式全局上下文]
+    end
+
+    subgraph Split[视频分段节点]
+        F1[写入 continuity_notes&lt;br/&gt;main_character / location / main_action / split_type]
+        F2[时长控制与降级切分]
+    end
+
+    subgraph Convert[指令转换节点]
+        C1[拼装全剧上下文&lt;br/&gt;_format_global_context]
+        C2[消费修复参数&lt;br/&gt;apply_repair_params]
+        C3[检索成功提示词模板&lt;br/&gt;PromptTemplateKB]
+        C4[生成双语提示词]
+    end
+
+    subgraph Audit[质量审查节点]
+        A1[五项规则检查]
+        A2[加权评分与状态决策]
+        A3[生成修复参数]
+    end
+
+    subgraph Continuity[连续性守护节点]
+        G1[六项词表规则检查]
+        G2[签名去重与问题分级]
+        G3[生成修复参数并路由&lt;br/&gt;回流未接通]
+        G4[检索历史解决方案&lt;br/&gt;search_similar_scene]
+    end
+
+    Parse --&gt; Segment --&gt; Split --&gt; Convert --&gt; Audit --&gt; Continuity
+</pre>
+
+<h2>全局元数据与连续性锚点</h2>
+<p>解析节点从全剧提取 <code>global_metadata</code>，它是跨场景一致性的事实来源；下游只读不改。</p>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">字段</th>
+<th style="text-align:left">内容</th>
+<th style="text-align:left">消费方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>key_props</code></td>
+<td style="text-align:left">关键道具及 <code>appears_in</code> 场景列表、重要度</td>
+<td style="text-align:left">提示词“本场景关键道具”</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>character_outfits</code></td>
+<td style="text-align:left">角色在各场景的服装、发型、配饰</td>
+<td style="text-align:left">提示词“角色服装要求”</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>key_locations</code></td>
+<td style="text-align:left">地点名称、<code>appears_in</code>、视觉特征</td>
+<td style="text-align:left">提示词“本场景地点”</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>continuity_notes</code></td>
+<td style="text-align:left">全剧级连续性提醒</td>
+<td style="text-align:left">提示词“连续性要求”</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>audio_atmosphere</code></td>
+<td style="text-align:left">整体音频氛围</td>
+<td style="text-align:left">音频提示词</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>recurring_sounds</code></td>
+<td style="text-align:left">反复出现的环境声、音效</td>
+<td style="text-align:left">音频提示词</td>
+</tr>
+</tbody>
+</table>
+
+<pre class="mermaid">flowchart LR
+    subgraph Parse[剧本解析]
+        A[global_metadata&lt;br/&gt;key_props / character_outfits&lt;br/&gt;key_locations]
+    end
+
+    subgraph Segment[分镜生成]
+        B[ShotInfo.main_character]
+    end
+
+    subgraph Split[视频分段]
+        C[VideoFragment.continuity_notes&lt;br/&gt;main_character / location&lt;br/&gt;main_action / split_type]
+    end
+
+    subgraph Convert[指令转换]
+        D[_format_global_context&lt;br/&gt;拼装全剧上下文]
+        E[提示词模板引用&lt;br/&gt;角色服装/道具/地点]
+    end
+
+    A --&gt; D
+    B --&gt; C
+    A --&gt; C
+    C --&gt; E
+</pre>
+
+<p>片段级注释由分段节点生成，规则路径与 LLM 路径字段不同：</p>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">路径</th>
+<th style="text-align:left">字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">规则切分</td>
+<td style="text-align:left"><code>main_character</code>、<code>location</code>（固定为 <code>场景{scene_id}</code>）、<code>main_action</code>、<code>split_type</code></td>
+</tr>
+<tr>
+<td style="text-align:left">LLM 切分</td>
+<td style="text-align:left">另含 <code>continuity_id</code>、<code>prev_fragment</code>、<code>split_reason</code>、<code>segment_part</code>、<code>continuity_hints</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>代码中存在结构化锚点模型 <code>ContinuityAnchor</code>（<code>anchor_id</code>、<code>anchor_type</code>、<code>name</code>、<code>value</code>、<code>start_time</code>、<code>end_time</code>、<code>fragment_range</code>、<code>priority</code>、<code>metadata</code>，并提供 <code>is_active_at()</code>），但没有任何节点或检查器引用它。当前实际生效的“锚点”是上述两段文本通道，不是可查询的时间区间对象。</p>
+
+<h2>提示词约束</h2>
+<p>转换节点在每个片段提示词中注入四段上下文，来源均为 <code>global_metadata</code> 与片段的 <code>continuity_notes</code>。</p>
+
+<pre class="mermaid">flowchart LR
+    subgraph Source[数据来源]
+        A[ParsedScript.global_metadata&lt;br/&gt;key_props / character_outfits&lt;br/&gt;key_locations / continuity_notes]
+    end
+
+    subgraph Format[运行时格式化]
+        B[_format_global_context&lt;br/&gt;按场景过滤]
+        C[【本场景关键道具】&lt;br/&gt;无命中降级为全量]
+        D[【角色服装要求】&lt;br/&gt;全量输出]
+        E[【本场景地点】&lt;br/&gt;无命中降级为全量]
+        F[【特别注意，连续性要求】]
+    end
+
+    subgraph Inject[模板注入]
+        G[提示词模板&lt;br/&gt;【全剧上下文】区块]
+        H[【重要约束】生成指令&lt;br/&gt;与全局上下文保持一致]
+    end
+
+    A --&gt; B
+    B --&gt; C &amp; D &amp; E &amp; F
+    C &amp; D &amp; E &amp; F --&gt; G --&gt; H
+</pre>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">段落</th>
+<th style="text-align:left">生成规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">【本场景关键道具】</td>
+<td style="text-align:left">按 <code>appears_in</code> 过滤当前场景；无命中时退回全量道具，重要道具加标记</td>
+</tr>
+<tr>
+<td style="text-align:left">【角色服装要求】</td>
+<td style="text-align:left">全量输出角色服装，不按场景裁剪</td>
+</tr>
+<tr>
+<td style="text-align:left">【本场景地点】</td>
+<td style="text-align:left">按 <code>appears_in</code> 过滤；无命中时退回全量地点</td>
+</tr>
+<tr>
+<td style="text-align:left">【特别注意，连续性要求】</td>
+<td style="text-align:left">原样拼接片段 <code>continuity_notes</code>，不做语义改写</td>
+</tr>
+</tbody>
+</table>
+
+<p>四段内容装入模板的【全剧上下文】区块，并在生成指令中追加【重要约束】：人物外观、道具、场景与上下文保持一致。冲突时以上下文为准，而非模型自由发挥。提示词中另有 <code>_format_global_metadata</code> 的 prompt / split / shot 三种变体，分别用于转换、分段与分镜阶段，并按场景裁剪以控制长度。</p>
+
+<p>场景过滤的依据是 <code>appears_in</code>；该字段缺失或没有命中时，段落退回全量列表，宁可多给上下文也不省略约束。服装段落不做场景裁剪，因为同一角色在不同场景的换装信息需要同时可见。</p>
+
+<h2>六项规则检查</h2>
+<p>连续性守护节点以关键词和数值规则检查六个维度，不调用 LLM。</p>
+
+<pre class="mermaid">flowchart LR
+    subgraph Check[六项检查（关键词/数值规则）]
+        V1[角色：出现在场对照&lt;br/&gt;外观三类词表]
+        V2[场景：相邻 scene_id 跳变&lt;br/&gt;跳变占比阈值]
+        V3[动作：动作词表按镜头描述追踪]
+        V4[风格：style 去重种类数]
+        V5[时间：起止时间差]
+        V6[道具：道具动词表]
+    end
+
+    subgraph After[后处理]
+        R1[签名去重] --&gt; R2[通过判定&lt;br/&gt;critical&gt;0 或 major&gt;3] --&gt; R3[分级与修复建议]
+    end
+
+    Check --&gt; After
+</pre>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">维度</th>
+<th style="text-align:left">判定</th>
+<th style="text-align:left">违规类型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色</td>
+<td style="text-align:left">有对话的角色是否出现在镜头；服装 / 发型 / 配饰词表</td>
+<td style="text-align:left"><code>CHARACTER_MISSING</code>（MAJOR）、外观变化（WARNING）</td>
+</tr>
+<tr>
+<td style="text-align:left">场景</td>
+<td style="text-align:left">相邻镜头 <code>scene_id</code> 跳变及占比</td>
+<td style="text-align:left"><code>SCENE_JUMP</code>（WARNING）、<code>SCENE_TOO_FREQUENT</code>（&gt;30%，MODERATE）</td>
+</tr>
+<tr>
+<td style="text-align:left">动作</td>
+<td style="text-align:left">走/跑/跳/转身/坐下/站起/拿起/放下 按角色追踪</td>
+<td style="text-align:left"><code>ACTION_BREAK</code>（MODERATE）</td>
+</tr>
+<tr>
+<td style="text-align:left">风格</td>
+<td style="text-align:left"><code>AIVideoPrompt.style</code> 去重种类数</td>
+<td style="text-align:left">种类 &gt;2 → <code>STYLE_INCONSISTENT</code>（MODERATE）</td>
+</tr>
+<tr>
+<td style="text-align:left">时间</td>
+<td style="text-align:left">片段起点与前段“起点 + 时长”的差值</td>
+<td style="text-align:left">正差 &gt;0.1 秒 → <code>TIME_GAP</code>（MAJOR）；负差 → <code>TIME_OVERLAP</code>（ERROR）</td>
+</tr>
+<tr>
+<td style="text-align:left">道具</td>
+<td style="text-align:left">拿/举/抱/提/端/持/握 按角色统计</td>
+<td style="text-align:left"><code>PROP_CHANGE</code>（WARNING）</td>
+</tr>
+</tbody>
+</table>
+
+<p>通过条件为 <code>critical_count == 0</code> 且 <code>major_count ≤ 3</code>；任一 CRITICAL 或 MAJOR 超过 3 个即不通过，其余级别只记录。问题签名由类型、片段、场景、严重度、位置与描述前 100 字组成，同一位置同类问题只报一次；描述超过 500 字符截断。每条问题带 <code>source_stage</code>、<code>auto_fixable</code> 与 <code>suggestion</code>，供后续修复使用。</p>
+
+<p>误报边界：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；缺少分镜或片段时对应检查直接跳过。规则检查不依赖 LLM，配额耗尽时仍可运行，代价是对近义表达与隐含动作不敏感。</p>
+
+<h2>RAG 检索</h2>
+<p>KnowledgeManager 维护两个知识库，均按 <code>script_id</code> 隔离，不跨剧本复用。</p>
+
+<pre class="mermaid">flowchart LR
+    subgraph KM[KnowledgeManager 内部]
+        A[PromptTemplateKB&lt;br/&gt;成功提示词模板] 
+        B[ScriptKnowledgeBase&lt;br/&gt;剧本级知识检索]
+    end
+
+    subgraph Store[存储机制]
+        C[SentenceSplitter&lt;br/&gt;chunk 512 / overlap 20]
+        D[SimpleVectorStore&lt;br/&gt;prompt_vector_store.json]
+        E[data/embedding/prompt_templates/&lt;br/&gt;按 script_id 隔离]
+    end
+
+    subgraph Query[检索入口]
+        F[search_similar_prompts&lt;br/&gt;top_k=3，min_score=0.6]
+        G[query 手动余弦检索&lt;br/&gt;search_similar_scene 等入口]
+        H[query_character / query_scene&lt;br/&gt;解析结果字典直查]
+    end
+
+    A --&gt; C --&gt; D --&gt; E
+    B --&gt; G
+    F &amp; G &amp; H --&gt; I[检索结果注入生成或问题增强]
+</pre>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">知识库</th>
+<th style="text-align:left">存储与检索</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>PromptTemplateKB</code></td>
+<td style="text-align:left">LlamaIndex + <code>SimpleVectorStore</code>；<code>SentenceSplitter(chunk_size=512, chunk_overlap=20)</code>；落盘 <code>data/embedding/prompt_templates/{script_id}/prompt_vector_store.json</code>；<code>search_similar(top_k=3, min_score=0.6)</code>，<code>get_best_match(min_score=0.7)</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ScriptKnowledgeBase</code></td>
+<td style="text-align:left">手动余弦扫描；<code>query_character</code> / <code>query_scene</code> 走解析结果字典直查；<code>use_rerank</code> 参数被接收但未使用</td>
+</tr>
+</tbody>
+</table>
+
+<p>检索结果用于三处：生成阶段参考历史成功模板（Document 元数据含 <code>type</code>、<code>fragment_id</code>、<code>scene</code>、<code>style</code>、<code>quality_score</code>）；连续性问题补充 <code>historical_solutions</code>（<code>top_k=2</code>）；为剧本背景与角色设定提供事实。向量库为空或检索异常时返回空列表，不阻断主流程。</p>
+
+<p><code>BAAI/bge-reranker-large</code> 只出现在 <code>create_retriever_for_script</code> 中，调用它的 <code>KnowledgeRouter</code> 尚未接线，因此实际检索没有重排阶段。</p>
+
+<p>工作流在调用剧本知识库前会先判断 <code>is_script_kb_available()</code>；索引未初始化、依赖缺失或检索异常时均返回空结果，不抛错、不阻断生成。检索是增强项，不是主链的前置条件。</p>
+
+<h2>种子建议</h2>
+<p><code>global_settings</code> 只包含 <code>style_consistency: True</code> 与 <code>use_common_negative_prompt: True</code>，没有种子字段。<code>execution_suggestions</code> 输出三条执行建议：按顺序生成片段、保持相同种子值以获得一致性、生成后检查片段衔接。种子需要执行层在调用视频模型时自行注入；PenShot 侧若要支持固定种子，需新增字段并透传到 <code>AIVideoPrompt</code>，当前未实现。</p>
+
+<p>建议文案不进入模型请求，也不会被校验。执行层若固定种子，应在同一任务内复用同一值，并自行记录以便复现；跨任务沿用同一值只会重现画面风格，不能保证内容正确。</p>
+
+<h2>一致性工作流</h2>
+<p>主链在转换后先过质量审查，再过连续性守护；审查的修复路由已接通，守护的修复路由未接通。</p>
+
+<pre class="mermaid">flowchart TB
+    subgraph Real[真实主链（已接线）]
+        Start([输入原始剧本]) --&gt; Parse[剧本解析&lt;br/&gt;提取 global_metadata]
+        Parse --&gt; Segment[分镜生成]
+        Segment --&gt; Split[视频分段&lt;br/&gt;写入 continuity_notes]
+        Split --&gt; Convert[指令转换&lt;br/&gt;全剧上下文 + 模板参考]
+        Convert --&gt; Audit[质量审查&lt;br/&gt;五项检查→加权评分→修复参数]
+        Audit --&gt;|通过| Continuity[连续性守护&lt;br/&gt;六项词表检查→修复参数]
+        Audit -.-&gt;|NEEDS_REPAIR：已接通| Convert
+        Continuity -.-&gt;|四阶段修复路由：未接通| Parse
+        Continuity --&gt; FinalOutput[最终输出&lt;br/&gt;AIVideoInstructions]
+    end
+</pre>
+
+<p>审查扣分从 100 起算，warning 5、moderate 10、major 25、critical 40、error 60；≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，否则 FAILED。PASSED 直接放行，MINOR 违规不超过 3 个也放行；MODERATE / MAJOR 带修复参数回到 CONVERT_PROMPT；CRITICAL 重试或转人工。</p>
+
+<p>审查的 NEEDS_RETRY 与 NEEDS_REPAIR 都回到 CONVERT_PROMPT，因为审查本身不产生内容，重跑审查无法改变结果。连续性守护的修复目标虽配置为 CONVERT_PROMPT，但决策恒为 SUCCESS，实际只记录问题，不会触发回炉。</p>
+
+<p>以下为已确认的实现边界，不影响主链运行，但会限制自动化程度。</p>
+
+<h2>当前限制</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">限制</th>
+<th style="text-align:left">现状与影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">快照未接入</td>
+<td style="text-align:left"><code>take_snapshot</code> 无调用方；<code>get_snapshot_at_time(t)</code> 取第一个不早于 t 的快照，而非时间最近者</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性修复回流未接通</td>
+<td style="text-align:left">决策读取顶层 <code>state.continuity_issues</code>，实际字段在 <code>state.domain</code>，恒判 SUCCESS；<code>NEEDS_RETRY</code> 也不在条件边映射中</td>
+</tr>
+<tr>
+<td style="text-align:left">无固定种子</td>
+<td style="text-align:left">只在 <code>execution_suggestions</code> 中给出文字建议，代码与数据结构均无 seed</td>
+</tr>
+<tr>
+<td style="text-align:left">结构化锚点未启用</td>
+<td style="text-align:left"><code>ContinuityAnchor</code>、<code>GlobalConsistencyContract</code>、<code>process_with_contract</code>、<code>check_with_contract</code>、<code>CrossChunkValidator</code> 均无调用方</td>
+</tr>
+<tr>
+<td style="text-align:left">关键词误报</td>
+<td style="text-align:left">近义动作、道具动词变化会被判为不一致，需要人工忽略</td>
+</tr>
+<tr>
+<td style="text-align:left">风格守护未实例化</td>
+<td style="text-align:left"><code>PromptStyleGuardian</code> 未创建，<code>initialize_style()</code> 调用的 <code>search_similar_style</code> 不存在</td>
+</tr>
+<tr>
+<td style="text-align:left">知识库按剧本隔离</td>
+<td style="text-align:left">同一 <code>script_id</code> 之外无法复用成功模板与历史方案</td>
+</tr>
+</tbody>
+</table>
+
+<p>节点级输入输出与失败降级见<a href="nodes.html">工作流节点</a>；全局编排与路由见<a href="architecture.html">技术架构</a>；知识库构建细节见<a href="rag-knowledge-base.html">RAG 知识库</a>。</p>

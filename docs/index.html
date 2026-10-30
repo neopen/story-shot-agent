@@ -1,917 +1,692 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>PenShot - 智能分镜视频生成 | AI 剧本转视频工具</title>
-
-    <!-- SEO Meta Tags -->
-    <meta name="description" content="PenShot 是专业的 AI 智能分镜视频生成工具，支持剧本解析、镜头拆分、AI 提示词生成，提供 REST API、MCP 协议和 Python SDK，轻松集成到现有工作流。">
-    <meta name="keywords" content="AI视频生成,分镜生成,剧本转视频,智能分镜,视频AI,Runway,Pika,AI工具,视频制作">
-    <meta name="author" content="PenShot Team">
-    <meta name="robots" content="index, follow">
-    <meta name="language" content="Chinese">
-
-    <!-- Open Graph / Social Media -->
-    <meta property="og:title" content="PenShot - 智能分镜视频生成">
-    <meta property="og:description" content="从剧本到视频，AI 智能分镜，一键生成专业视频">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://shot.helpenx.com">
-    <meta property="og:image" content="https://shot.helpenx.com/og-image.png">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="PenShot - 智能分镜视频生成">
-    <meta name="twitter:description" content="从剧本到视频，AI 智能分镜，一键生成专业视频">
-
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://shot.helpenx.com">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --primary-light: #818cf8;
-            --secondary: #ec4899;
-            --dark: #0f172a;
-            --light: #f8fafc;
-            --gray: #64748b;
-            --gray-light: #e2e8f0;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --error: #ef4444;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            color: var(--dark);
-            background: var(--light);
-            line-height: 1.6;
-        }
-
-        /* 导航栏 */
-        .navbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background: rgba(255,255,255,0.98);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            z-index: 1000;
-            padding: 1rem 2rem;
-        }
-
-        .nav-container {
-            max-width: 1280px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            text-decoration: none;
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 2rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .nav-links a {
-            text-decoration: none;
-            color: var(--dark);
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav-links a:hover {
-            color: var(--primary);
-        }
-
-        .github-btn, .blog-btn {
-            background: var(--dark);
-            color: white !important;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-        }
-
-        .github-btn:hover, .blog-btn:hover {
-            background: var(--primary);
-        }
-
-        /* 按钮样式 */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 10px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.2s;
-            cursor: pointer;
-            border: none;
-            font-size: 1rem;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-        }
-
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--primary);
-            color: var(--primary);
-        }
-
-        .btn-outline:hover {
-            background: var(--primary);
-            color: white;
-        }
-
-        /* Hero 区域 */
-        .hero {
-            padding: 120px 2rem 80px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-align: center;
-        }
-
-        .hero h1 {
-            font-size: 3.5rem;
-            margin-bottom: 1rem;
-            animation: fadeInUp 0.6s ease;
-        }
-
-        .hero p {
-            font-size: 1.25rem;
-            max-width: 620px;
-            margin: 0 auto 2rem;
-            opacity: 0.9;
-            animation: fadeInUp 0.6s ease 0.1s both;
-        }
-
-        .hero-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            animation: fadeInUp 0.6s ease 0.2s both;
-        }
-
-        .hero-buttons .btn-outline {
-            border-color: white;
-            color: white;
-        }
-
-        .hero-buttons .btn-outline:hover {
-            background: white;
-            color: var(--primary);
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* 统计数字 */
-        .stats {
-            background: white;
-            padding: 3rem 0;
-            margin-top: -2rem;
-            position: relative;
-            z-index: 10;
-        }
-
-        .stats-grid {
-            display: flex;
-            justify-content: center;
-            gap: 4rem;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .stat-label {
-            color: var(--gray);
-            font-size: 0.9rem;
-        }
-
-        /* 容器 */
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        /* 章节 */
-        .section {
-            padding: 80px 0;
-        }
-
-        .section-title {
-            text-align: center;
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .section-subtitle {
-            text-align: center;
-            color: var(--gray);
-            margin-bottom: 3rem;
-            font-size: 1.1rem;
-        }
-
-        /* 卡片网格 */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
-
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -12px rgba(0,0,0,0.1);
-        }
-
-        .card-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .card h3 {
-            margin-bottom: 0.75rem;
-        }
-
-        .card p {
-            color: var(--gray);
-            line-height: 1.6;
-        }
-
-        /* 代码块 */
-        .code-block {
-            background: var(--dark);
-            border-radius: 12px;
-            padding: 1.5rem;
-            overflow-x: auto;
-            margin: 1rem 0;
-        }
-
-        .code-block pre {
-            color: #e2e8f0;
-            font-family: 'Fira Code', 'Courier New', monospace;
-            font-size: 0.9rem;
-            margin: 0;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        /* 特性列表 */
-        .features-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .feature-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .feature-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--primary-light);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        /* 工作流步骤 */
-        .workflow {
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-
-        .step {
-            flex: 1;
-            min-width: 180px;
-            text-align: center;
-            padding: 1.5rem;
-            background: white;
-            border-radius: 16px;
-            position: relative;
-        }
-
-        .step-number {
-            width: 40px;
-            height: 40px;
-            background: var(--primary);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin: 0 auto 1rem;
-        }
-
-        /* 对比表格 */
-        .comparison {
-            overflow-x: auto;
-        }
-
-        .comparison-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-        }
-
-        .comparison-table th,
-        .comparison-table td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--gray-light);
-        }
-
-        .comparison-table th {
-            background: var(--primary);
-            color: white;
-            font-weight: 600;
-        }
-
-        .comparison-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .check {
-            color: var(--success);
-            font-weight: bold;
-        }
-
-        /* 页脚 */
-        .footer {
-            background: var(--dark);
-            color: var(--gray-light);
-            padding: 3rem 0;
-        }
-
-        .footer-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .footer-col h4 {
-            color: white;
-            margin-bottom: 1rem;
-        }
-
-        .footer-col a {
-            display: block;
-            color: var(--gray-light);
-            text-decoration: none;
-            margin-bottom: 0.5rem;
-            transition: color 0.2s;
-        }
-
-        .footer-col a:hover {
-            color: var(--primary-light);
-        }
-
-        .footer-bottom {
-            text-align: center;
-            padding-top: 2rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.875rem;
-        }
-
-        /* 响应式 */
-        @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-            .hero h1 {
-                font-size: 2.5rem;
-            }
-            .section-title {
-                font-size: 2rem;
-            }
-            .workflow {
-                flex-direction: column;
-            }
-            .stats-grid {
-                gap: 2rem;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenShot · 把剧本拆成连贯的 AI 视频分镜</title>
+  <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。">
+  <meta name="keywords" content="PenShot,剧本分镜,AI视频,分镜智能体,LangGraph,剧本转视频,Sora,Runway,Veo,可灵,MCP,RAG">
+  <meta name="author" content="PenShot Team">
+  <meta name="theme-color" content="#0a0c11">
+  <link rel="canonical" href="https://shot.helpenx.com/">
+  <meta property="og:site_name" content="PenShot">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="PenShot · 把剧本拆成连贯的 AI 视频分镜">
+  <meta property="og:description" content="基于 LangGraph 的开源剧本分镜智能体：剧本解析、镜头拆分、片段切割、提示词生成与连续性守护，一条流水线输出可投喂 Sora / Veo / Runway / 可灵的分镜脚本。">
+  <meta property="og:url" content="https://shot.helpenx.com/">
+  <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PenShot · 把剧本拆成连贯的 AI 视频分镜">
+  <meta name="twitter:description" content="基于 LangGraph 的开源剧本分镜智能体，把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本。">
+  <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="assets/css/site.css">
+  <script>document.documentElement.classList.add('js');</script>
 </head>
-<body>
+<body data-search-index="docs/search-index.json">
+<a class="skip-link" href="#main">跳到正文</a>
 
-<!-- 导航栏 -->
-<nav class="navbar">
-    <div class="nav-container">
-        <a href="#" class="logo">
-            <div class="logo-icon">✍️</div>
-            <span>PenShot</span>
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="index.html" aria-label="PenShot 首页">
+      <img src="assets/img/logo-mark.svg" alt="" width="30" height="30">
+      <span>PenShot<small>Storyboard Agent</small></span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="index.html" class="is-active">首页</a>
+      <a href="#features">功能</a>
+      <a href="#workflow">工作流程</a>
+      <a href="#integrations">集成</a>
+      <a href="docs/">文档</a>
+      <a href="docs/case-study.html">案例</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+      <a class="header-github" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>
+        <span>GitHub</span>
+      </a>
+      <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="打开导航">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" data-mobile-nav>
+  <a href="index.html">首页</a>
+  <a href="#features">功能</a>
+  <a href="#workflow">工作流程</a>
+  <a href="#integrations">集成方式</a>
+  <a href="docs/">文档</a>
+  <a href="docs/case-study.html">实战案例</a>
+  <div class="mobile-nav__cta">
+    <a class="btn btn--primary" href="docs/quick-start.html">快速开始</a>
+    <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<main id="main">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Open source · LangGraph multi-agent</span>
+          <h1>把剧本，拆成<br><em>连贯的 AI 视频片段</em></h1>
+          <p class="hero-sub">
+            PenShot 是一个开源的剧本分镜智能体。自动完成剧本解析、镜头拆分、片段切割与提示词生成，
+            输出可直接投喂 <strong>Sora、Veo、Runway、可灵</strong> 的 5 秒级分镜脚本。
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn--accent btn--lg" href="docs/quick-start.html">
+              快速开始
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            </a>
+            <a class="btn btn--on-dark btn--lg" href="docs/">浏览文档</a>
+            <a class="btn btn--on-dark btn--lg" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>
+              GitHub
+            </a>
+          </div>
+          <div class="hero-meta">
+            <span>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              MIT License
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              Python 3.10+
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              pip install penshot
+            </span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="film-card">
+            <div class="film-bar">
+              <i></i><i></i><i></i>
+              <span>storyboard / <b>frag_001–003</b></span>
+            </div>
+            <div class="film-frames">
+              <figure class="frame frame--rain">
+                <figcaption><span>SHOT 01</span><b>4.0s</b></figcaption>
+              </figure>
+              <figure class="frame frame--close">
+                <figcaption><span>SHOT 02</span><b>3.0s</b></figcaption>
+              </figure>
+              <figure class="frame frame--dawn">
+                <figcaption><span>SHOT 03</span><b>5.2s</b></figcaption>
+              </figure>
+            </div>
+            <div class="film-code">
+<span class="c-com">// 中英双语提示词 · 片段级输出</span><br>
+{<br>
+&nbsp;&nbsp;<span class="c-key">"fragment_id"</span>: <span class="c-str">"frag_002"</span>,<br>
+&nbsp;&nbsp;<span class="c-key">"duration"</span>: <span class="c-num">3.0</span>,<br>
+&nbsp;&nbsp;<span class="c-key">"model"</span>: <span class="c-str">"runway_gen2"</span>,<br>
+&nbsp;&nbsp;<span class="c-key">"prompt"</span>: <span class="c-str">"中景：林小雨蹲在长椅旁…"</span>,<br>
+&nbsp;&nbsp;<span class="c-key">"negative_prompt"</span>: <span class="c-str">"blurry, deformed hands…"</span>,<br>
+&nbsp;&nbsp;<span class="c-key">"audio_prompt"</span>: { <span class="c-key">"voice_type"</span>: <span class="c-str">"character_dialogue"</span> }<span class="c-caret"></span>
+}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-stats">
+      <div class="container">
+        <div class="hero-stat">
+          <strong><span>6</span> 个</strong>
+          <small>核心智能体节点</small>
+        </div>
+        <div class="hero-stat">
+          <strong><span>5</span> 秒</strong>
+          <small>片段粒度，适配主流模型</small>
+        </div>
+        <div class="hero-stat">
+          <strong><span>3</span> 层</strong>
+          <small>短期 / 中期 / 长期记忆</small>
+        </div>
+        <div class="hero-stat">
+          <strong><span>3</span> 种</strong>
+          <small>SDK / REST / MCP 接入</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech strip -->
+  <div class="tech-strip" aria-label="技术生态">
+    <span>LangGraph</span>
+    <span>LlamaIndex</span>
+    <span>Chroma</span>
+    <span>Redis</span>
+    <span>FastAPI</span>
+    <span>OpenAI · Qwen · DeepSeek · Ollama</span>
+    <span>Sora · Veo · Runway · 可灵</span>
+  </div>
+
+  <!-- Why -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Why PenShot</span>
+        <h2>分镜的体力活，交给智能体</h2>
+        <p>AI 视频模型一次只能生成 5–10 秒。要把两分钟的剧本变成成片，中间隔着几十次拆分、提示词编写与一致性校对。PenShot 把这一段自动化。</p>
+      </div>
+      <div class="problem-grid">
+        <article class="problem-card" data-reveal>
+          <span class="p-index">01 / 时长限制</span>
+          <h3>剧本太长，模型吃不下</h3>
+          <p>两分钟的剧本需要拆成几十个片段。切在哪里、每段多长，直接决定成片是否流畅。</p>
+          <div class="solution">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+            <span><b>智能分段与时长规划</b>，输出模型友好的 5 秒级片段。</span>
+          </div>
+        </article>
+        <article class="problem-card" data-reveal>
+          <span class="p-index">02 / 视觉漂移</span>
+          <h3>角色换装、场景跳变</h3>
+          <p>每个片段独立生成，角色长相、服装、场景光线很容易前后不一致，拼接后立刻穿帮。</p>
+          <div class="solution">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+            <span><b>三层记忆 + 连续性守护</b>，把一致性交给系统。</span>
+          </div>
+        </article>
+        <article class="problem-card" data-reveal>
+          <span class="p-index">03 / 提示词工程</span>
+          <h3>手写 Prompt 费时费力</h3>
+          <p>每个镜头都要写画面、风格、负面词，还要兼顾不同模型的格式与时长偏好。</p>
+          <div class="solution">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+            <span><b>中英双语提示词包</b>，正向、负面与音频提示词一次生成。</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Workflow -->
+  <section class="section section--paper" id="workflow">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Pipeline</span>
+        <h2>六段式分镜流水线</h2>
+        <p>从原始剧本到可执行的分镜提示词包，每一步都有明确的输入、输出与失败降级。</p>
+      </div>
+      <div class="workflow" data-reveal>
+        <article class="workflow-step">
+          <span class="w-num">01</span>
+          <h3>剧本解析</h3>
+          <p>识别场景、角色、对话与动作，输出结构化剧本。</p>
+          <span class="w-tag">parse_script</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">02</span>
+          <h3>镜头拆分</h3>
+          <p>按叙事与动作变化划分镜头，估算景别与时长。</p>
+          <span class="w-tag">segment_shot</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">03</span>
+          <h3>片段切割</h3>
+          <p>规则或 LLM 双模式切分，让单段适配 5 秒限制。</p>
+          <span class="w-tag">split_video</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">04</span>
+          <h3>提示词转换</h3>
+          <p>生成中英双语正向词、负面词与音频提示词。</p>
+          <span class="w-tag">convert_prompt</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">05</span>
+          <h3>质量审计</h3>
+          <p>规则 + LLM 双重检查，自动修复时长、间隙与关联问题。</p>
+          <span class="w-tag">audit_quality</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">06</span>
+          <h3>连续性守护</h3>
+          <p>跨片段校验角色、场景、道具与动作的一致性。</p>
+          <span class="w-tag">continuity_check</span>
+        </article>
+      </div>
+      <p class="doc-deck" style="margin-top:20px;font-size:13px">
+        六个业务节点之外，还有循环检查、错误处理与人工干预等控制节点。
+        <a class="text-link" href="docs/architecture.html">查看十节点状态机 →</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Capabilities -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Capabilities</span>
+        <h2>为分镜而生的工程能力</h2>
+        <p>不只是一个提示词模板：记忆、检索、切割、审查与多协议接入，都在同一条链路里。</p>
+      </div>
+      <div class="bento">
+        <article class="bento-card bento-card--dark bento-card--wide" data-reveal>
+          <span class="bento-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>
+          </span>
+          <h3>三层记忆，守住跨片段一致性</h3>
+          <p>短期记忆缓存任务状态，中期记忆保存上下文，长期记忆通过向量检索召回角色、场景与历史分镜。跨片段的角色与场景信息由系统显式传递。</p>
+          <div class="memory-visual" aria-hidden="true">
+            <div class="memory-row"><i></i>短期记忆 · Redis 任务缓存<b>TTL</b></div>
+            <div class="memory-row"><i></i>中期记忆 · 任务上下文<b>context</b></div>
+            <div class="memory-row"><i></i>长期记忆 · 向量语义检索<b>Chroma</b></div>
+            <div class="memory-row"><i></i>连续性守护 · 快照传递<b>guardian</b></div>
+          </div>
+        </article>
+
+        <article class="bento-card bento-card--half" data-reveal>
+          <span class="bento-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="m8 7-4 5 4 5"/><path d="m16 7 4 5-4 5"/></svg>
+          </span>
+          <h3>规则 + LLM 双模式切割</h3>
+          <p>短镜头按 2.5 秒均分，省成本且输出确定；超过阈值的镜头交给 LLM，在动作停顿、对话句末与情绪转折处切分。</p>
+          <div class="split-visual" aria-hidden="true">
+            <div class="split-track">
+              <span>2.5s</span>
+              <span>2.5s</span>
+              <span>LLM 语义切分</span>
+            </div>
+            <div class="split-legend"><span><i></i>规则均分</span><span><i></i>LLM 切分</span></div>
+          </div>
+        </article>
+
+        <article class="bento-card bento-card--third" data-reveal>
+          <span class="bento-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>
+          </span>
+          <h3>中英双语提示词</h3>
+          <p>每个片段同时包含正向、负面与音频提示词，既能直接投喂模型，也方便人工审查。</p>
+          <div class="chip-row">
+            <span class="chip chip--amber">positive</span>
+            <span class="chip">negative</span>
+            <span class="chip">audio</span>
+            <span class="chip">style</span>
+          </div>
+        </article>
+
+        <article class="bento-card bento-card--third" data-reveal>
+          <span class="bento-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+          </span>
+          <h3>可插拔 LLM</h3>
+          <p>OpenAI、通义千问、DeepSeek、Ollama 通过统一配置切换，不绑定单一模型供应商。</p>
+          <div class="chip-row">
+            <span class="chip">OpenAI</span>
+            <span class="chip">Qwen</span>
+            <span class="chip">DeepSeek</span>
+            <span class="chip">Ollama</span>
+          </div>
+        </article>
+
+        <article class="bento-card bento-card--third" data-reveal>
+          <span class="bento-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>
+          </span>
+          <h3>多协议接入</h3>
+          <p>Python SDK、REST API、MCP Server 与 LangGraph 节点，按你的工程形态选择。</p>
+          <div class="chip-row">
+            <span class="chip">SDK</span>
+            <span class="chip">REST</span>
+            <span class="chip">MCP</span>
+            <span class="chip">LangGraph</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Output -->
+  <section class="section section--paper">
+    <div class="container">
+      <div class="output-grid">
+        <div class="output-copy" data-reveal>
+          <span class="eyebrow">Output</span>
+          <h2>不是一段描述，<br>是一份可执行的分镜包</h2>
+          <p>每个片段都包含正向提示词、负面提示词、时长、目标模型、视觉风格与音频提示词。中英双语，模型与人都能读。</p>
+          <ul class="output-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              片段级提示词，可直接投喂 Runway、Sora、Veo、可灵
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              负面词排除卡通、畸变手部、多余肢体与水印
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              音频提示词包含环境音、角色台词、情绪与语速
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              保留 task_id 与 source_fragments，分镜可双向追溯
+            </li>
+          </ul>
+          <p style="margin-top:24px"><a class="text-link" href="docs/quick-start.html#sec-5">查看完整输出示例 →</a></p>
+        </div>
+
+        <div class="shot-board" data-reveal aria-label="分镜输出示例">
+          <div class="shot-board__head">
+            <span>storyboard / <b>深夜来电.json</b></span>
+            <span>13 片段 · 48.0s</span>
+          </div>
+          <ul class="shot-list">
+            <li class="shot">
+              <span class="shot__thumb" aria-hidden="true"></span>
+              <span class="shot__body">
+                <strong>全景：雨夜公寓客厅</strong>
+                <small>cinematic wide shot · 冷色低照度</small>
+              </span>
+              <span class="shot__meta"><b>4.0s</b>runway</span>
+            </li>
+            <li class="shot">
+              <span class="shot__thumb" aria-hidden="true"></span>
+              <span class="shot__body">
+                <strong>中景：林然蜷在沙发</strong>
+                <small>medium shot · 米色毛毯与旧台灯</small>
+              </span>
+              <span class="shot__meta"><b>3.0s</b>runway</span>
+            </li>
+            <li class="shot">
+              <span class="shot__thumb" aria-hidden="true"></span>
+              <span class="shot__body">
+                <strong>特写：手机屏幕亮起</strong>
+                <small>close-up · 冷光映在脸上</small>
+              </span>
+              <span class="shot__meta"><b>5.2s</b>runway</span>
+            </li>
+          </ul>
+          <div class="shot-board__code"><span class="k">"prompt"</span>: <span class="s">"Cinematic wide shot: midnight apartment, heavy rain outside, Lin Ran curled on the sofa under an old wool blanket…"</span>,
+<span class="k">"negative_prompt"</span>: <span class="s">"cartoon, anime, 3D render, deformed hands, extra limbs, watermark"</span>,
+<span class="k">"audio_prompt"</span>: { <span class="k">"model_type"</span>: <span class="s">"AudioLDM_3"</span>, <span class="k">"emotion"</span>: <span class="s">"tense"</span> }</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Integrations -->
+  <section class="section" id="integrations">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Integrations</span>
+        <h2>三种方式，接进你的工作流</h2>
+        <p>可以嵌入自有服务，也可以作为独立服务部署，或直接挂给支持 MCP 的 IDE 与 Agent 客户端。</p>
+      </div>
+
+      <div class="integration-grid">
+        <div data-reveal>
+          <div class="integration-nav" role="tablist" aria-label="接入方式" data-tabs>
+            <button class="integration-tab" type="button" role="tab" id="tab-sdk" aria-controls="panel-sdk" aria-selected="true">
+              <span class="it-icon">SDK</span>
+              <span><strong>Python SDK</strong><small>嵌入自有服务，3 行代码提交任务</small></span>
+            </button>
+            <button class="integration-tab" type="button" role="tab" id="tab-rest" aria-controls="panel-rest" aria-selected="false" tabindex="-1">
+              <span class="it-icon">API</span>
+              <span><strong>REST API</strong><small>/api/v1 下的 17 个端点，开箱即用</small></span>
+            </button>
+            <button class="integration-tab" type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="false" tabindex="-1">
+              <span class="it-icon">MCP</span>
+              <span><strong>MCP Server</strong><small>7 个工具，接入 Claude Desktop / Cursor</small></span>
+            </button>
+          </div>
+          <p class="doc-deck" style="margin-top:22px;font-size:13px">
+            还提供 LangGraph 节点与 A2A 示例，详见
+            <a class="text-link" href="docs/integration.html">集成指南 →</a>
+          </p>
+        </div>
+
+        <div data-reveal>
+          <div class="code-panel" id="panel-sdk" role="tabpanel" aria-labelledby="tab-sdk">
+            <div class="code-panel__bar">
+              <i></i><i></i><i></i><span>python · sdk</span>
+              <button class="bar-copy" type="button" data-copy-target="#sdk-code">复制</button>
+            </div>
+            <pre id="sdk-code"><code><span class="c-key">from</span> penshot.api <span class="c-key">import</span> create_penshot_agent
+
+agent = create_penshot_agent(max_concurrent=<span class="c-num">5</span>)
+
+script = <span class="c-str">"早晨，一个女孩在咖啡馆读书，阳光透过窗户…"</span>
+task_id = agent.breakdown_script_async(script)
+
+result = agent.wait_for_result(task_id)
+<span class="c-fn">print</span>(result.data[<span class="c-str">"instructions"</span>][<span class="c-str">"project_info"</span>])</code></pre>
+            <div class="code-panel__foot">
+              <a href="docs/quick-start.html">快速开始</a> · <a href="https://github.com/neopen/story-shot-agent/tree/main/example">完整示例</a>
+            </div>
+          </div>
+
+          <div class="code-panel" id="panel-rest" role="tabpanel" aria-labelledby="tab-rest" hidden>
+            <div class="code-panel__bar">
+              <i></i><i></i><i></i><span>bash · rest api</span>
+              <button class="bar-copy" type="button" data-copy-target="#rest-code">复制</button>
+            </div>
+            <pre id="rest-code"><code><span class="c-com"># 启动服务</span>
+python main.py
+
+<span class="c-com"># 提交分镜任务</span>
+curl -X POST http://localhost:<span class="c-num">8000</span>/api/v1/storyboard \
+  -H <span class="c-str">"Content-Type: application/json"</span> \
+  -d <span class="c-str">'{"script": "你的剧本内容…"}'</span>
+
+<span class="c-com"># 查询任务状态</span>
+curl http://localhost:<span class="c-num">8000</span>/api/v1/status/{task_id}</code></pre>
+            <div class="code-panel__foot">
+              <a href="docs/integration.html">REST 接口参考</a> · <a href="https://github.com/neopen/story-shot-agent">源码仓库</a>
+            </div>
+          </div>
+
+          <div class="code-panel" id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp" hidden>
+            <div class="code-panel__bar">
+              <i></i><i></i><i></i><span>bash · mcp server</span>
+              <button class="bar-copy" type="button" data-copy-target="#mcp-code">复制</button>
+            </div>
+            <pre id="mcp-code"><code><span class="c-com"># 启动 MCP Server</span>
+python -m penshot.mcp_server --max-concurrent <span class="c-num">5</span>
+
+<span class="c-com"># 在 Claude Desktop / Cursor 中配置后直接调用</span>
+breakdown_script(script=<span class="c-str">"你的剧本内容…"</span>)
+get_task_result(task_id=<span class="c-str">"..."</span>)</code></pre>
+            <div class="code-panel__foot">
+              <a href="docs/mcp.html">MCP 服务文档</a> · 7 个工具契约
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Use cases -->
+  <section class="section section--tight section--paper">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Use cases</span>
+        <h2>为这些创作场景准备</h2>
+        <p>共同点只有一个：已经有一个文字剧本，想低成本、高连贯地变成视频素材。</p>
+      </div>
+      <div class="problem-grid problem-grid--four" data-reveal>
+        <article class="problem-card">
+          <span class="p-index">短视频创作</span>
+          <h3>把故事脚本变成日更素材</h3>
+          <p>编剧或自媒体作者输入故事，直接得到可逐段生成的分镜提示词，缩短从文字到成片的距离。</p>
+        </article>
+        <article class="problem-card">
+          <span class="p-index">影视预可视化</span>
+          <h3>低成本完成分镜预演</h3>
+          <p>独立电影人与学生剧组在正式拍摄前，用 AI 片段验证镜头节奏、场景与角色设定。</p>
+        </article>
+        <article class="problem-card">
+          <span class="p-index">游戏剧情</span>
+          <h3>快速原型过场动画</h3>
+          <p>独立游戏开发者把剧情文本转成过场分镜，先验证叙事，再投入正式美术资源。</p>
+        </article>
+        <article class="problem-card">
+          <span class="p-index">教育培训</span>
+          <h3>把课程文字可视化</h3>
+          <p>在线教育与知识付费团队将讲稿拆成镜头脚本，批量生成课程视频的画面素材。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Docs -->
+  <section class="section" id="docs">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Documentation</span>
+        <h2>从快速开始到源码细节</h2>
+        <p>文档按使用路径组织：先跑通，再理解架构，最后深入检索、性能与评测。</p>
+      </div>
+      <div class="docs-grid">
+        <a class="doc-card" href="docs/quick-start.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span>
+            <span class="doc-card__cat">开始使用</span>
+          </div>
+          <h3>快速开始</h3>
+          <p>安装、配置 .env，跑通第一个《雨中的约定》分镜任务。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
         </a>
-        <div class="nav-links">
-            <a href="#features">功能</a>
-            <a href="#workflow">工作流程</a>
-            <a href="#demo">在线演示</a>
-            <a href="#pricing">定价</a>
-            <a href="#usage">快速开始</a>
-            <a href="#api">API 接口</a>
-            <a href="docs/" target="_blank" class="blog-btn">文档</a>
-            <a href="https://pengline.cn" target="_blank" class="blog-btn">博客</a>
-            <a href="https://github.com/neopen/story-shot-agent" target="_blank" class="github-btn">GitHub</a>
-        </div>
+        <a class="doc-card" href="docs/architecture.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg></span>
+            <span class="doc-card__cat">核心设计</span>
+          </div>
+          <h3>技术架构</h3>
+          <p>十节点状态机、决策路由与三级循环防护的完整拆解。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/consistency.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="doc-card__cat">核心设计</span>
+          </div>
+          <h3>一致性策略</h3>
+          <p>三层记忆、快照与连续性检查如何压制角色漂移。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/integration.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg></span>
+            <span class="doc-card__cat">集成与接口</span>
+          </div>
+          <h3>集成指南</h3>
+          <p>SDK、REST、MCP 与 A2A 四条路径的边界与用法。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/mcp.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg></span>
+            <span class="doc-card__cat">集成与接口</span>
+          </div>
+          <h3>MCP 服务</h3>
+          <p>七个工具、手写 JSON-RPC 与双传输的实现细节。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/case-study.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15v3"/><path d="M12 10v8"/><path d="M17 6v12"/></svg></span>
+            <span class="doc-card__cat">评测与案例</span>
+          </div>
+          <h3>实战案例</h3>
+          <p>《深夜来电》从七元素剧本到六阶段链路的完整复盘。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+      </div>
+      <p style="margin-top:28px"><a class="text-link" href="docs/">浏览全部 20 篇文档 →</a></p>
     </div>
-</nav>
+  </section>
 
-<!-- Hero 区域 -->
-<section class="hero">
-    <h1>从剧本到视频，AI 智能分镜</h1>
-    <p>PenShot 是专业的 AI 智能分镜视频生成工具，将剧本自动转换为分镜序列，一键生成 AI 视频。支持 REST API、MCP 协议和 Python SDK。</p>
-    <div class="hero-buttons">
-        <a href="#demo" class="btn btn-primary">在线体验</a>
-        <a href="#usage" class="btn btn-outline">快速开始</a>
-        <a href="https://github.com/neopen/story-shot-agent" target="_blank" class="btn btn-outline">GitHub</a>
-    </div>
-</section>
-
-<!-- 统计数字 -->
-<section class="stats">
+  <!-- CTA -->
+  <section class="section" style="padding-top:0">
     <div class="container">
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-number">5000+</div>
-                <div class="stat-label">代码行数</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">10+</div>
-                <div class="stat-label">AI 模型支持</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">3</div>
-                <div class="stat-label">集成协议</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">100%</div>
-                <div class="stat-label">开源免费</div>
-            </div>
+      <div class="cta-panel" data-reveal>
+        <h2>给 PenShot 一个 Star，<br>把故事拍出来。</h2>
+        <p>MIT 协议，支持本地部署与二次开发。欢迎提交 Issue、补充示例，或参与文档共建。</p>
+        <div class="cta-actions">
+          <a class="btn btn--accent btn--lg" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.3L5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg>
+            在 GitHub 查看
+          </a>
+          <a class="btn btn--on-dark btn--lg" href="docs/quick-start.html">阅读快速开始</a>
         </div>
+        <p class="cta-note">pip install penshot · docker pull neotems/penshot</p>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- 核心特性 -->
-<section id="features" class="section">
-    <div class="container">
-        <h2 class="section-title">核心特性</h2>
-        <p class="section-subtitle">专为 AI 视频生成设计的智能工作流</p>
-        <div class="grid">
-            <div class="card">
-                <div class="card-icon">📝</div>
-                <h3>智能剧本解析</h3>
-                <p>支持多种格式剧本输入，自动识别场景、角色、对话，提取核心元素。支持自然语言、标准格式、对话列表等。</p>
-            </div>
-            <div class="card">
-                <div class="card-icon">🎬</div>
-                <h3>AI 分镜拆分</h3>
-                <p>基于内容智能拆分镜头，自动判断景别（特写/中景/全景）、时长和镜头运动，生成专业分镜。</p>
-            </div>
-            <div class="card">
-                <div class="card-icon">✂️</div>
-                <h3>视频片段切割</h3>
-                <p>将镜头切割为适合 AI 生成的短片段，确保每段不超过 5 秒，保证 AI 模型的最佳生成效果。</p>
-            </div>
-            <div class="card">
-                <div class="card-icon">🤖</div>
-                <h3>AI 提示词生成</h3>
-                <p>自动生成高质量 AI 视频提示词，支持 Runway Gen-2、Pika Labs、Sora 等主流 AI 视频模型。</p>
-            </div>
-            <div class="card">
-                <div class="card-icon">📊</div>
-                <h3>质量审查</h3>
-                <p>自动检查片段时长、连续性，提供详细的审查报告，确保生成质量。</p>
-            </div>
-            <div class="card">
-                <div class="card-icon">🔌</div>
-                <h3>多协议支持</h3>
-                <p>支持 REST API、MCP 协议、Python SDK，轻松集成到 LangGraph、Claude Desktop、Cursor 等系统。</p>
-            </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand brand--footer" href="index.html">
+          <img src="assets/img/logo-mark.svg" alt="" width="30" height="30">
+          <span>PenShot<small>Storyboard Agent</small></span>
+        </a>
+        <p>开源的剧本分镜智能体。把任意长度的剧本拆成 5 秒级、视觉连贯的 AI 视频片段脚本。</p>
+        <div class="footer-badges">
+          <span>MIT License</span>
+          <span>Python 3.10+</span>
+          <span>LangGraph</span>
         </div>
+      </div>
+      <div class="footer-col">
+        <h4>产品</h4>
+        <ul>
+          <li><a href="#features">功能特性</a></li>
+          <li><a href="#workflow">工作流程</a></li>
+          <li><a href="#integrations">集成方式</a></li>
+          <li><a href="docs/quick-start.html#sec-5">输出示例</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>文档</h4>
+        <ul>
+          <li><a href="docs/quick-start.html">快速开始</a></li>
+          <li><a href="docs/architecture.html">技术架构</a></li>
+          <li><a href="docs/nodes.html">工作流节点</a></li>
+          <li><a href="docs/integration.html">集成指南</a></li>
+          <li><a href="docs/mcp.html">MCP 服务</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>资源</h4>
+        <ul>
+          <li><a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a></li>
+          <li><a href="https://hub.docker.com/r/neotems/penshot" target="_blank" rel="noopener">Docker Hub</a></li>
+          <li><a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener">问题反馈</a></li>
+          <li><a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a></li>
+        </ul>
+      </div>
     </div>
-</section>
-
-<!-- 工作流程 -->
-<section id="workflow" class="section" style="background: var(--gray-light);">
-    <div class="container">
-        <h2 class="section-title">工作流程</h2>
-        <p class="section-subtitle">5 个步骤，从剧本到视频</p>
-        <div class="workflow">
-            <div class="step">
-                <div class="step-number">1</div>
-                <h4>剧本解析</h4>
-                <p>输入剧本文本，AI 解析场景、角色、对话，提取核心元素</p>
-            </div>
-            <div class="step">
-                <div class="step-number">2</div>
-                <h4>镜头拆分</h4>
-                <p>智能拆分镜头，确定景别（特写/中景/全景）和时长</p>
-            </div>
-            <div class="step">
-                <div class="step-number">3</div>
-                <h4>片段切割</h4>
-                <p>切割为 ≤5 秒的 AI 生成片段，保证模型最佳效果</p>
-            </div>
-            <div class="step">
-                <div class="step-number">4</div>
-                <h4>提示词生成</h4>
-                <p>生成高质量 AI 视频提示词，支持主流视频模型</p>
-            </div>
-            <div class="step">
-                <div class="step-number">5</div>
-                <h4>视频生成</h4>
-                <p>调用 AI 模型生成视频，拼接为完整作品</p>
-            </div>
-        </div>
+    <div class="footer-bottom">
+      <span>© <span data-year>2026</span> PenShot · MIT License · Built with LangGraph</span>
+      <span><i class="status-dot"></i>Open source · 持续迭代中</span>
     </div>
-</section>
-
-<!-- 在线演示 -->
-<section id="demo" class="section">
-    <div class="container">
-        <h2 class="section-title">在线演示</h2>
-        <p class="section-subtitle">试试将你的剧本转换为分镜</p>
-
-        <div class="card" style="max-width: 800px; margin: 0 auto;">
-            <h3>📝 剧本输入</h3>
-            <textarea id="script-input" rows="6" style="width: 100%; padding: 1rem; border: 1px solid var(--gray-light); border-radius: 12px; font-family: inherit; margin: 1rem 0;" placeholder="输入你的剧本内容，例如：
-场景：现代办公室
-时间：下午3点
-人物：小李（程序员）
-动作：小李正在写代码，突然接到电话，表情惊讶"></textarea>
-
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <select id="language-select" style="padding: 0.5rem; border-radius: 8px; border: 1px solid var(--gray-light);">
-                    <option value="zh">中文</option>
-                    <option value="en">English</option>
-                </select>
-                <button id="demo-submit" class="btn btn-primary">开始生成</button>
-            </div>
-
-            <div id="demo-result" style="display: none; margin-top: 1rem;">
-                <h4>生成结果</h4>
-                <div id="demo-result-content" class="code-block">
-                    <pre id="demo-result-pre">等待生成...</pre>
-                </div>
-            </div>
-
-            <div id="demo-loading" style="display: none; text-align: center; padding: 2rem;">
-                <div>⏳ 正在处理中，请稍候...</div>
-            </div>
-
-            <p style="font-size: 0.875rem; color: var(--gray); margin-top: 1rem;">
-                💡 提示：这是一个演示接口，实际应该调用服务 API。
-            </p>
-        </div>
-    </div>
-</section>
-
-<!-- 定价 -->
-<section id="pricing" class="section" style="background: var(--gray-light);">
-    <div class="container">
-        <h2 class="section-title">定价</h2>
-        <p class="section-subtitle">开源免费，企业级支持可选</p>
-
-        <div class="grid">
-            <div class="card" style="text-align: center;">
-                <h3>社区版</h3>
-                <div style="font-size: 2rem; font-weight: 700; margin: 1rem 0;">免费</div>
-                <ul style="list-style: none; text-align: left;">
-                    <li>✓ 完整功能</li>
-                    <li>✓ 本地部署</li>
-                    <li>✓ 社区支持</li>
-                    <li>✓ MIT 协议</li>
-                </ul>
-                <a href="docs/" target="_blank" class="btn btn-outline" style="margin-top: 1rem;">文档</a>
-                <a href="https://github.com/neopen/story-shot-agent" target="_blank" class="btn btn-outline" style="margin-top: 1rem;">GitHub</a>
-            </div>
-
-            <div class="card" style="text-align: center; border: 2px solid var(--primary);">
-                <h3>企业版</h3>
-                <div style="font-size: 2rem; font-weight: 700; margin: 1rem 0;">定制</div>
-                <ul style="list-style: none; text-align: left;">
-                    <li>✓ 优先技术支持</li>
-                    <li>✓ 定制开发</li>
-                    <li>✓ SLA 保障</li>
-                    <li>✓ 私有化部署</li>
-                </ul>
-                <a href="#" class="btn btn-primary" style="margin-top: 1rem;">联系我们</a>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- 快速开始 -->
-<section id="usage" class="section">
-    <div class="container">
-        <h2 class="section-title">快速开始</h2>
-        <p class="section-subtitle">3 分钟上手 PenShot</p>
-
-        <div class="card" style="margin-bottom: 2rem;">
-            <h3>安装</h3>
-            <div class="code-block">
-                <pre>pip install penshot</pre>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom: 2rem;">
-            <h3>环境配置</h3>
-            <div class="code-block">
-                <pre>编辑 .env 文件，配置必要的 LLM 与 Embedding 参数：
-                    
-########################## LLM 模型配置 #########################
-PENSHOT_LLM__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
-PENSHOT_LLM__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-PENSHOT_LLM__DEFAULT__MODEL_NAME=qwen-plus
-PENSHOT_LLM__DEFAULT__TIMEOUT=30
-
-########################## 嵌入模型配置 #########################
-PENSHOT_EMBED__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
-PENSHOT_EMBED__DEFAULT__API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
-
-########################## Redis 配置 ##########################
-PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0</pre>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom: 2rem;">
-            <h3>基础用法（Python SDK 调用）</h3>
-            <div class="code-block">
-                <pre>from penshot.api import create_penshot_agent
-
-async def main():
-    # 创建智能体
-    agent = create_penshot_agent(max_concurrent=5)
-
-    # 提交任务
-    script = "早晨，一个女孩在咖啡馆读书，阳光透过窗户..."
-    task_id = agent.breakdown_script_async(
-        script,
-        callback=lambda r: print(f"任务 {r.task_id} 已完成")
-    )
-
-    # 获取结果
-    result = await agent.wait_for_result_async(task_id)
-    print(f"最终结果: 成功={result.success}, 状态={result.status}")
-    print(f"result={result}")</pre>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>🌐 REST API</h3>
-            <div class="code-block">
-                <pre># 启动服务
-penshot serve-rest --port 8000
-
-# 提交任务
-curl -X POST http://localhost:8000/api/v1/storyboard \
-  -H "Content-Type: application/json" \
-  -d '{"script": "你的剧本内容...", "language": "zh"}'
-
-# 查询状态
-curl http://localhost:8000/api/v1/status/{task_id}
-
-# 获取结果
-curl http://localhost:8000/api/v1/result/{task_id}</pre>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- API 文档 -->
-<section id="api" class="section" style="background: var(--gray-light);">
-    <div class="container">
-        <h2 class="section-title">API 接口</h2>
-        <p class="section-subtitle">常用的 REST API 接口（更多 API 参考 <a href="docs/integration.html" target="_blank">文档</a>）</p>
-
-        <div class="comparison">
-            <table class="comparison-table">
-                <thead>
-                    <tr><th>方法</th><th>端点</th><th>描述</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>POST</td><td>/api/v1/storyboard</td><td>异步提交分镜生成任务</td></tr>
-                    <tr><td>POST</td><td>/api/v1/storyboard/sync</td><td>同步提交，等待完成</td></tr>
-                    <tr><td>GET</td><td>/api/v1/status/{task_id}</td><td>查询任务状态</td></tr>
-                    <tr><td>GET</td><td>/api/v1/result/{task_id}</td><td>获取任务结果</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-
-<!-- 技术栈 -->
-<section class="section">
-    <div class="container">
-        <h2 class="section-title">技术架构</h2>
-        <div class="features-list">
-            <div class="feature-item"><div class="feature-icon">🐍</div><div><strong>Python 3.9+</strong><br>核心开发语言</div></div>
-            <div class="feature-item"><div class="feature-icon">⚡</div><div><strong>FastAPI</strong><br>高性能 Web 框架</div></div>
-            <div class="feature-item"><div class="feature-icon">🧠</div><div><strong>LangGraph</strong><br>工作流编排</div></div>
-            <div class="feature-item"><div class="feature-icon">🗄️</div><div><strong>Redis</strong><br>任务持久化</div></div>
-            <div class="feature-item"><div class="feature-icon">🔌</div><div><strong>MCP 协议</strong><br>AI 智能体集成</div></div>
-            <div class="feature-item"><div class="feature-icon">🎨</div><div><strong>Runway/Pika/Sora</strong><br>AI 视频生成</div></div>
-        </div>
-    </div>
-</section>
-
-<!-- 页脚 -->
-<footer class="footer">
-    <div class="container">
-        <div class="footer-grid">
-            <div class="footer-col">
-                <h4>PenShot</h4>
-                <p>AI 驱动的智能分镜视频生成工具</p>
-            </div>
-            <div class="footer-col">
-                <h4>链接</h4>
-                <a href="#features">功能特性</a>
-                <a href="#workflow">工作流程</a>
-                <a href="#pricing">定价</a>
-                <a href="#usage">快速开始</a>
-            </div>
-            <div class="footer-col">
-                <h4>资源</h4>
-                <a href="https://github.com/neopen/story-shot-agent" target="_blank">GitHub</a>
-                <a href="docs/" target="_blank">文档</a>
-                <a href="https://pengline.cn" target="_blank">博客</a>
-                <a href="https://github.com/neopen/story-shot-agent/issues">问题反馈</a>
-            </div>
-            <div class="footer-col">
-                <h4>联系方式</h4>
-                <a href="mailto:helpenx+shot@gmail.com">helpenx@gmail.com</a>
-                <a href="https://github.com/neopen/story-shot-agent/issues">GitHub Issues</a>
-                <a href="https://pengline.cn">博客</a>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            <p>© 2025 PenShot. MIT License. | 从剧本到视频，AI 智能分镜</p>
-        </div>
-    </div>
+  </div>
 </footer>
 
-<script>
-    // 平滑滚动
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth' });
-            }
-        });
-    });
-
-    // 在线演示功能
-    const demoSubmit = document.getElementById('demo-submit');
-    const scriptInput = document.getElementById('script-input');
-    const languageSelect = document.getElementById('language-select');
-    const demoResult = document.getElementById('demo-result');
-    const demoLoading = document.getElementById('demo-loading');
-    const demoResultPre = document.getElementById('demo-result-pre');
-
-    demoSubmit.addEventListener('click', async function() {
-        const script = scriptInput.value.trim();
-        if (!script) {
-            alert('请输入剧本内容');
-            return;
-        }
-
-        demoLoading.style.display = 'block';
-        demoResult.style.display = 'none';
-
-        // 模拟 API 调用
-        setTimeout(() => {
-            demoLoading.style.display = 'none';
-            demoResult.style.display = 'block';
-
-            // 模拟生成结果
-            const mockResult = {
-                success: true,
-                task_id: "demo_" + Date.now(),
-                shots: [
-                    { id: "shot_001", description: "中景：小李在办公室写代码", duration: 3.0, shot_type: "medium_shot" },
-                    { id: "shot_002", description: "特写：小李惊讶的表情", duration: 2.0, shot_type: "close_up" },
-                    { id: "shot_003", description: "中景：小李接听电话", duration: 2.5, shot_type: "medium_shot" }
-                ],
-                stats: { shot_count: 3, total_duration: 7.5 }
-            };
-
-            demoResultPre.textContent = JSON.stringify(mockResult, null, 2);
-        }, 1500);
-    });
-
-    // 滚动动画
-    const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, observerOptions);
-
-    document.querySelectorAll('.card, .step, .feature-item').forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(20px)';
-        el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-        observer.observe(el);
-    });
-</script>
+<script src="assets/js/site.js" defer></script>
 </body>
 </html>

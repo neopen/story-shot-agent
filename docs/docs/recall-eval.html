@@ -3,131 +3,147 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PenShot 召回评测：三层记忆真机实测、静默失效与评测方法论 · PenShot 文档</title>
+  <title>召回评测 · PenShot 文档</title>
   <meta name="description" content="以源码与真机数据为准绳考证 PenShot 召回链路：拆解三层记忆的写入分发、Redis 降级与摘要持久化机制，澄清嵌入模型与向量库的选型误传，并实测记录长期记忆空库与评测脚本哑参数两类静默失效边界，附一套可复现的召回评测方法论与排查清单。">
-  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="https://shot.helpenx.com/docs/recall-eval.html">
-  <meta property="og:site_name" content="PenShot 文档">
-  <meta property="og:title" content="PenShot 召回评测：三层记忆真机实测、静默失效与评测方法论">
-  <meta property="og:description" content="以源码与真机数据为准绳考证 PenShot 召回链路：拆解三层记忆的写入分发、Redis 降级与摘要持久化机制，澄清嵌入模型与向量库的选型误传，并实测记录长期记忆空库与评测脚本哑参数两类静默失效边界，附一套可复现的召回评测方法论与排查清单。">
+  <meta property="og:site_name" content="PenShot">
   <meta property="og:type" content="article">
+  <meta property="og:title" content="召回评测 · PenShot 文档">
+  <meta property="og:description" content="以源码与真机数据为准绳考证 PenShot 召回链路：拆解三层记忆的写入分发、Redis 降级与摘要持久化机制，澄清嵌入模型与向量库的选型误传，并实测记录长期记忆空库与评测脚本哑参数两类静默失效边界，附一套可复现的召回评测方法论与排查清单。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/recall-eval.html">
-  <meta name="twitter:card" content="summary">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
-  <style>
-:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
-*{margin:0;padding:0;box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
-a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
-.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
-.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
-.topbar nav{display:flex;gap:20px;font-size:14.5px}
-.topbar nav a{color:var(--muted);font-weight:500}
-.topbar nav a:hover{color:var(--brand)}
-.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
-.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
-.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
-.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
-.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
-.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
-.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
-.sidebar a.active{background:var(--brand);color:#fff}
-.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
-.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
-.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
-.toc-mobile a{display:block;padding:3px 0;font-size:14px}
-.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
-.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
-.article h3{font-size:1.22em;margin:1.5em 0 .6em}
-.article h4{font-size:1.08em;margin:1.3em 0 .5em}
-.article p{margin:.85em 0}
-.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
-.article li{margin:.35em 0}
-.article img{max-width:100%;height:auto;border-radius:8px}
-.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
-.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
-.article th{background:var(--bg);font-weight:600}
-.article tr:nth-child(even) td{background:#fbfdff}
-.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
-.article blockquote p{margin:.3em 0}
-.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
-.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
-.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
-.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
-.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
-.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
-.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
-.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
-.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
-.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
-.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
-.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
-.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
-.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
-.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
-.doc-nav a{font-weight:600}
-footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
-footer a{color:var(--muted);margin:0 10px}
-footer a:hover{color:var(--brand)}
-@media (max-width:960px){
-  .sidebar{display:none}
-  .toc-mobile{display:block}
-  .content{padding:20px 6px 50px}
-  .topbar nav{gap:12px}
-}
-</style>
-  <style>
-.hljs{color:#24292e;background:#f6f8fa}
-.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
-.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
-.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
-.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
-.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
-.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
-.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
-.hljs-section{color:#005cc5;font-weight:700}
-.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
-</style>
+  <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="召回评测 · PenShot 文档">
+  <meta name="twitter:description" content="以源码与真机数据为准绳考证 PenShot 召回链路：拆解三层记忆的写入分发、Redis 降级与摘要持久化机制，澄清嵌入模型与向量库的选型误传，并实测记录长期记忆空库与评测脚本哑参数两类静默失效边界，附一套可复现的召回评测方法论与排查清单。">
+  <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/docs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script>document.documentElement.classList.add('js');</script>
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
-    <nav>
-      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
-      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+<body class="docs-page" data-search-index="search-index.json">
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="../index.html" aria-label="PenShot 首页">
+      <img src="../assets/img/logo-mark.svg" alt="" width="30" height="30">
+      <span>PenShot<small>Storyboard Agent</small></span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="../index.html">首页</a>
+      <a href="../index.html#features">功能</a>
+      <a href="../index.html#workflow">工作流程</a>
+      <a href="../index.html#integrations">集成</a>
+      <a href="index.html" class="is-active">文档</a>
+      <a href="case-study.html">案例</a>
     </nav>
-  </header>
-  <div class="wrap">
-    <aside class="sidebar">
-      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
-      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html" class="active">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
-<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a>
-<h4>技术分析</h4>
-<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
-<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
-<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
-<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
-<h4>版本与演进</h4><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
-<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
-<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
-    </aside>
-    <main class="content">
-      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
-      <article class="article">
-        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-05-21</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
-        <h1>PenShot 召回评测：三层记忆真机实测、静默失效与评测方法论</h1>
-<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a>  （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="mcp.html">MCP Server</a> ·  <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
-<blockquote>
+    <div class="header-actions">
+      <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+      <a class="header-github" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg><span>GitHub</span>
+      </a>
+      <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="打开导航">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" data-mobile-nav>
+  <a href="../index.html">首页</a>
+  <a href="../index.html#features">功能</a>
+  <a href="../index.html#workflow">工作流程</a>
+  <a href="../index.html#integrations">集成方式</a>
+  <a href="index.html">文档</a>
+  <a href="case-study.html">实战案例</a>
+  <div class="mobile-nav__cta">
+    <a class="btn btn--primary" href="quick-start.html">快速开始</a>
+    <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<main id="main">
+  <div class="docs-shell">
+  <aside class="docs-sidebar" data-docs-sidebar aria-label="文档导航">
+    <button class="sidebar-close" type="button" data-sidebar-close aria-label="关闭目录"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="sidebar-search">
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档</span><kbd>Ctrl K</kbd></button>
+    </div>
+    <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
+    <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
+        <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">工作流检查点</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="evolution.html">版本演进</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
+        <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>检索与记忆</div>
+        <ul class="sidebar-links"><li><a href="rag-knowledge-base.html">RAG 知识库</a></li><li><a href="chunking.html">分块策略</a></li><li><a href="recall.html">召回体系</a></li><li><a href="recall-eval.html" class="is-active" aria-current="page">召回评测</a></li><li><a href="vector-search.html">向量检索</a></li><li><a href="rerank.html">重排序</a></li><li><a href="token-optimization.html">Token 优化</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15v3"/><path d="M12 10v8"/><path d="M17 6v12"/></svg>评测与案例</div>
+        <ul class="sidebar-links"><li><a href="performance.html">性能评测</a></li><li><a href="case-study.html">实战案例</a></li></ul>
+      </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-extra">
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>GitHub 源码</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>PyPI 安装包</a>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
+    </div>
+    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-30</div>
+  </aside>
+  <div class="sidebar-overlay" data-sidebar-overlay></div>
+  <div class="docs-main">
+    <nav class="breadcrumbs" aria-label="面包屑">
+      <a href="../index.html">首页</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html">文档</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html#retrieval">检索与记忆</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <span>召回评测</span>
+    </nav>
+    <div class="docs-mobile-bar">
+      <button type="button" data-sidebar-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>文档目录</button>
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+    </div>
+    <details class="toc-mobile">
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 22 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">评测概述：从评测报告到源码考证</a></li><li class="toc-depth-3"><a href="#sec-2">为什么要评测召回系统</a></li><li class="toc-depth-3"><a href="#sec-3">真机环境与真实配置</a></li><li class="toc-depth-3"><a href="#sec-4">召回链路真实接线图</a></li><li class="toc-depth-2"><a href="#sec-5">关键要点拆解（一）：向量检索的实现与边界</a></li><li class="toc-depth-3"><a href="#sec-6">相似度检索</a></li><li class="toc-depth-3"><a href="#sec-7">MMR检索</a></li><li class="toc-depth-2"><a href="#sec-8">关键要点拆解（二）：重排序原理与未接线真相</a></li><li class="toc-depth-3"><a href="#sec-9">真实状态：装配完整，但未接线</a></li><li class="toc-depth-3"><a href="#sec-10">接线前值得审视的设计点</a></li><li class="toc-depth-2"><a href="#sec-11">关键要点拆解（三）：三层记忆真实机制与失效边界</a></li><li class="toc-depth-3"><a href="#sec-12">短期记忆</a></li><li class="toc-depth-3"><a href="#sec-13">中期记忆</a></li><li class="toc-depth-3"><a href="#sec-14">长期记忆</a></li><li class="toc-depth-2"><a href="#sec-15">关键要点拆解（四）：混合检索与缓存真相</a></li><li class="toc-depth-3"><a href="#sec-16">混合检索策略</a></li><li class="toc-depth-3"><a href="#sec-17">缓存机制的真实形态</a></li><li class="toc-depth-2"><a href="#sec-18">关键要点拆解（五）：召回对输出的真实影响链</a></li><li class="toc-depth-2"><a href="#sec-19">从零开始：一套可复现的召回评测方法论</a></li><li class="toc-depth-2"><a href="#sec-20">版本与验证说明</a></li><li class="toc-depth-2"><a href="#sec-21">总结与建议</a></li><li class="toc-depth-2"><a href="#sec-22">相关链接</a></li></ul>
+    </details>
+    <div class="docs-layout">
+      <article class="doc-body">
+        <header class="doc-header">
+          <span class="doc-header__cat">检索与记忆</span>
+          <h1>召回评测</h1>
+          <p class="doc-deck">三层记忆的真机实测、静默失效与一套可复用的评测方法。</p>
+          <div class="doc-meta-row">
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-05-21</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 35 分钟阅读</span>
+            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/recall-eval.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
+          </div>
+        </header>
+        <blockquote>
 <p><strong>文档定位</strong>：这是一篇实现细节文档。重点放在源码路径、状态变化、数据结构和异常边界，方便开发者从“能用”进一步理解“为什么这样实现”。<br>
 <strong>事实边界</strong>：实现文档：功能、接口和代码行为以文中标注版本对应的源码为准；仓库后续版本可能发生变化。<br>
 <strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
 <strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
 </blockquote>
 <hr>
-<h2>评测概述：从评测报告到源码考证</h2>
-<h3>为什么要评测召回系统</h3>
+<h2 id="sec-1">评测概述：从评测报告到源码考证</h2>
+<h3 id="sec-2">为什么要评测召回系统</h3>
 <p>召回系统是 PenShot 智能增强层的核心组件，负责从历史成功案例和知识库中检索相关信息，以增强当前任务的处理质量。它的好坏直接决定了提示词增强与连续性验证的成效。本文围绕三个核心能力展开考察：向量检索的实现与效率边界、重排序对检索结果的优化效果、以及三层记忆系统在不同查询场景下的表现。</p>
 <p><strong>写在前面：本文的三条考察纪律</strong></p>
 <p>先说明本文的性质：这是一篇&quot;源码考证 + 真机数据实测&quot;文章，而非一份跑过完整基准的评测报告。项目当前没有积累任何真实的召回评测数据（原因见后文），因此本文坚持三条纪律：所有代码结论以源码为准、可回查；所有数据要么可复现、要么明确标注属性，真机证据与理论分析分开陈述；宁可指出项目当前实现的不足，也不为了&quot;显得高级&quot;而堆砌概念。</p>
@@ -143,7 +159,7 @@ footer a:hover{color:var(--brand)}
 <p><strong>评测脚本自带哑参数</strong>：项目内唯一的&quot;重排序对照测试&quot;传入的 <code>use_rerank</code> 参数从未被实现读取，无论怎么调都会输出&quot;重排序无效&quot;——直接照搬会得出完全错误的结论。</p>
 </li>
 </ul>
-<h3>真机环境与真实配置</h3>
+<h3 id="sec-3">真机环境与真实配置</h3>
 <p>与其罗列一套虚构的测试参数，不如直接呈现项目的真机环境。以下信息全部可回查：模型配置来自项目根目录的 <code>.env</code>，运行证据来自 <code>logs/</code> 下的 13 份真实日志（2026-05-04 至 2026-09-06），存储形态来自 <code>data/memory/</code> 与 <code>data/embedding/</code> 目录快照。</p>
 <table>
 <thead>
@@ -205,7 +221,7 @@ footer a:hover{color:var(--brand)}
         Store3[(SimpleVectorStore&lt;br/&gt;脚本知识库)]
     end
 </pre>
-<h3>召回链路真实接线图</h3>
+<h3 id="sec-4">召回链路真实接线图</h3>
 <p>原图把&quot;知识路由器&quot;画成中央调度、把 Chroma 画成统一的&quot;向量数据库&quot;——这与源码事实不符。按当前代码的真实调用关系重画如下：</p>
 <pre class="mermaid">graph TB
     subgraph Prod[&quot;生产链路（已接线）&quot;]
@@ -246,8 +262,8 @@ footer a:hover{color:var(--brand)}
 <p><strong>真机数据实况</strong>：<code>data/embedding/</code> 下实际只有两份脚本知识库（12 条与 2 条记录），<code>data/memory/</code> 下有三个剧本的记忆目录——其中长期记忆 Chroma 集合的文档数经 SQLite 核验全部为 0，中期摘要则有 2026-05-05 至 07-23 期间的多份按小时快照。&quot;数千个向量文档&quot;的评测口径在真机数据中并不存在，这也是本文无法给出真实召回率指标的根本原因。</p>
 </blockquote>
 <hr>
-<h2>关键要点拆解（一）：向量检索的实现与边界</h2>
-<h3>相似度检索</h3>
+<h2 id="sec-5">关键要点拆解（一）：向量检索的实现与边界</h2>
+<h3 id="sec-6">相似度检索</h3>
 <p>先给出源码层面的结论：PenShot 里的&quot;相似度检索&quot;存在两条实现路径，理解它们的差异比任何跑分数字都重要。</p>
 <p><strong>生产路径一：<code>search_similar</code>（提示词模板检索）</strong>。走标准 LlamaIndex 检索：<code>as_retriever(similarity_top_k=top_k, retriever_mode=&quot;similarity&quot;)</code> 取回结果后，用 <code>score &lt; min_score</code> 过滤低分项，再用 <code>metadata.type == &quot;prompt_template&quot;</code> 过滤类型。<code>min_score</code> 的默认值来自构造参数——<code>workflow_nodes.py</code> 实例化模板管理器时传入了 <code>min_similarity_score=0.7, top_k=3</code>，即生产环境的&quot;及格线&quot;是余弦相似度 0.7。</p>
 <p><strong>生产路径二：<code>query()</code>（场景相似检索）</strong>。这条路径没有走 LlamaIndex 的检索器，而是手动实现余弦相似度：查询文本嵌入后，遍历向量存储内的全部文档向量逐一计算、排序、截取 Top-K。源码摘录：</p>
@@ -292,7 +308,7 @@ footer a:hover{color:var(--brand)}
 <blockquote>
 <p><strong>真机数据实况</strong>：脚本知识库的真实规模让&quot;召回率&quot;暂时失去比较意义——样本 A 全库 12 条（4 场景 + 8 角色），样本 B 仅 2 条。在这种规模下查询&quot;角色&quot;主题，返回结果里出现多个角色文档几乎是结构性必然，任何准确率百分比都会被样本量淹没。项目内也不存在标注数据集或评测产物，&quot;角色查询准确率最高、动作序列最低&quot;之类的分类型对比没有数据来源——这也是本文把重心放在机制考证而非指标罗列的根本原因。</p>
 </blockquote>
-<h3>MMR检索</h3>
+<h3 id="sec-7">MMR检索</h3>
 <p>MMR 检索在相似度基础上增加了多样性惩罚因子，避免返回语义冗余的结果。但必须先给出它在 PenShot 里的真实状态：<strong>已实现装配逻辑、未接线生效</strong>。<code>create_retriever_for_script</code> 中存在完整的分支：</p>
 <pre class="hljs"><code><span class="hljs-comment"># llama_index_knowledge.py L588-593：MMR 分支</span>
 <span class="hljs-keyword">if</span> search_type == <span class="hljs-string">&quot;mmr&quot;</span>:
@@ -304,7 +320,7 @@ footer a:hover{color:var(--brand)}
 </code></pre>
 <p>两层断裂让它无法生效：其一，<code>create_retriever_for_script</code> 的全部触达路径都没有生产调用方（详见前文接线图的&quot;未接线区&quot;）；其二，生产路径中的 <code>query()</code> 虽然签名带 <code>search_type</code> 参数，函数体却从未读取它——内部只有一条手动余弦相似度的代码路径。<strong>因此真机上从未有过一次 MMR 检索真正执行</strong>。下文保留原理与调参分析，是因为这个分支一旦接线就会用到；但请把&quot;原理成立&quot;与&quot;已生效&quot;分开看待。</p>
 <p>关于 MMR 的公式：它实现在候选集 $D$ 中迭代选取文档，使目标函数</p>
-<p><img src="/imgs/math/image-20260914175909622.png" alt="image-20260914175909622"></p>
+<p>$$\mathrm{MMR}=\arg\max_{d_i\in D\setminus S}\left[\lambda\cdot\mathrm{sim}(d_i,q)-(1-\lambda)\cdot\max_{d_j\in S}\mathrm{sim}(d_i,d_j)\right]$$</p>
 <p>最大化，其中 $S$ 是已选集合。即每一步都在&quot;更贴近查询&quot;与&quot;与已选内容更不重合&quot;之间按 $\lambda$ 权衡，从而既保相关又添多样。</p>
 <pre class="mermaid">graph LR
     subgraph MMR[&quot;MMR检索原理&quot;]
@@ -326,7 +342,7 @@ footer a:hover{color:var(--brand)}
 <p>排坑提示：MMR 的效果高度依赖 $\lambda$（本项目中即 <code>mmr_threshold</code>）。$\lambda$ 过大会退化成普通相似度检索，$\lambda$ 过小则会牺牲相关性、招回大量低质结果。若业务更看重&quot;覆盖多种方案&quot;，可将 $\lambda$ 适当调低；若追求&quot;精准命中&quot;，应保持较高的 $\lambda$。另外提醒：接线启用 MMR 时建议同步暴露参数配置——硬编码值迟早会遇到&quot;某个场景想调却调不了&quot;的困境。</p>
 </blockquote>
 <hr>
-<h2>关键要点拆解（二）：重排序原理与未接线真相</h2>
+<h2 id="sec-8">关键要点拆解（二）：重排序原理与未接线真相</h2>
 <p>重排序使用专门的模型对初步检索结果进行精细排序：它基于交叉编码器架构，能捕捉查询与文档之间的深层语义交互——这是设计初衷。但在 PenShot 里，它当前并未接入生产链路。先看原理，再看真实状态。</p>
 <p>补充架构说明：向量检索使用<strong>双编码器（BiEncoder）</strong>——查询与文档分别独立编码后再算余弦相似度，速度快但缺乏交互；重排序使用<strong>交叉编码器（CrossEncoder）</strong>——查询与文档拼接后联合编码，注意力机制让两者 token 相互&quot;看见&quot;对方，精度高但速度慢。因此业界普遍采用&quot;先粗排后精排&quot;的两阶段策略：</p>
 <pre class="mermaid">flowchart TB
@@ -345,7 +361,7 @@ footer a:hover{color:var(--brand)}
         end
     end
 </pre>
-<h3>真实状态：装配完整，但未接线</h3>
+<h3 id="sec-9">真实状态：装配完整，但未接线</h3>
 <p><code>create_retriever_for_script</code> 中的重排序装配代码是完整的，三个关键事实逐一考证：</p>
 <ul class="lvl-0">
 <li class="lvl-2">
@@ -362,7 +378,7 @@ footer a:hover{color:var(--brand)}
 <blockquote>
 <p><strong>数据撤回</strong>：原文声称&quot;重排序后 top-1 准确率由 68% 提升至 86%&quot;，该数字没有任何来源——项目既无重排序实测（模型未接线），也无准确率埋点。同理，“单次重排序耗时是向量检索数倍”“重排序对查询长度敏感”&quot;边界案例改进明显&quot;等描述均无实测依据，一并撤回。</p>
 </blockquote>
-<h3>接线前值得审视的设计点</h3>
+<h3 id="sec-10">接线前值得审视的设计点</h3>
 <p>装配代码里还有几个细节，在接线启用前值得提前审视：</p>
 <ol>
 <li class="lvl-3">
@@ -376,8 +392,8 @@ footer a:hover{color:var(--brand)}
 </li>
 </ol>
 <hr>
-<h2>关键要点拆解（三）：三层记忆真实机制与失效边界</h2>
-<h3>短期记忆</h3>
+<h2 id="sec-11">关键要点拆解（三）：三层记忆真实机制与失效边界</h2>
+<h3 id="sec-12">短期记忆</h3>
 <p>短期记忆的真实结构是&quot;Redis 优先、内存降级&quot;的双轨制。源码层面的关键事实：</p>
 <ul class="lvl-0">
 <li class="lvl-2">
@@ -414,7 +430,7 @@ footer a:hover{color:var(--brand)}
 <p>从&quot;评测&quot;视角看短期记忆，有两个值得记录的工程细节：</p>
 <p>其一，<strong>降级链的兑现条件</strong>：<code>redis_utils.py</code> 的 <code>RedisClient</code> 在建立连接时会 ping 一次，<strong>ping 失败直接抛异常</strong>。也就是说，&quot;Redis 不可用时降级文件&quot;并不是自动生效——它依赖调用方捕获初始化异常并切换到文件存储；同时 <code>get_redis_url()</code> 带了 <code>lru_cache(maxsize=1)</code>，运行期修改环境变量不会重新解析 URL（需清缓存或重启进程）。</p>
 <p>其二，<strong>没有&quot;任务完成即清空&quot;</strong>：代码中不存在基于任务完成钩子的清理逻辑，短期窗口只靠两个机制自然滚动——<code>deque</code> 的 20 条上限与 Redis 的 1 小时 TTL。一小时内连续跑多个剧本时，会话残留属于设计内行为；隔离依赖 session_id 的剧本粒度，而不是&quot;用完即清&quot;。</p>
-<h3>中期记忆</h3>
+<h3 id="sec-13">中期记忆</h3>
 <p>中期记忆基于 LangChain 的摘要链（LLM 摘要 + 中文摘要提示词），把长对话浓缩为摘要后持久化为 JSON。源码层面有两个机制值得细看——一个是设计，一个是缺陷。</p>
 <p><strong>设计：滚动摘要的触发逻辑</strong>。积压的对话字符数超过阈值（<code>max_token_limit * 4</code>，默认 500 → 2000 字符）时，把新增对话交给 LLM 生成摘要，替换掉原始消息；摘要自身超过另一阈值（<code>max_token_limit * 2</code> → 1000 字符）时截断。此外，工作流写入层还有一个独立的统计摘要（<code>_calculate_medium_term_summary</code>）：对数值字段计算 avg/min/max/count，并对 <code>completeness_score</code> 做 improving/declining/stable 趋势判定——这不是文本压缩，而是质量仪表盘。</p>
 <pre class="mermaid">flowchart TB
@@ -438,7 +454,7 @@ footer a:hover{color:var(--brand)}
 <p>排坑提示：两句话——其一，<strong>持久化的读路径和写路径必须使用同一个文件名约定</strong>。这类不一致不会报错、不会告警，只会在重启后表现为&quot;记忆凭空消失&quot;，排查成本极高；其二，中期记忆的 token 上限本质是信息取舍。若任务需要长时间保留细节（如跨幕伏笔），建议引入分层摘要或主题聚类，避免单一摘要&quot;压过头&quot;丢掉关键决策点。</p>
 </blockquote>
 <p>此外，原文称&quot;异步保存、不阻塞主流程&quot;——源码中 <code>save_json_result</code> 是同步调用，没有异步包装。&quot;阶段完成后即时触发写入&quot;这句是准确的，但&quot;异步&quot;属于美化，一并纠正。</p>
-<h3>长期记忆</h3>
+<h3 id="sec-14">长期记忆</h3>
 <p>长期记忆基于 Chroma（<code>langchain_chroma</code>，每剧本一个 collection，SQLite + HNSW 落地）。<strong>但真机数据给出了本次考证最意外的一个事实：三个真实剧本的长期记忆集合，文档数全部为 0。</strong></p>
 <p>写入路径的机制是这样的：工作流每个阶段完成后，<code>WorkflowMemory.after_stage_completion</code> 会评估该阶段结果是否构成&quot;成功案例&quot;（<code>_is_successful_case</code>——如 <code>parse_script</code> 阶段要求 <code>completeness_score &gt;= 0.8</code>），通过才生成长期记忆条目（格式为&quot;[阶段] 执行完成 + 统计 + 场景/角色/镜头摘要&quot;，限 2000 字符、保留最近 30 条成功模式），经增强文本后写入 Chroma。检索侧用 <code>similarity_search_with_score</code> 并按 <code>score &gt;= 0.7</code> 过滤、<code>long_term_k=3</code> 取前 3 条。</p>
 <p>也就是说，长期记忆是一个&quot;全靠成功样本喂养&quot;的冷启动系统：<strong>样本不够成功，它就一直是空的</strong>。空库状态下的检索不会报错——它安静地返回零条结果，任何依赖&quot;历史经验&quot;增强的逻辑都会静默退化为&quot;没有经验可用&quot;。这类失效没有任何告警，是记忆系统最需要监控的指标（本仓库中没有任何此类监控）。</p>
@@ -464,8 +480,8 @@ footer a:hover{color:var(--brand)}
 <p>排坑提示：长期记忆有两个&quot;不报警的坑&quot;。其一，<strong>查询与写入必须使用同一套嵌入模型与维度</strong>，否则召回静默失效——真机正是这个风险的活例：配置声明 1536 维、实际落盘 1024 维，任何按配置硬编码维度的处理代码都会错位；其二，<strong>空库不是错误</strong>：写入门槛未达标时系统一切&quot;正常&quot;，检索只是安静地返回零结果。给长期记忆加一个&quot;集合文档数&quot;监控，比任何检索日志都更能提前暴露问题。</p>
 </blockquote>
 <hr>
-<h2>关键要点拆解（四）：混合检索与缓存真相</h2>
-<h3>混合检索策略</h3>
+<h2 id="sec-15">关键要点拆解（四）：混合检索与缓存真相</h2>
+<h3 id="sec-16">混合检索策略</h3>
 <p>原始版本把混合检索描述成&quot;加权合并&quot;——源码里并非如此。真实的实现位于 <code>llama_index_router.py</code> 的 <code>_hybrid_search</code>：把向量检索、记忆检索、结构化查询三路结果<strong>直接合并</strong>，按各自的 <code>score</code> 排序，再用&quot;前 100 字符&quot;作去重键过滤，最后截取 <code>top_k</code>。全程<strong>没有任何权重系数</strong>——流传的 0.6/0.4/0.3 权重在代码里不存在。</p>
 <p>三个来自源码的细节值得记录：</p>
 <ul class="lvl-0">
@@ -501,7 +517,7 @@ footer a:hover{color:var(--brand)}
 <p>排坑提示：混合检索最容易被忽视的不是&quot;权重调不好&quot;，而是<strong>分数量纲不统一</strong>——本实现干脆放弃了加权，直接按原始分排序。当三路分数量纲差异大（余弦分数 0.5-0.8 vs 硬编码 0.9 vs 记忆侧分数）时，“排序&quot;实际上是对结构化结果的无条件优先。若要真正启用这套混合检索，第一步应该是给三路分数做归一化或引入可配置权重，而不是照搬某个&quot;经验权重表”。</p>
 </blockquote>
 <p>原始版本关于&quot;查询延迟是各来源最大值 + 融合开销&quot;的描述属于推测性美化——融合逻辑本身就是内存里的列表合并与排序，开销可忽略；真正的成本大头仍是各路的嵌入/检索调用。但必须强调：这段逻辑当前没有任何生产流量，讨论其延迟没有实测意义。</p>
-<h3>缓存机制的真实形态</h3>
+<h3 id="sec-17">缓存机制的真实形态</h3>
 <p>先把结论放前面：<strong>PenShot 没有任何检索结果缓存</strong>。真机代码里能找到的缓存只有两处，都与&quot;加速检索&quot;无关：</p>
 <table>
 <thead>
@@ -532,7 +548,7 @@ footer a:hover{color:var(--brand)}
 <p>反过来说，如果未来要给检索加缓存，最需要注意的不是 LRU 算法选择，而是缓存键的设计：检索依赖&quot;查询文本 + 嵌入模型版本 + 索引内容版本&quot;三者，漏掉任何一项都会产生&quot;更新了数据却命中旧结果&quot;的静默错误——这与前文的中期记忆文件名缺陷、维度偏差属于同一类问题：<strong>不报错的错误，才是最贵的错误</strong>。</p>
 <p><strong>检索缓存不存在，“命中率”&quot;LRU 淘汰&quot;等描述自然无从谈起，一并撤回。</strong> 值得校准的是对&quot;缓存&quot;的整体印象：PenShot 并非没有缓存，而是缓存全部集中在<strong>写入侧的成本规避</strong>（模板去重、LLM 复用），没有放在<strong>读取侧的延迟优化</strong>——这个取向与其&quot;单剧本小索引&quot;的规模前提是自洽的。技术讨论中常把&quot;缓存命中率&quot;当作系统先进性的指标，但这个案例展示了更朴素的判断标准：<strong>缓存收益必须大于一致性成本，否则&quot;不做缓存&quot;就是正确答案</strong>。</p>
 <hr>
-<h2>关键要点拆解（五）：召回对输出的真实影响链</h2>
+<h2 id="sec-18">关键要点拆解（五）：召回对输出的真实影响链</h2>
 <p>先问一个比指标更重要的问题：召回结果究竟以什么路径影响最终输出？逐条复核调用链后，答案是&quot;两通、一断&quot;。</p>
 <p><strong>链路一：提示词增强（已接线）</strong>。<code>convert_prompt</code> 节点对每个片段调用 <code>enhance_prompt(fragment.prompt, enhancement_mode=&quot;append&quot;)</code>（<code>workflow_nodes.py</code> L574-582），内部走 <code>get_best_match → search_similar</code>（top_k=1、min_score=0.7、仅模板类型），命中就把匹配模板拼接进原提示词。<strong>这是&quot;召回质量直接影响生成输入&quot;的实链路</strong>——它只有一个质量闸门（0.7 分数阈值），过了闸门的内容直接进入提示词。</p>
 <p><strong>链路二：连续性检查（已接线）</strong>。<code>search_similar_scene</code> 为每个连续性问题检索历史场景方案（<code>top_k=2</code>），填充 <code>historical_solutions</code>。前文已指出这条链没有分数门槛——低质结果也可能被当作&quot;历史方案&quot;。</p>
@@ -553,14 +569,14 @@ footer a:hover{color:var(--brand)}
 <p>原始版本还声称&quot;连续性问题的检出率显著提升&quot;，同样没有数据支撑——检索返回的确被用于填充 <code>historical_solutions</code>，但&quot;提升多少&quot;从未被测量，撤回。</p>
 <p>原始版本说&quot;召回失败时系统回退到基于规则的默认处理&quot;——源码里没有这样的显式降级分支。真实的&quot;失败形态&quot;是静默的：<code>search_similar</code> 查不到就返回空列表、增强环节原样保留提示词；<code>query()</code> 甚至不会返回空（无分数门槛，永远给出&quot;最像的&quot;几条）。换句话说，<strong>召回系统不会报错，它只会安静地少做事或做错事</strong>——这也解释了为什么&quot;召回质量&quot;在这类系统里最不容易被及时发现，最需要评测体系来兜底。</p>
 <hr>
-<h2>从零开始：一套可复现的召回评测方法论</h2>
+<h2 id="sec-19">从零开始：一套可复现的召回评测方法论</h2>
 <p>本文反复指出&quot;项目没有任何评测数据&quot;。但发现缺失只是第一步，把评测做起来才是终点。基于本文考证出的真实架构，一套最小可行的评测流程如下——不需要新框架，用项目内现成能力即可：</p>
 <p><strong>第一步：构造最小评测集</strong>。按查询类型分层取样：角色查询（如&quot;主角是谁&quot;）、场景查询（如&quot;雨夜街道&quot;）、模板查询（如&quot;愤怒情绪的提示词&quot;），每类 10 条，人工标注期望命中的文档。真机索引只有 2-12 条文档，评测集的价值不在于统计显著性，而在于建立<strong>可重复的回归基线</strong>——更换嵌入模型或阈值后，同一套评测跑出的差异才是可解释的。</p>
 <p><strong>第二步：指标分为&quot;健康度&quot;与&quot;效果&quot;两层</strong>。健康度优先：空结果率、长期记忆集合文档数、嵌入维度一致性断言——这三项能第一时间暴露前文那类静默失效；效果层再跟上：命中率@K、MRR、首条命中分数分布。</p>
 <p><strong>第三步：先验证开关，再做对照</strong>。本文最大的教训是&quot;哑参数&quot;——<code>use_rerank</code>/<code>search_type</code> 传了等于没传。任何 A/B 实验开始前，先跑一次&quot;开关有效性验证&quot;：变更参数后打印最终生效的配置（或断言参数被读取），确认旋钮真的连着线。</p>
 <p><strong>第四步：从小索引的现实出发设计结论</strong>。2-12 条文档的召回实验只能回答&quot;链路是否通&quot;，回答不了&quot;准确率多少&quot;。要得到有价值的数字，需要先灌入几十上百条剧本构建有统计意义的索引——这是评测的前置工程量，无法绕过。</p>
 <hr>
-<h2>版本与验证说明</h2>
+<h2 id="sec-20">版本与验证说明</h2>
 <p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
 <ol>
 <li class="lvl-3">
@@ -574,7 +590,7 @@ footer a:hover{color:var(--brand)}
 </li>
 </ol>
 <p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
-<h2>总结与建议</h2>
+<h2 id="sec-21">总结与建议</h2>
 <p>把全文考证压缩成一张&quot;三口径&quot;清单——这是本文最诚实的产出：</p>
 <p><strong>已接线（真实生产行为）</strong></p>
 <ul class="lvl-0">
@@ -622,7 +638,7 @@ footer a:hover{color:var(--brand)}
 </li>
 </ol>
 <hr>
-<h2>相关链接</h2>
+<h2 id="sec-22">相关链接</h2>
 <p><strong>核心文档</strong></p>
 <ul class="lvl-0">
 <li class="lvl-2">
@@ -678,18 +694,48 @@ footer a:hover{color:var(--brand)}
 </li>
 </ul>
 
+        <nav class="doc-pager" aria-label="文档翻页">
+    <a class="pager-link" href="recall.html">
+      <span class="pager-link__label">← 上一篇 · 检索与记忆</span>
+      <strong>召回体系</strong>
+      <small>三层记忆与多路召回：在 GraphRAG 缺席时，召回靠什么在跑。</small>
+    </a>
+    <a class="pager-link pager-link--next" href="vector-search.html">
+      <span class="pager-link__label">下一篇 → · 检索与记忆</span>
+      <strong>向量检索</strong>
+      <small>手动余弦相似度替代检索器：向量检索的真实实现与边界。</small>
+    </a>
+  </nav>
       </article>
-    </main>
+      <aside class="doc-toc" aria-label="本页目录">
+        <div class="toc-inner">
+          <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">评测概述：从评测报告到源码考证</a></li><li class="toc-depth-3"><a href="#sec-2">为什么要评测召回系统</a></li><li class="toc-depth-3"><a href="#sec-3">真机环境与真实配置</a></li><li class="toc-depth-3"><a href="#sec-4">召回链路真实接线图</a></li><li class="toc-depth-2"><a href="#sec-5">关键要点拆解（一）：向量检索的实现与边界</a></li><li class="toc-depth-3"><a href="#sec-6">相似度检索</a></li><li class="toc-depth-3"><a href="#sec-7">MMR检索</a></li><li class="toc-depth-2"><a href="#sec-8">关键要点拆解（二）：重排序原理与未接线真相</a></li><li class="toc-depth-3"><a href="#sec-9">真实状态：装配完整，但未接线</a></li><li class="toc-depth-3"><a href="#sec-10">接线前值得审视的设计点</a></li><li class="toc-depth-2"><a href="#sec-11">关键要点拆解（三）：三层记忆真实机制与失效边界</a></li><li class="toc-depth-3"><a href="#sec-12">短期记忆</a></li><li class="toc-depth-3"><a href="#sec-13">中期记忆</a></li><li class="toc-depth-3"><a href="#sec-14">长期记忆</a></li><li class="toc-depth-2"><a href="#sec-15">关键要点拆解（四）：混合检索与缓存真相</a></li><li class="toc-depth-3"><a href="#sec-16">混合检索策略</a></li><li class="toc-depth-3"><a href="#sec-17">缓存机制的真实形态</a></li><li class="toc-depth-2"><a href="#sec-18">关键要点拆解（五）：召回对输出的真实影响链</a></li><li class="toc-depth-2"><a href="#sec-19">从零开始：一套可复现的召回评测方法论</a></li><li class="toc-depth-2"><a href="#sec-20">版本与验证说明</a></li><li class="toc-depth-2"><a href="#sec-21">总结与建议</a></li><li class="toc-depth-2"><a href="#sec-22">相关链接</a></li></ul>
+          <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/recall-eval.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
+        </div>
+      </aside>
+    </div>
   </div>
-  <footer>
-    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
-    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
-    <a href="index.html">文档中心</a>
-    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
-  </footer>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
-  </script>
+</div>
+</main>
+<footer class="docs-footer">
+  <div class="docs-footer__inner">
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <div class="docs-footer__links">
+      <a href="https://shot.helpenx.com">官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener">问题反馈</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/docs.js" defer></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="../assets/js/katex-init.js"></script>
 </body>
 </html>

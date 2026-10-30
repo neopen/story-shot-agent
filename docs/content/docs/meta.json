@@ -1,0 +1,74 @@
+{
+  "overview": {
+    "title": "项目概览 · PenShot 文档",
+    "h1": "项目概览",
+    "description": "PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。",
+    "updated": "2026-10-31"
+  },
+  "quick-start": {
+    "title": "快速开始 · PenShot 文档",
+    "h1": "快速开始",
+    "description": "从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。",
+    "updated": "2026-10-31"
+  },
+  "architecture": {
+    "title": "技术架构 · PenShot 文档",
+    "h1": "技术架构",
+    "description": "PenShot 的六段工作流、十节点状态机、七态决策路由、三级循环防护与两套持久化存储。",
+    "updated": "2026-10-31"
+  },
+  "nodes": {
+    "title": "工作流节点 · PenShot 文档",
+    "h1": "工作流节点",
+    "description": "PenShot 六个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、镜头拆分、视频分段、指令转换、质量审查与连续性守护。",
+    "updated": "2026-10-31"
+  },
+  "consistency": {
+    "title": "一致性策略 · PenShot 文档",
+    "h1": "一致性策略",
+    "description": "PenShot 如何通过全局元数据、连续性锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。",
+    "updated": "2026-10-31"
+  },
+  "checkpoint": {
+    "title": "检查点与恢复 · PenShot 文档",
+    "h1": "检查点与恢复",
+    "description": "PenShot 的 LangGraph 检查点机制、SQLite/内存双模式、任务恢复流程，以及当前版本在断点续传上的已知边界。",
+    "updated": "2026-10-31"
+  },
+  "core-implementation": {
+    "title": "核心实现 · PenShot 文档",
+    "h1": "核心实现",
+    "description": "PenShot 的多厂商 LLM 客户端、YAML 提示词管理、重试与循环控制、任务池与上下文窗口管理的实现要点。",
+    "updated": "2026-10-31"
+  },
+  "dev-guide": {
+    "title": "开发指南 · PenShot 文档",
+    "h1": "开发指南",
+    "description": "PenShot 的本地开发环境、项目结构、双层状态机、启动方式，以及新增智能体与提示词模板的扩展步骤。",
+    "updated": "2026-10-31"
+  },
+  "integration": {
+    "title": "集成指南 · PenShot 文档",
+    "h1": "集成指南",
+    "description": "通过 Python SDK、REST API、MCP 与 LangGraph/A2A 集成 PenShot 的方式、参数、返回结构与接入注意事项。",
+    "updated": "2026-10-31"
+  },
+  "mcp": {
+    "title": "MCP 服务 · PenShot 文档",
+    "h1": "MCP 服务",
+    "description": "PenShot MCP Server 的七个工具契约、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。",
+    "updated": "2026-10-31"
+  },
+  "memory": {
+    "title": "记忆系统 · PenShot 文档",
+    "h1": "记忆系统",
+    "description": "PenShot 三层记忆的职责、存储、写入与召回流程，脚本记忆门面 ScriptMemory 的组装方式，以及 Redis/Chroma 降级边界。",
+    "updated": "2026-10-31"
+  },
+  "rag-knowledge-base": {
+    "title": "知识库与检索 · PenShot 文档",
+    "h1": "知识库与检索",
+    "description": "PenShot RAG 知识库的索引、分块、向量检索与重排序实现，包含 LongScriptChunker、手动余弦检索和当前接线状态。",
+    "updated": "2026-10-31"
+  }
+}

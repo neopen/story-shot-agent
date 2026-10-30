@@ -1,0 +1,239 @@
+<p>PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo 等视频模型逐段生成的分镜提示词包。</p>
+
+<h2>功能定位</h2>
+<p>主流视频模型单次通常只能生成 5–10 秒画面，更长的成片需要先拆分剧本、逐段生成再拼接。PenShot 处理其中最容易出错的一步：把剧本拆成符合时长限制的片段，并让片段之间在角色、场景、道具和动作上保持衔接。</p>
+<p>输入可以是自然语言剧本、标准剧本或已有分镜文本；输出是片段序列，以及每个片段的正向提示词、负向提示词、目标模型、时长与音频提示词。视频生成、拼接与口型对齐由下游工具完成。典型用途包括短视频批量分镜、影视预可视化与游戏过场动画原型。</p>
+<p>提示词面向的模型由枚举定义：<code>VideoModelType</code> 覆盖 Runway Gen-2、Sora、Veo、Pika、Midjourney、Stable、DALL·E 等，共 8 种；<code>AudioModelType</code> 覆盖 XTTSv2、AudioLDM_3、Bark、ElevenLabs、Azure TTS、OpenAI TTS，共 6 种。</p>
+
+<h2>六阶段工作流</h2>
+<pre class="mermaid">flowchart LR
+    subgraph Input[&quot;输入层&quot;]
+        A[原始剧本&lt;br/&gt;自然语言 / 标准剧本]
+    end
+    
+    subgraph Core[&quot;核心处理链（六个节点）&quot;]
+        B[剧本解析&lt;br/&gt;parse_script]
+        C[分镜拆分&lt;br/&gt;segment_shot]
+        D[片段分割&lt;br/&gt;split_video]
+        E[提示词转换&lt;br/&gt;convert_prompt]
+    end
+    
+    subgraph Control[&quot;质量与控制层&quot;]
+        F[质量审查&lt;br/&gt;audit_quality]
+        G[连续性检查&lt;br/&gt;continuity_check]
+    end
+    
+    subgraph Output[&quot;输出层&quot;]
+        H[分镜序列 + 双语提示词&lt;br/&gt;+ 音频提示词]
+    end
+    
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H
+    F --&gt;|发现问题| I[生成修复参数&lt;br/&gt;打回上游重跑]
+    F --&gt;|严重问题| J[人工干预 / 错误处理]
+</pre>
+<p>六个核心节点对应 <code>PipelineNode</code> 枚举中的六个值；输出、修复与人工干预属于辅助节点。质量审查发现问题时生成修复参数并打回上游，严重问题转入人工干预。连续性检查节点受循环上限约束，最多循环 5 次、重试 2 次，避免问题片段无限返工。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">阶段</th>
+<th style="text-align:left">节点</th>
+<th style="text-align:left">输入 → 输出</th>
+<th style="text-align:left">关键行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本解析</td>
+<td style="text-align:left"><code>parse_script</code></td>
+<td style="text-align:left">原始文本 → 结构化剧本</td>
+<td style="text-align:left">提取场景、角色、对话、动作，给出置信度</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头拆分</td>
+<td style="text-align:left"><code>segment_shot</code></td>
+<td style="text-align:left">结构化剧本 → 镜头序列</td>
+<td style="text-align:left">按内容划分镜头，标注景别与时长</td>
+</tr>
+<tr>
+<td style="text-align:left">片段分割</td>
+<td style="text-align:left"><code>split_video</code></td>
+<td style="text-align:left">镜头序列 → 视频片段</td>
+<td style="text-align:left">规则或 LLM 切分，继承连续性约束</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词转换</td>
+<td style="text-align:left"><code>convert_prompt</code></td>
+<td style="text-align:left">片段 → 提示词</td>
+<td style="text-align:left">逐片段生成双语正向词、负向词与音频提示词</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审查</td>
+<td style="text-align:left"><code>audit_quality</code></td>
+<td style="text-align:left">提示词 → 审查报告</td>
+<td style="text-align:left">规则检查与 LLM 连贯性检查</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性检查</td>
+<td style="text-align:left"><code>continuity_check</code></td>
+<td style="text-align:left">全阶段产物 → 校验结论</td>
+<td style="text-align:left">视觉、角色、场景、动作四类校验，按来源路由修复</td>
+</tr>
+</tbody>
+</table>
+
+<h2>核心能力</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本解析</td>
+<td style="text-align:left">识别场景、角色、对话与动作，输出结构化元素及解析置信度</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头拆分</td>
+<td style="text-align:left">按内容划分镜头，标注景别、时长与主角色</td>
+</tr>
+<tr>
+<td style="text-align:left">双路径分段</td>
+<td style="text-align:left">≤5.5 秒的镜头直接映射为片段，超阈值镜头交由 LLM 在语义边界切分；关闭 LLM 时按 2.5 秒左右等分</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词工程</td>
+<td style="text-align:left">逐片段生成中英双语正向词、负向词与音频提示词，措辞跨片段复用</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审查</td>
+<td style="text-align:left">5 项规则检查加 1 项 LLM 连贯性检查，输出违规条目与修复建议</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性守护</td>
+<td style="text-align:left">按视觉、角色、场景、动作四类校验，问题可路由回对应上游阶段</td>
+</tr>
+<tr>
+<td style="text-align:left">工程接入</td>
+<td style="text-align:left">同步、异步与批量调用，任务池、检查点、三层记忆与 MCP Server</td>
+</tr>
+</tbody>
+</table>
+
+<h2>输出形态</h2>
+<p>结果是单个 JSON 包，顶层为 <code>task_id</code>、<code>success</code> 与 <code>data.instructions</code>；<code>instructions</code> 下分 <code>metadata</code>、<code>project_info</code>、<code>fragments</code>、<code>global_settings</code> 与 <code>execution_suggestions</code>。每个片段自带模型与风格字段，可独立投喂下游生成服务。</p>
+<pre class="hljs"><code>{
+  "task_id": "HL202603061716542571",
+  "success": true,
+  "data": {
+    "instructions": {
+      "metadata": {
+        "video_model": "runway_gen2",
+        "audio_model": "XTTSv2",
+        "total_prompts": 13
+      },
+      "project_info": { "total_fragments": 13, "total_duration": 48.0 },
+      "fragments": [
+        {
+          "fragment_id": "frag_001",
+          "prompt": "Cinematic wide shot: ...\n\n全景镜头：...",
+          "negative_prompt": "cartoon, anime, ...",
+          "duration": 4.0,
+          "model": "runway_gen2",
+          "style": "cinematic realism, ...",
+          "audio_prompt": {
+            "audio_id": "audio_001",
+            "prompt": "Natural rainfall ...",
+            "model_type": "AudioLDM_3",
+            "voice_type": "narration",
+            "previous_audio_id": null
+          }
+        }
+      ],
+      "global_settings": { "style_consistency": true }
+    }
+  }
+}</code></pre>
+<p><code>project_info</code> 汇总片段数与总时长；<code>execution_suggestions</code> 是通用执行建议文本，不是强制参数。<code>prompt</code> 为英文描述加中文对照；<code>negative_prompt</code> 排除卡通、畸变手部、水印等常见瑕疵；<code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，并以 <code>previous_audio_id</code> 串联上下文。样例落盘文件的字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>，写解析代码时以模型定义为准。</p>
+
+<h2>接入方式</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">方式</th>
+<th style="text-align:left">入口</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Python SDK</td>
+<td style="text-align:left"><code>create_penshot_agent()</code>、<code>PenshotFunction</code></td>
+<td style="text-align:left">同步、异步与批量调用；任务池默认并发 10、队列 1000</td>
+</tr>
+<tr>
+<td style="text-align:left">REST</td>
+<td style="text-align:left"><code>/api/v1</code>，默认端口 8000</td>
+<td style="text-align:left">内置 FastAPI 服务，共 17 个端点，含提交、状态、结果与队列观测</td>
+</tr>
+<tr>
+<td style="text-align:left">MCP</td>
+<td style="text-align:left"><code>python -m penshot.mcp_server</code></td>
+<td style="text-align:left">7 个工具，默认 stdio 传输，可接入 Claude Desktop、Cursor 等客户端</td>
+</tr>
+<tr>
+<td style="text-align:left">CLI</td>
+<td style="text-align:left"><code>story-shot-agent serve-rest</code></td>
+<td style="text-align:left">安装后启动 REST 服务，默认监听 0.0.0.0:8000</td>
+</tr>
+</tbody>
+</table>
+<p>四种入口共用同一套任务池与工作流，任务状态与结果一致。接入细节见 <a href="integration.html">集成指南</a> 与 <a href="mcp.html">MCP 服务</a>。</p>
+
+<h2>当前边界</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">边界</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">只产出提示词</td>
+<td style="text-align:left">不生成视频，拼接、转场与口型对齐需外部工具完成</td>
+</tr>
+<tr>
+<td style="text-align:left">分割策略</td>
+<td style="text-align:left">镜头 ≤ 5.5 秒时走规则路径，通常 1:1 成为片段，不判断语义；超过阈值且 <code>enable_llm=True</code> 才交给 LLM 在动作停顿、句末等边界切分；关闭 LLM 时按 2.5 秒左右等分</td>
+</tr>
+<tr>
+<td style="text-align:left">时长校验</td>
+<td style="text-align:left">提示词建议单段不低于 1.5 秒、总时长误差小于 0.5 秒；代码强校验区间为 1.0–5.0 秒，总偏差超过 1 秒告警、超过 2 秒按比例缩放</td>
+</tr>
+<tr>
+<td style="text-align:left">修复闭环</td>
+<td style="text-align:left">审计输出 <code>violations</code> 与 <code>recommended_actions</code>，存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；自动修复尚未完全闭环</td>
+</tr>
+<tr>
+<td style="text-align:left">分割缓存</td>
+<td style="text-align:left"><code>split_cache</code> 为进程内字典，多副本部署时各自独立、无法共享命中</td>
+</tr>
+<tr>
+<td style="text-align:left">Redis 依赖</td>
+<td style="text-align:left">可选；不可用时短期记忆降级为本地文件，任务不中断，但多实例之间记忆互不可见</td>
+</tr>
+</tbody>
+</table>
+<p>这些边界不影响“剧本 → 分镜提示词”主链路的可用性，但属于生产选型前应评估的部分。</p>
+
+<h2>下一步</h2>
+<ul>
+<li><a href="quick-start.html">快速开始</a>：安装、配置并跑通第一个任务。</li>
+<li><a href="architecture.html">技术架构</a>：十个节点、决策路由与循环防护。</li>
+<li><a href="nodes.html">工作流节点</a>：六个智能体节点的输入、规则与降级。</li>
+<li><a href="consistency.html">一致性策略</a>：跨片段的角色与场景漂移如何压制。</li>
+<li><a href="checkpoint.html">检查点与恢复</a>：状态落盘与任务恢复的当前能力。</li>
+</ul>
+<p>源码与安装包：<a href="https://github.com/neopen/story-shot-agent">GitHub</a>、<a href="https://pypi.org/project/penshot/">PyPI</a>；更多工程测评见 <a href="https://pengline.cn">pengline.cn</a>。</p>

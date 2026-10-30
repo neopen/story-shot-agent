@@ -3,129 +3,145 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段 · PenShot 文档</title>
+  <title>版本演进 · PenShot 文档</title>
   <meta name="description" content="梳理 PenShot 从 v0.1 MVP 到 v5.0 导演级分镜的完整演进路线：从任意格式剧本自动拆分片段并保证角色、场景与动作一致性，逐版本解读质量保障、智能增强、一致性契约、多模型适配、超长剧本与分布式调度等关键技术的真实落地状态，并对照源码核实各版本能力边界与规划差距。">
-  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="https://shot.helpenx.com/docs/evolution.html">
-  <meta property="og:site_name" content="PenShot 文档">
-  <meta property="og:title" content="PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段">
-  <meta property="og:description" content="梳理 PenShot 从 v0.1 MVP 到 v5.0 导演级分镜的完整演进路线：从任意格式剧本自动拆分片段并保证角色、场景与动作一致性，逐版本解读质量保障、智能增强、一致性契约、多模型适配、超长剧本与分布式调度等关键技术的真实落地状态，并对照源码核实各版本能力边界与规划差距。">
+  <meta property="og:site_name" content="PenShot">
   <meta property="og:type" content="article">
+  <meta property="og:title" content="版本演进 · PenShot 文档">
+  <meta property="og:description" content="梳理 PenShot 从 v0.1 MVP 到 v5.0 导演级分镜的完整演进路线：从任意格式剧本自动拆分片段并保证角色、场景与动作一致性，逐版本解读质量保障、智能增强、一致性契约、多模型适配、超长剧本与分布式调度等关键技术的真实落地状态，并对照源码核实各版本能力边界与规划差距。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/evolution.html">
-  <meta name="twitter:card" content="summary">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🎬</text></svg>">
-  <style>
-:root{--brand:#6366f1;--brand-dark:#4f46e5;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
-*{margin:0;padding:0;box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-size:16px}
-a{color:var(--brand);text-decoration:none}a:hover{color:var(--brand-dark);text-decoration:underline}
-.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 24px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;color:var(--ink)}
-.topbar .brand .doc-badge{font-size:12px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:2px 8px}
-.topbar nav{display:flex;gap:20px;font-size:14.5px}
-.topbar nav a{color:var(--muted);font-weight:500}
-.topbar nav a:hover{color:var(--brand)}
-.wrap{display:flex;max-width:1280px;margin:0 auto;padding:0 16px}
-.sidebar{width:264px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;padding:24px 16px 40px 0;border-right:1px solid var(--line)}
-.sidebar .side-home{display:block;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:15px}
-.sidebar .side-home:hover{color:var(--brand);text-decoration:none}
-.sidebar h4{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:600}
-.sidebar a{display:block;padding:5px 10px;border-radius:6px;font-size:14px;color:#334155;line-height:1.5}
-.sidebar a:hover{background:var(--bg);color:var(--brand);text-decoration:none}
-.sidebar a.active{background:var(--brand);color:#fff}
-.content{flex:1;min-width:0;padding:32px 20px 60px 36px;max-width:860px}
-.toc-mobile{display:none;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
-.toc-mobile summary{cursor:pointer;font-weight:600;color:var(--ink)}
-.toc-mobile a{display:block;padding:3px 0;font-size:14px}
-.article h1{font-size:1.9em;line-height:1.35;margin:.4em 0 .8em}
-.article h2{font-size:1.45em;margin:1.8em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
-.article h3{font-size:1.22em;margin:1.5em 0 .6em}
-.article h4{font-size:1.08em;margin:1.3em 0 .5em}
-.article p{margin:.85em 0}
-.article ul,.article ol{padding-left:1.6em;margin:.7em 0}
-.article li{margin:.35em 0}
-.article img{max-width:100%;height:auto;border-radius:8px}
-.article table{border-collapse:collapse;width:100%;margin:1.1em 0;font-size:.94em;display:block;overflow-x:auto}
-.article th,.article td{border:1px solid var(--line);padding:8px 12px;text-align:left}
-.article th{background:var(--bg);font-weight:600}
-.article tr:nth-child(even) td{background:#fbfdff}
-.article blockquote{margin:1.1em 0;padding:.7em 1.1em;border-left:4px solid var(--brand);background:var(--bg);border-radius:0 8px 8px 0;color:#334155}
-.article blockquote p{margin:.3em 0}
-.article code:not(pre code){background:#eef2f7;color:#c7254e;padding:.15em .4em;border-radius:4px;font-size:.88em;word-break:break-word}
-.article pre.hljs{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0;line-height:1.6}
-.article pre.hljs code{background:none;padding:0;color:var(--ink);font-size:.9em;font-family:ui-monospace,SFMono-Regular,'Cascadia Code',Consolas,Menlo,monospace}
-.article pre.mermaid{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:1.1em 0}
-.article hr{border:none;border-top:1px solid var(--line);margin:2em 0}
-.article .success,.article .tips,.article .warning,.article .danger{border-radius:8px;padding:.9em 1.1em;margin:1.1em 0;border:1px solid}
-.article .success{border-color:#a7f3d0;background:#ecfdf5}.article .success p:first-of-type::before{content:'✅ '}
-.article .tips{border-color:#bfdbfe;background:#eff6ff}.article .tips p:first-of-type::before{content:'💡 '}
-.article .warning{border-color:#fde68a;background:#fffbeb}.article .warning p:first-of-type::before{content:'⚠️ '}
-.article .danger{border-color:#fecaca;background:#fef2f2}.article .danger p:first-of-type::before{content:'🚫 '}
-.article .success>p:first-child,.article .tips>p:first-child,.article .warning>p:first-child,.article .danger>p:first-child{margin-top:0}
-.article .success>p:last-child,.article .tips>p:last-child,.article .warning>p:last-child,.article .danger>p:last-child{margin-bottom:0}
-.doc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--muted)}
-.doc-meta .tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
-.doc-nav{display:flex;justify-content:space-between;gap:16px;margin-top:48px;padding-top:20px;border-top:1px solid var(--line)}
-.doc-nav a{font-weight:600}
-footer{border-top:1px solid var(--line);padding:22px 24px;text-align:center;color:var(--muted);font-size:13.5px}
-footer a{color:var(--muted);margin:0 10px}
-footer a:hover{color:var(--brand)}
-@media (max-width:960px){
-  .sidebar{display:none}
-  .toc-mobile{display:block}
-  .content{padding:20px 6px 50px}
-  .topbar nav{gap:12px}
-}
-</style>
-  <style>
-.hljs{color:#24292e;background:#f6f8fa}
-.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.constant_{color:#d73a49}
-.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}
-.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id,.hljs-variable{color:#005cc5}
-.hljs-string,.hljs-meta .hljs-string,.hljs-regexp{color:#032f62}
-.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-tag,.hljs-subst,.hljs-symbol{color:#e36209}
-.hljs-built_in,.hljs-class .hljs-title{color:#e36209}
-.hljs-comment,.hljs-meta,.hljs-quote{color:#6a737d}
-.hljs-section{color:#005cc5;font-weight:700}
-.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
-</style>
+  <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="版本演进 · PenShot 文档">
+  <meta name="twitter:description" content="梳理 PenShot 从 v0.1 MVP 到 v5.0 导演级分镜的完整演进路线：从任意格式剧本自动拆分片段并保证角色、场景与动作一致性，逐版本解读质量保障、智能增强、一致性契约、多模型适配、超长剧本与分布式调度等关键技术的真实落地状态，并对照源码核实各版本能力边界与规划差距。">
+  <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/docs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script>document.documentElement.classList.add('js');</script>
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="index.html">🎬 PenShot <span class="doc-badge">文档</span></a>
-    <nav>
-      <a href="https://shot.helpenx.com" target="_blank" rel="noopener">产品官网</a>
-      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+<body class="docs-page" data-search-index="search-index.json">
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="../index.html" aria-label="PenShot 首页">
+      <img src="../assets/img/logo-mark.svg" alt="" width="30" height="30">
+      <span>PenShot<small>Storyboard Agent</small></span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="../index.html">首页</a>
+      <a href="../index.html#features">功能</a>
+      <a href="../index.html#workflow">工作流程</a>
+      <a href="../index.html#integrations">集成</a>
+      <a href="index.html" class="is-active">文档</a>
+      <a href="case-study.html">案例</a>
     </nav>
-  </header>
-  <div class="wrap">
-    <aside class="sidebar">
-      <a class="side-home" href="index.html">🎬 剧本分镜智能体 · 文档中心</a>
-      <h4>实现与源码分析</h4><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a>
-<h4>设计与方案</h4><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a>
-<h4>技术分析</h4>
-<h4>案例与测评</h4><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a>
-<h4>入门与使用</h4><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a>
-<h4>性能与评测</h4><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a>
-<h4>架构与核心设计</h4><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a>
-<h4>版本与演进</h4><a href="evolution.html" class="active">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a>
-<h4>API 与配置参考</h4><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a>
-<h4>项目概览</h4><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a>
-    </aside>
-    <main class="content">
-      <details class="toc-mobile"><summary>📑 文档目录</summary><div><strong style="font-size:13px;color:var(--muted)">实现与源码分析</strong><a href="mcp.html">PenShot MCP 服务源码考证：七工具契约、手写 JSON-RPC 与双传输真相</a><a href="rag-knowledge-base.html">PenShot RAG 知识库考证：模板增强已接线，路由与重排序为何停在图纸上？</a><a href="chunking.html">PenShot 分块策略源码考证：双阈值切分、重叠真相与接线现状</a><a href="recall.html">PenShot 召回体系考证：GraphRAG 缺席、混合检索未接线，召回靠什么在跑？</a><a href="recall-eval.html">PenShot 召回评测源码考证：三层记忆真机实测、静默失效与评测方法论</a><a href="vector-search.html">PenShot 向量检索考证：手动余弦替代检索器，空结果与重排序的源码真相</a><a href="dev-guide.html">PenShot 开发指南源码考证：双启动链、双层状态机与二次开发扩展点</a><a href="core-implementation.html">PenShot 核心实现：LLM 客户端、提示词工程与三层记忆源码拆解</a><a href="checkpoint.html">PenShot 工作流检查点：状态明明落了盘，断点续传为何仍然失效？</a><a href="nodes.html">PenShot 节点详解：六大智能体的源码实现与规则逻辑</a><a href="token-optimization.html">PenShot 从百万 Token 到千 Token 的成本优化体系与工程实践</a><a href="rerank.html">PenShot 重排序源码考证：装配逻辑、哑参数与默认关闭的接线真相</a></div><div><strong style="font-size:13px;color:var(--muted)">设计与方案</strong><a href="consistency.html">PenShot 一致性策略：多片段生成如何压制角色与场景漂移</a></div><div><strong style="font-size:13px;color:var(--muted)">技术分析</strong></div><div><strong style="font-size:13px;color:var(--muted)">案例与测评</strong><a href="case-study.html">PenShot 实战复盘：《深夜来电》七元素剧本的六阶段链路与质量分对照</a></div><div><strong style="font-size:13px;color:var(--muted)">入门与使用</strong><a href="quick-start.html">PenShot 快速开始：从环境安装到首个分镜任务的完整实操</a></div><div><strong style="font-size:13px;color:var(--muted)">性能与评测</strong><a href="performance.html">PenShot 性能评测：两次真实运行的阶段耗时画像与 LLM 瓶颈拆解</a></div><div><strong style="font-size:13px;color:var(--muted)">架构与核心设计</strong><a href="architecture.html">PenShot 技术架构：十节点状态机、决策路由与三级循环防护</a></div><div><strong style="font-size:13px;color:var(--muted)">版本与演进</strong><a href="evolution.html">PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</a></div><div><strong style="font-size:13px;color:var(--muted)">API 与配置参考</strong><a href="integration.html">PenShot 集成接入源码考证：SDK、REST、MCP 三条官方链路与 A2A 真相</a></div><div><strong style="font-size:13px;color:var(--muted)">项目概览</strong><a href="index.html">PenShot 剧本分镜智能体：六段工作流如何把任意剧本拆成连贯视频片段</a></div></details>
-      <article class="article">
-        <div class="doc-meta"><span class="tag">PenShot</span><span class="tag">更新 2026-04-28</span><a href="https://shot.helpenx.com" target="_blank" rel="noopener">shot.helpenx.com ↗</a></div>
-        <h1>PenShot 智能分镜智能体架构演进：从 MVP 到导演级分镜的五阶段</h1>
-<p>相关链接：<a href="https://github.com/neopen/story-shot-agent">GitHub</a> | <a href="https://shot.helpenx.com/">官网</a> | <a href="index.html">文档</a> （<a href="architecture.html">架构设计</a> · <a href="recall.html">召回策略</a> · <a href="consistency.html">一致性策略</a> · <a href="rag-knowledge-base.html">RAG 增强</a>）</p>
-<blockquote>
+    <div class="header-actions">
+      <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+      <a class="header-github" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg><span>GitHub</span>
+      </a>
+      <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="打开导航">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" data-mobile-nav>
+  <a href="../index.html">首页</a>
+  <a href="../index.html#features">功能</a>
+  <a href="../index.html#workflow">工作流程</a>
+  <a href="../index.html#integrations">集成方式</a>
+  <a href="index.html">文档</a>
+  <a href="case-study.html">实战案例</a>
+  <div class="mobile-nav__cta">
+    <a class="btn btn--primary" href="quick-start.html">快速开始</a>
+    <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<main id="main">
+  <div class="docs-shell">
+  <aside class="docs-sidebar" data-docs-sidebar aria-label="文档导航">
+    <button class="sidebar-close" type="button" data-sidebar-close aria-label="关闭目录"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="sidebar-search">
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档</span><kbd>Ctrl K</kbd></button>
+    </div>
+    <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
+    <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
+        <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">工作流检查点</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="evolution.html" class="is-active" aria-current="page">版本演进</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
+        <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>检索与记忆</div>
+        <ul class="sidebar-links"><li><a href="rag-knowledge-base.html">RAG 知识库</a></li><li><a href="chunking.html">分块策略</a></li><li><a href="recall.html">召回体系</a></li><li><a href="recall-eval.html">召回评测</a></li><li><a href="vector-search.html">向量检索</a></li><li><a href="rerank.html">重排序</a></li><li><a href="token-optimization.html">Token 优化</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15v3"/><path d="M12 10v8"/><path d="M17 6v12"/></svg>评测与案例</div>
+        <ul class="sidebar-links"><li><a href="performance.html">性能评测</a></li><li><a href="case-study.html">实战案例</a></li></ul>
+      </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-extra">
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>GitHub 源码</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>PyPI 安装包</a>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
+    </div>
+    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-30</div>
+  </aside>
+  <div class="sidebar-overlay" data-sidebar-overlay></div>
+  <div class="docs-main">
+    <nav class="breadcrumbs" aria-label="面包屑">
+      <a href="../index.html">首页</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html">文档</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html#core">核心设计</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <span>版本演进</span>
+    </nav>
+    <div class="docs-mobile-bar">
+      <button type="button" data-sidebar-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>文档目录</button>
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+    </div>
+    <details class="toc-mobile">
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 20 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">读完本文后，你应该知道什么</a></li><li class="toc-depth-2"><a href="#sec-2">一、概述：项目定位与核心目标</a></li><li class="toc-depth-2"><a href="#sec-3">二、关键要点拆解：架构演进总览</a></li><li class="toc-depth-2"><a href="#sec-4">三、关键要点拆解：v0.1 → v0.3（基础 → 质量 → 智能）</a></li><li class="toc-depth-3"><a href="#sec-5">v0.1：MVP 基础分镜</a></li><li class="toc-depth-3"><a href="#sec-6">v0.2：质量保障</a></li><li class="toc-depth-3"><a href="#sec-7">v0.3：智能增强</a></li><li class="toc-depth-2"><a href="#sec-8">四、关键要点拆解：v0.4 → v0.7（一致性 → 模型 → 镜头 → 超长剧本）</a></li><li class="toc-depth-3"><a href="#sec-9">v0.4：一致性保障</a></li><li class="toc-depth-3"><a href="#sec-10">v0.5：模型适配</a></li><li class="toc-depth-3"><a href="#sec-11">v0.6：镜头增强</a></li><li class="toc-depth-3"><a href="#sec-12">v0.7：超长剧本</a></li><li class="toc-depth-2"><a href="#sec-13">五、关键要点拆解：v1.0 → v5.0（批量 → 分布式 → 企业 → 多模态 → 生态）</a></li><li class="toc-depth-3"><a href="#sec-14">v1.0：多任务多格式</a></li><li class="toc-depth-3"><a href="#sec-15">v1.5：分布式调度</a></li><li class="toc-depth-3"><a href="#sec-16">v2.0：企业级 / v3.0：多模态 / v4.0：专业生态 / v5.0：终极形态</a></li><li class="toc-depth-2"><a href="#sec-17">六、技术债务与演进方向</a></li><li class="toc-depth-2"><a href="#sec-18">版本与验证说明</a></li><li class="toc-depth-2"><a href="#sec-19">总结与建议</a></li><li class="toc-depth-2"><a href="#sec-20">相关链接</a></li></ul>
+    </details>
+    <div class="docs-layout">
+      <article class="doc-body">
+        <header class="doc-header">
+          <span class="doc-header__cat">核心设计</span>
+          <h1>版本演进</h1>
+          <p class="doc-deck">从 MVP 到导演级分镜：五个阶段的能力叠加与后续路线图。</p>
+          <div class="doc-meta-row">
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-04-28</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 30 分钟阅读</span>
+            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/evolution.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
+          </div>
+        </header>
+        <blockquote>
 <p><strong>文档定位</strong>：这是一篇版本文档。重点是按版本说明功能变化、架构变化和兼容性边界；版本号与发布日期以项目仓库 Release/CHANGELOG 为最终依据。<br>
 <strong>事实边界</strong>：版本文档：版本历史与路线说明应以项目仓库 Release/CHANGELOG 为最终依据。<br>
 <strong>权威来源</strong>：<a href="https://github.com/neopen/story-shot-agent">PenShot 源码仓库</a>；涉及版本历史时，以仓库 Release / CHANGELOG 为准。<br>
 <strong>代码标记</strong>：如果正文出现“源码/实现”字样，表示对应代码路径可在仓库中核对；示例代码仅用于演示调用方式，不应理解为项目源码原样。</p>
 </blockquote>
-<h2>读完本文后，你应该知道什么</h2>
+<h2 id="sec-1">读完本文后，你应该知道什么</h2>
 <p>从 MVP 到专业级剧本分镜智能体的完整演进历程。</p>
 <ul class="lvl-0">
 <li class="lvl-2">
@@ -139,7 +155,7 @@ footer a:hover{color:var(--brand)}
 </li>
 </ul>
 <hr>
-<h2>一、概述：项目定位与核心目标</h2>
+<h2 id="sec-2">一、概述：项目定位与核心目标</h2>
 <p>PenShot 是一个<strong>剧本分镜智能体系统</strong>，将自然语言剧本自动转换为结构化的视频分镜和 AI 提示词，最终对接文生视频模型生成视频片段。</p>
 <p><strong>核心目标</strong></p>
 <table>
@@ -199,7 +215,7 @@ footer a:hover{color:var(--brand)}
 <p><strong>补充说明</strong>：这四条原则决定了演进节奏——&quot;渐进增强&quot;让每个版本都能独立交付，避免大爆炸式重写；&quot;向后兼容&quot;保证老用户的存储与 API 不因升级被破坏；&quot;标准驱动&quot;使输出能直接对接专业剪辑工具链。</p>
 </blockquote>
 <hr>
-<h2>二、关键要点拆解：架构演进总览</h2>
+<h2 id="sec-3">二、关键要点拆解：架构演进总览</h2>
 <p><strong>演进路线图-基础阶段</strong></p>
 <pre class="mermaid">timeline
     title PenShot 架构演进路线图之基础阶段
@@ -532,8 +548,8 @@ footer a:hover{color:var(--brand)}
 <p><strong>补充说明</strong>：这张表清晰展示了&quot;能力叠加&quot;的演进逻辑——后一版本在前一版本能力不丢失的前提下叠加新维度，且新能力往往先用 🔄（规划中）标记，再逐步落到 ✅（已发布），保证产品始终可用。</p>
 </blockquote>
 <hr>
-<h2>三、关键要点拆解：v0.1 → v0.3（基础 → 质量 → 智能）</h2>
-<h3>v0.1：MVP 基础分镜</h3>
+<h2 id="sec-4">三、关键要点拆解：v0.1 → v0.3（基础 → 质量 → 智能）</h2>
+<h3 id="sec-5">v0.1：MVP 基础分镜</h3>
 <p>验证核心流程可行性，实现剧本到分镜的端到端基础能力。</p>
 <pre class="mermaid">graph TB
     subgraph Input[&quot;输入层&quot;]
@@ -691,7 +707,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v0.2：质量保障</h3>
+<h3 id="sec-6">v0.2：质量保障</h3>
 <p>建立质量闭环，确保输出可靠性和稳定性。</p>
 <pre class="mermaid">graph TB
     subgraph Core[&quot;PenShot 核心 v0.2&quot;]
@@ -1117,7 +1133,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v0.3：智能增强</h3>
+<h3 id="sec-7">v0.3：智能增强</h3>
 <p>引入智能决策和知识积累能力，实现经验驱动的自适应优化。</p>
 <pre class="mermaid">graph TB
     subgraph Workflow[&quot;LangGraph 工作流引擎&quot;]
@@ -1508,8 +1524,8 @@ footer a:hover{color:var(--brand)}
 </tbody>
 </table>
 <hr>
-<h2>四、关键要点拆解：v0.4 → v0.7（一致性 → 模型 → 镜头 → 超长剧本）</h2>
-<h3>v0.4：一致性保障</h3>
+<h2 id="sec-8">四、关键要点拆解：v0.4 → v0.7（一致性 → 模型 → 镜头 → 超长剧本）</h2>
+<h3 id="sec-9">v0.4：一致性保障</h3>
 <p>从根本上解决跨阶段一致性问题，建立完整的角色/道具/场景追踪体系。</p>
 <pre class="mermaid">graph TB
     subgraph Contract[&quot;一致性契约 v0.4&quot;]
@@ -1832,7 +1848,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v0.5：模型适配</h3>
+<h3 id="sec-10">v0.5：模型适配</h3>
 <p>适配主流视频生成模型，增强情感表达和提示词质量。</p>
 <pre class="mermaid">graph TB
     subgraph ModelAdapt[&quot;模型适配层 v0.5&quot;]
@@ -2062,7 +2078,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v0.6：镜头增强</h3>
+<h3 id="sec-11">v0.6：镜头增强</h3>
 <p>提升镜头语言表达能力，支持专业级镜头设计。</p>
 <pre class="mermaid">graph TB
     subgraph ShotEnhance[&quot;镜头增强层 v0.6&quot;]
@@ -2265,7 +2281,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v0.7：超长剧本</h3>
+<h3 id="sec-12">v0.7：超长剧本</h3>
 <p>支持小说、电影级别的超长剧本处理。</p>
 <pre class="mermaid">graph TB
     subgraph LongScript[&quot;超长剧本引擎 v0.7&quot;]
@@ -2431,8 +2447,8 @@ footer a:hover{color:var(--brand)}
 </tbody>
 </table>
 <hr>
-<h2>五、关键要点拆解：v1.0 → v5.0（批量 → 分布式 → 企业 → 多模态 → 生态）</h2>
-<h3>v1.0：多任务多格式</h3>
+<h2 id="sec-13">五、关键要点拆解：v1.0 → v5.0（批量 → 分布式 → 企业 → 多模态 → 生态）</h2>
+<h3 id="sec-14">v1.0：多任务多格式</h3>
 <p>提升吞吐量和兼容性，支持批量处理和多格式输出。</p>
 <p><strong>批量任务队列</strong></p>
 <table>
@@ -2525,7 +2541,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v1.5：分布式调度</h3>
+<h3 id="sec-15">v1.5：分布式调度</h3>
 <p>支持高可用、弹性伸缩和复杂任务编排。</p>
 <pre class="mermaid">graph TB
     subgraph Scheduler[&quot;NeoTask 调度层&quot;]
@@ -2632,7 +2648,7 @@ footer a:hover{color:var(--brand)}
 </tr>
 </tbody>
 </table>
-<h3>v2.0：企业级 / v3.0：多模态 / v4.0：专业生态 / v5.0：终极形态</h3>
+<h3 id="sec-16">v2.0：企业级 / v3.0：多模态 / v4.0：专业生态 / v5.0：终极形态</h3>
 <p><strong>v2.0：企业级</strong>——多租户、可观测、可管理，满足企业级部署需求。</p>
 <table>
 <thead>
@@ -2776,7 +2792,7 @@ footer a:hover{color:var(--brand)}
     Input --&gt; PenShot --&gt; Output
 </pre>
 <hr>
-<h2>六、技术债务与演进方向</h2>
+<h2 id="sec-17">六、技术债务与演进方向</h2>
 <table>
 <thead>
 <tr>
@@ -2819,7 +2835,7 @@ footer a:hover{color:var(--brand)}
 </tbody>
 </table>
 <hr>
-<h2>版本与验证说明</h2>
+<h2 id="sec-18">版本与验证说明</h2>
 <p>本文属于项目文档而不是永久不变的 API 契约。以下情况发生时，应重新核对源码或发布说明：</p>
 <ol>
 <li class="lvl-3">
@@ -2833,7 +2849,7 @@ footer a:hover{color:var(--brand)}
 </li>
 </ol>
 <p>如果你要把本文内容用于生产环境，请优先使用仓库当前版本的 README、源码、测试和 Release 记录进行最终确认。</p>
-<h2>总结与建议</h2>
+<h2 id="sec-19">总结与建议</h2>
 <p><strong>关键设计决策</strong></p>
 <table>
 <thead>
@@ -2941,7 +2957,7 @@ footer a:hover{color:var(--brand)}
 </table>
 <p><strong>实践建议</strong>：PenShot 的演进路线对同类&quot;LLM 智能体&quot;产品有较强参考价值——先用 v0.1 打通<strong>端到端最小闭环</strong>，再用 v0.2/v0.3 补齐<strong>质量与智能</strong>，随后才谈<strong>一致性与专业适配</strong>，最后过渡到批量、分布式与企业化。每个版本都以可独立交付为前提，避免了重写式演进的高风险。</p>
 <hr>
-<h2>相关链接</h2>
+<h2 id="sec-20">相关链接</h2>
 <p><strong>核心文档</strong></p>
 <ul class="lvl-0">
 <li class="lvl-2">
@@ -2997,18 +3013,48 @@ footer a:hover{color:var(--brand)}
 </li>
 </ul>
 
+        <nav class="doc-pager" aria-label="文档翻页">
+    <a class="pager-link" href="core-implementation.html">
+      <span class="pager-link__label">← 上一篇 · 核心设计</span>
+      <strong>核心实现</strong>
+      <small>LLM 客户端、提示词工程与三层记忆的源码级拆解。</small>
+    </a>
+    <a class="pager-link pager-link--next" href="integration.html">
+      <span class="pager-link__label">下一篇 → · 集成与接口</span>
+      <strong>集成指南</strong>
+      <small>Python SDK、REST API、MCP Server 与 A2A：四条接入路径的边界与用法。</small>
+    </a>
+  </nav>
       </article>
-    </main>
+      <aside class="doc-toc" aria-label="本页目录">
+        <div class="toc-inner">
+          <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">读完本文后，你应该知道什么</a></li><li class="toc-depth-2"><a href="#sec-2">一、概述：项目定位与核心目标</a></li><li class="toc-depth-2"><a href="#sec-3">二、关键要点拆解：架构演进总览</a></li><li class="toc-depth-2"><a href="#sec-4">三、关键要点拆解：v0.1 → v0.3（基础 → 质量 → 智能）</a></li><li class="toc-depth-3"><a href="#sec-5">v0.1：MVP 基础分镜</a></li><li class="toc-depth-3"><a href="#sec-6">v0.2：质量保障</a></li><li class="toc-depth-3"><a href="#sec-7">v0.3：智能增强</a></li><li class="toc-depth-2"><a href="#sec-8">四、关键要点拆解：v0.4 → v0.7（一致性 → 模型 → 镜头 → 超长剧本）</a></li><li class="toc-depth-3"><a href="#sec-9">v0.4：一致性保障</a></li><li class="toc-depth-3"><a href="#sec-10">v0.5：模型适配</a></li><li class="toc-depth-3"><a href="#sec-11">v0.6：镜头增强</a></li><li class="toc-depth-3"><a href="#sec-12">v0.7：超长剧本</a></li><li class="toc-depth-2"><a href="#sec-13">五、关键要点拆解：v1.0 → v5.0（批量 → 分布式 → 企业 → 多模态 → 生态）</a></li><li class="toc-depth-3"><a href="#sec-14">v1.0：多任务多格式</a></li><li class="toc-depth-3"><a href="#sec-15">v1.5：分布式调度</a></li><li class="toc-depth-3"><a href="#sec-16">v2.0：企业级 / v3.0：多模态 / v4.0：专业生态 / v5.0：终极形态</a></li><li class="toc-depth-2"><a href="#sec-17">六、技术债务与演进方向</a></li><li class="toc-depth-2"><a href="#sec-18">版本与验证说明</a></li><li class="toc-depth-2"><a href="#sec-19">总结与建议</a></li><li class="toc-depth-2"><a href="#sec-20">相关链接</a></li></ul>
+          <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/evolution.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
+        </div>
+      </aside>
+    </div>
   </div>
-  <footer>
-    <a href="https://shot.helpenx.com" target="_blank" rel="noopener">PenShot 官网</a>·
-    <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>·
-    <a href="index.html">文档中心</a>
-    <div style="margin-top:6px">© 2026 helpenx.com · 文档基线以文中标注版本对应的源码为准</div>
-  </footer>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
-  </script>
+</div>
+</main>
+<footer class="docs-footer">
+  <div class="docs-footer__inner">
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <div class="docs-footer__links">
+      <a href="https://shot.helpenx.com">官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener">问题反馈</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/docs.js" defer></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="../assets/js/katex-init.js"></script>
 </body>
 </html>

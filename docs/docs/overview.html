@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目概览 · PenShot 文档</title>
+  <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。">
+  <meta name="theme-color" content="#0b0d12">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/overview.html">
+  <meta property="og:site_name" content="PenShot">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="项目概览 · PenShot 文档">
+  <meta property="og:description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/overview.html">
+  <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="项目概览 · PenShot 文档">
+  <meta name="twitter:description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。">
+  <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/docs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body class="docs-page" data-search-index="search-index.json">
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="../index.html" aria-label="PenShot 首页">
+      <img src="../assets/img/logo-mark.svg" alt="" width="30" height="30">
+      <span>PenShot<small>Storyboard Agent</small></span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="../index.html">首页</a>
+      <a href="../index.html#features">功能</a>
+      <a href="../index.html#workflow">工作流程</a>
+      <a href="../index.html#integrations">集成</a>
+      <a href="index.html" class="is-active">文档</a>
+      <a href="case-study.html">案例</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+      <a class="header-github" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg><span>GitHub</span>
+      </a>
+      <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="打开导航">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" data-mobile-nav>
+  <a href="../index.html">首页</a>
+  <a href="../index.html#features">功能</a>
+  <a href="../index.html#workflow">工作流程</a>
+  <a href="../index.html#integrations">集成方式</a>
+  <a href="index.html">文档</a>
+  <a href="case-study.html">实战案例</a>
+  <div class="mobile-nav__cta">
+    <a class="btn btn--primary" href="quick-start.html">快速开始</a>
+    <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<main id="main">
+  <div class="docs-shell">
+  <aside class="docs-sidebar" data-docs-sidebar aria-label="文档导航">
+    <button class="sidebar-close" type="button" data-sidebar-close aria-label="关闭目录"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="sidebar-search">
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档</span><kbd>Ctrl K</kbd></button>
+    </div>
+    <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
+    <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
+        <ul class="sidebar-links"><li><a href="overview.html" class="is-active" aria-current="page">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
+        <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
+        <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>检索与记忆</div>
+        <ul class="sidebar-links"><li><a href="memory.html">记忆系统</a></li><li><a href="rag-knowledge-base.html">知识库与检索</a></li></ul>
+      </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-extra">
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>GitHub 源码</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>PyPI 安装包</a>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
+    </div>
+    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-30</div>
+  </aside>
+  <div class="sidebar-overlay" data-sidebar-overlay></div>
+  <div class="docs-main">
+    <nav class="breadcrumbs" aria-label="面包屑">
+      <a href="../index.html">首页</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html">文档</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html#start">开始使用</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <span>项目概览</span>
+    </nav>
+    <div class="docs-mobile-bar">
+      <button type="button" data-sidebar-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>文档目录</button>
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+    </div>
+    <details class="toc-mobile">
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 7 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">功能定位</a></li><li class="toc-depth-2"><a href="#sec-2">六阶段工作流</a></li><li class="toc-depth-2"><a href="#sec-3">核心能力</a></li><li class="toc-depth-2"><a href="#sec-4">输出形态</a></li><li class="toc-depth-2"><a href="#sec-5">接入方式</a></li><li class="toc-depth-2"><a href="#sec-6">当前边界</a></li><li class="toc-depth-2"><a href="#sec-7">下一步</a></li></ul>
+    </details>
+    <div class="docs-layout">
+      <article class="doc-body">
+        <header class="doc-header">
+          <span class="doc-header__cat">开始使用</span>
+          <h1>项目概览</h1>
+          <p class="doc-deck">一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本。</p>
+          <div class="doc-meta-row">
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 7 分钟阅读</span>
+            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/overview.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
+          </div>
+        </header>
+        <p>PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo 等视频模型逐段生成的分镜提示词包。</p>
+
+<h2 id="sec-1">功能定位</h2>
+<p>主流视频模型单次通常只能生成 5–10 秒画面，更长的成片需要先拆分剧本、逐段生成再拼接。PenShot 处理其中最容易出错的一步：把剧本拆成符合时长限制的片段，并让片段之间在角色、场景、道具和动作上保持衔接。</p>
+<p>输入可以是自然语言剧本、标准剧本或已有分镜文本；输出是片段序列，以及每个片段的正向提示词、负向提示词、目标模型、时长与音频提示词。视频生成、拼接与口型对齐由下游工具完成。典型用途包括短视频批量分镜、影视预可视化与游戏过场动画原型。</p>
+<p>提示词面向的模型由枚举定义：<code>VideoModelType</code> 覆盖 Runway Gen-2、Sora、Veo、Pika、Midjourney、Stable、DALL·E 等，共 8 种；<code>AudioModelType</code> 覆盖 XTTSv2、AudioLDM_3、Bark、ElevenLabs、Azure TTS、OpenAI TTS，共 6 种。</p>
+
+<h2 id="sec-2">六阶段工作流</h2>
+<pre class="mermaid">flowchart LR
+    subgraph Input[&quot;输入层&quot;]
+        A[原始剧本&lt;br/&gt;自然语言 / 标准剧本]
+    end
+    
+    subgraph Core[&quot;核心处理链（六个节点）&quot;]
+        B[剧本解析&lt;br/&gt;parse_script]
+        C[分镜拆分&lt;br/&gt;segment_shot]
+        D[片段分割&lt;br/&gt;split_video]
+        E[提示词转换&lt;br/&gt;convert_prompt]
+    end
+    
+    subgraph Control[&quot;质量与控制层&quot;]
+        F[质量审查&lt;br/&gt;audit_quality]
+        G[连续性检查&lt;br/&gt;continuity_check]
+    end
+    
+    subgraph Output[&quot;输出层&quot;]
+        H[分镜序列 + 双语提示词&lt;br/&gt;+ 音频提示词]
+    end
+    
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H
+    F --&gt;|发现问题| I[生成修复参数&lt;br/&gt;打回上游重跑]
+    F --&gt;|严重问题| J[人工干预 / 错误处理]
+</pre>
+<p>六个核心节点对应 <code>PipelineNode</code> 枚举中的六个值；输出、修复与人工干预属于辅助节点。质量审查发现问题时生成修复参数并打回上游，严重问题转入人工干预。连续性检查节点受循环上限约束，最多循环 5 次、重试 2 次，避免问题片段无限返工。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">阶段</th>
+<th style="text-align:left">节点</th>
+<th style="text-align:left">输入 → 输出</th>
+<th style="text-align:left">关键行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本解析</td>
+<td style="text-align:left"><code>parse_script</code></td>
+<td style="text-align:left">原始文本 → 结构化剧本</td>
+<td style="text-align:left">提取场景、角色、对话、动作，给出置信度</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头拆分</td>
+<td style="text-align:left"><code>segment_shot</code></td>
+<td style="text-align:left">结构化剧本 → 镜头序列</td>
+<td style="text-align:left">按内容划分镜头，标注景别与时长</td>
+</tr>
+<tr>
+<td style="text-align:left">片段分割</td>
+<td style="text-align:left"><code>split_video</code></td>
+<td style="text-align:left">镜头序列 → 视频片段</td>
+<td style="text-align:left">规则或 LLM 切分，继承连续性约束</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词转换</td>
+<td style="text-align:left"><code>convert_prompt</code></td>
+<td style="text-align:left">片段 → 提示词</td>
+<td style="text-align:left">逐片段生成双语正向词、负向词与音频提示词</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审查</td>
+<td style="text-align:left"><code>audit_quality</code></td>
+<td style="text-align:left">提示词 → 审查报告</td>
+<td style="text-align:left">规则检查与 LLM 连贯性检查</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性检查</td>
+<td style="text-align:left"><code>continuity_check</code></td>
+<td style="text-align:left">全阶段产物 → 校验结论</td>
+<td style="text-align:left">视觉、角色、场景、动作四类校验，按来源路由修复</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="sec-3">核心能力</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">剧本解析</td>
+<td style="text-align:left">识别场景、角色、对话与动作，输出结构化元素及解析置信度</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头拆分</td>
+<td style="text-align:left">按内容划分镜头，标注景别、时长与主角色</td>
+</tr>
+<tr>
+<td style="text-align:left">双路径分段</td>
+<td style="text-align:left">≤5.5 秒的镜头直接映射为片段，超阈值镜头交由 LLM 在语义边界切分；关闭 LLM 时按 2.5 秒左右等分</td>
+</tr>
+<tr>
+<td style="text-align:left">提示词工程</td>
+<td style="text-align:left">逐片段生成中英双语正向词、负向词与音频提示词，措辞跨片段复用</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审查</td>
+<td style="text-align:left">5 项规则检查加 1 项 LLM 连贯性检查，输出违规条目与修复建议</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性守护</td>
+<td style="text-align:left">按视觉、角色、场景、动作四类校验，问题可路由回对应上游阶段</td>
+</tr>
+<tr>
+<td style="text-align:left">工程接入</td>
+<td style="text-align:left">同步、异步与批量调用，任务池、检查点、三层记忆与 MCP Server</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="sec-4">输出形态</h2>
+<p>结果是单个 JSON 包，顶层为 <code>task_id</code>、<code>success</code> 与 <code>data.instructions</code>；<code>instructions</code> 下分 <code>metadata</code>、<code>project_info</code>、<code>fragments</code>、<code>global_settings</code> 与 <code>execution_suggestions</code>。每个片段自带模型与风格字段，可独立投喂下游生成服务。</p>
+<pre class="hljs"><code>{
+  "task_id": "HL202603061716542571",
+  "success": true,
+  "data": {
+    "instructions": {
+      "metadata": {
+        "video_model": "runway_gen2",
+        "audio_model": "XTTSv2",
+        "total_prompts": 13
+      },
+      "project_info": { "total_fragments": 13, "total_duration": 48.0 },
+      "fragments": [
+        {
+          "fragment_id": "frag_001",
+          "prompt": "Cinematic wide shot: ...\n\n全景镜头：...",
+          "negative_prompt": "cartoon, anime, ...",
+          "duration": 4.0,
+          "model": "runway_gen2",
+          "style": "cinematic realism, ...",
+          "audio_prompt": {
+            "audio_id": "audio_001",
+            "prompt": "Natural rainfall ...",
+            "model_type": "AudioLDM_3",
+            "voice_type": "narration",
+            "previous_audio_id": null
+          }
+        }
+      ],
+      "global_settings": { "style_consistency": true }
+    }
+  }
+}</code></pre>
+<p><code>project_info</code> 汇总片段数与总时长；<code>execution_suggestions</code> 是通用执行建议文本，不是强制参数。<code>prompt</code> 为英文描述加中文对照；<code>negative_prompt</code> 排除卡通、畸变手部、水印等常见瑕疵；<code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，并以 <code>previous_audio_id</code> 串联上下文。样例落盘文件的字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>，写解析代码时以模型定义为准。</p>
+
+<h2 id="sec-5">接入方式</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">方式</th>
+<th style="text-align:left">入口</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Python SDK</td>
+<td style="text-align:left"><code>create_penshot_agent()</code>、<code>PenshotFunction</code></td>
+<td style="text-align:left">同步、异步与批量调用；任务池默认并发 10、队列 1000</td>
+</tr>
+<tr>
+<td style="text-align:left">REST</td>
+<td style="text-align:left"><code>/api/v1</code>，默认端口 8000</td>
+<td style="text-align:left">内置 FastAPI 服务，共 17 个端点，含提交、状态、结果与队列观测</td>
+</tr>
+<tr>
+<td style="text-align:left">MCP</td>
+<td style="text-align:left"><code>python -m penshot.mcp_server</code></td>
+<td style="text-align:left">7 个工具，默认 stdio 传输，可接入 Claude Desktop、Cursor 等客户端</td>
+</tr>
+<tr>
+<td style="text-align:left">CLI</td>
+<td style="text-align:left"><code>story-shot-agent serve-rest</code></td>
+<td style="text-align:left">安装后启动 REST 服务，默认监听 0.0.0.0:8000</td>
+</tr>
+</tbody>
+</table>
+<p>四种入口共用同一套任务池与工作流，任务状态与结果一致。接入细节见 <a href="integration.html">集成指南</a> 与 <a href="mcp.html">MCP 服务</a>。</p>
+
+<h2 id="sec-6">当前边界</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">边界</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">只产出提示词</td>
+<td style="text-align:left">不生成视频，拼接、转场与口型对齐需外部工具完成</td>
+</tr>
+<tr>
+<td style="text-align:left">分割策略</td>
+<td style="text-align:left">镜头 ≤ 5.5 秒时走规则路径，通常 1:1 成为片段，不判断语义；超过阈值且 <code>enable_llm=True</code> 才交给 LLM 在动作停顿、句末等边界切分；关闭 LLM 时按 2.5 秒左右等分</td>
+</tr>
+<tr>
+<td style="text-align:left">时长校验</td>
+<td style="text-align:left">提示词建议单段不低于 1.5 秒、总时长误差小于 0.5 秒；代码强校验区间为 1.0–5.0 秒，总偏差超过 1 秒告警、超过 2 秒按比例缩放</td>
+</tr>
+<tr>
+<td style="text-align:left">修复闭环</td>
+<td style="text-align:left">审计输出 <code>violations</code> 与 <code>recommended_actions</code>，存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；自动修复尚未完全闭环</td>
+</tr>
+<tr>
+<td style="text-align:left">分割缓存</td>
+<td style="text-align:left"><code>split_cache</code> 为进程内字典，多副本部署时各自独立、无法共享命中</td>
+</tr>
+<tr>
+<td style="text-align:left">Redis 依赖</td>
+<td style="text-align:left">可选；不可用时短期记忆降级为本地文件，任务不中断，但多实例之间记忆互不可见</td>
+</tr>
+</tbody>
+</table>
+<p>这些边界不影响“剧本 → 分镜提示词”主链路的可用性，但属于生产选型前应评估的部分。</p>
+
+<h2 id="sec-7">下一步</h2>
+<ul>
+<li><a href="quick-start.html">快速开始</a>：安装、配置并跑通第一个任务。</li>
+<li><a href="architecture.html">技术架构</a>：十个节点、决策路由与循环防护。</li>
+<li><a href="nodes.html">工作流节点</a>：六个智能体节点的输入、规则与降级。</li>
+<li><a href="consistency.html">一致性策略</a>：跨片段的角色与场景漂移如何压制。</li>
+<li><a href="checkpoint.html">检查点与恢复</a>：状态落盘与任务恢复的当前能力。</li>
+</ul>
+<p>源码与安装包：<a href="https://github.com/neopen/story-shot-agent">GitHub</a>、<a href="https://pypi.org/project/penshot/">PyPI</a>；更多工程测评见 <a href="https://pengline.cn">pengline.cn</a>。</p>
+
+        <nav class="doc-pager" aria-label="文档翻页">
+    <span class="pager-spacer"></span>
+    <a class="pager-link pager-link--next" href="quick-start.html">
+      <span class="pager-link__label">下一篇 → · 开始使用</span>
+      <strong>快速开始</strong>
+      <small>从安装、配置到跑通第一个分镜任务，完整走一遍最小可用链路。</small>
+    </a>
+  </nav>
+      </article>
+      <aside class="doc-toc" aria-label="本页目录">
+        <div class="toc-inner">
+          <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">功能定位</a></li><li class="toc-depth-2"><a href="#sec-2">六阶段工作流</a></li><li class="toc-depth-2"><a href="#sec-3">核心能力</a></li><li class="toc-depth-2"><a href="#sec-4">输出形态</a></li><li class="toc-depth-2"><a href="#sec-5">接入方式</a></li><li class="toc-depth-2"><a href="#sec-6">当前边界</a></li><li class="toc-depth-2"><a href="#sec-7">下一步</a></li></ul>
+          <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/overview.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="docs-footer">
+  <div class="docs-footer__inner">
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <div class="docs-footer__links">
+      <a href="https://shot.helpenx.com">官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener">问题反馈</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/docs.js" defer></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="../assets/js/katex-init.js"></script>
+</body>
+</html>

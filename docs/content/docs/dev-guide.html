@@ -1,0 +1,258 @@
+<p>面向需要修改 PenShot 源码的开发者，覆盖本地环境、项目结构、两级状态机、启动路径，以及新增智能体与提示词模板的扩展方法。</p>
+<p>首次安装与运行见 <a href="quick-start.html">快速开始</a>；SDK、REST 与 MCP 的调用方式见 <a href="integration.html">集成指南</a>。</p>
+<h2>本地开发环境</h2>
+<p>PenShot 需要 Python 3.10 及以上版本和可用的 OpenAI 兼容 LLM 密钥。Redis 不是本地开发的硬依赖，只在多进程部署时用于共享任务记录。</p>
+<pre class="hljs"><code>git <span class="hljs-built_in">clone</span> https://github.com/neopen/story-shot-agent.git
+<span class="hljs-built_in">cd</span> story-shot-agent
+python -m venv .venv
+<span class="hljs-built_in">source</span> .venv/bin/activate        <span class="hljs-comment"># Windows: .venv\Scripts\activate</span>
+pip install -e <span class="hljs-string">&quot;.[dev]&quot;</span>
+<span class="hljs-built_in">cp</span> .env.example .env
+python -m pytest tests/ -x -q
+</code></pre>
+<p>依赖由 <code>pyproject.toml</code> 管理，仓库没有 <code>requirements.txt</code>。<code>[dev]</code> 附加组包含 pytest、ruff、mypy 等工具；只运行服务时 <code>pip install -e .</code> 即可。配置从 <code>.env</code> 自动加载，最少需要填写 <code>PENSHOT_LLM__DEFAULT__BASE_URL</code>、<code>API_KEY</code> 与 <code>MODEL_NAME</code>，使用 RAG 或记忆功能时再补 <code>PENSHOT_EMBED__DEFAULT__*</code>。</p>
+<table>
+<thead>
+<tr><th>变量组</th><th>用途</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PENSHOT_LLM__DEFAULT__*</code></td><td>主模型的 BASE_URL、API_KEY、MODEL_NAME、TEMPERATURE、TIMEOUT</td></tr>
+<tr><td><code>PENSHOT_LLM__FALLBACK__*</code></td><td>主模型不可用或重试耗尽后的备用厂商</td></tr>
+<tr><td><code>PENSHOT_EMBED__DEFAULT__*</code></td><td>嵌入模型，模板默认 <code>text-embedding-v4</code>、1536 维</td></tr>
+<tr><td><code>PENSHOT_REDIS_*</code></td><td>多进程任务记录共享，单进程可省略</td></tr>
+</tbody>
+</table>
+<p>变量名使用双下划线表示层级：<code>DEFAULT</code> 是默认 profile，<code>FALLBACK</code> 是备用 profile。密钥也支持 <code>${ENV_VAR}</code> 间接引用。接入本地 Ollama 时，<code>BASE_URL</code> 通常指向 <code>http://localhost:11434/v1</code>。</p>
+<h2>项目结构</h2>
+<pre class="hljs"><code>story-shot-agent/
+├── src/penshot/
+│   ├── api/                    function_calls.py（SDK）、rest_api.py（17 个路由）
+│   ├── app/                    FastAPI 组装、生命周期、全局异常处理
+│   ├── config/                 config_loader / config_models / logging.yaml / settings.yaml
+│   ├── neopen/
+│   │   ├── agent/              五个智能体与 workflow/（编排、节点、状态、决策、检查点）
+│   │   ├── task/               TaskFactory / TaskManager / AsyncTaskProcessor
+│   │   ├── prompts/v1.x/       zh/ 与 en/ 的 YAML 模板；v2.x 为空占位
+│   │   ├── client/             LLM 客户端与 AIConfig
+│   │   ├── knowledge/          记忆与知识库
+│   │   └── shot_config.py      ShotConfig 流程参数
+│   ├── cli.py                  8 个子命令
+│   ├── http_server.py          REST 启动器
+│   ├── mcp_server.py           MCP stdio 服务
+│   ├── mcp_http_server.py      MCP HTTP 联调服务
+│   └── logger.py               日志封装，级别由 config/logging.yaml 决定
+├── main.py                     服务入口
+├── examples/                   SDK、REST、MCP、workflow 示例
+└── tests/                      unit / integration / e2e / benchmarks
+</code></pre>
+<table>
+<thead>
+<tr><th>改动目标</th><th>位置</th></tr>
+</thead>
+<tbody>
+<tr><td>新增智能体或节点</td><td><code>neopen/agent/</code> 与 <code>workflow/workflow_nodes.py</code></td></tr>
+<tr><td>调整提示词</td><td><code>neopen/prompts/v1.x/zh/</code>、<code>v1.x/en/</code></td></tr>
+<tr><td>对外接口</td><td><code>api/function_calls.py</code>、<code>api/rest_api.py</code></td></tr>
+<tr><td>任务与状态</td><td><code>neopen/task/task_models.py</code>、<code>task_factory.py</code></td></tr>
+<tr><td>流程参数</td><td><code>neopen/shot_config.py</code></td></tr>
+<tr><td>日志级别与格式</td><td><code>config/logging.yaml</code></td></tr>
+</tbody>
+</table>
+<p><code>api</code> 只做协议适配，SDK、REST 与 MCP 最终都调用同一套任务工厂；<code>app</code> 负责应用组装、生命周期与全局异常；<code>neopen</code> 承载业务，其中 <code>agent/workflow</code> 定义图结构与节点调度，<code>task</code> 定义任务记录、队列与工作线程。新增能力优先落在 <code>neopen</code>，避免在三个接口层分别实现同一段逻辑。</p>
+<h2>启动路径</h2>
+<p>三个入口最终都加载 <code>penshot.app:app</code>，启动后提供 <code>/api/v1</code> 路由与 <code>/docs</code> 交互文档。差别集中在参数来源与进程模型。</p>
+<table>
+<thead>
+<tr><th>入口</th><th>参数与行为</th></tr>
+</thead>
+<tbody>
+<tr><td><code>python main.py</code></td><td>接受 <code>--host</code>、<code>--port</code>；reload 与 workers 从配置读取，reload 开启时强制 workers=1</td></tr>
+<tr><td><code>python -m penshot.http_server</code></td><td>额外接受 <code>--max-concurrent</code>、<code>--queue-size</code>、<code>--reload</code>，通过环境变量传给应用</td></tr>
+<tr><td><code>story-shot-agent serve-rest</code></td><td>CLI 封装，接受 <code>--host</code>、<code>--port</code>，固定 <code>reload=False</code></td></tr>
+</tbody>
+</table>
+<pre class="mermaid">flowchart LR
+    A1[&quot;python main.py&quot;] --&gt; B[&quot;uvicorn / penshot.app:app&quot;]
+    A2[&quot;python -m penshot.http_server&quot;] --&gt; B
+    A3[&quot;story-shot-agent serve-rest&quot;] --&gt; B
+    B --&gt; C[&quot;FastAPI lifespan&lt;br/&gt;startup_with_recovery&quot;]
+    C --&gt; D[&quot;TaskFactory&lt;br/&gt;进程内队列&quot;]
+    D --&gt; E[&quot;MultiAgentPipeline&lt;br/&gt;10 节点图&quot;]
+    E --&gt; F[&quot;WorkflowOrchestrator&lt;br/&gt;LangGraph&quot;]
+    F --&gt; G[&quot;SQLite / 内存检查点&quot;]
+</pre>
+<p>任务队列、并发计数与回调都是进程内状态。使用多个 worker 且未配置 Redis 时，提交到进程 A 的任务在进程 B 查询会得到 <code>not_found</code>；启动日志会给出警告。需要横向扩展时配置 <code>PENSHOT_REDIS_URL</code> 或 <code>PENSHOT_REDIS_HOST</code> 等分键。</p>
+<p>应用启动时，FastAPI lifespan 调用 <code>startup_with_recovery</code>，创建数据目录并尝试恢复未完成任务。检查点由 <code>checkpoint_mode</code> 选择：<code>auto</code> 按环境决定，<code>memory</code> 仅进程内有效，<code>sqlite</code> 与 <code>postgres</code> 支持跨进程恢复。多进程部署除了 Redis，还应固定使用可共享的检查点后端。</p>
+<p>CLI 共 8 个子命令：<code>breakdown</code>、<code>batch</code>、<code>status</code>、<code>result</code>、<code>cancel</code>、<code>queue-status</code>、<code>serve</code>、<code>serve-rest</code>。其中 <code>serve</code> 启动 MCP stdio 服务，<code>serve-rest</code> 启动 REST 服务；其余命令直接创建 SDK 实例，适合本地验证单个任务。</p>
+<h2>两级状态机</h2>
+<p>任务生命周期由两层状态共同描述：<code>TaskStatus</code> 管理任务生死，共 8 个值；<code>TaskStage</code> 管理阶段进度，共 24 个带权重的中文阶段。任一处理环节失败都会进入 <code>FAILED</code>，不会把半成品当作成功结果返回。</p>
+<table>
+<thead>
+<tr><th>TaskStatus</th><th>值</th><th>语义</th></tr>
+</thead>
+<tbody>
+<tr><td>PENDING</td><td><code>pending</code></td><td>已创建，等待调度</td></tr>
+<tr><td>PROCESSING</td><td><code>processing</code></td><td>工作线程执行中</td></tr>
+<tr><td>SUCCESS</td><td><code>success</code></td><td>成功终态</td></tr>
+<tr><td>FAILED</td><td><code>failed</code></td><td>失败终态</td></tr>
+<tr><td>CANCELLED</td><td><code>cancelled</code></td><td>取消终态</td></tr>
+<tr><td>NOT_FOUND</td><td><code>not_found</code></td><td>任务不存在</td></tr>
+<tr><td>TIMEOUT</td><td><code>timeout</code></td><td>等待结果超时</td></tr>
+<tr><td>UNKNOWN</td><td><code>unknown</code></td><td>未知状态</td></tr>
+</tbody>
+</table>
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: 提交任务（TaskFactory.submit）
+    PENDING --&gt; PROCESSING: 队列调度到工作线程
+    PENDING --&gt; CANCELLED: 排队期间取消
+    PROCESSING --&gt; SUCCESS: 工作流执行完成
+    PROCESSING --&gt; FAILED: 节点失败或未捕获异常
+    PROCESSING --&gt; CANCELLED: 执行期间取消
+    SUCCESS --&gt; [*]
+    FAILED --&gt; [*]
+    CANCELLED --&gt; [*]
+</pre>
+<p>成功终态的字面量是 <code>success</code>，不存在 <code>COMPLETED</code>。<code>completed</code> 只出现在阶段明细 <code>stages_progress[*].status</code> 中，表示某个阶段完成，不能用于判断任务终态。</p>
+<p><code>TaskStage</code> 每个阶段包含 code、中文名与 0–100 的权重，权重用于估算总进度。<code>init</code>、<code>processing</code>、<code>error_handling</code> 的权重为 0，其余阶段按处理顺序递增。</p>
+<table>
+<thead>
+<tr><th>阶段组</th><th>阶段代码</th><th>权重</th></tr>
+</thead>
+<tbody>
+<tr><td>剧本解析</td><td><code>parsing_start</code> / <code>parsing_script</code> / <code>parsing_complete</code></td><td>0 / 10 / 15</td></tr>
+<tr><td>镜头拆分</td><td><code>segment_start</code> / <code>segmenting</code> / <code>segment_complete</code></td><td>15 / 25 / 30</td></tr>
+<tr><td>视频分段</td><td><code>split_start</code> / <code>splitting</code> / <code>split_complete</code></td><td>30 / 45 / 50</td></tr>
+<tr><td>提示词转换</td><td><code>convert_start</code> / <code>converting</code> / <code>convert_complete</code></td><td>50 / 65 / 70</td></tr>
+<tr><td>质量审查</td><td><code>audit_start</code> / <code>auditing</code> / <code>audit_complete</code></td><td>70 / 80 / 85</td></tr>
+<tr><td>连续性检查</td><td><code>continuity_start</code> / <code>continuity_checking</code> / <code>continuity_complete</code></td><td>85 / 92 / 95</td></tr>
+<tr><td>输出</td><td><code>output_start</code> / <code>output_generating</code> / <code>complete</code></td><td>95 / 98 / 100</td></tr>
+</tbody>
+</table>
+<pre class="mermaid">flowchart LR
+    A[&quot;init / processing&lt;br/&gt;weight 0&quot;] --&gt; B[&quot;解析&lt;br/&gt;0 → 15&quot;]
+    B --&gt; C[&quot;拆分镜头&lt;br/&gt;15 → 30&quot;]
+    C --&gt; D[&quot;视频分段&lt;br/&gt;30 → 50&quot;]
+    D --&gt; E[&quot;提示词转换&lt;br/&gt;50 → 70&quot;]
+    E --&gt; F[&quot;质量审查&lt;br/&gt;70 → 85&quot;]
+    F --&gt; G[&quot;连续性检查&lt;br/&gt;85 → 95&quot;]
+    G --&gt; H[&quot;输出&lt;br/&gt;95 → 100&quot;]
+    H --&gt; I[&quot;complete&lt;br/&gt;100&quot;]
+    A -.-&gt; J[&quot;error_handling&lt;br/&gt;weight 0&quot;]
+</pre>
+<p><code>GET /api/v1/status/{task_id}</code> 返回的 <code>current_stage</code>、<code>stage_name</code>、<code>progress</code> 与 <code>stages_progress</code> 来自这套阶段体系。单个阶段还有 <code>pending</code>、<code>processing</code>、<code>completed</code>、<code>failed</code> 四个子状态，用于驱动前端进度条。</p>
+<p>提交任务时，<code>TaskFactory.submit</code> 先创建任务记录并置为 <code>PENDING</code>，再异步入队；工作线程取出后改为 <code>PROCESSING</code>，各节点在执行前后写入阶段明细。取消接口只对未进入终态的任务生效，对已结束任务返回 400。等待超时只影响调用方，不会自动终止后台工作流，因此 <code>wait_for_result</code> 可能返回 <code>None</code>，而任务仍在继续执行。</p>
+<p>阶段权重是进度估算值，不是耗时比例。一个 10 权重单位的阶段可能很快完成，也可能长时间停在某个中间百分比；<code>progress</code> 只能用于展示，不能用作剩余时间预测。</p>
+<h2>工作流装配</h2>
+<p>核心流水线由 <code>MultiAgentPipeline</code> 构建，LangGraph 图中注册了 10 个节点：<code>parse_script</code>、<code>segment_shot</code>、<code>split_video</code>、<code>convert_prompt</code>、<code>audit_quality</code>、<code>continuity_check</code>、<code>loop_check</code>、<code>human_intervention</code>、<code>error_handler</code>、<code>generate_output</code>。</p>
+<p><code>WorkflowOrchestrator</code> 只负责结构定义：<code>add_node(name, node)</code> 注册接收并返回 <code>WorkflowState</code> 的 callable，<code>add_edge</code> 定义固定流转，<code>add_conditional_edge(source, condition, mapping)</code> 按决策函数返回值选择目标。装配顺序为 <code>build(state_schema=WorkflowState)</code>、<code>validate()</code>、<code>compile(checkpointer=saver)</code>；入口固定为 <code>parse_script</code>，终点为 <code>END</code>。</p>
+<p>条件边使用 7 个决策状态：<code>success</code>、<code>valid</code>、<code>needs_repair</code>、<code>needs_retry</code>、<code>needs_human</code>、<code>failed</code>、<code>abort</code>。例如质量审查失败会回到 <code>convert_prompt</code> 修复，连续失败则转入 <code>human_intervention</code> 或 <code>error_handler</code>。</p>
+<p><code>loop_check</code> 是统一的重入闸门：拆分、分段、转换成功后先进入循环检查，再按决策结果跳回拆分、分段、转换、审查或继续输出。<code>ShotConfig.max_total_loops</code> 默认 20，按节点最大循环次数之和计算；超限后不再回退上游，转入错误处理或人工干预，避免无限重试。</p>
+<p>检查点按 <code>script_id</code> 与 <code>task_id</code> 隔离，保存的是 LangGraph 状态而非最终结果。修改 <code>WorkflowState</code> 结构后，旧检查点可能无法反序列化；开发阶段可切换 <code>checkpoint_mode=&quot;memory&quot;</code> 或清理对应检查点目录。多进程部署除 Redis 外，还应确认 <code>checkpoint_mode</code> 指向各进程都能访问的存储。</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;智能体协作图&quot;
+        A[剧本解析智能体&lt;br/&gt;ScriptParserAgent]
+        B[镜头分割智能体&lt;br/&gt;ShotSegmenterAgent]
+        C[视频分割智能体&lt;br/&gt;VideoSplitterAgent]
+        D[提示词转换智能体&lt;br/&gt;PromptConverterAgent]
+        E[质量审查智能体&lt;br/&gt;QualityAuditorAgent]
+
+        A --&gt;|结构化数据| B
+        B --&gt;|镜头序列| C
+        C --&gt;|片段序列| D
+        D --&gt;|提示词数据| E
+
+        A -.-&gt;|降级| A1[规则解析器]
+        B -.-&gt;|降级| B1[规则镜头分割器]
+        C -.-&gt;|降级| C1[规则视频分割器]
+        D -.-&gt;|降级| D1[模板转换器]
+    end
+</pre>
+<p>每个智能体采用“抽象基类 + LLM 实现 + 规则实现 + 工厂”的结构，对外包装类位于 <code>neopen/agent/*_agent.py</code>。当前运行期真正接线了两条降级路径：提示词转换在单片段粒度失败时回退模板转换器，视频分割异常时整镜头回退规则分割。剧本解析的规则校验路径已实现但调用被注释，<code>use_local_rules</code> 属于预留开关，不能当作现成能力。</p>
+<h2>新增智能体</h2>
+<p>推荐沿用现有结构，分三步接入。</p>
+<p><strong>建立子包。</strong> 在 <code>neopen/agent/</code> 下新增 <code>my_agent/</code>，包含抽象基类、LLM 实现、规则实现、工厂与 Pydantic 模型。基类继承 <code>BaseAgent</code>（纯规则）或 <code>BaseLLMAgent</code>（带 LLM 重试与缓存接口）。</p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.neopen.agent.base_agent <span class="hljs-keyword">import</span> BaseAgent
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">MyBaseAgent</span>(<span class="hljs-title class_ inherited__">BaseAgent</span>):
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">process</span>(<span class="hljs-params">self, *args, **kwargs</span>):
+        <span class="hljs-keyword">raise</span> NotImplementedError
+</code></pre>
+<p><strong>声明状态与节点方法。</strong> <code>WorkflowState</code> 由 <code>InputState</code>、<code>DomainState</code>、<code>ExecutionState</code>、<code>ErrorState</code>、<code>ConfigState</code>、<code>OutputState</code> 组合而成，新字段写入对应嵌套模型。节点方法放在 <code>WorkflowNodes</code>，签名统一为接收并返回 <code>WorkflowState</code>。</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">my_node</span>(<span class="hljs-params">self, state: WorkflowState</span>) -&gt; WorkflowState:
+    state.domain.my_results = self.my_agent.process(state.domain.parsed_script)
+    <span class="hljs-keyword">return</span> state
+</code></pre>
+<p><strong>注册到编排图。</strong> 在 <code>_init_agents</code> 中构造智能体并传入 <code>WorkflowNodes</code>，再在 <code>_build_workflow</code> 中挂节点与条件边。</p>
+<pre class="hljs"><code>orchestrator.add_node(
+    <span class="hljs-string">&quot;my_node&quot;</span>,
+    <span class="hljs-keyword">lambda</span> graph_state: self.workflow_nodes.my_node(graph_state)
+)
+orchestrator.add_conditional_edge(
+    <span class="hljs-string">&quot;my_node&quot;</span>,
+    <span class="hljs-keyword">lambda</span> graph_state: self.decision_funcs.decide_after_my_node(graph_state),
+    {
+        PipelineState.SUCCESS: PipelineNode.CONVERT_PROMPT.value,
+        PipelineState.NEEDS_RETRY: <span class="hljs-string">&quot;my_node&quot;</span>,
+        PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value,
+    }
+)
+</code></pre>
+<p>节点方法不要吞掉异常：可恢复的问题写入 <code>ExecutionState</code> 的错误列表并返回修复状态，不可恢复的异常交给 <code>error_handler</code>。否则条件边拿到未知状态，图会在运行时中断。新增智能体后，至少补一个 <code>tests/unit</code> 用例，覆盖正常输入、空输入与 LLM 失败回退。</p>
+<pre class="mermaid">flowchart LR
+    A[&quot;新建 agent 子包&lt;br/&gt;base / llm / rule / factory / models&quot;] --&gt; B[&quot;继承 BaseAgent&lt;br/&gt;或 BaseLLMAgent&quot;]
+    B --&gt; C[&quot;在 WorkflowState 的&lt;br/&gt;嵌套状态中声明字段&quot;]
+    C --&gt; D[&quot;在 WorkflowNodes&lt;br/&gt;增加节点方法&quot;]
+    D --&gt; E[&quot;WorkflowOrchestrator&lt;br/&gt;add_node / add_conditional_edge&quot;]
+    E --&gt; F[&quot;新增 YAML 模板&lt;br/&gt;v1.x/zh 与 en&quot;]
+    F --&gt; G[&quot;pytest + 单跑 pipeline&quot;]
+</pre>
+<h2>新增提示词模板</h2>
+<p>模板位于 <code>neopen/prompts/v1.x/zh/</code>，英文版本放在 <code>v1.x/en/</code>，每个智能体一个 YAML 文件。顶层固定 <code>version</code> 与 <code>changelog</code>，每个模板段落由 <code>name</code>、<code>description</code>、<code>template</code> 三个字段组成。</p>
+<pre class="hljs"><code><span class="hljs-attr">version:</span> <span class="hljs-string">&quot;1.3&quot;</span>
+<span class="hljs-attr">changelog:</span> <span class="hljs-string">|
+  - 2026-03-30: 添加 history_hint 参数
+</span><span class="hljs-attr">my_agent_system:</span>
+  <span class="hljs-attr">name:</span> <span class="hljs-string">&quot;my_agent_prompt&quot;</span>
+  <span class="hljs-attr">description:</span> <span class="hljs-string">&quot;自定义智能体系统提示词&quot;</span>
+  <span class="hljs-attr">template:</span> <span class="hljs-string">|
+    输出 JSON，结构如下：
+    {{ &quot;items&quot;: [] }}
+    输入剧本：{input}
+</span></code></pre>
+<p>模板渲染走 Python <code>.format()</code>：占位符使用单大括号，字面量大括号必须双写 <code>{{ }}</code>。读取入口是 <code>PromptManager.get_prompt(name)</code> 与 <code>get_name_prompt(name)</code>，内部按“版本 + 语言”定位文件，支持剥离 <code>_prompt</code> 后缀匹配，并带最多 1024 条的进程内缓存。全局管理器默认 <code>version=&quot;v1.x&quot;</code>；<code>v2.x</code> 目录存在但为空，不能视为已启用的模板体系。</p>
+<p>匹配顺序是：缓存键名、<code>name</code> 字段、去掉 <code>_prompt</code> 后缀后的名称。模板名不存在时抛出 <code>KeyError</code>，不会静默返回空字符串。模板按语言目录分别查找，不存在跨语言回退；新增模板后应同时补中文与英文两份，否则切换 <code>ShotLanguage</code> 时会因找不到模板而抛出 <code>KeyError</code>。</p>
+<p>新增智能体时通常需要同步三处：智能体构造函数、<code>WorkflowNodes</code> 的依赖注入、以及 YAML 中对应的模板键。只加模板不加调用代码不会生效；只加代码不补模板，第一次 LLM 调用就会因找不到模板失败。</p>
+<h2>调试</h2>
+<p>日志级别与格式在 <code>config/logging.yaml</code> 中配置。业务代码直接导入模块级函数，不需要也不存在 <code>set_level</code> 这个模块函数。</p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.logger <span class="hljs-keyword">import</span> debug, info, warning, error, log_with_context, log_performance
+
+info(<span class="hljs-string">&quot;开始调试&quot;</span>)
+log_with_context(<span class="hljs-string">&quot;INFO&quot;</span>, <span class="hljs-string">&quot;带上下文的日志&quot;</span>, {<span class="hljs-string">&quot;task_id&quot;</span>: <span class="hljs-string">&quot;TSK001&quot;</span>})
+log_performance(<span class="hljs-string">&quot;parse_script&quot;</span>, <span class="hljs-number">1234.5</span>)
+</code></pre>
+<p>单跑流水线需要先准备 <code>ShotConfig</code> 与 <code>TaskManager</code>，再构造 <code>MultiAgentPipeline</code>。调试单个节点时，可直接构造 <code>WorkflowState</code> 并调用 <code>WorkflowNodes</code> 的方法，避免重复跑完整条链。</p>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.neopen.agent.workflow.workflow_pipeline <span class="hljs-keyword">import</span> MultiAgentPipeline
+
+pipeline = MultiAgentPipeline(
+    script_id=<span class="hljs-string">&quot;debug-001&quot;</span>,
+    task_id=<span class="hljs-string">&quot;TSK-DEBUG-001&quot;</span>,
+    config=shot_config,
+    task_manager=task_manager,
+)
+result = <span class="hljs-keyword">await</span> pipeline.run_process(raw_script, shot_config)
+</code></pre>
+<table>
+<thead>
+<tr><th>现象</th><th>排查方向</th></tr>
+</thead>
+<tbody>
+<tr><td>任务长期停留在 <code>pending</code></td><td>并发已满导致排队；或提交与查询不在同一进程</td></tr>
+<tr><td>多 worker 下查询 <code>not_found</code></td><td>未配置 Redis，任务记录没有跨进程共享</td></tr>
+<tr><td>提示词被截断</td><td><code>ShotConfig.max_prompt_length</code> 默认 200；触发判断与截断动作的计数口径不一致</td></tr>
+<tr><td>道具信息丢失</td><td>检查 <code>GlobalMetadata.key_props</code> 及解析、拆分、转换各阶段的传递</td></tr>
+<tr><td>模型切换无效</td><td>同时核对 <code>BASE_URL</code>、<code>API_KEY</code> 与 <code>MODEL_NAME</code> 是否属于同一厂商</td></tr>
+</tbody>
+</table>
+<p>不依赖 LLM 的调试优先使用 <code>tests/unit</code> 下的单元测试与 mock；需要可运行场景时，从 <code>examples/sdk/01</code> 至 <code>07</code> 中选择最小示例。仓库没有 <code>penshot.agent.mock_data</code> 一类的模拟数据模块。</p>
+<h2>延伸阅读</h2>
+<p>工作流各节点的输入输出与失败处理见 <a href="nodes.html">工作流节点</a>；检查点与恢复见 <a href="checkpoint.html">检查点与恢复</a>；接口调用与部署参数见 <a href="integration.html">集成指南</a>。源码与版本记录以 <a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a> 为准。</p>

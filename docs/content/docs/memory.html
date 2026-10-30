@@ -1,0 +1,282 @@
+<p>PenShot 的记忆系统按短期、中期、长期三层保存任务上下文与历史经验：<code>MemoryManager</code> 按剧本路由到 <code>ScriptMemory</code>，后者统一负责写入分发、召回组装与提示词格式化。</p>
+<blockquote>
+<p><strong>事实边界</strong>：实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入。记忆已接入工作流四个处理阶段，但中期摘要的读回、长期库的冷启动与 Redis 运行期故障仍存在静默失效边界。</p>
+</blockquote>
+<h2>架构与隔离</h2>
+<p><code>MemoryManager</code> 是多剧本容器，内部持有 <code>Dict[str, ScriptMemory]</code>；<code>ScriptMemory</code> 才真正持有三层记忆。<code>MemoryManager</code> 的职责是按 <code>script_id</code> 路由，并统一做序列化与反序列化。</p>
+<p>同一进程内不同剧本的记忆互不可见：Redis key 带 session_id，Chroma collection 与文件路径都带 <code>script_id</code>。重启后短期记忆能否恢复，取决于是否配置了持久化目录以及 Redis 是否可用。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">层级</th>
+<th style="text-align:left">类</th>
+<th style="text-align:left">存储介质</th>
+<th style="text-align:left">隔离键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">短期</td>
+<td style="text-align:left"><code>ShortTermMemory</code></td>
+<td style="text-align:left">Redis 会话历史 + 进程内 <code>deque</code>；降级为 JSON 文件</td>
+<td style="text-align:left"><code>penshot:memory:{session_id}</code></td>
+</tr>
+<tr>
+<td style="text-align:left">中期</td>
+<td style="text-align:left"><code>MediumTermMemory</code></td>
+<td style="text-align:left">LLM 摘要 + 按小时归档的 JSON</td>
+<td style="text-align:left"><code>data/memory/{script_id}/</code></td>
+</tr>
+<tr>
+<td style="text-align:left">长期</td>
+<td style="text-align:left"><code>LongTermMemory</code></td>
+<td style="text-align:left">Chroma 向量库（本地持久化）</td>
+<td style="text-align:left"><code>script_{script_id}_memory</code> collection</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">classDiagram
+    class MemoryManager {
+        -llm: BaseLanguageModel
+        -config: MemoryConfig
+        -_script_memories: Dict~script_id, ScriptMemory~
+        -_current_script_id: str
+        
+        +set_script(script_id)
+        +get_script(script_id) ScriptMemory
+        +add(input_text, output_text, level, metadata, script_id)
+        +add_raw(input_text, output_text, level, metadata, script_id)
+        +add_stage(stage_name, content, metadata, script_id)
+        +recall(query, level, k, script_id) MemoryContext
+        +get(key, level, default, script_id)
+        +get_list(key, level, script_id)
+        +get_latest_deserialized(key, level, script_id)
+        +search(query, k, level, script_id)
+        +get_context_for_llm(query, max_tokens, script_id)
+        +get_stats(script_id) Dict
+        +clear_script(script_id)
+        -_deserialize(value, metadata)
+        -_to_str(value)
+    }
+
+    class ScriptMemory {
+        +short_term: ShortTermMemory
+        +medium_term: MediumTermMemory
+        +long_term: LongTermMemory
+        +add(input_text, output_text, level, metadata)
+        +add_stage(stage_name, content, metadata)
+        +recall(query, level, k) MemoryContext
+        +search(query, k, level)
+        +get_stats() Dict
+    }
+
+    class MemoryContext {
+        +short_term: List
+        +medium_term: str
+        +long_term: List
+        +to_prompt(max_tokens) str
+    }
+
+    class MemoryConfig {
+        +short_term_size: int
+        +short_term_ttl: int
+        +medium_term_max_tokens: int
+        +long_term_enabled: bool
+        +long_term_k: int
+        +embeddings: BaseEmbedding
+    }
+
+    class MemoryLevel {
+        SHORT_TERM
+        MEDIUM_TERM
+        LONG_TERM
+    }
+
+    MemoryManager &quot;1&quot; --&gt; &quot;*&quot; ScriptMemory : 按 script_id 隔离
+    ScriptMemory --&gt; MemoryContext : recall 产出
+    MemoryManager --&gt; MemoryConfig
+    MemoryManager --&gt; MemoryLevel
+</pre>
+<p><code>MemoryLevel</code> 枚举还定义了 <code>EPHEMERAL</code>（瞬时），但 <code>ScriptMemory</code> 只初始化 short / medium / long 三个实例，没有对应实现。该层属于预留定义，不应当作可用能力。</p>
+<pre class="mermaid">flowchart TB
+    subgraph ShortTerm[&quot;短期记忆 (Short-Term)&quot;]
+        S1[会话历史&lt;br/&gt;LangChain ChatMessageHistory]
+        S2[滑动窗口&lt;br/&gt;deque maxlen=20]
+        S3[Redis 可选&lt;br/&gt;key: penshot:memory:{session_id}]
+    end
+
+    subgraph MediumTerm[&quot;中期记忆 (Medium-Term)&quot;]
+        M1[阶段统计摘要]
+        M2[修复记录]
+        M_Compress[压缩存储&lt;br/&gt;max_tokens=500]
+    end
+
+    subgraph LongTerm[&quot;长期记忆 (Long-Term)&quot;]
+        L1[成功模式]
+        L2[常见问题模式]
+        L3[可复用知识向量]
+        L_Vector[Chroma 向量库&lt;br/&gt;collection: script_{script_id}_memory]
+    end
+
+    subgraph Access[&quot;统一访问层&quot;]
+        A_WM[WorkflowMemory&lt;br/&gt;四阶段读历史、写归档]
+        A_MM[MemoryManager&lt;br/&gt;recall / get / add]
+    end
+
+    A_WM --&gt; A_MM
+    A_MM --&gt; ShortTerm
+    A_MM --&gt; MediumTerm
+    A_MM --&gt; LongTerm
+
+    style ShortTerm fill:#e3f2fd
+    style MediumTerm fill:#fff3e0
+    style LongTerm fill:#e8f5e9
+    style Access fill:#fce4ec
+</pre>
+<h2>短期记忆</h2>
+<p>短期记忆是“Redis 优先、内存降级”的双轨结构：进程内用 <code>deque(maxlen=20)</code> 维护滑动窗口，Redis 侧用 <code>RedisChatMessageHistory</code> 保存会话，<code>ttl=3600</code> 秒。窗口是 FIFO，不是 LRU；窗口满时从队首挤出最旧条目。</p>
+<pre class="mermaid">flowchart LR
+    subgraph 输入流
+        I1[交互1] --&gt; I2[交互2] --&gt; I3[...] --&gt; I4[交互19] --&gt; I5[交互20] --&gt; I6[交互21]
+    end
+
+    subgraph 滑动窗口[deque maxlen 20]
+        W1[交互19] --&gt; W2[交互20] --&gt; W3[交互21]
+    end
+
+    I1 -.-&gt;|超出自动丢弃| W1
+    I4 &amp; I5 &amp; I6 --&gt; W1 &amp; W2 &amp; W3
+    W1 &amp; W2 &amp; W3 --&gt; O[get_recent 当前上下文]
+</pre>
+<p>初始化时执行一次 Redis 探活（3 秒连接超时 + <code>ping()</code>）。失败则打 <code>warning</code>，整体切到“内存 + 文件”模式；若配置了 <code>term_persist_path</code>，每次 <code>add()</code> 同步写 <code>short_term.json</code>，重启后由 <code>_load_from_file()</code> 恢复窗口。</p>
+<p>降级决策只发生在实例构造时。运行中途 Redis 才失效时，<code>add()</code> 的缓冲区追加与 Redis 写入在同一个 <code>try</code> 块内，本次交互既写不进 Redis，也不会进入内存窗口；后续写入持续失败，直到 Redis 恢复。当前没有重连探活或补偿队列。</p>
+<p>短期记忆也没有“任务完成即清空”的钩子。退场只靠两个机制：<code>deque</code> 的 20 条上限与 Redis 的 1 小时 TTL。内存模式没有自动过期。</p>
+<h2>中期记忆</h2>
+<p>中期记忆用 LLM 做滚动摘要：每次写入把“已有摘要 + 新内容”交给模型融合，生成新的摘要文本。<code>medium_term_max_tokens=500</code> 是名义上限，实际以字符截断兜底：输入不超过 <code>500*4=2000</code> 字符，输出不超过 <code>500*2=1000</code> 字符，超出部分静默截断。</p>
+<pre class="mermaid">flowchart TB
+    subgraph Trigger[&quot;触发判断（每次写入时）&quot;]
+        NEW[新增对话] --&gt; CHK{积压字符数超过&lt;br/&gt;max_token_limit × 4 ?}
+        CHK --&gt;|否| WAIT[继续积压]
+        CHK --&gt;|是| LLM[调用 LLM 生成摘要]
+    end
+
+    subgraph Persist[&quot;持久化（按小时分文件）&quot;]
+        LLM --&gt; CAP{摘要超长?&lt;br/&gt;超过 max_token_limit × 2}
+        CAP --&gt;|是| TRUNC[截断至 1000 字符]
+        CAP --&gt;|否| KEEP[原样保留]
+        TRUNC --&gt; FILE[(JSON 快照文件&lt;br/&gt;medium_summary 按小时命名)]
+        KEEP --&gt; FILE
+    end
+</pre>
+<p>持久化路径存在一处读写不一致：<code>_persist_to_file</code> 写入 <code>medium_summary_{YYYYMMDDHH}.json</code>，<code>_load_from_file</code> 与 <code>clear</code> 操作固定名 <code>medium_summary.json</code>。结果是摘要快照持续产生，但进程重启后加载不回来，历史摘要留在磁盘上不参与后续上下文。</p>
+<p>工作流还会写另一类中期数据：每个阶段完成后，<code>WorkflowMemory.after_stage_completion()</code> 提取场景数、角色数、问题数、修复参数等统计，生成带时间戳的阶段摘要；数值字段计算 avg / min / max / count，并对 <code>completeness_score</code> 做 improving / declining / stable 趋势判定。写入时统计摘要最多保留 20 条。</p>
+<p>字符与 token 的换算按“4 字符 ≈ 1 token”处理，对中文会系统性低估 token 数。功能上仍会压缩，但配置中“500 tokens”的语义在中文场景下并不精确。</p>
+<h2>长期记忆</h2>
+<p>长期记忆使用 Chroma，collection 为 <code>script_{script_id}_memory</code>，持久化目录为 <code>data/memory/{script_id}/</code>。写入时把 <code>tags</code> / <code>category</code> 拼进正文再入库，让元数据参与语义召回；检索用 <code>similarity_search_with_score</code> 取前 <code>k=3</code> 条，并按 <code>score &gt;= 0.7</code> 过滤。</p>
+<pre class="mermaid">flowchart TB
+    subgraph 存储
+        T[记忆条目 + tags/category] --&gt; E[共享 Embedding 模型&lt;br/&gt;默认 OpenAI 1536 维]
+        E --&gt; V[(Chroma 向量库&lt;br/&gt;每剧本一个 collection)]
+    end
+
+    subgraph 检索
+        Q[查询: 林小雨的服装] --&gt; E2[Embedding 模型]
+        E2 --&gt; S[similarity_search_with_score&lt;br/&gt;k=3]
+        V --&gt; S
+        S --&gt; R[按 score_threshold 0.7 过滤]
+    end
+</pre>
+<p>长期层是“成功样本驱动”的冷启动系统。工作流阶段完成后，<code>_is_successful_case</code> 先判定是否达标（例如 <code>parse_script</code> 要求 <code>completeness_score &gt;= 0.8</code>），通过才生成条目：格式为阶段名 + 统计 + 场景/角色/镜头摘要，单条限 2000 字符，成功模式保留最近 30 条。未达标就跳过写入。</p>
+<p>因此空库不是异常：集合文档数为 0 时，检索安静返回零条结果，依赖历史经验增强的逻辑静默退化为“没有经验可用”。长期库也没有自动过期，只能显式清理。</p>
+<p>两个必须核对的约束：查询与写入必须使用同一套嵌入模型与维度，换模型等于换度量尺；<code>similarity_search_with_score</code> 在 Chroma 默认 L2 度量下返回距离（越小越相似），而过滤条件是 <code>score &gt;= threshold</code>，方向与“保留更相似结果”相反，使用前应打印分数分布确认。</p>
+<h2>写入分发</h2>
+<p><code>ScriptMemory.add(input_text, output_text, level, metadata)</code> 的语义是一对交互，而不是键值写入。所有条目先写短期，再按级别或重要性分流：</p>
+<ul>
+<li><code>level=MEDIUM_TERM</code>：同时写入中期摘要链。</li>
+<li><code>level=LONG_TERM</code> 且长期层可用：拼接为“问题 + 回答”写入 Chroma。</li>
+<li>未指定级别：<code>metadata.important</code> 为真时提升到中期；短期用量达到容量 80% 时，取最近 5 条打成摘要写入中期。</li>
+</ul>
+<pre class="mermaid">flowchart TB
+    subgraph Write[写入链路]
+        I[add input/output] --&gt; ST[短期记忆&lt;br/&gt;deque + Redis]
+        ST --&gt;|metadata.important| MT[中期记忆&lt;br/&gt;LLM 摘要融合]
+        ST --&gt;|窗口用量≥ 80%&lt;br/&gt;最近 5 条打成摘要| MT
+        I --&gt;|level=LONG_TERM| LT[长期记忆&lt;br/&gt;Chroma]
+    end
+
+    subgraph Read[召回链路]
+        Q[recall query, level, k] --&gt; R1[get_recent k]
+        Q --&gt; R2[get_summary]
+        Q --&gt; R3[search query, k]
+        R1 &amp; R2 &amp; R3 --&gt; MC[MemoryContext 按层组装]
+    end
+</pre>
+<p>没有“中期 → 长期”的自动晋升，也没有基于重要度评分的自动分层；进入长期必须由调用方显式传入 <code>level=LONG_TERM</code>。<code>WorkflowMemory.after_stage_completion()</code> 也不是逐层升华，而是在同一次事件里把不同粒度的结果分别写入三层。</p>
+<p>80% 水位判断没有“已压缩”标记：窗口达到 16 条后，每次 <code>add()</code> 都会再触发一次摘要 LLM 调用，且近满载时每次取到的最近 5 条高度重叠。这是当前实现的额外调用开销。</p>
+<h2>召回组装</h2>
+<p><code>recall(query, level=None, k=3)</code> 按层查询后原样组装为 <code>MemoryContext</code>：短期是最近 k 条列表，中期是摘要字符串，长期是相关条目列表。<code>level</code> 为 <code>None</code> 时查三层；指定某一层时只查该层。</p>
+<pre class="mermaid">sequenceDiagram
+    participant A as 智能体
+    participant M as MemoryManager
+    participant S as ScriptMemory
+    participant C as MemoryContext
+
+    A-&gt;&gt;M: recall(query, level, k, script_id)
+    M-&gt;&gt;S: 按 script_id 路由
+    S-&gt;&gt;S: 短期 get_recent / 中期 get_summary / 长期 search
+    S-&gt;&gt;C: 组装三层字段
+    C--&gt;&gt;A: to_prompt(max_tokens=2000)
+    Note over C: 无加权融合，按层拼接
+</pre>
+<p><code>to_prompt(max_tokens=2000)</code> 依次拼接“最近对话 / 历史摘要 / 相关经验”。短期最多取 10 条、单条超过 500 字符截断；长期最多取 5 条、单条超过 800 字符截断。整体按 1 token ≈ 2 字符估算，超出预算时回退到最近句号或换行，并追加 <code>[上下文已截断]</code>。</p>
+<p>这里没有 0.6 / 0.3 / 0.1 之类的加权融合，也不存在 <code>MemoryFusion</code> 类。三层的取舍只发生在两处：<code>to_prompt()</code> 的格式化上限，以及调用方传入的 <code>level</code>。便捷接口 <code>get(key, ...)</code> 同样走 <code>recall()</code>：按 key 匹配最近一条，短期返回该条的 <code>output</code>，长期返回该条的 <code>content</code>。</p>
+<h2>降级与限制</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">行为</th>
+<th style="text-align:left">影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Redis 初始化失败</td>
+<td style="text-align:left">warning 后切内存；配置了路径则写 <code>short_term.json</code></td>
+<td style="text-align:left">跨进程可见性丢失；重启可经文件恢复</td>
+</tr>
+<tr>
+<td style="text-align:left">Redis 运行期中断</td>
+<td style="text-align:left"><code>add()</code> 整体失败，不落内存也不落 Redis</td>
+<td style="text-align:left">故障期间的交互丢失，无自动重连</td>
+</tr>
+<tr>
+<td style="text-align:left">Chroma 未启用或不可用</td>
+<td style="text-align:left"><code>long_term</code> 为 <code>None</code>，写入与召回跳过该层</td>
+<td style="text-align:left">长期能力整体缺失，短期与中期继续工作，无替代向量库</td>
+</tr>
+<tr>
+<td style="text-align:left">长期库为空</td>
+<td style="text-align:left">检索返回零条，不报错</td>
+<td style="text-align:left">历史经验增强静默失效，需要监控集合文档数</td>
+</tr>
+<tr>
+<td style="text-align:left">嵌入模型或维度不一致</td>
+<td style="text-align:left">相似度分数失去意义</td>
+<td style="text-align:left">召回结果不可用，且不会抛错</td>
+</tr>
+<tr>
+<td style="text-align:left">中期摘要重启</td>
+<td style="text-align:left">按小时文件名与固定读取名不一致</td>
+<td style="text-align:left">历史摘要加载不回来</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>EPHEMERAL</code> 仅存在于枚举，没有实现。</li>
+<li>没有中期到长期的自动晋升，也没有重要度评分分层。</li>
+<li>没有加权融合或跨层重排；<code>MemoryContext</code> 只做按层拼接与截断。</li>
+<li><code>long_term_enabled=False</code> 时仍会探测已有数据，发现历史条目会自动启用并回写配置，避免配置错误导致旧记忆静默失效。</li>
+<li>记忆按 <code>script_id</code> 隔离；跨剧本迁移与共享不在当前能力内。</li>
+</ul>
+<p>检查点与任务恢复见 <a href="checkpoint.html">检查点与恢复</a>；知识库索引与模板检索见 <a href="rag-knowledge-base.html">知识库与检索</a>。</p>

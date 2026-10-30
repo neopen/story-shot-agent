@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://shot.helpenx.com/sitemap.xml

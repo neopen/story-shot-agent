@@ -1,0 +1,439 @@
+<p>PenShot 用 LangGraph 检查点持久化工作流状态：每个 super-step 结束后把完整状态快照写入 saver，理论上可凭同一 <code>thread_id</code> 从最近快照恢复。当前版本只接通写入侧，断点续传尚未生效。</p>
+<blockquote>
+<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.3.x 源码。检查点文件只用于状态回溯，不能替代业务结果存档。</p>
+</blockquote>
+<h2>能力边界</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">能力</th>
+<th style="text-align:left">当前状态</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">状态写入</td>
+<td style="text-align:left">已实现</td>
+<td style="text-align:left">saver 已接入 <code>compile(checkpointer=saver)</code>，逐 super-step 落盘</td>
+</tr>
+<tr>
+<td style="text-align:left">状态查询</td>
+<td style="text-align:left">无入口</td>
+<td style="text-align:left">没有 <code>get_state</code> 调用；只能离线打开 <code>.db</code> 复盘</td>
+</tr>
+<tr>
+<td style="text-align:left">断点续传</td>
+<td style="text-align:left">未实现</td>
+<td style="text-align:left">执行时 <code>thread_id</code> 不稳定，历史快照无法命中</td>
+</tr>
+<tr>
+<td style="text-align:left">任务迁移</td>
+<td style="text-align:left">未实现</td>
+<td style="text-align:left">单机 SQLite，无分布式存储后端</td>
+</tr>
+<tr>
+<td style="text-align:left">旧检查点清理</td>
+<td style="text-align:left">未接线</td>
+<td style="text-align:left"><code>cleanup_old_checkpoints()</code> 无调用方</td>
+</tr>
+<tr>
+<td style="text-align:left">连接释放</td>
+<td style="text-align:left">部分失效</td>
+<td style="text-align:left"><code>close()</code> 为异步方法，<code>__exit__</code> 调用时未 await</td>
+</tr>
+</tbody>
+</table>
+<h2>写入机制</h2>
+<p>LangGraph 的 <code>BaseCheckpointSaver</code> 定义保存与读取接口。工作流在每个 super-step 边界写入一条快照：同步执行走 <code>put</code> / <code>get_tuple</code>，异步执行走 <code>aput</code> / <code>aget_tuple</code>。快照保存的是过程态而非结果态，因此可支撑回溯与续跑。</p>
+<pre class="mermaid">sequenceDiagram
+    participant User as 用户
+    participant Workflow as LangGraph工作流
+    participant Saver as CheckpointSaver
+    participant Storage as 存储后端
+    
+    User-&gt;&gt;Workflow: 启动任务 (thread_id)
+    Workflow-&gt;&gt;Saver: 检查是否存在历史检查点
+    Saver-&gt;&gt;Storage: 查询 thread_id 对应的状态
+    
+    alt 存在检查点
+        Storage--&gt;&gt;Saver: 返回保存的状态
+        Saver--&gt;&gt;Workflow: 恢复状态
+        Workflow--&gt;&gt;User: 从断点继续执行
+    else 不存在检查点
+        Workflow-&gt;&gt;Workflow: 从头执行
+    end
+    
+    loop 每个节点执行后
+        Workflow-&gt;&gt;Saver: 保存状态快照
+        Saver-&gt;&gt;Storage: 持久化存储
+    end
+    
+    Workflow--&gt;&gt;User: 任务完成
+</pre>
+<p>上图是 LangGraph 的完整读写路径。PenShot 只执行其中的写入循环；“查询历史 → 恢复状态”这一段在代码中没有调用入口。</p>
+<p>检查点记录以 <code>(thread_id, checkpoint_ns, checkpoint_id)</code> 为联合主键。<code>checkpoint_ns</code> 是子图命名空间，顶层图默认为空字符串；<code>checkpoint_id</code> 按执行顺序递增。同一 <code>thread_id</code> 对应一条完整时间线，更换 <code>thread_id</code> 即产生新时间线。</p>
+<h2>存储模式与降级</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">模式</th>
+<th style="text-align:left">后端</th>
+<th style="text-align:left">持久性</th>
+<th style="text-align:left">适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>memory</code></td>
+<td style="text-align:left"><code>MemorySaver</code>（进程内存）</td>
+<td style="text-align:left">进程退出即丢失</td>
+<td style="text-align:left">本地开发、单元测试</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>sqlite</code></td>
+<td style="text-align:left"><code>SqliteSaver</code>（单文件）</td>
+<td style="text-align:left">跨进程保留</td>
+<td style="text-align:left">单机部署、顺序任务</td>
+</tr>
+</tbody>
+</table>
+<p><code>auto</code> 模式（默认）通过“在目标目录创建 <code>.write_test</code> 文件再删除”判断可写性，可写则选 SQLite，否则落回内存。降级共有两条链：导入期缺少 <code>langgraph-checkpoint-sqlite</code>，或运行期目录不可写。两条链都只写 <code>warning</code> 日志，任务照常成功。</p>
+<pre class="mermaid">flowchart TB
+    subgraph ActualArchitecture[&quot;PenShot 实际检查点架构&quot;]
+        direction TB
+        
+        subgraph WorkflowLayer[&quot;工作流层&quot;]
+            WF[LangGraph 工作流]
+            WF --&gt;|invoke 同步调用| N1[节点1] --&gt; N2[节点2] --&gt; N3[节点3]
+        end
+        
+        subgraph CheckpointLayer[&quot;检查点层&quot;]
+            CP[WorkflowCheckpointer]
+            CP --&gt;|get_saver| MS[MemorySaver]
+            CP --&gt;|get_saver| SS[SqliteSaver]
+        end
+        
+        subgraph StorageLayer[&quot;存储层&quot;]
+            RAM[进程内存]
+            DB[(SQLite .db文件)]
+        end
+        
+        MS --&gt; RAM
+        SS --&gt; DB
+    end
+</pre>
+<p>SQLite 连接建立后执行 <code>PRAGMA journal_mode=WAL</code> 与 <code>PRAGMA synchronous=NORMAL</code>。WAL 改善单文件读写并发，但不改变 <code>SqliteSaver</code> 的定位：轻量、同步、面向小规模场景，不以多线程扩展为目标。</p>
+<h2>文件与表结构</h2>
+<p>每个任务一个数据库文件，目录按剧本隔离；隔离依赖路径拼装，而不是数据库字段。</p>
+<pre class="hljs"><code>data/checkpoints/
+├── script_001/
+│   ├── task_001.db
+│   └── task_002.db
+└── script_002/
+    └── task_003.db
+</code></pre>
+<p><code>SqliteSaver.setup()</code> 只建两张表：<code>checkpoints</code> 存状态快照，<code>writes</code> 存通道中间数据（pending writes）。状态与元数据序列化为 BLOB，表中没有 <code>script_id</code> / <code>task_id</code> 等业务列。</p>
+<pre class="hljs"><code>CREATE TABLE IF NOT EXISTS checkpoints (
+    thread_id TEXT NOT NULL,
+    checkpoint_ns TEXT NOT NULL DEFAULT &#x27;&#x27;,
+    checkpoint_id TEXT NOT NULL,
+    parent_checkpoint_id TEXT,
+    type TEXT,
+    checkpoint BLOB,
+    metadata BLOB,
+    PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
+);
+CREATE TABLE IF NOT EXISTS writes (
+    thread_id TEXT NOT NULL,
+    checkpoint_ns TEXT NOT NULL DEFAULT &#x27;&#x27;,
+    checkpoint_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    idx INTEGER NOT NULL,
+    channel TEXT NOT NULL,
+    type TEXT,
+    value BLOB,
+    PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
+);
+</code></pre>
+<pre class="mermaid">flowchart TB
+    subgraph SQLiteMode[&quot;SqliteSaver 模式&quot;]
+        direction TB
+        
+        Worker[PenShot Worker] --&gt; Conn[SQLite连接&lt;br/&gt;check_same_thread=False]
+        Conn --&gt; DB[(task_xxx.db)]
+        
+        subgraph Storage[&quot;表结构（LangGraph 内建）&quot;]
+            T1[(checkpoints表&lt;br/&gt;thread_id, checkpoint_ns, checkpoint_id&lt;br/&gt;状态快照与元数据BLOB)]
+            T2[(writes表&lt;br/&gt;thread_id, checkpoint_id, task_id&lt;br/&gt;中间数据value BLOB)]
+        end
+        
+        DB --&gt; Storage
+    end
+</pre>
+<h2>快照内容与观测</h2>
+<p>一条 <code>checkpoints</code> 记录包含执行后的通道值、父检查点 ID、序列化类型与元数据；<code>writes</code> 保存尚未合并进通道的 pending writes，用于重放同一 super-step 内已完成的节点输出。两者都由 LangGraph 序列化，业务代码不应直接解析 BLOB。</p>
+<p>观测以数据库为准。执行 <code>SELECT thread_id, COUNT(*) FROM checkpoints GROUP BY thread_id;</code> 可判断同一任务是否产生多条时间线；执行 <code>SELECT COUNT(*) FROM checkpoints;</code> 可确认写入是否真的发生。若 <code>thread_id</code> 种类随运行次数增长，说明标识不稳定，续传不可能命中。</p>
+<p>检查点不保存 LLM 请求与响应原文。需要复现提示词时，应结合业务日志、模板版本与输入剧本；磁盘占用随任务数与 super-step 数线性增长，长剧本单任务会产生较多快照。</p>
+<h2>WorkflowCheckpointer</h2>
+<p>门面类封装模式选择、存储路径与连接管理，对外提供 saver 和运行配置。</p>
+<pre class="mermaid">flowchart TB
+    subgraph CheckpointerDesign[&quot;WorkflowCheckpointer 实际设计&quot;]
+        direction TB
+        
+        subgraph PublicAPI[&quot;公共接口&quot;]
+            get_saver[get_saver 获取原生Saver]
+            get_config[get_config 获取运行配置]
+            cleanup[cleanup_old_checkpoints 清理旧文件]
+            get_stats[get_stats 获取统计信息]
+            close[close 关闭资源]
+        end
+        
+        subgraph Internal[&quot;内部组件&quot;]
+            mode_detect[_determine_mode 模式自动检测]
+            storage_setup[_setup_storage 存储路径管理]
+        end
+        
+        subgraph StorageModes[&quot;支持的存储模式&quot;]
+            memory[MemorySaver&lt;br/&gt;开发测试/降级兜底]
+            sqlite[SqliteSaver&lt;br/&gt;单机持久化]
+        end
+        
+        PublicAPI --&gt; Internal
+        Internal --&gt; StorageModes
+    end
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">接口</th>
+<th style="text-align:left">行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>get_saver()</code></td>
+<td style="text-align:left">返回 <code>SqliteSaver</code> 或 <code>MemorySaver</code> 实例，用于 <code>graph.compile()</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>get_config()</code></td>
+<td style="text-align:left">返回稳定配置 <code>{"configurable": {"thread_id": "{script_id}_{task_id}"}}</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>get_stats()</code></td>
+<td style="text-align:left">返回模式、路径与文件大小等信息</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>cleanup_old_checkpoints(keep_count=10)</code></td>
+<td style="text-align:left">按修改时间保留最近 N 个 <code>task_*.db</code>，跳过当前实例文件</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>close()</code></td>
+<td style="text-align:left"><code>async def</code>，关闭 SQLite 连接并置空 saver</td>
+</tr>
+</tbody>
+</table>
+<p><code>CheckpointerFactory</code> 以 <code>{script_id}_{task_id}</code> 为键、<code>threading.RLock</code> 加锁复用实例，避免重复创建 SQLite 连接。工厂的 <code>close_all()</code> 与实例的 <code>close()</code> 都没有调用方；<code>__exit__</code> 直接调用异步 <code>close()</code> 只会创建协程，连接不会真正关闭，并留下 <code>coroutine 'close' was never awaited</code> 警告。</p>
+<h2>调用链与 thread_id 缺口</h2>
+<pre class="hljs"><code># workflow_pipeline.py —— 初始化时创建管理器
+self.checkpointer = create_checkpointer(self.script_id, self.task_id, config)
+
+# workflow_pipeline.py —— 构建图时把 saver 交给 LangGraph
+saver = self.checkpointer.get_saver()
+compiled_graph = orchestrator.graph.compile(checkpointer=saver)
+
+# workflow_output_fixer.py —— 执行时传入 thread_id 配置
+final_state = workflow.invoke(
+    initial_state,
+    config={&quot;configurable&quot;: {&quot;thread_id&quot;: f&quot;process_{id(initial_state)}&quot;}}
+)
+</code></pre>
+<p>前两处接线正确。第三处没有使用 <code>get_config()</code> 的稳定标识，而是使用 <code>f&quot;process_{id(initial_state)}&quot;</code>。<code>id()</code> 是 CPython 对象的内存地址，同一任务每次运行都会得到新值，因此每次执行都写入一条全新时间线。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">环节</th>
+<th style="text-align:left">设计意图</th>
+<th style="text-align:left">当前实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">写入</td>
+<td style="text-align:left">每个 super-step 落盘快照</td>
+<td style="text-align:left">真实执行</td>
+</tr>
+<tr>
+<td style="text-align:left">标识</td>
+<td style="text-align:left">同一任务固定 <code>thread_id</code></td>
+<td style="text-align:left">每次运行使用对象内存地址</td>
+</tr>
+<tr>
+<td style="text-align:left">读取</td>
+<td style="text-align:left">按 <code>thread_id</code> 查历史并恢复</td>
+<td style="text-align:left">无读取入口</td>
+</tr>
+<tr>
+<td style="text-align:left">清理</td>
+<td style="text-align:left">定期删除旧检查点</td>
+<td style="text-align:left">方法存在，无调用方</td>
+</tr>
+<tr>
+<td style="text-align:left">释放</td>
+<td style="text-align:left">任务结束关闭连接</td>
+<td style="text-align:left">无调用方，且异步关闭失效</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">flowchart LR
+    subgraph WritePath[&quot;已接线的写入路径&quot;]
+        W1[任务执行] --&gt; W2[compile 时注入 saver]
+        W2 --&gt; W3[每个 super-step 写入快照]
+        W3 --&gt; W4[(任务 .db 文件)]
+    end
+
+    subgraph ReadPath[&quot;未接线的恢复路径&quot;]
+        R1[任务启动] -.-&gt;|无 get_state 调用| R2[查询历史检查点]
+        R2 -.-&gt; R3[复用 thread_id 续跑]
+        R3 -.-&gt; R4[跳过已完成阶段]
+    end
+
+    W4 -.-&gt;|thread_id 每次变化| X[历史时间线不可命中]
+    X -.-&gt; R2
+</pre>
+<p>结果是一本“只进不出”的账：数据真实、完整、可离线回溯，但任务失败后仍从头执行，已落盘的快照不会被读取。检查点当前的价值集中在事后分析，而不是恢复执行。</p>
+<h2>异步执行边界</h2>
+<p><code>ainvoke</code> 会调用 saver 的 <code>aput</code> / <code>aget_tuple</code> / <code>alist</code>，同步版 <code>SqliteSaver</code> 对这三个方法一律抛出 <code>NotImplementedError</code>。项目因此把执行链路整体切回同步 <code>invoke</code>，并在回退路径中保留了被注释的 <code>await workflow.ainvoke(...)</code>。</p>
+<pre class="mermaid">flowchart LR
+    direction LR %% 强制主画布从左到右
+    subgraph SyncSaver[&quot;同步 Saver 问题&quot;]
+        direction LR %% 强制子图1内部从左到右
+        A[async def run] --&gt;|ainvoke| W[异步工作流]
+        W --&gt;|调用| S[SqliteSaver]
+        S -.-&gt;|不支持异步方法| E[NotImplementedError]
+    end
+
+    subgraph AsyncSaver[&quot;异步 Saver 方案&quot;]
+        direction LR %% 强制子图2内部从左到右
+        A2[async def run] --&gt;|ainvoke| W2[异步工作流]
+        W2 --&gt;|调用| AS[AsyncSqliteSaver]
+        AS --&gt;|await| DB2[(SQLite)]
+    end
+</pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">方案</th>
+<th style="text-align:left">依赖</th>
+<th style="text-align:left">代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>invoke</code> + <code>SqliteSaver</code></td>
+<td style="text-align:left"><code>langgraph-checkpoint-sqlite</code></td>
+<td style="text-align:left">调用方线程内顺序执行，放弃协程调度</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ainvoke</code> + <code>AsyncSqliteSaver</code></td>
+<td style="text-align:left">额外安装 <code>aiosqlite</code></td>
+<td style="text-align:left">异步链路全改造，连接需用 <code>async with</code> 管理</td>
+</tr>
+</tbody>
+</table>
+<p>两条链路不能交叉：异步工作流配同步 saver 会在首次写入时直接失败；同步工作流配异步 saver 则拿不到协程结果。选择哪条取决于调用方是否已经在事件循环内。</p>
+<h2>配置项</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">字段</th>
+<th style="text-align:left">默认值</th>
+<th style="text-align:left">是否生效</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>checkpoint_mode</code></td>
+<td style="text-align:left"><code>auto</code></td>
+<td style="text-align:left">是</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>checkpoint_dir</code></td>
+<td style="text-align:left"><code>data/checkpoints</code>（取自 <code>settings.get_data_paths()</code>）</td>
+<td style="text-align:left">是</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>postgres_uri</code></td>
+<td style="text-align:left"><code>None</code></td>
+<td style="text-align:left">否，无消费方</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>max_checkpoints_per_script</code></td>
+<td style="text-align:left"><code>10</code></td>
+<td style="text-align:left">否，无消费方</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>checkpoint_max_connections</code></td>
+<td style="text-align:left"><code>5</code></td>
+<td style="text-align:left">否，无消费方</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>checkpoint_idle_timeout</code></td>
+<td style="text-align:left"><code>600</code></td>
+<td style="text-align:left">否，无消费方</td>
+</tr>
+</tbody>
+</table>
+<p><code>checkpoint_mode</code> 的注释仍列出 <code>postgres</code>，但枚举只有 <code>MEMORY</code> 与 <code>SQLITE</code>。传入其他值时 <code>_determine_mode</code> 会落入 <code>auto</code> 分支，按 SQLite 逻辑处理，不会报错。</p>
+<h2>常见失效</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">现象</th>
+<th style="text-align:left">原因</th>
+<th style="text-align:left">处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">重启后没有新 <code>.db</code></td>
+<td style="text-align:left">依赖缺失或目录不可写，静默降级到内存</td>
+<td style="text-align:left">检查启动 warning；生产环境显式设置 <code>checkpoint_mode=sqlite</code></td>
+</tr>
+<tr>
+<td style="text-align:left">任务失败后从头重跑</td>
+<td style="text-align:left"><code>thread_id</code> 使用对象地址</td>
+<td style="text-align:left">改用 <code>checkpointer.get_config()</code>，并补续跑入口</td>
+</tr>
+<tr>
+<td style="text-align:left">目录持续增长</td>
+<td style="text-align:left">清理方法未接线，时间线只增不减</td>
+<td style="text-align:left">任务收尾显式调用清理；多进程下先确认无活跃写入</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ainvoke</code> 抛出 <code>NotImplementedError</code></td>
+<td style="text-align:left">同步 <code>SqliteSaver</code> 不支持异步方法</td>
+<td style="text-align:left">改用 <code>AsyncSqliteSaver</code> 并安装 <code>aiosqlite</code>，不要混搭</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>coroutine was never awaited</code></td>
+<td style="text-align:left">同步 <code>__exit__</code> 调用异步 <code>close()</code></td>
+<td style="text-align:left">改为同步 <code>close()</code>，或在关闭钩子中 <code>await close()</code></td>
+</tr>
+</tbody>
+</table>
+<h2>最小修复路径</h2>
+<ol>
+<li>把执行路径的 <code>config</code> 换成 <code>self.checkpointer.get_config()</code>，让同一任务跨运行命中同一时间线。</li>
+<li>任务启动时以 <code>None</code> 为输入、复用同一 <code>thread_id</code> 续跑，把“从头执行”改为“从最近快照继续”。</li>
+<li>把 <code>cleanup_old_checkpoints()</code> 接入任务收尾，把 <code>CheckpointerFactory.close_all()</code> 接入服务关闭钩子，并修正 <code>close()</code> 的异步调用。</li>
+</ol>
+<p>更远的方向是切换 <code>AsyncSqliteSaver</code> 以支持异步链路，或引入 Postgres / Redis 后端实现多机共享；这些属于后续版本范围，不是当前能力。</p>
+<h2>上线核对</h2>
+<ul>
+<li>启动日志中不存在“依赖未安装”或“SQLite 不可用”的 warning。</li>
+<li><code>data/checkpoints</code> 存在且可写；容器部署时挂载持久卷，避免随镜像重建丢失。</li>
+<li>任务结束后 <code>.db</code> 可打开，<code>checkpoints</code> 记录数大于 0。</li>
+<li>显式设置 <code>checkpoint_mode</code>，避免 <code>auto</code> 在只读环境中静默退化为内存模式。</li>
+</ul>
+<p>修复顺序有依赖：先稳定标识，续跑才有意义；清理与释放可以独立接入，但应在确认无并发任务后执行。在续跑入口补齐之前，应把检查点视为审计日志，而不是恢复机制。</p>
