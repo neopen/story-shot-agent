@@ -1,6 +1,6 @@
 <p>PenShot 的记忆系统按短期、中期、长期三层保存任务上下文与历史经验：<code>MemoryManager</code> 按剧本路由到 <code>ScriptMemory</code>，后者统一负责写入分发、召回组装与提示词格式化。</p>
 <blockquote>
-<p><strong>事实边界</strong>：实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入。记忆已接入工作流四个处理阶段，但中期摘要的读回、长期库的冷启动与 Redis 运行期故障仍存在静默失效边界。</p>
+<p><strong>适用范围</strong>：实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入，已接入工作流四个处理阶段。中期摘要重启后无法读回、长期库为空时检索返回空结果、Redis 运行期中断会丢失当次交互，均属于已知边界。</p>
 </blockquote>
 <h2>架构与隔离</h2>
 <p><code>MemoryManager</code> 是多剧本容器，内部持有 <code>Dict[str, ScriptMemory]</code>；<code>ScriptMemory</code> 才真正持有三层记忆。<code>MemoryManager</code> 的职责是按 <code>script_id</code> 路由，并统一做序列化与反序列化。</p>

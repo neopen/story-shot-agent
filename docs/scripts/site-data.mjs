@@ -23,7 +23,7 @@ export const categories = [
     name: '开始使用',
     desc: '安装、配置，跑通第一个分镜任务',
     icon: 'rocket',
-    docs: ['overview', 'quick-start', 'dev-guide'],
+    docs: ['overview', 'quick-start'],
   },
   {
     id: 'core',
@@ -68,7 +68,7 @@ export const docs = {
   },
   'dev-guide': {
     title: '开发指南',
-    deck: '理解双启动链、双层状态机与二次开发扩展点，把 PenShot 接进自己的工程。',
+    deck: '本地环境、项目结构、两级状态机与二次开发扩展点。',
   },
   architecture: {
     title: '技术架构',

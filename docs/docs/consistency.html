@@ -42,7 +42,7 @@
       <a href="../index.html#workflow">工作流程</a>
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
-      <a href="case-study.html">案例</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">博客</a>
     </nav>
     <div class="header-actions">
       <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
@@ -63,7 +63,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="case-study.html">实战案例</a>
+  <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
     <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
@@ -80,7 +80,7 @@
     <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
     <div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
-        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li></ul>
       </div>
 <div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
@@ -101,7 +101,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-30</div>
+    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -365,7 +365,7 @@
 
 <p>四段内容装入模板的【全剧上下文】区块，并在生成指令中追加【重要约束】：人物外观、道具、场景与上下文保持一致。冲突时以上下文为准，而非模型自由发挥。提示词中另有 <code>_format_global_metadata</code> 的 prompt / split / shot 三种变体，分别用于转换、分段与分镜阶段，并按场景裁剪以控制长度。</p>
 
-<p>场景过滤的依据是 <code>appears_in</code>；该字段缺失或没有命中时，段落退回全量列表，宁可多给上下文也不省略约束。服装段落不做场景裁剪，因为同一角色在不同场景的换装信息需要同时可见。</p>
+<p>场景过滤的依据是 <code>appears_in</code>；该字段缺失或没有命中时，段落退回全量列表，宁可多给上下文也不省略约束。服装段落不做场景裁剪，始终输出全部角色的服装信息。</p>
 
 <h2 id="sec-4">六项规则检查</h2>
 <p>连续性守护节点以关键词和数值规则检查六个维度，不调用 LLM。</p>
@@ -431,7 +431,7 @@
 
 <p>通过条件为 <code>critical_count == 0</code> 且 <code>major_count ≤ 3</code>；任一 CRITICAL 或 MAJOR 超过 3 个即不通过，其余级别只记录。问题签名由类型、片段、场景、严重度、位置与描述前 100 字组成，同一位置同类问题只报一次；描述超过 500 字符截断。每条问题带 <code>source_stage</code>、<code>auto_fixable</code> 与 <code>suggestion</code>，供后续修复使用。</p>
 
-<p>误报边界：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；缺少分镜或片段时对应检查直接跳过。</p>
+<p>误报边界：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；缺少分镜或片段时对应检查直接跳过。规则检查不依赖 LLM，配额耗尽时仍可运行，代价是对近义表达与隐含动作不敏感。</p>
 
 <h2 id="sec-5">RAG 检索</h2>
 <p>KnowledgeManager 维护两个知识库，均按 <code>script_id</code> 隔离，不跨剧本复用。</p>
@@ -509,6 +509,8 @@
 <p>审查扣分从 100 起算，warning 5、moderate 10、major 25、critical 40、error 60；≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，否则 FAILED。PASSED 直接放行，MINOR 违规不超过 3 个也放行；MODERATE / MAJOR 带修复参数回到 CONVERT_PROMPT；CRITICAL 重试或转人工。</p>
 
 <p>审查的 NEEDS_RETRY 与 NEEDS_REPAIR 都回到 CONVERT_PROMPT，因为审查本身不产生内容，重跑审查无法改变结果。连续性守护的修复目标虽配置为 CONVERT_PROMPT，但决策恒为 SUCCESS，实际只记录问题，不会触发回炉。</p>
+
+<p>以下为已确认的实现边界，不影响主链运行，但会限制自动化程度。</p>
 
 <h2 id="sec-8">当前限制</h2>
 <table>

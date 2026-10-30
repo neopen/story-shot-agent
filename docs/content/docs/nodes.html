@@ -288,7 +288,7 @@
     participant Parser as 剧本解析智能体
     participant LLM as LLM服务
     
-    User-&gt;&gt;API: POST 接口 {text: &quot;剧本文本&quot;}
+    User-&gt;&gt;API: POST 剧本解析请求
     API-&gt;&gt;Parser: 调用解析任务
     Parser-&gt;&gt;LLM: 发送解析请求
     Note over Parser,LLM: 使用提示词让LLM提取&lt;br/&gt;场景、角色、对话、动作
@@ -312,7 +312,7 @@
         B[场景遍历] --&gt; C[元素序列分组]
         C --&gt; D{合并判断}
         D --&gt;|连续对话且同角色| E[合并进当前镜头]
-        D --&gt;|连续动作(默认不合并)| F[创建新镜头]
+        D --&gt;|连续动作（默认不合并）| F[创建新镜头]
         D --&gt;|对话后短动作&lt;3秒| E
         E --&gt; G[镜头类型判定]
         F --&gt; G
@@ -675,6 +675,8 @@
 
 <p>失败与降级：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；上下文缺失时对应检查直接跳过。更关键的是修复回流未接通：决策函数读取顶层 <code>state.continuity_issues</code>，实际字段在 <code>state.domain.continuity_issues</code>，导致恒为 SUCCESS；返回的 NEEDS_RETRY 也不在条件边键集合中。因此问题会被记录，但不会自动回退上游。</p>
 
+<p>限制按节点归集，跨节点的路由与计数问题见<a href="architecture.html">技术架构</a>的“当前限制”。</p>
+
 <h2>节点级限制</h2>
 <table>
 <thead>
@@ -708,4 +710,4 @@
 </tbody>
 </table>
 
-<p>跨片段一致性机制见<a href="consistency.html">一致性策略</a>；工作流与评分路由见<a href="architecture.html">技术架构</a>。</p>
+<p>跨片段一致性机制见<a href="consistency.html">一致性策略</a>；各节点的实现入口与测试用例见 <a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a>。</p>

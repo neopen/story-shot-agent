@@ -23,7 +23,7 @@
     G --&gt; H[&quot;PenshotResult / JSON 结果&quot;]
 </pre>
 <p>SDK、REST 与 MCP 最终都进入同一套任务模型，差异在协议适配层。REST 与 MCP 不需要额外编写业务逻辑；需要自定义鉴权、计费或路由时，再用 SDK 嵌入自有服务。</p>
-<p>内置 REST 只包含 CORS 与请求上下文中间件，不提供鉴权、限流与 TLS。面向公网部署时应在网关或反向代理层补充这些能力；SDK 与 MCP 的权限边界由宿主进程决定。</p>
+<p>内置 REST 的中间件只覆盖 CORS、请求上下文与处理耗时响应头（<code>X-Process-Time</code>），不提供鉴权、限流与 TLS。面向公网部署时应在网关或反向代理层补充这些能力；SDK 与 MCP 的权限边界由宿主进程决定。</p>
 
 <h2>安装与配置</h2>
 <pre class="hljs"><code>pip install penshot

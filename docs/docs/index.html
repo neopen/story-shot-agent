@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PenShot 文档 · 剧本分镜智能体</title>
-  <meta name="description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成、RAG 检索与真实运行评测。">
+  <meta name="description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。">
   <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="https://shot.helpenx.com/docs/">
   <meta property="og:site_name" content="PenShot">
   <meta property="og:type" content="website">
   <meta property="og:title" content="PenShot 文档 · 剧本分镜智能体">
-  <meta property="og:description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成、RAG 检索与真实运行评测。">
+  <meta property="og:description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:width" content="1200">
@@ -18,7 +18,7 @@
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="PenShot 文档 · 剧本分镜智能体">
-  <meta name="twitter:description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成、RAG 检索与真实运行评测。">
+  <meta name="twitter:description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -42,7 +42,7 @@
       <a href="../index.html#workflow">工作流程</a>
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
-      <a href="case-study.html">案例</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">博客</a>
     </nav>
     <div class="header-actions">
       <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
@@ -63,7 +63,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="case-study.html">实战案例</a>
+  <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
     <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
@@ -78,7 +78,7 @@
           <div>
             <span class="eyebrow">Documentation</span>
             <h1>PenShot 文档</h1>
-            <p>从第一条剧本到可投喂给视频模型的分镜提示词包。这里记录 PenShot 的工作流、源码实现、接入方式与真实运行数据。</p>
+            <p>从第一条剧本到可投喂给视频模型的分镜提示词包。这里记录 PenShot 的工作流、接入方式、记忆与检索实现。</p>
             <button class="docs-search" type="button" data-search-open>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档、节点、API 或关键词</span><kbd>Ctrl K</kbd>
             </button>
@@ -115,7 +115,7 @@
         <section class="hub-section" id="start">
         <div class="hub-section__head">
           <h2><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</h2>
-          <p>安装、配置，跑通第一个分镜任务 · 3 篇</p>
+          <p>安装、配置，跑通第一个分镜任务 · 2 篇</p>
         </div>
         <div class="hub-list">
           <a class="hub-item" href="overview.html">
@@ -125,10 +125,6 @@
               </a><a class="hub-item" href="quick-start.html">
                 <strong>快速开始</strong>
                 <span>从安装、配置到跑通第一个分镜任务，完整走一遍最小可用链路。</span>
-                <em>阅读 →</em>
-              </a><a class="hub-item" href="dev-guide.html">
-                <strong>开发指南</strong>
-                <span>理解双启动链、双层状态机与二次开发扩展点，把 PenShot 接进自己的工程。</span>
                 <em>阅读 →</em>
               </a>
         </div>
@@ -161,7 +157,7 @@
                 <em>阅读 →</em>
               </a><a class="hub-item" href="dev-guide.html">
                 <strong>开发指南</strong>
-                <span>理解双启动链、双层状态机与二次开发扩展点，把 PenShot 接进自己的工程。</span>
+                <span>本地环境、项目结构、两级状态机与二次开发扩展点。</span>
                 <em>阅读 →</em>
               </a>
         </div>

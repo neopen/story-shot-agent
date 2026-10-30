@@ -8,6 +8,12 @@ const contentDir = path.join(root, 'content', 'docs');
 const outDir = path.join(root, 'docs');
 const meta = JSON.parse(fs.readFileSync(path.join(contentDir, 'meta.json'), 'utf8'));
 const today = new Date().toISOString().slice(0, 10);
+const contentDate =
+  Object.values(meta)
+    .map((item) => item.updated)
+    .filter(Boolean)
+    .sort()
+    .pop() || today;
 
 const escapeHtml = (value) =>
   String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -116,7 +122,6 @@ const head = ({ title, description, canonical, prefix, type = 'website', withKat
 
 const header = ({ prefix = '', active = '', searchIndex }) => {
   const docsHome = prefix ? 'index.html' : 'docs/';
-  const caseHref = prefix ? 'case-study.html' : 'docs/case-study.html';
   const quickStartHref = prefix ? 'quick-start.html' : 'docs/quick-start.html';
   return `<body class="docs-page" data-search-index="${searchIndex}">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -133,7 +138,7 @@ const header = ({ prefix = '', active = '', searchIndex }) => {
       <a href="${prefix}index.html#workflow">工作流程</a>
       <a href="${prefix}index.html#integrations">集成</a>
       <a href="${docsHome}"${active === 'docs' ? ' class="is-active"' : ''}>文档</a>
-      <a href="${caseHref}">案例</a>
+      <a href="${site.blog}" target="_blank" rel="noopener">博客</a>
     </nav>
     <div class="header-actions">
       <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
@@ -154,7 +159,7 @@ const header = ({ prefix = '', active = '', searchIndex }) => {
   <a href="${prefix}index.html#workflow">工作流程</a>
   <a href="${prefix}index.html#integrations">集成方式</a>
   <a href="${docsHome}">文档</a>
-  <a href="${caseHref}">实战案例</a>
+  <a href="${site.blog}" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="${quickStartHref}">快速开始</a>
     <a class="btn btn--ghost" href="${site.repo}" target="_blank" rel="noopener">GitHub</a>
@@ -195,7 +200,7 @@ const sidebar = (slug) => {
       <a href="${site.url}" target="_blank" rel="noopener">${icon('globe', 13)}产品官网</a>
       <a href="${site.issues}" target="_blank" rel="noopener">${icon('prompt', 13)}问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot ${site.version}<br>MIT License · ${today}</div>
+    <div class="sidebar-foot">PenShot ${site.version}<br>MIT License · ${contentDate}</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>`;
 };
@@ -369,7 +374,7 @@ function renderHub() {
   const canonical = `${site.url}/docs/`;
   const title = 'PenShot 文档 · 剧本分镜智能体';
   const description =
-    'PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成、RAG 检索与真实运行评测。';
+    'PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。';
 
   const page = `${head({
     title,
@@ -386,7 +391,7 @@ ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
           <div>
             <span class="eyebrow">Documentation</span>
             <h1>PenShot 文档</h1>
-            <p>从第一条剧本到可投喂给视频模型的分镜提示词包。这里记录 PenShot 的工作流、源码实现、接入方式与真实运行数据。</p>
+            <p>从第一条剧本到可投喂给视频模型的分镜提示词包。这里记录 PenShot 的工作流、接入方式、记忆与检索实现。</p>
             <button class="docs-search" type="button" data-search-open>
               ${icon('search', 16)}<span>搜索文档、节点、API 或关键词</span><kbd>Ctrl K</kbd>
             </button>
@@ -471,14 +476,6 @@ function writeSitemaps(renderedDocs) {
     .map((entry) => url(`${site.url}/docs/${entry.slug}.html`, meta[entry.slug].updated || today))
     .join('\n');
 
-  const docsSitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${url(`${site.url}/docs/`, today)}
-${docsEntries}
-</urlset>
-`;
-  fs.writeFileSync(path.join(outDir, 'sitemap.xml'), docsSitemap, 'utf8');
-
   const rootSitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${url(`${site.url}/`, today)}
@@ -493,7 +490,7 @@ ${docsEntries}
     `User-agent: *\nAllow: /\n\nSitemap: ${site.url}/sitemap.xml\n`,
     'utf8'
   );
-  console.log('sitemaps + robots written');
+  console.log('sitemap + robots written');
 }
 
 /* ------------------------------------------------------------------- build */
