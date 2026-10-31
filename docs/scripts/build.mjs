@@ -90,24 +90,44 @@ function buildExcerptMap(body, toc) {
 
 /* --------------------------------------------------------------- templates */
 
-const head = ({ title, description, canonical, prefix, type = 'website', withKatex = false }) => `<!DOCTYPE html>
+const head = ({
+  title,
+  description,
+  keywords = [],
+  canonical,
+  prefix,
+  type = 'website',
+  withKatex = false,
+  updated = '',
+  section = '',
+  jsonLd = null,
+}) => `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(description)}">
+  <meta name="keywords" content="${escapeHtml(keywords.join(','))}">
+  <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
   <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="${canonical}">
   <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="${type}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:url" content="${canonical}">
   <meta property="og:image" content="${site.url}/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  ${updated ? `<meta property="article:published_time" content="${updated}T00:00:00+08:00">` : ''}
+  ${updated ? `<meta property="article:modified_time" content="${updated}T00:00:00+08:00">` : ''}
+  ${section ? `<meta property="article:section" content="${escapeHtml(section)}">` : ''}
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
@@ -118,6 +138,7 @@ const head = ({ title, description, canonical, prefix, type = 'website', withKat
   <link rel="stylesheet" href="${prefix}assets/css/docs.css">
   ${withKatex ? '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">' : ''}
   <script>document.documentElement.classList.add('js');</script>
+  ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
 </head>`;
 
 const header = ({ prefix = '', active = '', searchIndex }) => {
@@ -269,6 +290,31 @@ function renderDoc(slug) {
   const canonical = `${site.url}/docs/${slug}.html`;
   const title = `${doc.title} · PenShot 文档`;
   const description = metaInfo.description || doc.deck;
+  const keywords = metaInfo.keywords || [];
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: doc.title,
+    name: doc.title,
+    description,
+    url: canonical,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+    datePublished: updated,
+    dateModified: updated,
+    inLanguage: 'zh-CN',
+    articleSection: category.name,
+    keywords: keywords.join(', '),
+    image: `${site.url}/assets/img/og-cover.png`,
+    author: { '@type': 'Organization', name: 'PenShot Team', url: site.url },
+    publisher: {
+      '@type': 'Organization',
+      name: 'PenShot',
+      url: site.url,
+      logo: { '@type': 'ImageObject', url: `${site.url}/assets/img/logo-512.png` },
+      sameAs: [site.repo, site.pypi],
+    },
+    isPartOf: { '@type': 'WebSite', name: 'PenShot', url: site.url },
+  };
 
   const tocHtml = toc.length
     ? `<div class="toc-title">${icon('list', 12)}本页目录</div>
@@ -278,10 +324,14 @@ function renderDoc(slug) {
   const page = `${head({
     title,
     description,
+    keywords,
     canonical,
     prefix: '../',
     type: 'article',
     withKatex: true,
+    updated,
+    section: category.name,
+    jsonLd,
   })}
 ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
   ${sidebar(slug)}
@@ -375,13 +425,52 @@ function renderHub() {
   const title = 'PenShot 文档 · 剧本分镜智能体';
   const description =
     'PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。';
+  const keywords = [
+    'PenShot 文档',
+    '剧本分镜',
+    '快速开始',
+    '技术架构',
+    'MCP',
+    'REST API',
+    'Python SDK',
+    'Docker 部署',
+    '记忆系统',
+    'RAG',
+  ];
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description,
+    url: canonical,
+    inLanguage: 'zh-CN',
+    isPartOf: { '@type': 'WebSite', name: 'PenShot', url: site.url },
+    publisher: {
+      '@type': 'Organization',
+      name: 'PenShot',
+      url: site.url,
+      logo: { '@type': 'ImageObject', url: `${site.url}/assets/img/logo-512.png` },
+    },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: docOrder.length,
+      itemListElement: docOrder.map(({ slug }, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: docs[slug].title,
+        url: `${site.url}/docs/${slug}.html`,
+      })),
+    },
+  };
 
   const page = `${head({
     title,
     description,
+    keywords,
     canonical,
     prefix: '../',
     type: 'website',
+    jsonLd,
   })}
 ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
   <main id="main">

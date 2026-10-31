@@ -5,17 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>一致性策略 · PenShot 文档</title>
   <meta name="description" content="PenShot 如何通过全局元数据、连续性锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。">
+  <meta name="keywords" content="一致性策略,角色一致性,场景连贯,连续性锚点,提示词约束,向量检索,跨片段,分镜">
+  <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
   <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="https://shot.helpenx.com/docs/consistency.html">
   <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="一致性策略 · PenShot 文档">
   <meta property="og:description" content="PenShot 如何通过全局元数据、连续性锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/consistency.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="一致性策略 · PenShot 文档">
   <meta name="twitter:description" content="PenShot 如何通过全局元数据、连续性锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。">
@@ -26,6 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"一致性策略","name":"一致性策略","description":"PenShot 如何通过全局元数据、连续性锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。","url":"https://shot.helpenx.com/docs/consistency.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/consistency.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"一致性策略, 角色一致性, 场景连贯, 连续性锚点, 提示词约束, 向量检索, 跨片段, 分镜","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -80,7 +90,7 @@
     <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
     <div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
-        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li></ul>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="docker.html">Docker 部署</a></li></ul>
       </div>
 <div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>

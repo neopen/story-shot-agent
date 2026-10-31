@@ -5,17 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>快速开始 · PenShot 文档</title>
   <meta name="description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。">
+  <meta name="keywords" content="PenShot 安装,penshot pip,快速开始,LLM 配置,嵌入模型,剧本分镜,Python SDK,任务提交">
+  <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
   <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="https://shot.helpenx.com/docs/quick-start.html">
   <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="快速开始 · PenShot 文档">
   <meta property="og:description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/quick-start.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:section" content="开始使用">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="快速开始 · PenShot 文档">
   <meta name="twitter:description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。">
@@ -26,6 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"快速开始","name":"快速开始","description":"从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。","url":"https://shot.helpenx.com/docs/quick-start.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/quick-start.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot 安装, penshot pip, 快速开始, LLM 配置, 嵌入模型, 剧本分镜, Python SDK, 任务提交","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -80,7 +90,7 @@
     <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
     <div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
-        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html" class="is-active" aria-current="page">快速开始</a></li></ul>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html" class="is-active" aria-current="page">快速开始</a></li><li><a href="docker.html">Docker 部署</a></li></ul>
       </div>
 <div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
@@ -131,7 +141,7 @@
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/quick-start.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
-        <p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>。</p>
+        <p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。</p>
 
 <h2 id="sec-1">前置条件</h2>
 <table>
@@ -152,6 +162,11 @@
 <td style="text-align:left">Redis</td>
 <td style="text-align:left">6.0 及以上，可选</td>
 <td style="text-align:left">短期记忆会话与多进程任务记录共享</td>
+</tr>
+<tr>
+<td style="text-align:left">Docker</td>
+<td style="text-align:left">20.10 及以上，可选</td>
+<td style="text-align:left">容器部署；使用 Compose 时另需 Compose v2</td>
 </tr>
 <tr>
 <td style="text-align:left">内存</td>
@@ -176,7 +191,7 @@ pip install "penshot[llm-providers]"
 # 或使用官方镜像
 docker pull neotems/penshot
 </code></pre>
-<p>核心依赖自带 <code>langchain-ollama</code>，连接本地 Ollama 无需额外安装；缺少对应厂商 SDK 时请求会直接报错，不会静默切换模型。当前发布线为 v0.3.x。</p>
+<p>核心依赖自带 <code>langchain-ollama</code>，连接本地 Ollama 无需额外安装；缺少对应厂商 SDK 时请求会直接报错，不会静默切换模型。当前发布线为 v0.3.x。镜像的启动参数、Compose 与持久化配置见 <a href="docker.html">Docker 部署</a>。</p>
 
 <h2 id="sec-3">配置</h2>
 <p>在项目根目录创建 <code>.env</code>，最少配置对话模型、嵌入模型与可选的 Redis。对话侧支持 OpenAI、通义千问（DashScope）、DeepSeek 与 Ollama 四类厂商，<code>API_KEY</code> 支持 <code>${ENV_VAR}</code> 形式间接引用环境变量：</p>
@@ -626,14 +641,18 @@ agent = create_penshot_agent(config=config)</code></pre>
 </table>
 
 <h2 id="sec-15">下一步</h2>
-<p>需要 HTTP 服务或 MCP 入口时，安装后可直接启动：</p>
+<p>需要 HTTP 服务或 MCP 入口时，安装后可直接启动；也可以用容器运行：</p>
 <pre class="hljs"><code># REST，默认监听 0.0.0.0:8000
 story-shot-agent serve-rest
 
 # MCP stdio 服务
 python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
+
+# 官方镜像
+docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
 </code></pre>
 <ul>
+<li><a href="docker.html">Docker 部署</a>：镜像、Compose、Redis、持久化与健康检查。</li>
 <li><a href="architecture.html">技术架构</a>：节点编排、决策路由与三级循环防护。</li>
 <li><a href="nodes.html">工作流节点</a>：每个节点的输入、规则与失败降级。</li>
 <li><a href="consistency.html">一致性策略</a>：跨片段连贯性的具体保障手段。</li>
@@ -649,10 +668,10 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
       <strong>项目概览</strong>
       <small>一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本。</small>
     </a>
-    <a class="pager-link pager-link--next" href="architecture.html">
-      <span class="pager-link__label">下一篇 → · 核心设计</span>
-      <strong>技术架构</strong>
-      <small>十个节点、决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。</small>
+    <a class="pager-link pager-link--next" href="docker.html">
+      <span class="pager-link__label">下一篇 → · 开始使用</span>
+      <strong>Docker 部署</strong>
+      <small>官方镜像与 Compose 启动 REST 服务，含 Redis、持久化与健康检查。</small>
     </a>
   </nav>
       </article>

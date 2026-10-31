@@ -42,6 +42,7 @@ python -m pytest tests/ -x -q
 │   ├── mcp_http_server.py      MCP HTTP 联调服务
 │   └── logger.py               日志封装，级别由 config/logging.yaml 决定
 ├── main.py                     服务入口
+├── scripts/                    Docker 入口 entrypoint.py 与运维脚本
 ├── examples/                   SDK、REST、MCP、workflow 示例
 └── tests/                      unit / integration / e2e / benchmarks
 </code></pre>
@@ -69,19 +70,22 @@ python -m pytest tests/ -x -q
 <tr><td><code>python main.py</code></td><td>接受 <code>--host</code>、<code>--port</code>；reload 与 workers 从配置读取，reload 开启时强制 workers=1</td></tr>
 <tr><td><code>python -m penshot.http_server</code></td><td>额外接受 <code>--max-concurrent</code>、<code>--queue-size</code>、<code>--reload</code>，通过环境变量传给应用</td></tr>
 <tr><td><code>story-shot-agent serve-rest</code></td><td>CLI 封装，接受 <code>--host</code>、<code>--port</code>，固定 <code>reload=False</code></td></tr>
+<tr><td><code>docker run … neotems/penshot</code></td><td>容器入口执行 <code>scripts.entrypoint start</code>，再按 <code>PENSHOT_API__HOST</code> 与 <code>PENSHOT_API__PORT</code> 启动 <code>main.py</code></td></tr>
 </tbody>
 </table>
 <pre class="mermaid">flowchart LR
     A1[&quot;python main.py&quot;] --&gt; B[&quot;uvicorn / penshot.app:app&quot;]
     A2[&quot;python -m penshot.http_server&quot;] --&gt; B
     A3[&quot;story-shot-agent serve-rest&quot;] --&gt; B
+    A4[&quot;docker run / compose&quot;] --&gt; A5[&quot;scripts.entrypoint start&quot;]
+    A5 --&gt; B
     B --&gt; C[&quot;FastAPI lifespan&lt;br/&gt;startup_with_recovery&quot;]
     C --&gt; D[&quot;TaskFactory&lt;br/&gt;进程内队列&quot;]
     D --&gt; E[&quot;MultiAgentPipeline&lt;br/&gt;10 节点图&quot;]
     E --&gt; F[&quot;WorkflowOrchestrator&lt;br/&gt;LangGraph&quot;]
     F --&gt; G[&quot;SQLite / 内存检查点&quot;]
 </pre>
-<p>任务队列、并发计数与回调都是进程内状态。使用多个 worker 且未配置 Redis 时，提交到进程 A 的任务在进程 B 查询会得到 <code>not_found</code>；启动日志会给出警告。需要横向扩展时配置 <code>PENSHOT_REDIS_URL</code> 或 <code>PENSHOT_REDIS_HOST</code> 等分键。</p>
+<p>任务队列、并发计数与回调都是进程内状态。使用多个 worker 且未配置 Redis 时，提交到进程 A 的任务在进程 B 查询会得到 <code>not_found</code>；启动日志会给出警告。需要横向扩展时配置 <code>PENSHOT_REDIS_URL</code> 或 <code>PENSHOT_REDIS_HOST</code> 等分键。容器同样是单进程模型，多副本部署需共享 Redis 与检查点，详见<a href="docker.html">Docker 部署</a>。</p>
 <p>应用启动时，FastAPI lifespan 调用 <code>startup_with_recovery</code>，创建数据目录并尝试恢复未完成任务。检查点由 <code>checkpoint_mode</code> 选择：<code>auto</code> 按环境决定，<code>memory</code> 仅进程内有效，<code>sqlite</code> 与 <code>postgres</code> 支持跨进程恢复。多进程部署除了 Redis，还应固定使用可共享的检查点后端。</p>
 <p>CLI 共 8 个子命令：<code>breakdown</code>、<code>batch</code>、<code>status</code>、<code>result</code>、<code>cancel</code>、<code>queue-status</code>、<code>serve</code>、<code>serve-rest</code>。其中 <code>serve</code> 启动 MCP stdio 服务，<code>serve-rest</code> 启动 REST 服务；其余命令直接创建 SDK 实例，适合本地验证单个任务。</p>
 <h2>两级状态机</h2>
@@ -255,4 +259,4 @@ result = <span class="hljs-keyword">await</span> pipeline.run_process(raw_script
 </table>
 <p>不依赖 LLM 的调试优先使用 <code>tests/unit</code> 下的单元测试与 mock；需要可运行场景时，从 <code>examples/sdk/01</code> 至 <code>07</code> 中选择最小示例。仓库没有 <code>penshot.agent.mock_data</code> 一类的模拟数据模块。</p>
 <h2>延伸阅读</h2>
-<p>工作流各节点的输入输出与失败处理见 <a href="nodes.html">工作流节点</a>；检查点与恢复见 <a href="checkpoint.html">检查点与恢复</a>；接口调用与部署参数见 <a href="integration.html">集成指南</a>。源码与版本记录以 <a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a> 为准。</p>
+<p>工作流各节点的输入输出与失败处理见 <a href="nodes.html">工作流节点</a>；检查点与恢复见 <a href="checkpoint.html">检查点与恢复</a>；接口调用与部署参数见 <a href="integration.html">集成指南</a> 与 <a href="docker.html">Docker 部署</a>。源码与版本记录以 <a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a> 为准。</p>

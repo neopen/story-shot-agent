@@ -1,0 +1,153 @@
+<p>PenShot 提供官方容器镜像，把 REST 服务、任务池与工作流打包为单一进程。镜像默认监听 8000 端口，内置健康检查；需要跨进程共享任务与短期记忆时，再接入 Redis。</p>
+
+<h2>镜像与容器</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">项</th><th style="text-align:left">说明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">镜像</td><td style="text-align:left"><code>neotems/penshot:latest</code>（Docker Hub）；<code>ghcr.io/neopen/penshot:latest</code>（GHCR 镜像）</td></tr>
+<tr><td style="text-align:left">基础镜像</td><td style="text-align:left"><code>python:3.11-slim</code>，非 root 用户 <code>appuser</code>（uid 1000）</td></tr>
+<tr><td style="text-align:left">端口</td><td style="text-align:left"><code>8000</code>，容器内固定监听 <code>0.0.0.0</code></td></tr>
+<tr><td style="text-align:left">入口</td><td style="text-align:left"><code>python -m scripts.entrypoint start</code>，转交 <code>main.py</code> 启动</td></tr>
+<tr><td style="text-align:left">健康检查</td><td style="text-align:left"><code>curl -f http://localhost:8000/health</code>，间隔 30 秒</td></tr>
+<tr><td style="text-align:left">标签</td><td style="text-align:left"><code>latest</code> 跟随 main；正式版本使用语义化版本标签</td></tr>
+</tbody>
+</table>
+<p>两个仓库发布同一镜像。生产环境应固定版本标签，避免 <code>latest</code> 随 main 漂移。容器内只运行 REST 服务，不含反向代理、TLS 与鉴权；对外暴露前应放在网关之后，MCP 协议客户端也不能直连 8000。</p>
+
+<h2>快速启动</h2>
+<p>先准备 <code>.env</code>，至少包含对话模型；使用记忆或语义检索时再补嵌入模型：</p>
+<pre class="hljs"><code>PENSHOT_LLM__DEFAULT__BASE_URL=https://api.deepseek.com
+PENSHOT_LLM__DEFAULT__API_KEY=sk-xxxxxxxx
+PENSHOT_LLM__DEFAULT__MODEL_NAME=deepseek-chat
+
+PENSHOT_EMBED__DEFAULT__BASE_URL=https://dashscope-intl.aliyuncs.com/api/v1
+PENSHOT_EMBED__DEFAULT__API_KEY=sk-xxxxxxxx
+PENSHOT_EMBED__DEFAULT__MODEL_NAME=text-embedding-v4
+</code></pre>
+<pre class="hljs"><code>docker pull neotems/penshot:latest
+
+docker run -d --name penshot \
+  -p 8000:8000 \
+  --env-file .env \
+  --restart unless-stopped \
+  neotems/penshot:latest
+
+curl http://localhost:8000/health
+</code></pre>
+<p>健康检查返回 <code>{&quot;status&quot;:&quot;healthy&quot;}</code> 只表示进程就绪，不代表模型密钥可用。模型配置错误时容器仍会启动，失败发生在任务执行阶段，错误写入日志。首次部署建议提交一个短剧本，验证从提交到结果的完整链路。</p>
+
+<h3>直接传环境变量</h3>
+<p>不想维护 <code>.env</code> 时，可以在 <code>docker run</code> 中用 <code>-e</code> 逐个注入配置。PowerShell 使用反引号换行：</p>
+<pre class="hljs"><code>docker run -d `
+  --name penshot `
+  -p 8000:8000 `
+  -e PENSHOT_LLM__DEFAULT__BASE_URL="https://api.deepseek.com" `
+  -e PENSHOT_LLM__DEFAULT__API_KEY="sk-xxxxxxxxxxxxxx" `
+  -e PENSHOT_LLM__DEFAULT__MODEL_NAME="deepseek-v4-flash" `
+  -e PENSHOT_EMBED__DEFAULT__BASE_URL="https://dashscope-intl.aliyuncs.com/api/v1" `
+  -e PENSHOT_EMBED__DEFAULT__API_KEY="sk-xxxxxxxxxxxxxx" `
+  -e PENSHOT_EMBED__DEFAULT__MODEL_NAME="text-embedding-v4" `
+  -e PENSHOT_REDIS_URL="redis://:123456@host.docker.internal:6379/0?protocol=2" `
+  neotems/penshot:latest
+</code></pre>
+<p>Linux / macOS 将行尾反引号换成 <code>\</code>。<code>PENSHOT_REDIS_URL</code> 可以省略：没有外部 Redis 时，单容器使用进程内任务池与记忆；使用外部 Redis 时，无密码写成 <code>redis://host:6379/0</code>，有密码写成 <code>redis://:PASSWORD@host:6379/0</code>，密码不要放在用户名位置。<code>host.docker.internal</code> 适用于 Docker Desktop，Linux 需加 <code>--add-host=host.docker.internal:host-gateway</code>，或改用容器网络中的服务名。</p>
+<p>直接写在命令里的密钥会进入 shell 历史，也能通过 <code>docker inspect</code> 读取；长期运行仍建议使用 <code>--env-file</code> 或容器平台的 Secret 管理。</p>
+
+<h2>Docker Compose</h2>
+<p>仓库自带的 Compose 从本地源码构建镜像，并启动一个 Redis 7 实例：</p>
+<pre class="hljs"><code>git clone https://github.com/neopen/story-shot-agent.git
+cd story-shot-agent
+cp .env.example .env
+# 编辑 .env，填入 LLM 与嵌入模型配置
+
+docker compose up -d --build
+docker compose ps
+docker compose logs -f story-shot-agent
+</code></pre>
+<p>应用会等待 Redis 健康后启动。Redis 默认密码为 <code>123456</code>，<code>docker-compose.yml</code> 中的 <code>--requirepass</code> 与应用的 <code>PENSHOT_REDIS_PASSWORD</code> 必须同步修改；数据写入 <code>redis_data</code> 卷。应用侧限制 2 CPU / 2 GB，日志按 10 MB × 3 轮转。停止用 <code>docker compose down</code>，追加 <code>-v</code> 会连同 Redis 数据一起删除。</p>
+<p>Compose 中的 <code>image: penshot:latest</code> 配合 <code>build: .</code> 表示本地构建，不会拉取官方镜像。只想使用发布镜像时，改用上面的 <code>docker run</code>，或删除 <code>build</code> 并把 <code>image</code> 改为 <code>neotems/penshot:latest</code>。</p>
+
+<h2>部署拓扑</h2>
+<pre class="mermaid">flowchart LR
+    C[&quot;调用方 / 前端&quot;] --&gt;|&quot;HTTP :8000&quot;| A[&quot;penshot 容器&lt;br/&gt;FastAPI /api/v1&quot;]
+    A --&gt; T[&quot;TaskFactory 任务池&quot;]
+    T --&gt; W[&quot;工作流编排&quot;]
+    W --&gt; L[&quot;LLM / Embedding API&quot;]
+    A -.->|&quot;任务与会话共享&quot;| R[(&quot;Redis 7&quot;)]
+    A -.->|&quot;/app/data&quot;| D[(&quot;检查点 / 本地记忆&quot;)]
+    M[&quot;docker compose&quot;] -.-> A
+    M -.-> R
+</pre>
+<p>单容器即单进程：任务池、并发计数与 <code>split_cache</code> 都在容器内。多副本部署时各副本独立，必须共享 Redis；需要断点恢复时，还要把检查点放到各副本都能访问的存储。</p>
+
+<h2>数据与持久化</h2>
+<p>镜像工作目录为 <code>/app</code>。解析结果、模板缓存、SQLite 检查点与本地记忆默认写在 <code>/app/data</code>；Compose 没有挂载该目录，容器重建后这些数据会丢失，只有 Redis 卷保留。需要保留时挂载数据目录：</p>
+<pre class="hljs"><code>mkdir -p data
+
+docker run -d --name penshot \
+  -p 8000:8000 \
+  --env-file .env \
+  -v &quot;$PWD/data:/app/data&quot; \
+  neotems/penshot:latest
+</code></pre>
+<p>容器以 uid 1000 运行，Linux 上需保证挂载目录可写：<code>sudo chown -R 1000:1000 data</code>。Docker Desktop 的绑定挂载通常无需额外处理。Redis 使用独立的 <code>redis_data</code> 卷，其余缓存不持久化，重建容器后重新生成。</p>
+<p>以上路径对应默认的 <code>development</code> 配置。若把 <code>PENSHOT_APP__ENVIRONMENT</code> 设为 <code>production</code>，向量库与缓存会改用 <code>/data/script-to-shot</code> 下的路径，需额外挂载该目录，否则数据落在容器可写层，重建后丢失。</p>
+
+<h2>启动与健康检查</h2>
+<pre class="mermaid">flowchart TD
+    A[&quot;docker run / compose up&quot;] --&gt; B[&quot;scripts.entrypoint start&quot;]
+    B --&gt; C[&quot;读取 PENSHOT_API__HOST / PORT&lt;br/&gt;默认 0.0.0.0:8000&quot;]
+    C --&gt; D[&quot;启动 FastAPI 与任务池&quot;]
+    D --&gt; E{&quot;/health 返回 200?&quot;}
+    E --&gt;|&quot;是&quot;| F[&quot;容器 healthy&quot;]
+    E --&gt;|&quot;否&quot;| G[&quot;查看 docker logs&lt;br/&gt;检查 .env、端口与依赖&quot;]
+</pre>
+<pre class="hljs"><code>docker ps --filter name=penshot
+docker logs -f penshot
+docker inspect --format '{{.State.Health.Status}}' penshot
+</code></pre>
+<p><code>/health</code> 与 <code>/api/v1/health</code> 都可用，容器健康检查使用前者。健康状态只覆盖进程与 HTTP 监听，不校验 LLM、嵌入模型或 Redis 是否可用。</p>
+
+<h2>更新与扩容</h2>
+<p>更新镜像后重建容器，数据卷保持不变：</p>
+<pre class="hljs"><code>docker pull neotems/penshot:latest
+docker rm -f penshot
+
+docker run -d --name penshot \
+  -p 8000:8000 \
+  --env-file .env \
+  -v &quot;$PWD/data:/app/data&quot; \
+  neotems/penshot:latest
+</code></pre>
+<p>Compose 场景执行 <code>git pull &amp;&amp; docker compose up -d --build</code>。横向扩容时，每个副本都要连接同一 Redis，并把 <code>checkpoint_mode</code> 指向共享 SQLite 路径或 PostgreSQL；否则副本之间互不可见，任务也无法恢复。容器内的任务队列不会跨副本调度。</p>
+
+<h2>常见问题</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">现象</th><th style="text-align:left">原因与处理</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">容器启动后立即退出</td><td style="text-align:left"><code>.env</code> 路径错误或必填变量缺失；查看 <code>docker logs penshot</code>，核对 <code>--env-file</code> 与键名</td></tr>
+<tr><td style="text-align:left">状态一直 unhealthy</td><td style="text-align:left">应用启动失败或 8000 被占用；查看日志，确认容器内端口未被覆盖</td></tr>
+<tr><td style="text-align:left">LLM 返回 401 / 403</td><td style="text-align:left"><code>BASE_URL</code>、<code>API_KEY</code>、<code>MODEL_NAME</code> 不属于同一供应商，三者一起核对</td></tr>
+<tr><td style="text-align:left">Redis 连接失败</td><td style="text-align:left">容器内的 <code>localhost</code> 指向容器自身；Compose 用服务名 <code>redis</code>，宿主机用 <code>host.docker.internal</code>，Linux 需加 <code>--add-host=host.docker.internal:host-gateway</code></td></tr>
+<tr><td style="text-align:left"><code>/app/data</code> 写入失败</td><td style="text-align:left">挂载目录对 uid 1000 不可写；<code>chown</code> 后重启容器</td></tr>
+<tr><td style="text-align:left">MCP 客户端连不上</td><td style="text-align:left">8000 提供 REST，不是 MCP 传输；覆盖入口运行 stdio：<code>docker run --rm -i --env-file .env --entrypoint python neotems/penshot:latest -m penshot.mcp_server</code></td></tr>
+</tbody>
+</table>
+
+<h2>部署边界</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">边界</th><th style="text-align:left">说明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">单进程任务池</td><td style="text-align:left">多副本需共享 Redis 与检查点，<code>split_cache</code> 不跨副本</td></tr>
+<tr><td style="text-align:left">无鉴权与 TLS</td><td style="text-align:left">只适合内网或网关之后，不要直接暴露公网</td></tr>
+<tr><td style="text-align:left">数据默认不持久化</td><td style="text-align:left">挂载 <code>/app/data</code>，否则容器重建即丢失</td></tr>
+<tr><td style="text-align:left">健康检查不校验模型</td><td style="text-align:left"><code>/health</code> 通过不代表 API Key 或嵌入模型可用</td></tr>
+</tbody>
+</table>
+<p>镜像与 Compose 的当前定义以仓库 <code>Dockerfile</code>、<code>docker-compose.yml</code> 为准；环境变量与调用参数见<a href="quick-start.html">快速开始</a>与<a href="integration.html">集成指南</a>。</p>

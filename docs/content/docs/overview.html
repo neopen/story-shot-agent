@@ -178,6 +178,11 @@
 <td style="text-align:left">内置 FastAPI 服务，共 17 个端点，含提交、状态、结果与队列观测</td>
 </tr>
 <tr>
+<td style="text-align:left">Docker</td>
+<td style="text-align:left"><code>neotems/penshot</code></td>
+<td style="text-align:left">REST 服务的官方镜像，内置健康检查；Compose 可一并启动 Redis</td>
+</tr>
+<tr>
 <td style="text-align:left">MCP</td>
 <td style="text-align:left"><code>python -m penshot.mcp_server</code></td>
 <td style="text-align:left">7 个工具，默认 stdio 传输，可接入 Claude Desktop、Cursor 等客户端</td>
@@ -189,7 +194,7 @@
 </tr>
 </tbody>
 </table>
-<p>四种入口共用同一套任务池与工作流，任务状态与结果一致。接入细节见 <a href="integration.html">集成指南</a> 与 <a href="mcp.html">MCP 服务</a>。</p>
+<p>上述入口共用同一套任务池与工作流，任务状态与结果一致。接入细节见 <a href="integration.html">集成指南</a> 与 <a href="mcp.html">MCP 服务</a>，容器部署见 <a href="docker.html">Docker 部署</a>。</p>
 
 <h2>当前边界</h2>
 <table>

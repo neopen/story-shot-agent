@@ -5,17 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PenShot 文档 · 剧本分镜智能体</title>
   <meta name="description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。">
+  <meta name="keywords" content="PenShot 文档,剧本分镜,快速开始,技术架构,MCP,REST API,Python SDK,Docker 部署,记忆系统,RAG">
+  <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
   <meta name="theme-color" content="#0b0d12">
   <link rel="canonical" href="https://shot.helpenx.com/docs/">
   <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="website">
   <meta property="og:title" content="PenShot 文档 · 剧本分镜智能体">
   <meta property="og:description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  
+  
+  
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="PenShot 文档 · 剧本分镜智能体">
   <meta name="twitter:description" content="PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。">
@@ -26,6 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   
   <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"PenShot 文档 · 剧本分镜智能体","description":"PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。","url":"https://shot.helpenx.com/docs/","inLanguage":"zh-CN","isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"}},"mainEntity":{"@type":"ItemList","numberOfItems":13,"itemListElement":[{"@type":"ListItem","position":1,"name":"项目概览","url":"https://shot.helpenx.com/docs/overview.html"},{"@type":"ListItem","position":2,"name":"快速开始","url":"https://shot.helpenx.com/docs/quick-start.html"},{"@type":"ListItem","position":3,"name":"Docker 部署","url":"https://shot.helpenx.com/docs/docker.html"},{"@type":"ListItem","position":4,"name":"技术架构","url":"https://shot.helpenx.com/docs/architecture.html"},{"@type":"ListItem","position":5,"name":"工作流节点","url":"https://shot.helpenx.com/docs/nodes.html"},{"@type":"ListItem","position":6,"name":"一致性策略","url":"https://shot.helpenx.com/docs/consistency.html"},{"@type":"ListItem","position":7,"name":"检查点与恢复","url":"https://shot.helpenx.com/docs/checkpoint.html"},{"@type":"ListItem","position":8,"name":"核心实现","url":"https://shot.helpenx.com/docs/core-implementation.html"},{"@type":"ListItem","position":9,"name":"开发指南","url":"https://shot.helpenx.com/docs/dev-guide.html"},{"@type":"ListItem","position":10,"name":"集成指南","url":"https://shot.helpenx.com/docs/integration.html"},{"@type":"ListItem","position":11,"name":"MCP 服务","url":"https://shot.helpenx.com/docs/mcp.html"},{"@type":"ListItem","position":12,"name":"记忆系统","url":"https://shot.helpenx.com/docs/memory.html"},{"@type":"ListItem","position":13,"name":"知识库与检索","url":"https://shot.helpenx.com/docs/rag-knowledge-base.html"}]}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -83,7 +93,7 @@
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档、节点、API 或关键词</span><kbd>Ctrl K</kbd>
             </button>
             <div class="docs-hero__meta">
-              <span class="meta-chip"><b>12</b> 篇文档</span>
+              <span class="meta-chip"><b>13</b> 篇文档</span>
               <span class="meta-chip"><b>6</b> 个智能体节点</span>
               <span class="meta-chip"><b>3</b> 种接入方式</span>
               <span class="meta-chip"><b>MIT</b> 开源协议</span>
@@ -115,7 +125,7 @@
         <section class="hub-section" id="start">
         <div class="hub-section__head">
           <h2><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</h2>
-          <p>安装、配置，跑通第一个分镜任务 · 2 篇</p>
+          <p>安装、配置，跑通第一个分镜任务 · 3 篇</p>
         </div>
         <div class="hub-list">
           <a class="hub-item" href="overview.html">
@@ -125,6 +135,10 @@
               </a><a class="hub-item" href="quick-start.html">
                 <strong>快速开始</strong>
                 <span>从安装、配置到跑通第一个分镜任务，完整走一遍最小可用链路。</span>
+                <em>阅读 →</em>
+              </a><a class="hub-item" href="docker.html">
+                <strong>Docker 部署</strong>
+                <span>官方镜像与 Compose 启动 REST 服务，含 Redis、持久化与健康检查。</span>
                 <em>阅读 →</em>
               </a>
         </div>

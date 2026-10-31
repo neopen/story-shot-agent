@@ -9,6 +9,7 @@
 <tr><td>Python SDK</td><td>嵌入自有 Python 服务，需要回调、批量或动态并发</td><td><code>penshot.api.PenshotFunction</code></td></tr>
 <tr><td>REST API</td><td>前后端分离、跨语言调用，或直接作为内部服务</td><td><code>/api/v1</code>，17 个端点</td></tr>
 <tr><td>MCP Server</td><td>挂载到 Claude Desktop、Cursor 等 MCP 客户端</td><td>7 个工具，stdio 或 HTTP</td></tr>
+<tr><td>Docker</td><td>独立部署 REST 服务，或交给容器平台托管</td><td><code>neotems/penshot</code></td></tr>
 <tr><td>LangGraph / A2A</td><td>更大工作流中的编排示例</td><td><code>examples/</code>，非产品内置协议</td></tr>
 </tbody>
 </table>
@@ -22,7 +23,7 @@
     F --&gt; G[&quot;工作流编排&quot;]
     G --&gt; H[&quot;PenshotResult / JSON 结果&quot;]
 </pre>
-<p>SDK、REST 与 MCP 最终都进入同一套任务模型，差异在协议适配层。REST 与 MCP 不需要额外编写业务逻辑；需要自定义鉴权、计费或路由时，再用 SDK 嵌入自有服务。</p>
+<p>SDK、REST 与 MCP 最终都进入同一套任务模型，差异在协议适配层。Docker 运行的是同一 REST 应用，只是把进程与依赖封装进容器。REST 与 MCP 不需要额外编写业务逻辑；需要自定义鉴权、计费或路由时，再用 SDK 嵌入自有服务。容器启动、Redis 与持久化配置见 <a href="docker.html">Docker 部署</a>。</p>
 <p>内置 REST 的中间件只覆盖 CORS、请求上下文与处理耗时响应头（<code>X-Process-Time</code>），不提供鉴权、限流与 TLS。面向公网部署时应在网关或反向代理层补充这些能力；SDK 与 MCP 的权限边界由宿主进程决定。</p>
 
 <h2>安装与配置</h2>

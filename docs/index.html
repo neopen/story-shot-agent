@@ -5,16 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PenShot · 把剧本拆成连贯的 AI 视频分镜</title>
   <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。">
-  <meta name="keywords" content="PenShot,剧本分镜,AI视频,分镜智能体,LangGraph,剧本转视频,Sora,Runway,Veo,可灵,MCP,RAG">
+  <meta name="keywords" content="PenShot,剧本分镜,剧本分镜智能体,AI视频,AI分镜,分镜脚本生成,剧本转视频,剧本解析,镜头拆分,视频片段生成,AI视频提示词,中英双语提示词,LangGraph,多智能体,Sora,Veo,Runway,可灵,MCP,RAG,Python SDK,REST API,Docker">
   <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
   <meta name="theme-color" content="#0a0c11">
   <link rel="canonical" href="https://shot.helpenx.com/">
   <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="website">
   <meta property="og:title" content="PenShot · 把剧本拆成连贯的 AI 视频分镜">
   <meta property="og:description" content="基于 LangGraph 的开源剧本分镜智能体：剧本解析、镜头拆分、片段切割、提示词生成与连续性守护，一条流水线输出可投喂 Sora / Veo / Runway / 可灵的分镜脚本。">
   <meta property="og:url" content="https://shot.helpenx.com/">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
@@ -26,6 +30,91 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="assets/css/site.css">
   <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://shot.helpenx.com/#organization",
+        "name": "PenShot",
+        "url": "https://shot.helpenx.com/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://shot.helpenx.com/assets/img/logo-512.png"
+        },
+        "sameAs": [
+          "https://github.com/neopen/story-shot-agent",
+          "https://pypi.org/project/penshot/",
+          "https://hub.docker.com/r/neotems/penshot"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://shot.helpenx.com/#website",
+        "url": "https://shot.helpenx.com/",
+        "name": "PenShot",
+        "alternateName": "PenShot 剧本分镜智能体",
+        "description": "基于 LangGraph 的开源剧本分镜智能体，把任意长度的剧本拆成 5 秒级、视觉连贯的 AI 视频分镜提示词。",
+        "inLanguage": "zh-CN",
+        "publisher": {
+          "@id": "https://shot.helpenx.com/#organization"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://shot.helpenx.com/#software",
+        "name": "PenShot",
+        "alternateName": "剧本分镜智能体",
+        "description": "自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，输出可直接投喂 Sora、Veo、Runway、可灵的分镜脚本。",
+        "url": "https://shot.helpenx.com/",
+        "applicationCategory": "MultimediaApplication",
+        "applicationSubCategory": "AI 视频分镜与提示词生成",
+        "operatingSystem": "Linux, macOS, Windows",
+        "softwareVersion": "0.3.x",
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/neopen/story-shot-agent",
+        "downloadUrl": "https://pypi.org/project/penshot/",
+        "image": "https://shot.helpenx.com/assets/img/og-cover.png",
+        "inLanguage": "zh-CN",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "剧本解析",
+          "镜头拆分",
+          "视频片段切割",
+          "中英双语提示词生成",
+          "跨片段一致性检查",
+          "Python SDK",
+          "REST API",
+          "MCP Server",
+          "Docker 部署"
+        ],
+        "publisher": {
+          "@id": "https://shot.helpenx.com/#organization"
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://shot.helpenx.com/#webpage",
+        "url": "https://shot.helpenx.com/",
+        "name": "PenShot · 把剧本拆成连贯的 AI 视频分镜",
+        "description": "PenShot 是一个基于 LangGraph 的开源剧本分镜智能体，把剧本拆成 5 秒级、视觉连贯的视频片段脚本。",
+        "isPartOf": {
+          "@id": "https://shot.helpenx.com/#website"
+        },
+        "about": {
+          "@id": "https://shot.helpenx.com/#software"
+        },
+        "inLanguage": "zh-CN"
+      }
+    ]
+  }
+  </script>
 </head>
 <body data-search-index="docs/search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -428,8 +517,8 @@
     <div class="container">
       <div class="section-head" data-reveal>
         <span class="eyebrow">Integrations</span>
-        <h2>三种方式，接进你的工作流</h2>
-        <p>可以嵌入自有服务，也可以作为独立服务部署，或直接挂给支持 MCP 的 IDE 与 Agent 客户端。</p>
+        <h2>从 SDK 到容器，接进你的工作流</h2>
+        <p>可以嵌入自有服务，作为独立服务运行，或挂给支持 MCP 的 IDE 与 Agent 客户端。</p>
       </div>
 
       <div class="integration-grid">
@@ -446,6 +535,10 @@
             <button class="integration-tab" type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="false" tabindex="-1">
               <span class="it-icon">MCP</span>
               <span><strong>MCP Server</strong><small>7 个工具，接入 Claude Desktop / Cursor</small></span>
+            </button>
+            <button class="integration-tab" type="button" role="tab" id="tab-docker" aria-controls="panel-docker" aria-selected="false" tabindex="-1">
+              <span class="it-icon">Docker</span>
+              <span><strong>Docker 部署</strong><small>官方镜像启动 REST 服务，内置健康检查</small></span>
             </button>
           </div>
           <p class="doc-deck" style="margin-top:22px;font-size:13px">
@@ -507,6 +600,24 @@ breakdown_script(script=<span class="c-str">"你的剧本内容…"</span>)
 get_task_result(task_id=<span class="c-str">"..."</span>)</code></pre>
             <div class="code-panel__foot">
               <a href="docs/mcp.html">MCP 服务文档</a> · 7 个工具契约
+            </div>
+          </div>
+
+          <div class="code-panel" id="panel-docker" role="tabpanel" aria-labelledby="tab-docker" hidden>
+            <div class="code-panel__bar">
+              <i></i><i></i><i></i><span>bash · docker</span>
+              <button class="bar-copy" type="button" data-copy-target="#docker-code">复制</button>
+            </div>
+            <pre id="docker-code"><code>docker pull neotems/penshot:latest
+
+docker run -d --name penshot \
+  -p 8000:8000 \
+  --env-file .env \
+  neotems/penshot:latest
+
+curl http://localhost:8000/api/v1/health</code></pre>
+            <div class="code-panel__foot">
+              <a href="docs/docker.html">Docker 部署文档</a> · Compose、Redis 与持久化
             </div>
           </div>
         </div>

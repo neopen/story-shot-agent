@@ -248,4 +248,5 @@ PENSHOT_EMBED__DEFAULT__DIMENSIONS=1536
 <p>默认配置下，两种服务都把任务与结果保存在进程内，进程退出即丢失；启用 Redis 后任务状态跨进程共享，但仍不承担结果归档。生产环境若要求审计、重试或结果归档，应在 REST 层实现，而不是依赖 MCP 服务。</p>
 
 <h2>延伸阅读</h2>
+<p>官方镜像默认启动 REST 服务；需要在容器内运行 stdio MCP 时，可覆盖入口：<code>docker run --rm -i --env-file .env --entrypoint python neotems/penshot:latest -m penshot.mcp_server</code>。端口、数据卷与 Compose 配置见<a href="docker.html">Docker 部署</a>。</p>
 <p>SDK 与 REST 的完整参数见<a href="integration.html">集成指南</a>；服务端任务池与状态机见<a href="dev-guide.html">开发者指南</a>与<a href="architecture.html">架构说明</a>；实现与示例代码见<a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a>。</p>

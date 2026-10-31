@@ -1,4 +1,4 @@
-<p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>。</p>
+<p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。</p>
 
 <h2>前置条件</h2>
 <table>
@@ -19,6 +19,11 @@
 <td style="text-align:left">Redis</td>
 <td style="text-align:left">6.0 及以上，可选</td>
 <td style="text-align:left">短期记忆会话与多进程任务记录共享</td>
+</tr>
+<tr>
+<td style="text-align:left">Docker</td>
+<td style="text-align:left">20.10 及以上，可选</td>
+<td style="text-align:left">容器部署；使用 Compose 时另需 Compose v2</td>
 </tr>
 <tr>
 <td style="text-align:left">内存</td>
@@ -43,7 +48,7 @@ pip install "penshot[llm-providers]"
 # 或使用官方镜像
 docker pull neotems/penshot
 </code></pre>
-<p>核心依赖自带 <code>langchain-ollama</code>，连接本地 Ollama 无需额外安装；缺少对应厂商 SDK 时请求会直接报错，不会静默切换模型。当前发布线为 v0.3.x。</p>
+<p>核心依赖自带 <code>langchain-ollama</code>，连接本地 Ollama 无需额外安装；缺少对应厂商 SDK 时请求会直接报错，不会静默切换模型。当前发布线为 v0.3.x。镜像的启动参数、Compose 与持久化配置见 <a href="docker.html">Docker 部署</a>。</p>
 
 <h2>配置</h2>
 <p>在项目根目录创建 <code>.env</code>，最少配置对话模型、嵌入模型与可选的 Redis。对话侧支持 OpenAI、通义千问（DashScope）、DeepSeek 与 Ollama 四类厂商，<code>API_KEY</code> 支持 <code>${ENV_VAR}</code> 形式间接引用环境变量：</p>
@@ -493,14 +498,18 @@ agent = create_penshot_agent(config=config)</code></pre>
 </table>
 
 <h2>下一步</h2>
-<p>需要 HTTP 服务或 MCP 入口时，安装后可直接启动：</p>
+<p>需要 HTTP 服务或 MCP 入口时，安装后可直接启动；也可以用容器运行：</p>
 <pre class="hljs"><code># REST，默认监听 0.0.0.0:8000
 story-shot-agent serve-rest
 
 # MCP stdio 服务
 python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
+
+# 官方镜像
+docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
 </code></pre>
 <ul>
+<li><a href="docker.html">Docker 部署</a>：镜像、Compose、Redis、持久化与健康检查。</li>
 <li><a href="architecture.html">技术架构</a>：节点编排、决策路由与三级循环防护。</li>
 <li><a href="nodes.html">工作流节点</a>：每个节点的输入、规则与失败降级。</li>
 <li><a href="consistency.html">一致性策略</a>：跨片段连贯性的具体保障手段。</li>

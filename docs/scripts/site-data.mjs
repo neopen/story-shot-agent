@@ -23,7 +23,7 @@ export const categories = [
     name: '开始使用',
     desc: '安装、配置，跑通第一个分镜任务',
     icon: 'rocket',
-    docs: ['overview', 'quick-start'],
+    docs: ['overview', 'quick-start', 'docker'],
   },
   {
     id: 'core',
@@ -65,6 +65,10 @@ export const docs = {
     title: '快速开始',
     deck: '从安装、配置到跑通第一个分镜任务，完整走一遍最小可用链路。',
     featured: true,
+  },
+  docker: {
+    title: 'Docker 部署',
+    deck: '官方镜像与 Compose 启动 REST 服务，含 Redis、持久化与健康检查。',
   },
   'dev-guide': {
     title: '开发指南',
