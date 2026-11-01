@@ -9,16 +9,26 @@ See LICENSE File For Details.
 @Time: 2026/5/21 16:34
 """
 import numpy as np
+import pytest
 from pathlib import Path
 from llama_index.core import StorageContext
 from penshot.neopen.shot_config import ShotConfig
+
+# 集成查询测试依赖预置的向量索引数据，缺失时跳过而非报错
+SCRIPT_ID = "SN1780745829485283341820"
+INDEX_DIR = Path(__file__).resolve().parents[2] / "data" / "embedding" / "script_kb" / SCRIPT_ID
+
+pytestmark = pytest.mark.skipif(
+    not (INDEX_DIR / "docstore.json").exists(),
+    reason="缺少预置向量索引 data/embedding/script_kb/.../docstore.json，跳过集成查询测试",
+)
 
 
 def test_vector_query():
     config = ShotConfig()
     embeddings = config.get_embed_by_config()
     script_id = "SN1780745829485283341820"
-    script_dir = Path("../../data/embedding/script_kb") / script_id
+    script_dir = INDEX_DIR
 
     print("=" * 60)
     print("直接向量查询")

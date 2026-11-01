@@ -33,7 +33,15 @@ class TestTaskLifecycleService:
 
     @pytest.fixture
     def lifecycle_service(self, repository, workflow_registry):
-        return TaskLifecycleService(repository, workflow_registry)
+        before = set(repository.list_task_ids())
+        service = TaskLifecycleService(repository, workflow_registry)
+        yield service
+        # 清理本用例新建的任务，避免污染共享 Redis（历史遗留数据不影响断言）
+        try:
+            for task_id in set(repository.list_task_ids()) - before:
+                service.delete_task(task_id)
+        except Exception:
+            pass
 
     def test_create_task(self, lifecycle_service):
         """测试创建任务"""
@@ -120,13 +128,16 @@ class TestTaskLifecycleService:
         assert task["progress"] == 0
 
     def test_get_pending_tasks(self, lifecycle_service):
-        """测试获取未完成任务"""
-        lifecycle_service.create_task("剧本1")
-        lifecycle_service.create_task("剧本2")
+        """测试获取未完成任务（不依赖共享 Redis 的历史数据）"""
+        _, task_id1 = lifecycle_service.create_task("剧本1")
+        _, task_id2 = lifecycle_service.create_task("剧本2")
 
         pending = lifecycle_service.get_pending_tasks(max_age_hours=24)
+        pending_ids = {t["task_id"] for t in pending}
 
-        assert len(pending) == 2
+        # 断言本用例创建的任务出现在待处理列表中，而非依赖绝对数量
+        assert task_id1 in pending_ids
+        assert task_id2 in pending_ids
 
     def test_get_metrics(self, lifecycle_service):
         """测试获取指标"""
@@ -169,7 +180,15 @@ class TestTaskLifecycleServiceIntegration:
     def lifecycle_service(self):
         repository = TaskRepository(task_ttl_seconds=3600)
         workflow_registry = WorkflowRegistry(max_cache_size=10)
-        return TaskLifecycleService(repository, workflow_registry)
+        before = set(repository.list_task_ids())
+        service = TaskLifecycleService(repository, workflow_registry)
+        yield service
+        # 清理本用例新建的任务，避免污染共享 Redis
+        try:
+            for task_id in set(repository.list_task_ids()) - before:
+                service.delete_task(task_id)
+        except Exception:
+            pass
 
     def test_full_lifecycle(self, lifecycle_service):
         """测试完整任务生命周期"""

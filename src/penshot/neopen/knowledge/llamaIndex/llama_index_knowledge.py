@@ -29,6 +29,7 @@ from pydantic import SerializeAsAny
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, warning
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
+from penshot.neopen.knowledge.embedding_adapter import embed_query_vector, to_llama_index_embedding
 from penshot.neopen.tools.script_parser_tool import parse_script_to_documents, parse_script_file_to_documents
 
 
@@ -55,7 +56,8 @@ class ScriptKnowledgeBase:
             chunk_size: 文本块大小
             chunk_overlap: 文本块重叠大小
         """
-        self.embeddings = embeddings
+        # 统一适配为 llama_index BaseEmbedding，避免传入 LangChain Embeddings 时索引创建失败
+        self.embeddings = to_llama_index_embedding(embeddings)
         if storage_dir is None:
             base_dir = settings.get_data_paths().get("data_embedding", "data/embedding")
             self.storage_dir = Path(base_dir) / "script_kb"
@@ -507,8 +509,8 @@ class ScriptKnowledgeBase:
                 error("向量存储未就绪")
                 return {"query": query_text, "results": [], "total_results": 0, "error": "向量存储未就绪"}
 
-            # 获取查询向量
-            query_embedding = self.embeddings.embed_query(query_text)
+            # 获取查询向量（兼容 llama_index / LangChain 嵌入接口）
+            query_embedding = embed_query_vector(self.embeddings, query_text)
 
             # 手动计算余弦相似度
             import numpy as np

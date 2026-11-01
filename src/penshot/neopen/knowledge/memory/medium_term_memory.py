@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Any, Dict
 
-from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import PromptTemplate
 
@@ -45,7 +45,7 @@ class MediumTermMemory:
         self.script_id = script_id
 
         # 会话历史存储
-        self._session_histories: Dict[str, ChatMessageHistory] = {}
+        self._session_histories: Dict[str, InMemoryChatMessageHistory] = {}
 
         # 设置 max_token_limit
         self.max_token_limit = config.medium_term_max_tokens
@@ -64,10 +64,10 @@ class MediumTermMemory:
         debug(f"初始化中期记忆: script={script_id}, max_tokens={config.medium_term_max_tokens}, "
               f"persist={self.persist_path is not None}")
 
-    def _get_session_history(self, session_id: str) -> ChatMessageHistory:
+    def _get_session_history(self, session_id: str) -> InMemoryChatMessageHistory:
         """获取或创建会话历史"""
         if session_id not in self._session_histories:
-            self._session_histories[session_id] = ChatMessageHistory()
+            self._session_histories[session_id] = InMemoryChatMessageHistory()
         return self._session_histories[session_id]
 
     def _summarize(self, summary: str, new_lines: str) -> str:

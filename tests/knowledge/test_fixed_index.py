@@ -12,10 +12,20 @@ See LICENSE File For Details.
 import asyncio
 from pathlib import Path
 
+import pytest
 from llama_index.core import StorageContext, VectorStoreIndex
 
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.shot_config import ShotConfig
+
+# 集成查询测试依赖预置的向量索引数据，缺失时跳过而非报错
+SCRIPT_ID = "SN1780745829485283341820"
+INDEX_DIR = Path(__file__).resolve().parents[2] / "data" / "embedding" / "script_kb" / SCRIPT_ID
+
+pytestmark = pytest.mark.skipif(
+    not (INDEX_DIR / "docstore.json").exists(),
+    reason="缺少预置向量索引 data/embedding/script_kb/.../docstore.json，跳过集成查询测试",
+)
 
 
 async def test_fixed():
@@ -28,7 +38,7 @@ async def test_fixed():
     print("=" * 60)
 
     # 方法1：直接使用 LlamaIndex
-    script_dir = Path("../../data/embedding/script_kb") / script_id
+    script_dir = INDEX_DIR
     storage_context = StorageContext.from_defaults(persist_dir=str(script_dir))
     index = VectorStoreIndex(
         nodes=[],

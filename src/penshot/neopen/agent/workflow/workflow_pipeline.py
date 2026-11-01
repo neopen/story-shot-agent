@@ -358,34 +358,40 @@ class MultiAgentPipeline:
                     "stage_count": 0
                 }
 
+            # 新状态结构：各数据分别位于 domain / execution / output / errors 子状态
+            domain = to_dict(state_dict.get('domain'))
+            execution = to_dict(state_dict.get('execution'))
+            output = to_dict(state_dict.get('output'))
+            errors = to_dict(state_dict.get('errors'))
+
             stages = []
 
-            parsed_script = state_dict.get('parsed_script')
+            parsed_script = domain.get('parsed_script')
             if parsed_script:
                 stages.append("PARSER")
 
-            shot_sequence = state_dict.get('shot_sequence')
+            shot_sequence = domain.get('shot_sequence')
             if shot_sequence:
                 stages.append("SEGMENTER")
 
-            fragment_sequence = state_dict.get('fragment_sequence')
+            fragment_sequence = domain.get('fragment_sequence')
             if fragment_sequence:
                 stages.append("SPLITTER")
 
-            instructions = state_dict.get('instructions')
+            instructions = domain.get('instructions')
             if instructions:
                 stages.append("CONVERTER")
 
-            audit_report = state_dict.get('audit_report')
+            audit_report = domain.get('audit_report')
             if audit_report:
                 stages.append("AUDITOR")
 
-            continuity_issues = state_dict.get('continuity_issues')
+            continuity_issues = domain.get('continuity_issues')
             if continuity_issues is not None:
                 stages.append("CONTINUITY")
 
-            current_node = state_dict.get('current_node')
-            current_stage = state_dict.get('current_stage')
+            current_node = execution.get('current_node')
+            current_stage = execution.get('current_stage')
 
             if hasattr(current_node, 'value'):
                 current_node = current_node.value
@@ -395,15 +401,15 @@ class MultiAgentPipeline:
             stats = {
                 "completed_stages": stages,
                 "stage_count": len(stages),
-                "has_final_output": state_dict.get('final_output') is not None,
+                "has_final_output": output.get('final_output') is not None,
                 "current_node": current_node,
                 "current_stage": current_stage,
-                "global_loops": state_dict.get('global_current_loops', 0),
-                "global_max_loops": state_dict.get('global_max_loops', 0),
-                "error_count": len(state_dict.get('error_messages', []))
+                "global_loops": execution.get('global_current_loops', 0),
+                "global_max_loops": execution.get('global_max_loops', 0),
+                "error_count": len(errors.get('error_messages') or [])
             }
 
-            last_audit_result = state_dict.get('last_audit_result')
+            last_audit_result = to_dict(domain.get('last_audit_result'))
             if last_audit_result:
                 stats["audit"] = {
                     "score": last_audit_result.get('score', 0),
@@ -412,7 +418,7 @@ class MultiAgentPipeline:
                     "total_checks": last_audit_result.get('total_checks', 0)
                 }
 
-            node_current_loops = state_dict.get('node_current_loops', {})
+            node_current_loops = execution.get('node_current_loops', {}) or {}
             if node_current_loops:
                 loops_summary = {}
                 for node, count in node_current_loops.items():
@@ -558,7 +564,11 @@ class MultiAgentPipeline:
                 current_stage = execution.get('current_stage')
                 current_node = execution.get('current_node')
 
-                if current_stage == 'END' or (isinstance(current_stage, str) and current_stage.endswith('END')) or current_node == 'generate_output':
+                # 兼容枚举/字符串：AgentStage.END 的值为 "completed"
+                stage_value = getattr(current_stage, 'value', current_stage)
+                node_value = getattr(current_node, 'value', current_node)
+
+                if stage_value in ('END', 'end', 'completed') or node_value == 'generate_output':
                     success = True
                     data = {
                         "task_id": input_data.get('task_id', initial_state.input.task_id),
@@ -602,26 +612,34 @@ class MultiAgentPipeline:
             current_fragment_count = len(fragments)
             current_stats = fragment_sequence.get("stats", {})
 
-            # 修复错误的统计
-            if current_stats.get("fragments_split", 0) == shot_count and shot_count > 0:
-                # 错误：所有镜头都被标记为分割
-                # 重新计算实际分割的镜头数
-                split_shots = set()
-                for f in fragments:
-                    if hasattr(f, 'metadata') and isinstance(f.metadata, dict):
-                        if f.metadata.get("is_split", False):
-                            original_shot = f.metadata.get("original_shot")
-                            if original_shot:
-                                split_shots.add(original_shot)
+            # 统一提取片段 metadata（兼容字典与对象两种形态）
+            split_shots = set()
+            has_split_metadata = False
+            for f in fragments:
+                metadata = f.get("metadata") if isinstance(f, dict) else getattr(f, "metadata", None)
+                if not isinstance(metadata, dict):
+                    continue
 
+                if "is_split" in metadata:
+                    has_split_metadata = True
+
+                if metadata.get("is_split", False):
+                    original_shot = metadata.get("original_shot")
+                    if original_shot:
+                        split_shots.add(original_shot)
+
+            # 仅在片段确实带有分割标记时校正统计，避免把正确统计误清零
+            if has_split_metadata and shot_count > 0:
                 actual_split_count = len(split_shots)
-                current_stats["fragments_split"] = actual_split_count
-                current_stats["split_ratio"] = round(actual_split_count / shot_count, 2) if shot_count > 0 else 0
+                if current_stats.get("fragments_split", 0) != actual_split_count:
+                    previous_count = current_stats.get("fragments_split", 0)
+                    current_stats["fragments_split"] = actual_split_count
+                    current_stats["split_ratio"] = round(actual_split_count / shot_count, 2)
 
-                fragment_sequence["stats"] = current_stats
-                data["fragment_sequence"] = fragment_sequence
+                    fragment_sequence["stats"] = current_stats
+                    data["fragment_sequence"] = fragment_sequence
 
-                warning(f"修复统计: fragments_split从{shot_count}改为{actual_split_count}")
+                    warning(f"修复统计: fragments_split从{previous_count}改为{actual_split_count}")
 
             return data
 

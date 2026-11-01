@@ -14,7 +14,7 @@ import os
 from typing import List, Dict, Optional, Any
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.schema import Document
-from penshot.logger import debug, info, error
+from penshot.logger import debug, info, error, warning
 
 
 class DocumentLoader:
@@ -193,10 +193,3 @@ class DirectoryLoader:
         
         info(f"成功加载{len(directory_paths)}个目录，总计提取到{len(all_documents)}个文档")
         return all_documents
-
-
-def warning(message: str):
-    """
-    临时警告函数，后续可以从logger模块导入
-    """
-    print(f"[警告] {message}")

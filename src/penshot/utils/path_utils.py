@@ -102,7 +102,8 @@ class PathResolver:
                     if root:
                         return root
                 frame = frame.f_back
-        except:
+        except Exception:
+            # 调用栈不可用时静默失败，交由后续策略继续查找
             pass
 
         return None

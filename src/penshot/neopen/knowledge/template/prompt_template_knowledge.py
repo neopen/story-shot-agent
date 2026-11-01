@@ -17,6 +17,7 @@ from llama_index.core.storage import StorageContext
 
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, warning
+from penshot.neopen.knowledge.embedding_adapter import to_llama_index_embedding
 
 
 class PromptTemplateKB:
@@ -31,7 +32,8 @@ class PromptTemplateKB:
             script_id: 剧本ID（用于数据隔离）
             storage_dir: 存储目录（可选）
         """
-        self.embeddings = embeddings
+        # 统一适配为 llama_index BaseEmbedding，兼容 LangChain 嵌入模型
+        self.embeddings = to_llama_index_embedding(embeddings)
         self.script_id = script_id
         if storage_dir is None:
             base_dir = settings.get_data_paths().get("data_embedding", "data/embedding")

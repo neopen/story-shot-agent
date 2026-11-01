@@ -26,6 +26,7 @@ from penshot.neopen.agent.workflow.workflow_pipeline import MultiAgentPipeline
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.task.task_models import TaskStatus, TaskStage
 from penshot.utils.hash_utils import text_to_id
+from penshot.utils.obj_utils import obj_to_dict
 from .task_repository import TaskRepository
 from .workflow_registry import WorkflowRegistry
 
@@ -41,6 +42,8 @@ class TaskLifecycleService:
         self.task_ttl_seconds = task_ttl_seconds
         self._metrics = {"created": 0, "completed": 0, "failed": 0}
         self._lock = RLock()
+        # 保存后台回调任务引用，防止任务被垃圾回收提前中断
+        self._callback_tasks: set = set()
         self.pipeline_factory = None
 
     # ==================== ID生成方法 ====================
@@ -97,25 +100,23 @@ class TaskLifecycleService:
         try:
             if config is None:
                 return {}
-            return self._safe_serialize(config) or {}
+            # 统一用 obj_to_dict 归一化：同一份配置无论是原始的 ShotConfig 对象，
+            # 还是任务记录里 JSON 反序列化后的 dict，都会得到一致的序列化结果，
+            # 从而保证工作流缓存键在“创建”和“清理”两侧始终一致。
+            return self._safe_serialize(obj_to_dict(config)) or {}
         except Exception as e:
             error(f"配置序列化失败: {e}")
             return {"raw": str(config)}
 
-    def _config_key(self, config: Any) -> str:
-        """Generate a stable key for a config"""
+    def _workflow_key(self, config: Any) -> str:
+        """生成工作流缓存键（与 get_workflow 使用同一套算法，供缓存清理复用）"""
         try:
             payload = json.dumps(self._serialize_config(config), sort_keys=True, ensure_ascii=False)
         except Exception as e:
-            warning(f"生成配置键失败: {e}")
+            warning(f"生成工作流键失败: {e}")
             payload = str(config)
-        try:
-            import hashlib
-            return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-        except Exception as e:
-            error(f"SHA256计算失败: {e}")
-            import uuid
-            return str(uuid.uuid5(uuid.NAMESPACE_DNS, payload))
+        import uuid
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, payload))
 
     # ==================== 核心业务方法 ====================
     def create_task(self, script: str, script_id: Optional[str] = None,
@@ -158,7 +159,7 @@ class TaskLifecycleService:
             "callbacks": [],
         }
 
-        self.repository.create_task(task_id, record, raw_config=config)
+        self.repository.create_task(task_id, record, raw_config=shot_config)
 
         with self._lock:
             self._metrics["created"] += 1
@@ -359,7 +360,7 @@ class TaskLifecycleService:
         self._try_trigger_callback(task_id, {"success": False, "error": error_message})
 
     def _try_trigger_callback(self, task_id: str, result: Dict[str, Any]) -> None:
-        """尝试触发回调"""
+        """尝试触发回调（HTTP 回调用唯一出口，避免同一任务重复通知）"""
         task = self.repository.read_task(task_id)
         if not task:
             return
@@ -368,7 +369,26 @@ class TaskLifecycleService:
         if not callback_url:
             return
 
-        asyncio.create_task(self._trigger_callback_async(task_id, callback_url, result))
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # 同步上下文（无运行中的事件循环）下退化为后台线程发送，
+            # 避免 RuntimeError 冒泡到 complete_task / fail_task 调用方
+            import threading
+
+            def _run_in_thread() -> None:
+                try:
+                    asyncio.run(self._trigger_callback_async(task_id, callback_url, result))
+                except Exception as e:
+                    error(f"回调触发失败: {task_id}, error={e}")
+
+            threading.Thread(target=_run_in_thread, daemon=True).start()
+            return
+
+        task_ref = asyncio.create_task(self._trigger_callback_async(task_id, callback_url, result))
+        # 保留引用，避免任务被垃圾回收提前中断
+        self._callback_tasks.add(task_ref)
+        task_ref.add_done_callback(self._callback_tasks.discard)
 
     async def _trigger_callback_async(self, task_id: str, callback_url: str, result: Dict[str, Any]) -> None:
         """异步触发HTTP回调"""
@@ -384,23 +404,32 @@ class TaskLifecycleService:
         except Exception as e:
             error(f"回调触发失败: {task_id}, error={e}")
 
-    def _cleanup_workflow_cache(self, task_id: str) -> None:
+    def _cleanup_workflow_cache(self, task_id: str, config: Any = None) -> None:
         """清理任务相关的工作流缓存"""
         try:
-            cfg = self.repository.get_raw_config(task_id)
-            if cfg is not None:
-                key = self._config_key(cfg)
-                if key and self.workflow_registry.get(key):
-                    still_used = False
-                    for other_id, other_cfg in self.repository.iter_raw_configs():
-                        if other_id == task_id:
-                            continue
-                        if self._config_key(other_cfg) == key:
-                            still_used = True
-                            break
-                    if not still_used:
-                        self.workflow_registry.pop(key)
-                        debug(f"清理工作流缓存: {key}")
+            cfg = config
+            if cfg is None:
+                cfg = self.repository.get_raw_config(task_id)
+            if cfg is None:
+                # 兼容 Redis / 进程重启场景：回退到任务记录中的 config
+                task = self.repository.read_task(task_id)
+                if task:
+                    cfg = task.get("config")
+            if cfg is None:
+                return
+
+            key = self._workflow_key(cfg)
+            if key and self.workflow_registry.get(key):
+                still_used = False
+                for other_id, other_cfg in self.repository.iter_raw_configs():
+                    if other_id == task_id or other_cfg is None:
+                        continue
+                    if self._workflow_key(other_cfg) == key:
+                        still_used = True
+                        break
+                if not still_used:
+                    self.workflow_registry.pop(key)
+                    debug(f"清理工作流缓存: {key}")
         except Exception as e:
             error(f"清理工作流缓存失败: {e}")
 
@@ -497,17 +526,16 @@ class TaskLifecycleService:
         """获取或创建工作流"""
         if task_id is not None and (config is None or isinstance(config, dict)):
             raw = self.repository.get_raw_config(task_id)
+            if raw is None:
+                # 兼容 Redis / 进程重启场景：回退到任务记录中的 config
+                task = self.repository.read_task(task_id)
+                if task:
+                    raw = task.get("config")
             if raw is not None:
                 config = raw
 
-        try:
-            payload = json.dumps(self._serialize_config(config), sort_keys=True, ensure_ascii=False)
-        except Exception as e:
-            warning(f"生成工作流键失败: {e}")
-            payload = str(config)
-
-        import uuid
-        key = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload))
+        # 与缓存清理共用同一套键算法，避免两处算法不一致导致清理失效
+        key = self._workflow_key(config)
 
         pipeline = self.workflow_registry.get(key)
         if pipeline is not None:
@@ -534,11 +562,20 @@ class TaskLifecycleService:
 
     def delete_task(self, task_id: str, cleanup_workflow: bool = True) -> bool:
         """删除任务"""
+        # 删除后无法再从仓库读取配置，需先取出用于工作流缓存清理
+        cfg = None
+        if cleanup_workflow:
+            cfg = self.repository.get_raw_config(task_id)
+            if cfg is None:
+                task = self.repository.read_task(task_id)
+                if task:
+                    cfg = task.get("config")
+
         if not self.repository.delete_task(task_id):
             return False
 
         if cleanup_workflow:
-            self._cleanup_workflow_cache(task_id)
+            self._cleanup_workflow_cache(task_id, cfg)
 
         return True
 

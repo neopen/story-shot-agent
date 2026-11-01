@@ -22,6 +22,7 @@ from llama_index.core.vector_stores import SimpleVectorStore
 
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, warning
+from penshot.neopen.knowledge.embedding_adapter import to_llama_index_embedding
 
 
 def create_vector_store(
@@ -45,6 +46,9 @@ def create_vector_store(
         VectorStoreIndex实例
     """
     import shutil
+
+    # 兼容传入 LangChain Embeddings 的情况
+    embedding_model = to_llama_index_embedding(embedding_model)
 
     try:
         # 如果提供了存储目录，配置存储上下文
@@ -168,6 +172,9 @@ def create_index_from_directory(
     Returns:
         VectorStoreIndex实例
     """
+    # 兼容传入 LangChain Embeddings 的情况
+    embedding_model = to_llama_index_embedding(embedding_model)
+
     try:
         # 先检查是否可以直接加载现有索引
         if storage_dir and os.path.exists(storage_dir) and not rebuild:
