@@ -22,7 +22,7 @@
 </p>
   
   <p align="center">
-    <a href="./README.md">中文文档</a> •
+    <a href="https://github.com/neopen/story-shot-agent/blob/main/README.md">中文文档</a> •
     <a href="https://shot.helpenx.com" target="_blank">WebSite</a> •
     <a href="https://shot.helpenx.com/docs/" target="_blank">Documentation</a> • 
     <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP Service</a> •
@@ -70,14 +70,14 @@ A multi-agent collaborative screenplay storyboarding system built on **LangChain
 ## 🏛️ System Architecture & Workflow
 
 <p align="center">
-  <img src="/assets/imgs/penshot-uml.webp" alt="PenShot Workflow" width="100%">
+  <img src="https://github.com/neopen/story-shot-agent/blob/main/assets/imgs/penshot-uml.webp" alt="PenShot Workflow" width="100%">
 </p>
 
 <details>
 <summary>🔍 <strong>Click to view detailed UML Class Architecture</strong></summary>
 
 <p align="center">
-  <img src="/assets/imgs/penshot.webp" alt="PenShot UML Architecture" width="100%">
+  <img src="https://github.com/neopen/story-shot-agent/blob/main/assets/imgs/penshot.webp" alt="PenShot UML Architecture" width="100%">
 </p>
 
 </details>
@@ -355,7 +355,7 @@ Edit the `.env` file to configure the required LLM and Embedding parameters：`v
 ## Development Roadmap
 
 <p align="center">
-  <img src="/assets/imgs/penshot-roadmap.webp" alt="PenShot Workflow" width="100%">
+  <img src="https://github.com/neopen/story-shot-agent/blob/main/assets/imgs/penshot-roadmap.webp" alt="PenShot Workflow" width="100%">
 </p>
 
 ### Short-Term
