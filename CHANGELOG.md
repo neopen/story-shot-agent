@@ -7,6 +7,13 @@
 
 ---
 
+## [0.3.13](https://github.com/neopen/story-shot-agent/compare/v0.3.12...v0.3.13) (2026-11-01)
+
+
+### 📝 Documentation (文档更新)
+
+* 文档内容更新 ([#78](https://github.com/neopen/story-shot-agent/issues/78)) ([140bd76](https://github.com/neopen/story-shot-agent/commit/140bd769dc6232a134f38e5b9c41eae5ee40f0ea))
+
 ## [0.3.12](https://github.com/neopen/story-shot-agent/compare/v0.3.11...v0.3.12) (2026-11-01)
 
 
