@@ -82,5 +82,5 @@ class BaseClient(ABC):
             llm.invoke("Hello, world!")
             return True
         except Exception as e:
-            print(f"LLM check failed: {e}")
+            warning(f"LLM 服务检查失败: {e}")
             return False

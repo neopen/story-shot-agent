@@ -73,5 +73,3 @@ def test_evaluate_rerank_quality():
     changed_count = sum(1 for r in results if r["changed"])
     print(f"\n{'=' * 60}")
     print(f"重排序效果统计: {changed_count}/{len(queries)} 个查询结果发生了变化")
-
-    return results

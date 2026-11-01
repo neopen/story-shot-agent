@@ -29,6 +29,8 @@ class TaskRepository:
         self._lock = RLock()
         self._local_tasks: Dict[str, Dict[str, Any]] = {}
         self._local_raw_configs: Dict[str, Any] = {}
+        # 每个任务一把更新锁，保证“读-改-写”在进程内串行，避免并发进度更新互相覆盖
+        self._update_locks: Dict[str, RLock] = {}
 
         self.use_redis = False
         self.redis_client = RedisClient()
@@ -48,6 +50,12 @@ class TaskRepository:
         return "penshot:tasks:ids"
 
     def create_task(self, task_id: str, record: Dict[str, Any], raw_config: Any = None) -> None:
+        # raw_config 只保存在本进程内存中（不参与 Redis 序列化），
+        # 供工作流缓存复用/清理使用；Redis 模式下也必须记录，
+        # 否则 get_raw_config 恒为 None，缓存清理将永远失效。
+        with self._lock:
+            self._local_raw_configs[task_id] = raw_config
+
         if self.use_redis and self.redis is not None:
             key = self.redis_key(task_id)
             payload = json.dumps(obj_to_dict(record), ensure_ascii=False)
@@ -55,7 +63,8 @@ class TaskRepository:
                 self.redis.set(key, payload)
                 self.redis.sadd(self.redis_tasks_set_key(), task_id)
             else:
-                self.redis.setex(key, self.task_ttl_seconds, payload)
+                # 使用 set(key, payload, ex=ttl) 代替已弃用的 setex
+                self.redis.set(key, payload, ex=self.task_ttl_seconds)
                 self.redis.sadd(self.redis_tasks_set_key(), task_id)
                 self.redis.expire(self.redis_tasks_set_key(), self.task_ttl_seconds * 2)
         else:
@@ -63,7 +72,6 @@ class TaskRepository:
                 if task_id in self._local_tasks:
                     raise ValueError(f"task_id already exists: {task_id}")
                 self._local_tasks[task_id] = record
-                self._local_raw_configs[task_id] = raw_config
 
     def read_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         if self.use_redis and self.redis:
@@ -81,11 +89,14 @@ class TaskRepository:
     def write_task(self, task_id: str, record: Dict[str, Any]) -> bool:
         if self.use_redis and self.redis:
             try:
-                self.redis.setex(
-                    self.redis_key(task_id),
-                    self.task_ttl_seconds,
-                    json.dumps(obj_to_dict(record), ensure_ascii=False)
-                )
+                key = self.redis_key(task_id)
+                payload = json.dumps(obj_to_dict(record), ensure_ascii=False)
+                # 使用 set(key, payload, ex=ttl) 代替已弃用的 setex；
+                # ttl 小于 1 表示不设置过期时间
+                if self.task_ttl_seconds < 1:
+                    self.redis.set(key, payload)
+                else:
+                    self.redis.set(key, payload, ex=self.task_ttl_seconds)
                 return True
             except Exception as e:
                 error(f"写入 Redis 任务失败: task_id={task_id}, error={e}")
@@ -96,27 +107,42 @@ class TaskRepository:
             self._local_tasks[task_id] = record
             return True
 
+    def _get_update_lock(self, task_id: str) -> RLock:
+        """获取指定任务的更新锁（不存在时创建）"""
+        with self._lock:
+            lock = self._update_locks.get(task_id)
+            if lock is None:
+                lock = RLock()
+                self._update_locks[task_id] = lock
+            return lock
+
     def update_task(self, task_id: str, updater: Callable[[Dict[str, Any]], None]) -> bool:
-        record = self.read_task(task_id)
-        if not record:
-            return False
-        updater(record)
-        return self.write_task(task_id, record)
+        # 读-改-写整体加锁：Redis 与内存模式下都不会丢失并发更新
+        with self._get_update_lock(task_id):
+            record = self.read_task(task_id)
+            if not record:
+                return False
+            updater(record)
+            return self.write_task(task_id, record)
 
     def delete_task(self, task_id: str) -> bool:
         if self.use_redis and self.redis:
             try:
                 self.redis.delete(self.redis_key(task_id))
                 self.redis.srem(self.redis_tasks_set_key(), task_id)
-                return True
             except Exception as e:
                 error(f"从 Redis 删除任务失败: task_id={task_id}, error={e}")
                 return False
+            with self._lock:
+                self._local_raw_configs.pop(task_id, None)
+                self._update_locks.pop(task_id, None)
+            return True
         with self._lock:
             if task_id not in self._local_tasks:
                 return False
             self._local_tasks.pop(task_id, None)
             self._local_raw_configs.pop(task_id, None)
+            self._update_locks.pop(task_id, None)
             return True
 
     def list_task_ids(self) -> list[str]:

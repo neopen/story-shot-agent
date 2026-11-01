@@ -388,15 +388,14 @@ class PipelineDecision:
 
         passed_checks = report.stats.get("passed_checks", 0)
         total_checks = report.stats.get("total_checks", 0)
-        # 记录审计结果到状态
-        if hasattr(state, 'audit_history'):
-            state.domain.audit_history.append({
-                "timestamp": datetime.now().isoformat(),
-                "status": report.status.value,
-                "score": report.score,
-                "passed_checks": passed_checks,
-                "total_checks": total_checks,
-            })
+        # 记录审计结果到状态（审计历史挂在嵌套的 domain 状态上）
+        state.domain.audit_history.append({
+            "timestamp": datetime.now().isoformat(),
+            "status": report.status.value,
+            "score": report.score,
+            "passed_checks": passed_checks,
+            "total_checks": total_checks,
+        })
 
         # 保存最后的审计结果
         state.domain.last_audit_result = {
@@ -600,8 +599,8 @@ class PipelineDecision:
             warning(f"总重试次数已达上限: {state.execution.total_retries}")
             return PipelineState.NEEDS_HUMAN
 
-        # 检查是否有中止标志
-        if hasattr(state, 'recovery_flags') and state.execution.recovery_flags.get('should_abort', False):
+        # 检查是否有中止标志（recovery_flags 挂在嵌套的 execution 状态上）
+        if state.execution.recovery_flags.get('should_abort', False):
             info("检测到中止标志，结束流程")
             return PipelineState.ABORT
 
@@ -612,7 +611,7 @@ class PipelineDecision:
 
         # ========== 增强的延迟检查逻辑 ==========
         # 1. 检查延迟标志（从recovery_flags获取）
-        if hasattr(state, 'recovery_flags') and state.execution.recovery_flags.get('need_delay', False):
+        if state.execution.recovery_flags.get('need_delay', False):
             delay_seconds = state.execution.recovery_flags.get('delay_seconds', 5)
             max_delay = state.execution.recovery_flags.get('max_delay', 60)
             delay_count = state.execution.recovery_flags.get('delay_count', 0)
@@ -682,9 +681,6 @@ class PipelineDecision:
                 info(f"检测到服务不可用错误，需要延迟 {delay_seconds} 秒后重试")
 
             if delay_needed:
-                if not hasattr(state, 'recovery_flags'):
-                    state.execution.recovery_flags = {}
-
                 state.execution.recovery_flags['need_delay'] = True
                 state.execution.recovery_flags['delay_seconds'] = delay_seconds
                 state.execution.recovery_flags['delay_reason'] = f"错误类型: {last_error[:100]}"
@@ -697,7 +693,7 @@ class PipelineDecision:
                 return PipelineState.NEEDS_RETRY
 
         # 检查修复标志
-        if hasattr(state, 'recovery_flags') and state.execution.recovery_flags.get('need_repair', False):
+        if state.execution.recovery_flags.get('need_repair', False):
             repair_type = state.execution.recovery_flags.get('repair_type', 'general')
 
             if repair_type in ["validation", "data"]:
@@ -713,19 +709,17 @@ class PipelineDecision:
                 info(f"需要一般修复: {repair_type}")
                 return PipelineState.VALID
 
-        # 默认：如果可以恢复，重新开始流程
-        if hasattr(state, 'recovery_flags') and state.execution.recovery_flags.get('can_recover', True):
-            info("错误可恢复，重新开始流程")
-            return PipelineState.NEEDS_RETRY
-
-        # 检查重试次数限制
-        total_retries = getattr(state, 'total_retries', 0)
-        if total_retries >= 10:  # 硬限制
-            warning(f"总重试次数过多: {total_retries}")
+        # 硬限制：总重试次数过多时转人工
+        if state.execution.total_retries >= 10:
+            warning(f"总重试次数过多: {state.execution.total_retries}")
             return PipelineState.NEEDS_HUMAN
 
-        # 最后的选择：重试
-        info("尝试重试流程")
+        # 默认：可恢复则重试，被标记为不可恢复则转人工
+        if not state.execution.recovery_flags.get('can_recover', True):
+            warning("错误被标记为不可恢复，转人工处理")
+            return PipelineState.NEEDS_HUMAN
+
+        info("错误可恢复，重新开始流程")
         return PipelineState.NEEDS_RETRY
 
     def decide_next_after_error(self, graph_state: WorkflowState) -> str:
@@ -984,9 +978,8 @@ class PipelineDecision:
         current_loops = state.execution.node_current_loops.get(stage_node, 0)
         state.execution.node_current_loops[stage_node] = current_loops + 1
 
-        # 2. 更新全局循环计数
-        if hasattr(state, 'global_current_loops'):
-            state.execution.global_current_loops += 1
+        # 2. 更新全局循环计数（计数挂在嵌套的 execution 状态上，根状态无该属性）
+        state.execution.global_current_loops += 1
 
         # 3. 检查节点循环是否超限
         max_loops = state.execution.node_max_loops.get(stage_node, 3)
@@ -1001,34 +994,12 @@ class PipelineDecision:
                 warning(f"节点 {stage_node.value} 循环超限: {current_loops + 1}/{max_loops}")
                 return PipelineState.FAILED, f"节点 {stage_node.value} 循环超限"
 
-        # 4. 检查全局循环是否超限
-        if hasattr(state, 'global_current_loops') and hasattr(state, 'global_max_loops'):
-            if state.execution.global_current_loops >= state.execution.global_max_loops:
-                state.execution.global_loop_exceeded = True
-                return PipelineState.FAILED, f"全局循环超限: {state.execution.global_current_loops}/{state.execution.global_max_loops}"
+        # 4. 检查全局循环是否超限（同上，直接读取嵌套状态字段）
+        if state.execution.global_current_loops >= state.execution.global_max_loops:
+            state.execution.global_loop_exceeded = True
+            return PipelineState.FAILED, f"全局循环超限: {state.execution.global_current_loops}/{state.execution.global_max_loops}"
 
         return PipelineState.SUCCESS, f"节点 {stage_node.value} 循环正常 ({current_loops + 1}/{max_loops})"
-
-    # ===================
-    async def _execute_delay(self, delay_seconds: float):
-        """异步执行延迟（辅助方法）"""
-        import asyncio
-        try:
-            # 检查事件循环是否正在运行
-            loop = asyncio.get_running_loop()
-            if loop.is_closed():
-                info("事件循环已关闭，跳过延迟执行")
-                return
-            info(f"异步延迟执行 {delay_seconds} 秒...")
-            await asyncio.sleep(delay_seconds)
-            info(f"异步延迟结束，继续执行")
-        except RuntimeError as e:
-            # 事件循环已关闭或不在运行
-            warning(f"无法执行异步延迟: {e}")
-            # 降级到同步延迟
-            import time
-            time.sleep(delay_seconds)
-
 
     def _classify_continuity_issues(self, issues):
         """分类连续性问题的严重程度"""

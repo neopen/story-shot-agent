@@ -36,7 +36,7 @@ print(f"项目根目录: {PROJECT_ROOT}")
 print(f".env 文件: {ENV_FILE}")
 
 
-class TestLLMProviderConfig(BaseModel):
+class LLMProviderConfigSpec(BaseModel):
     """LLM提供商配置"""
     base_url: str = Field(default="https://api.openai.com/v1")
     api_key: SecretStr = Field(default=SecretStr(""))
@@ -63,7 +63,7 @@ class TestLLMProviderConfig(BaseModel):
         return v
 
 
-class TestEmbeddingProviderConfig(BaseModel):
+class EmbeddingProviderConfigSpec(BaseModel):
     """嵌入模型提供商配置"""
     base_url: str = Field(default="https://api.openai.com/v1")
     api_key: SecretStr = Field(default=SecretStr(""))
@@ -89,16 +89,16 @@ class TestEmbeddingProviderConfig(BaseModel):
         return v
 
 
-class TestLLMConfig(BaseModel):
+class LLMConfigSpec(BaseModel):
     """LLM主配置"""
-    default: TestLLMProviderConfig = Field(default_factory=TestLLMProviderConfig)
-    fallback: Optional[TestLLMProviderConfig] = Field(default_factory=TestLLMProviderConfig)
+    default: LLMProviderConfigSpec = Field(default_factory=LLMProviderConfigSpec)
+    fallback: Optional[LLMProviderConfigSpec] = Field(default_factory=LLMProviderConfigSpec)
 
 
-class TestEmbeddingConfig(BaseModel):
+class EmbeddingConfigSpec(BaseModel):
     """嵌入模型主配置"""
-    default: TestEmbeddingProviderConfig = Field(default_factory=TestEmbeddingProviderConfig)
-    fallback: TestEmbeddingProviderConfig = Field(default_factory=TestEmbeddingProviderConfig)
+    default: EmbeddingProviderConfigSpec = Field(default_factory=EmbeddingProviderConfigSpec)
+    fallback: EmbeddingProviderConfigSpec = Field(default_factory=EmbeddingProviderConfigSpec)
 
 
 # ====== 2. 自定义环境变量源：智能转换键名 ======
@@ -132,8 +132,8 @@ class TestEmbeddingConfig(BaseModel):
 class Settings(BaseSettings):
     """主配置 - 优先级: 环境变量 > YAML > 模型默认值"""
     # AI 模型配置
-    llm: TestLLMConfig = Field(default_factory=TestLLMConfig)
-    embed: TestEmbeddingConfig = Field(default_factory=TestEmbeddingConfig)
+    llm: LLMConfigSpec = Field(default_factory=LLMConfigSpec)
+    embed: EmbeddingConfigSpec = Field(default_factory=EmbeddingConfigSpec)
 
     model_config = SettingsConfigDict(
         case_sensitive=False,  # 设置大小写不敏感

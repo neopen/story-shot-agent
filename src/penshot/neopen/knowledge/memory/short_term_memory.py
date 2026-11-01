@@ -13,13 +13,13 @@ from collections import deque
 from pathlib import Path
 from typing import Optional, Any, Dict, List
 
-from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableLambda
 
 from penshot.logger import debug, warning, info, error
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
+from penshot.neopen.knowledge.memory.redis_chat_history import RedisChatMessageHistory
 
 
 class ShortTermMemory:
@@ -118,7 +118,7 @@ class ShortTermMemory:
         if session_id not in self._session_histories:
             try:
                 if self._redis_available and self.config.short_term_redis_url:
-                    # Redis key 格式: penshot:memory:{session_id}
+                    # Redis key 格式: message_store:penshot:memory:{session_id}
                     redis_key = f"penshot:memory:{session_id}"
                     self._session_histories[session_id] = RedisChatMessageHistory(
                         session_id=redis_key,
@@ -332,8 +332,8 @@ class ShortTermMemory:
         try:
             import redis
             client = redis.from_url(self.config.short_term_redis_url)
-            pattern = f"penshot:memory:{self._session_id}*"
-            keys = client.keys(pattern)
+            # key 实际带有 message_store: 前缀，按 session_id 匹配以兼容不同前缀配置
+            keys = client.keys(f"*{self._session_id}*")
             client.close()
             return [k.decode('utf-8') if isinstance(k, bytes) else k for k in keys]
         except Exception as e:

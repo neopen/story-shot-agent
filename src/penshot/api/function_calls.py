@@ -98,18 +98,20 @@ class PenshotFunction:
 
     def _start_background_loop(self):
         """启动后台事件循环"""
+        started = threading.Event()
 
         def run_loop():
             self._background_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._background_loop)
+            started.set()
             self._background_loop.run_forever()
 
         self._background_thread = threading.Thread(target=run_loop, daemon=True)
         self._background_thread.start()
 
-        # 等待循环启动
-        while self._background_loop is None:
-            pass
+        # 等待循环启动（事件驱动，避免忙等占满 CPU）
+        if not started.wait(timeout=5):
+            error("后台事件循环启动超时")
 
     def _run_async_in_background(self, coro):
         """在后台事件循环中运行协程"""

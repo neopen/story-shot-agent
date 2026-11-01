@@ -329,42 +329,45 @@ class WorkflowOutputFixer:
                           initial_state: WorkflowState) -> Dict[str, Any]:
         """修复最终结果"""
         try:
-            # 构建基础结果
-            result = {
-                "success": True,
-                "data": {},
-                "task_id": getattr(initial_state, 'task_id', 'unknown'),
-                "workflow_status": "completed"
-            }
+            # 状态为嵌套结构（input/domain/execution/errors/output），统一取子状态
+            state_dict = to_dict(state_dict)
+            domain = to_dict(state_dict.get('domain'))
 
             # 提取需要的数据
             inner_data = {}
 
-            # 添加instructions（如果存在）
-            if 'instructions' in state_dict:
-                inner_data["instructions"] = state_dict['instructions']
-            elif state_dict.get('domain') and hasattr(state_dict['domain'], 'instructions'):
-                inner_data["instructions"] = state_dict['domain'].instructions
+            # instructions 及各阶段数据始终保留：
+            # 修复器不能因为 is_debug=False 就丢失最终输出的核心业务数据
+            instructions = domain.get('instructions')
+            if instructions is None:
+                # 兼容旧的扁平状态结构
+                instructions = state_dict.get('instructions')
+            if instructions is not None:
+                inner_data["instructions"] = instructions
 
             # 1. 添加修复后的fragment_sequence
-            if self.is_debug:
-                inner_data["fragment_sequence"] = self._prepare_fragment_sequence_data(correct_fragment_sequence)
+            inner_data["fragment_sequence"] = self._prepare_fragment_sequence_data(correct_fragment_sequence)
 
             # 2. 添加其他必要的数据
-            if self.is_debug:
-                self._add_other_data(state_dict, inner_data, correct_fragment_sequence)
+            self._add_other_data(state_dict, inner_data, correct_fragment_sequence)
 
-            # 3. 添加处理统计
+            # 3. 添加处理统计（详细统计仅调试模式输出）
             if self.is_debug:
                 inner_data["processing_stats"] = self._build_processing_stats(state_dict, correct_fragment_sequence)
 
-            # 4. 设置data.data
-            result["data"] = inner_data
+            # 4. 只有拿到 instructions 才认为修复成功，避免返回空 data 却宣称成功
+            success = "instructions" in inner_data
 
-            # 5. 添加时间戳
-            result["created_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            result["completed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            result["processing_time_ms"] = int(time.time() * 1000)  # 简化处理
+            # 5. 构建结果
+            result = {
+                "success": success,
+                "data": inner_data,
+                "task_id": initial_state.input.task_id,
+                "workflow_status": "completed" if success else "failed",
+                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "completed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "processing_time_ms": int(time.time() * 1000)  # 简化处理
+            }
 
             debug(f"修复完成，最终数据结构: {list(inner_data.keys())}")
 
@@ -414,57 +417,82 @@ class WorkflowOutputFixer:
     def _add_other_data(self, state_dict: Dict[str, Any],
                         inner_data: Dict[str, Any],
                         fragment_sequence: FragmentSequence):
-        """添加其他数据"""
+        """添加其他数据（优先从 domain 子状态读取，兼容旧的扁平结构）"""
         try:
+            state_dict = to_dict(state_dict)
+            domain = to_dict(state_dict.get('domain'))
+
+            def _pick(key: str):
+                """取字段：新状态结构在 domain 下，旧结构在顶层"""
+                value = domain.get(key)
+                return state_dict.get(key) if value is None else value
+
             # 添加shot_sequence
-            if 'shot_sequence' in state_dict:
-                inner_data["shot_sequence"] = state_dict['shot_sequence']
+            shot_sequence = _pick('shot_sequence')
+            if shot_sequence is not None:
+                inner_data["shot_sequence"] = shot_sequence
 
             # 添加script_analysis
-            if 'parsed_script' in state_dict:
-                inner_data["script_analysis"] = state_dict['parsed_script']
+            parsed_script = _pick('parsed_script')
+            if parsed_script is not None:
+                inner_data["script_analysis"] = parsed_script
 
             # 添加audit_report（如果存在）
-            if 'audit_report' in state_dict:
-                inner_data["audit_report"] = state_dict['audit_report']
+            audit_report = _pick('audit_report')
+            if audit_report is not None:
+                inner_data["audit_report"] = audit_report
 
             # 添加continuity_issues（如果存在）
-            if 'continuity_issues' in state_dict:
-                inner_data["continuity_issues"] = state_dict['continuity_issues']
+            continuity_issues = _pick('continuity_issues')
+            if continuity_issues is not None:
+                inner_data["continuity_issues"] = continuity_issues
 
         except Exception as e:
             error(f"添加其他数据时出错: {str(e)}")
 
     def _build_processing_stats(self, state_dict: Dict[str, Any],
-                                fragment_sequence: FragmentSequence) -> Dict[str, Any]:
-        """构建处理统计"""
+                                fragment_sequence: Optional[Any] = None) -> Dict[str, Any]:
+        """构建处理统计（从 domain/execution/errors 子状态读取）"""
         try:
+            state_dict = to_dict(state_dict)
+            domain = to_dict(state_dict.get('domain'))
+            execution = to_dict(state_dict.get('execution'))
+            errors = to_dict(state_dict.get('errors'))
+
+            completed_stages = self._get_completed_stages(state_dict)
+            current_node = execution.get('current_node')
+            current_stage = execution.get('current_stage')
+
             stats = {
-                "completed_stages": self._get_completed_stages(state_dict),
-                "stage_count": len(self._get_completed_stages(state_dict)),
+                "completed_stages": completed_stages,
+                "stage_count": len(completed_stages),
                 "has_final_output": True,
-                "current_node": "generate_output",
-                "current_stage": "completed",
-                "global_loops": state_dict.get('global_current_loops', 0),
-                "global_max_loops": state_dict.get('global_max_loops', 0),
-                "error_count": len(state_dict.get('error_messages', []))
+                "current_node": getattr(current_node, 'value', current_node) or "generate_output",
+                "current_stage": getattr(current_stage, 'value', current_stage) or "completed",
+                "global_loops": execution.get('global_current_loops', 0),
+                "global_max_loops": execution.get('global_max_loops', 0),
+                "error_count": len(errors.get('error_messages') or [])
             }
 
             # 添加审计信息
-            if 'audit_report' in state_dict:
-                audit_report = state_dict['audit_report']
-                if isinstance(audit_report, dict):
-                    stats["audit"] = {
-                        "score": audit_report.get('score', 100),
-                        "status": audit_report.get('status', 'passed'),
-                        "passed_checks": audit_report.get('passed_checks', 0),
-                        "total_checks": audit_report.get('total_checks', 0)
-                    }
+            audit_report = domain.get('audit_report')
+            if audit_report is None:
+                # 兼容旧的扁平状态结构
+                audit_report = state_dict.get('audit_report')
+            if isinstance(audit_report, dict):
+                stats["audit"] = {
+                    "score": audit_report.get('score', 100),
+                    "status": audit_report.get('status', 'passed'),
+                    "passed_checks": audit_report.get('passed_checks', 0),
+                    "total_checks": audit_report.get('total_checks', 0)
+                }
 
-            # 添加片段统计
+            # 添加片段统计（兼容 FragmentSequence 对象与字典两种形态）
+            fs = to_dict(fragment_sequence) if fragment_sequence is not None else {}
+            fragments = fs.get('fragments') or []
             stats["fragment_stats"] = {
-                "total_fragments": len(fragment_sequence.fragments),
-                "avg_duration": fragment_sequence.stats.get('avg_duration', 0) if hasattr(fragment_sequence, 'stats') else 0,
+                "total_fragments": len(fragments),
+                "avg_duration": (fs.get('stats') or {}).get('avg_duration', 0),
                 "fixed_by_output_fixer": True
             }
 
@@ -475,20 +503,24 @@ class WorkflowOutputFixer:
             return {}
 
     def _get_completed_stages(self, state_dict: Dict[str, Any]) -> List[str]:
-        """获取完成的阶段"""
+        """获取完成的阶段（从新状态结构的 domain 子状态读取）"""
         stages = []
 
-        if state_dict.get('parsed_script'):
+        # 兼容字典/对象输入，统一取 domain 子状态
+        state_dict = to_dict(state_dict)
+        domain = to_dict(state_dict.get('domain'))
+
+        if domain.get('parsed_script'):
             stages.append("PARSER")
-        if state_dict.get('shot_sequence'):
+        if domain.get('shot_sequence'):
             stages.append("SEGMENTER")
-        if state_dict.get('fragment_sequence'):
+        if domain.get('fragment_sequence'):
             stages.append("SPLITTER")
-        if state_dict.get('instructions'):
+        if domain.get('instructions'):
             stages.append("CONVERTER")
-        if state_dict.get('audit_report'):
+        if domain.get('audit_report'):
             stages.append("AUDITOR")
-        if state_dict.get('continuity_issues') is not None:
+        if domain.get('continuity_issues') is not None:
             stages.append("CONTINUITY")
 
         return stages
@@ -516,7 +548,11 @@ class WorkflowOutputFixer:
                 current_stage = execution.get('current_stage')
                 current_node = execution.get('current_node')
 
-                if current_stage == 'END' or (isinstance(current_stage, str) and current_stage.endswith('END')) or current_node == 'generate_output':
+                # 兼容枚举/字符串：AgentStage.END 的值为 "completed"
+                stage_value = getattr(current_stage, 'value', current_stage)
+                node_value = getattr(current_node, 'value', current_node)
+
+                if stage_value in ('END', 'end', 'completed') or node_value == 'generate_output':
                     success = True
                     data = {
                         "task_id": input_data.get('task_id', initial_state.input.task_id),
@@ -526,12 +562,18 @@ class WorkflowOutputFixer:
                         "status": "completed"
                     }
 
-            # 构建结果
+            # 构建结果：processing_stats 统一为 dict 结构（与 _build_processing_stats 一致）
+            fragment_sequence = None
+            if isinstance(data, dict):
+                fragment_sequence = data.get("fragment_sequence")
+            if fragment_sequence is None:
+                fragment_sequence = domain.get("fragment_sequence")
+
             result = {
                 "success": success,
                 "data": data,
                 "errors": errors.get('error_messages', []),
-                "processing_stats": self._get_completed_stages(state_dict),
+                "processing_stats": self._build_processing_stats(state_dict, fragment_sequence),
                 "task_id": initial_state.input.task_id,
                 "workflow_status": "completed" if success else "failed"
             }
@@ -544,11 +586,12 @@ class WorkflowOutputFixer:
 
     def _build_fallback_result(self, initial_state: WorkflowState) -> Dict[str, Any]:
         """构建回退结果"""
+        input_state = getattr(initial_state, "input", None)
         return {
             "success": False,
             "error": "无法修复workflow输出",
             "data": None,
-            "task_id": getattr(initial_state, 'task_id', 'unknown'),
+            "task_id": getattr(input_state, "task_id", "unknown"),
             "workflow_status": "failed"
         }
 

@@ -16,7 +16,7 @@ from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 from penshot.logger import debug, error, warning
-from penshot.utils.file_utils import get_logging_path, get_env_path
+from penshot.utils.file_utils import get_settings_path, get_env_path
 
 
 class ConfigLoader(PydanticBaseSettingsSource):
@@ -84,8 +84,8 @@ class ConfigLoader(PydanticBaseSettingsSource):
         # 从环境变量获取环境
         env = os.getenv("ENVIRONMENT", "development").lower()
 
-        # 1. 加载基础配置
-        settings_file = get_logging_path()
+        # 1. 加载基础配置（settings.yaml，而不是 logging.yaml）
+        settings_file = get_settings_path()
         if settings_file.exists():
             try:
                 with open(settings_file, 'r', encoding='utf-8') as f:

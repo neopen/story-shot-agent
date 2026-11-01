@@ -29,6 +29,8 @@ class LLMBaseConfig(BaseModel):
     max_tokens: int = Field(default=2000, ge=1)
     max_retries: int = Field(default=3, ge=0, le=10)
     retry_delay: int = Field(default=1, ge=0, le=60)
+    # 思考模式开关（Qwen3 等支持该参数的模型有效）；默认关闭，避免思考内容占满 max_tokens 导致 JSON 被截断
+    enable_thinking: Optional[bool] = Field(default=False)
 
     @field_validator("base_url", "model_name", mode="before")
     @classmethod
@@ -160,12 +162,35 @@ class StoryboardConfig(BaseModel):
     output: StoryboardOutputConfig = Field(default_factory=StoryboardOutputConfig)
 
 
+class DataPathsConfig(BaseModel):
+    """数据目录配置（对应 settings.yaml 的 paths.data）"""
+    input: str = Field(default="./data/input")
+    output: str = Field(default="./data/output")
+    memory: str = Field(default="./data/memory")
+    embedding: str = Field(default="./data/embedding")
+    template: str = Field(default="./data/template")
+    model: str = Field(default="./data/models")
+    checkpoint: str = Field(default="./data/checkpoints")
+    cache: str = Field(default="./data/cache")
+
+
+class LogPathsConfig(BaseModel):
+    """日志目录配置（对应 settings.yaml 的 paths.logs）"""
+    base: str = Field(default="./logs")
+    app: str = Field(default="./logs/app")
+    api: str = Field(default="./logs/api")
+    errors: str = Field(default="./logs/errors")
+
+
+class TempPathsConfig(BaseModel):
+    """临时目录配置（对应 settings.yaml 的 paths.temp）"""
+    base: str = Field(default="./tmp")
+    uploads: str = Field(default="./tmp/uploads")
+    processed: str = Field(default="./tmp/processed")
+
+
 class PathsConfig(BaseModel):
-    """路径配置"""
-    data_input: str = Field(default="data/input")
-    data_output: str = Field(default="data/output")
-    data_memory: str = Field(default="data/memory")
-    data_embedding: str = Field(default="data/embedding")
-    data_template: str = Field(default="data/template")
-    data_model: str = Field(default="data/models")
-    data_checkpoint: str = Field(default="data/checkpoints")
+    """路径配置（嵌套结构与 settings.yaml 对齐）"""
+    data: DataPathsConfig = Field(default_factory=DataPathsConfig)
+    logs: LogPathsConfig = Field(default_factory=LogPathsConfig)
+    temp: TempPathsConfig = Field(default_factory=TempPathsConfig)

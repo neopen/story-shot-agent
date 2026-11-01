@@ -9,6 +9,10 @@ See LICENSE File For Details.
 @Time: 2026/3/30
 """
 
+# 集成演示脚本：需真实启动 penshot.mcp_server 子进程并通过 stdio 交互，非单元测试。
+# 标记为不可被 pytest 收集，避免其阻塞/挂起整个测试套件；如需手动验证可直接运行本文件。
+__test__ = False
+
 import asyncio
 import json
 import subprocess

@@ -23,6 +23,7 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.storage import StorageContext
 
 from penshot.logger import debug, info, error, warning
+from penshot.neopen.knowledge.embedding_adapter import to_llama_index_embedding
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
@@ -71,7 +72,8 @@ class PromptTemplateManager:
             max_cache_size: 最大缓存数量
             max_metadata_length: 元数据最大长度（避免块大小警告）
         """
-        self.embedding_model = embedding_model
+        # 统一适配为 llama_index BaseEmbedding，兼容 LangChain 嵌入模型
+        self.embedding_model = to_llama_index_embedding(embedding_model)
         self.memory_manager = memory_manager
         self.base_storage_dir = storage_dir
         self.chunk_size = chunk_size
@@ -910,6 +912,8 @@ class PromptTemplateManager:
         else:
             return {
                 "total_scripts": len(self._caches),
+                # 全局模板总数：与按 script_id 查询时保持同一字段，避免调用方 KeyError
+                "template_count": sum(len(cache) for cache in self._caches.values()),
                 "scripts": {
                     sid: {
                         "template_count": len(cache),

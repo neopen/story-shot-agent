@@ -124,22 +124,48 @@ class Settings(BaseSettings):
         """
         return self.storyboard.generation.supported_styles
 
+    def _resolve_path_group(self, model, prefix: str) -> Dict[str, str]:
+        """
+        将嵌套路径模型展平为 {prefix}_{name} 键，并把相对路径转为项目根目录下的绝对路径。
+        """
+        app_root = PathResolver.get_project_root()
+
+        resolved = {}
+        for name, path in model.model_dump().items():
+            key = f"{prefix}_{name}"
+            if path and not os.path.isabs(path):
+                resolved[key] = os.path.normpath(os.path.join(app_root, path))
+            else:
+                resolved[key] = path
+
+        return resolved
+
     def get_data_paths(self) -> Dict[str, str]:
         """
         获取数据路径配置
+
+        将嵌套的 paths.data 展平为原有的 data_* 键，保持调用方兼容；
+        相对路径统一转为项目根目录下的绝对路径。
         """
-        paths_config = self.paths
-        app_root = PathResolver.get_project_root()
+        return self._resolve_path_group(self.paths.data, "data")
 
-        # 确保路径是绝对路径
-        data_paths = {}
-        for key, path in paths_config.model_dump().items():
-            if path and not os.path.isabs(path):
-                data_paths[key] = os.path.join(app_root, path)
-            else:
-                data_paths[key] = path
+    def get_log_paths(self) -> Dict[str, str]:
+        """
+        获取日志路径配置
 
-        return data_paths
+        将嵌套的 paths.logs 展平为 log_* 键（log_base/log_app/log_api/log_errors），
+        相对路径统一转为项目根目录下的绝对路径。
+        """
+        return self._resolve_path_group(self.paths.logs, "log")
+
+    def get_temp_paths(self) -> Dict[str, str]:
+        """
+        获取临时路径配置
+
+        将嵌套的 paths.temp 展平为 temp_* 键（temp_base/temp_uploads/temp_processed），
+        相对路径统一转为项目根目录下的绝对路径。
+        """
+        return self._resolve_path_group(self.paths.temp, "temp")
 
     def get_retriever_config(self) -> RetrieverConfig:
         return self.retriever

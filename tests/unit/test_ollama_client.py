@@ -1,5 +1,5 @@
 import requests
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 import subprocess
 import time
 
@@ -77,11 +77,11 @@ def create_ollama_llm(model_name, temperature=0):
         print(f"使用默认模型: {actual_model}")
     
     try:
-        llm = Ollama(
+        llm = OllamaLLM(
             model=actual_model,
             temperature=temperature,
             base_url="http://localhost:11434",  # 明确指定 base_url
-            timeout=120  # 增加超时时间
+            client_kwargs={"timeout": 120}  # 超时通过 client_kwargs 传给 ollama.Client
         )
         
         # 测试连接

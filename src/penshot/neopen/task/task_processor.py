@@ -18,9 +18,8 @@ from typing import List, Dict, Optional, Callable
 from penshot.logger import info, warning, error, debug
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
-from penshot.neopen.task.task_handler import CallbackHandler
 from penshot.neopen.task.task_manager import TaskManager
-from penshot.neopen.task.task_models import CallbackPayload, TaskPriority, TaskStatus, TaskResponse, TaskStage, QueuedTask
+from penshot.neopen.task.task_models import TaskPriority, TaskStatus, TaskResponse, TaskStage, QueuedTask
 from penshot.utils.log_utils import print_log_exception
 from penshot.utils.obj_utils import dict_to_obj
 
@@ -38,7 +37,6 @@ class AsyncTaskProcessor:
         初始化异步任务处理器
         """
         self.task_manager = task_manager
-        self.callback_handler = CallbackHandler()
 
         # 并发控制
         self.max_concurrent = max_concurrent
@@ -50,7 +48,11 @@ class AsyncTaskProcessor:
         self._queue: deque = deque()
         self._queue_max_size = queue_size
         self._queue_waiting = 0
-        self._total_processed = 0
+
+        # 队列唤醒事件：有新任务时唤醒工作器，避免空队列空转轮询
+        self._queue_event = asyncio.Event()
+        # 队列跨线程访问锁：cancel/recover 可能从非事件循环线程调用
+        self._queue_lock = threading.Lock()
 
         # 任务优先级映射
         self._priority_order = {
@@ -83,6 +85,7 @@ class AsyncTaskProcessor:
 
     def _start_background_loop(self):
         """启动后台事件循环"""
+        started = threading.Event()
 
         def run_loop():
             debug(f"[AsyncTaskProcessor] 后台线程启动，创建事件循环")
@@ -94,6 +97,7 @@ class AsyncTaskProcessor:
 
             # 创建工作器任务
             self._worker_task = self._background_loop.create_task(self._worker_loop())
+            started.set()
 
             try:
                 self._background_loop.run_forever()
@@ -106,17 +110,41 @@ class AsyncTaskProcessor:
         self._background_thread = threading.Thread(target=run_loop, daemon=True)
         self._background_thread.start()
 
-        # 等待循环启动
-        import time
-        timeout = 5
-        start = time.time()
-        while self._background_loop is None and (time.time() - start) < timeout:
-            time.sleep(0.01)
-
-        if self._background_loop:
+        # 等待循环启动（用事件等待替代 time.sleep 轮询）
+        if started.wait(timeout=5):
             info(f"[AsyncTaskProcessor] 后台事件循环启动成功")
         else:
             error(f"[AsyncTaskProcessor] 后台事件循环启动超时")
+
+    def _notify_queue_not_empty(self) -> None:
+        """唤醒等待队列的工作器（支持从任意线程调用）"""
+        loop = self._background_loop
+        if loop is not None and loop.is_running():
+            loop.call_soon_threadsafe(self._queue_event.set)
+        else:
+            self._queue_event.set()
+
+    def _stop_background_loop(self) -> None:
+        """停止后台事件循环：先取消工作器并等待其退出，再停止循环"""
+        loop = self._background_loop
+        if loop is None:
+            return
+
+        async def _stop():
+            worker = self._worker_task
+            if worker and not worker.done():
+                worker.cancel()
+                try:
+                    await worker
+                except asyncio.CancelledError:
+                    pass
+            loop.stop()
+
+        try:
+            loop.call_soon_threadsafe(lambda: loop.create_task(_stop()))
+        except RuntimeError:
+            # 事件循环已关闭，无需再停止
+            debug("[AsyncTaskProcessor] 后台事件循环已关闭，跳过停止操作")
 
     def _run_async_in_background(self, coro):
         """在后台事件循环中运行协程"""
@@ -146,14 +174,38 @@ class AsyncTaskProcessor:
                     # 启动任务
                     asyncio.create_task(self._execute_task(queued_task))
                 else:
-                    # 队列为空时短暂休眠
-                    await asyncio.sleep(0.05)
+                    # 队列为空：先清空唤醒标记再复核一次，避免漏掉刚入队的任务
+                    self._queue_event.clear()
+                    if not self._queue:
+                        await self._queue_event.wait()
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 error(f"工作器循环异常: {str(e)}")
                 await asyncio.sleep(0.5)
+
+    def _insert_queued_task(self, queued_task: QueuedTask) -> bool:
+        """按优先级插入队列（线程安全），队列已满时返回 False"""
+        with self._queue_lock:
+            if len(self._queue) >= self._queue_max_size:
+                return False
+
+            inserted = False
+            for i, existing in enumerate(self._queue):
+                if self._priority_order[queued_task.priority] < self._priority_order[existing.priority]:
+                    self._queue.insert(i, queued_task)
+                    inserted = True
+                    break
+
+            if not inserted:
+                self._queue.append(queued_task)
+
+            self._queue_waiting += 1
+            self._stats["total_submitted"] += 1
+            self._stats["peak_queue_size"] = max(self._stats["peak_queue_size"], len(self._queue))
+
+        return True
 
     async def _enqueue_task(
             self,
@@ -163,52 +215,35 @@ class AsyncTaskProcessor:
             metadata: Optional[Dict] = None
     ) -> bool:
         """将任务加入队列"""
-        # 检查队列是否已满
-        if len(self._queue) >= self._queue_max_size:
-            warning(f"任务队列已满，拒绝任务: {task_id}")
-            return False
-
         queued_task = QueuedTask(task_id, priority, callback, metadata)
         queued_task.enqueued_at = datetime.now(timezone.utc)
 
-        # 按优先级插入队列
-        inserted = False
-        for i, existing in enumerate(self._queue):
-            if self._priority_order[queued_task.priority] < self._priority_order[existing.priority]:
-                self._queue.insert(i, queued_task)
-                inserted = True
-                break
+        if not self._insert_queued_task(queued_task):
+            warning(f"任务队列已满，拒绝任务: {task_id}")
+            return False
 
-        if not inserted:
-            self._queue.append(queued_task)
-
-        self._queue_waiting += 1
-        self._stats["total_submitted"] += 1
-        self._stats["peak_queue_size"] = max(self._stats["peak_queue_size"], len(self._queue))
+        # 唤醒等待队列的工作器
+        self._notify_queue_not_empty()
 
         debug(f"任务入队: {task_id}, 优先级: {priority.name}, 队列长度: {len(self._queue)}")
         return True
 
     async def _dequeue_task(self) -> Optional[QueuedTask]:
         """从队列中取出任务"""
-        if not self._queue:
-            return None
-
-        await asyncio.sleep(0.01)
-
-        if self._queue:
+        with self._queue_lock:
+            if not self._queue:
+                return None
             task = self._queue.popleft()
             self._queue_waiting -= 1
-            task.started_at = datetime.now(timezone.utc)
 
-            # 计算等待时间
-            wait_ms = (task.started_at - task.enqueued_at).total_seconds() * 1000
-            self._update_avg_wait_time(wait_ms)
+        task.started_at = datetime.now(timezone.utc)
 
-            debug(f"任务出队: {task.task_id}, 等待时间: {wait_ms:.0f}ms")
-            return task
+        # 计算等待时间
+        wait_ms = (task.started_at - task.enqueued_at).total_seconds() * 1000
+        self._update_avg_wait_time(wait_ms)
 
-        return None
+        debug(f"任务出队: {task.task_id}, 等待时间: {wait_ms:.0f}ms")
+        return task
 
     def _update_avg_wait_time(self, wait_ms: float):
         """更新平均等待时间"""
@@ -236,7 +271,19 @@ class AsyncTaskProcessor:
                 # 执行实际的任务处理
                 result = await self._process_script_task_internal(task_id)
 
-                self._stats["total_completed"] += 1
+                # 依据执行结果区分完成/失败，避免失败任务停留在 PROCESSING
+                if getattr(result, "success", False):
+                    self._stats["total_completed"] += 1
+                else:
+                    self._stats["total_failed"] += 1
+                    current = self.task_manager.get_task(task_id) or {}
+                    current_status = getattr(current.get("status"), "value", current.get("status"))
+                    # 内部已把任务标记为终态（如 complete_task 判定失败）时不再重复失败，
+                    # 否则会重复计数并重复触发回调
+                    if current_status == TaskStatus.PROCESSING.value:
+                        self.task_manager.fail_task(
+                            task_id, getattr(result, "error", None) or "任务执行失败"
+                        )
 
                 # 触发回调
                 if queued_task.callback:
@@ -303,7 +350,7 @@ class AsyncTaskProcessor:
             if isinstance(created_at, str):
                 try:
                     created_at = datetime.fromisoformat(created_at)
-                except:
+                except (ValueError, TypeError):
                     created_at = None
 
             processing_time_ms = None
@@ -321,10 +368,9 @@ class AsyncTaskProcessor:
                 completed_at=completed_at
             )
 
+            # 回调统一由 TaskLifecycleService 在任务进入终态时触发，
+            # 此处不再重复发送 HTTP 回调，避免同一任务收到两次通知
             self.task_manager.complete_task(task_id, result_dict)
-
-            if task.get("callback_url"):
-                await self._handle_callback(task_id, result_dict)
 
             return result
 
@@ -340,27 +386,6 @@ class AsyncTaskProcessor:
                 error=str(e)
             )
 
-
-    async def _handle_callback(self, task_id: str, result: Dict):
-        """处理回调通知"""
-        task = self.task_manager.get_task(task_id)
-        if not task or not task.get("callback_url"):
-            return
-
-        try:
-            payload = CallbackPayload(
-                task_id=task_id,
-                status=TaskStatus.SUCCESS if result.get("success") else TaskStatus.FAILED,
-                data=result.get("data"),
-                error_message=result.get("error"),
-                completed_at=datetime.now(timezone.utc)
-            )
-            await self.callback_handler.notify_callback(
-                task["callback_url"],
-                payload.model_dump()
-            )
-        except Exception as e:
-            error(f"回调发送失败 for task {task_id}: {e}")
 
     # ==================== 公共接口 ====================
 
@@ -484,12 +509,13 @@ class AsyncTaskProcessor:
                 return True
 
         # 检查是否在队列中
-        for i, queued in enumerate(self._queue):
-            if queued.task_id == task_id:
-                del self._queue[i]
-                self._queue_waiting -= 1
-                info(f"已从队列中移除任务: {task_id}")
-                return True
+        with self._queue_lock:
+            for i, queued in enumerate(self._queue):
+                if queued.task_id == task_id:
+                    del self._queue[i]
+                    self._queue_waiting -= 1
+                    info(f"已从队列中移除任务: {task_id}")
+                    return True
 
         return False
 
@@ -514,11 +540,14 @@ class AsyncTaskProcessor:
             created_at = task.get("created_at")
             info(f"  待恢复任务: {task.get('task_id')}, 状态: {task.get('status')}, 创建时间: {created_at}")
 
-        # 将任务重新加入队列
+        # 将任务重新加入队列（复用统一入队逻辑，保持优先级、容量与统计一致）
+        restored = 0
         for task in pending_tasks:
             task_id = task.get("task_id")
+            if not task_id:
+                warning("跳过缺少 task_id 的待恢复任务")
+                continue
 
-            # 创建 QueuedTask 并加入队列
             queued_task = QueuedTask(
                 task_id=task_id,
                 priority=TaskPriority.NORMAL,
@@ -526,14 +555,17 @@ class AsyncTaskProcessor:
             )
             queued_task.enqueued_at = datetime.now(timezone.utc)
 
-            # 直接加入队列
-            self._queue.append(queued_task)
-            self._queue_waiting += 1
-            self._stats["total_submitted"] += 1
+            if not self._insert_queued_task(queued_task):
+                warning(f"队列已满，跳过恢复任务: {task_id}")
+                continue
 
+            restored += 1
             info(f"任务已恢复并加入队列: {task_id}")
 
-        info(f"任务恢复完成，队列长度: {len(self._queue)}")
+        if restored:
+            self._notify_queue_not_empty()
+
+        info(f"任务恢复完成: 恢复 {restored}/{len(pending_tasks)} 个，队列长度: {len(self._queue)}")
     #     ============================ 恢复任务 ================================
 
     def get_queue_status(self) -> Dict:
@@ -553,7 +585,7 @@ class AsyncTaskProcessor:
             **self._stats,
             "queue_status": self.get_queue_status(),
             "active_tasks_detail": {
-                task_id: {"status": TaskStatus.PROCESSING}
+                task_id: {"status": TaskStatus.PROCESSING.value}
                 for task_id in self._active_tasks.keys()
             }
         }
@@ -570,12 +602,12 @@ class AsyncTaskProcessor:
                     break
                 await asyncio.sleep(0.5)
 
-        # 停止后台事件循环
-        if self._background_loop:
-            self._background_loop.call_soon_threadsafe(self._background_loop.stop)
+        # 停止后台事件循环（先取消工作器，避免关闭时残留 pending 任务）
+        self._stop_background_loop()
 
         if self._background_thread and self._background_thread.is_alive():
-            self._background_thread.join(timeout=5)
+            # 同步 join 会阻塞调用方事件循环，放到线程池中等待
+            await asyncio.to_thread(self._background_thread.join, 5)
 
         info(f"任务处理器已关闭，总处理: {self._stats['total_completed'] + self._stats['total_failed']}")
 

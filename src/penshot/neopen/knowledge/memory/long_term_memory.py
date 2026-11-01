@@ -31,7 +31,7 @@ def _relevance_from_distance(distance: float) -> float:
     """把向量库返回的距离换算成 [0, 1] 的相关度（越大越相关）
 
     Chroma 的 l2 距离是平方欧氏距离，对单位化向量有 ``距离 = 2 - 2 * 余弦相似度``，
-    因此 ``1 - 距离 / 2`` 即余弦相似度；该配置默认用 OpenAI embeddings，向量是单位化的。
+    因此 ``1 - 距离 / 2`` 即余弦相似度；嵌入模型由 ``MemoryConfig.embeddings`` 提供（未指定时复用统一嵌入工厂）。
     """
     return max(0.0, min(1.0, 1.0 - distance / 2.0))
 

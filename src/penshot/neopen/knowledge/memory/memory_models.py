@@ -14,6 +14,7 @@ from typing import Optional
 
 from langchain_core.embeddings import Embeddings
 
+from penshot.logger import debug, warning
 from penshot.utils.redis_utils import get_redis_url
 
 
@@ -48,10 +49,15 @@ class MemoryConfig:
     embeddings: Embeddings = None
 
     def __post_init__(self):
-        """后处理"""
+        """未显式提供嵌入模型时复用统一嵌入工厂，避免再初始化一套无关的模型"""
         if not self.embeddings:
             try:
-                from langchain.embeddings import OpenAIEmbeddings
-                self.embeddings = OpenAIEmbeddings()
-            except ImportError:
-                pass
+                # LangChain 1.x 已移除 langchain.embeddings，改为复用项目统一嵌入工厂
+                from penshot.neopen.client.client_factory import get_default_embedding
+
+                self.embeddings = get_default_embedding()
+            except Exception as e:
+                warning(f"默认嵌入模型初始化失败: {e}")
+
+        if not self.embeddings:
+            debug("未提供嵌入模型，长期记忆的向量检索能力将不可用")

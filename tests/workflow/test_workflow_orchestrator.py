@@ -123,8 +123,9 @@ class TestWorkflowOrchestrator:
 
     def test_clear(self, orchestrator):
         """测试清空编排器"""
+        from langgraph.graph import END
         orchestrator.add_node("test_node", MagicMock())
-        orchestrator.add_edge("test_node", "END")
+        orchestrator.add_edge("test_node", END)
         orchestrator.build()
 
         orchestrator.clear()

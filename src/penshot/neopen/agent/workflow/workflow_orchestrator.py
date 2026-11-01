@@ -17,6 +17,7 @@ from langgraph.graph import StateGraph, END
 from penshot.logger import info, error, warning, debug
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode, PipelineState
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
+from penshot.utils.obj_utils import to_dict
 
 
 class WorkflowOrchestrator:
@@ -127,39 +128,42 @@ class WorkflowOrchestrator:
 
         try:
             result = self._compiled_graph.invoke(input_data)
-            # 提取统计信息
+            # 提取统计信息（仅字典结果支持原地修复）
             if isinstance(result, dict):
                 self._extract_and_fix_stats(result)
 
-            info(f"工作流执行完成，状态: {result.get('status', 'unknown')}")
+            status = result.get('status', 'unknown') if isinstance(result, dict) else getattr(result, 'status', 'unknown')
+            info(f"工作流执行完成，状态: {status}")
             return result
         except Exception as e:
             error(f"工作流执行失败: {e}")
             raise
 
     def _extract_and_fix_stats(self, state: Dict[str, Any]):
-        """提取并修复统计信息"""
+        """提取并修复统计信息（从嵌套的 domain 子状态读取，兼容旧的扁平结构）"""
         try:
-            fragment_sequence = state.get("fragment_sequence")
+            state_dict = to_dict(state)
+            domain = to_dict(state_dict.get("domain"))
+            fragment_sequence = domain.get("fragment_sequence") or state_dict.get("fragment_sequence")
+
             if fragment_sequence and isinstance(fragment_sequence, dict):
                 shot_count = fragment_sequence.get("source_info", {}).get("shot_count", 0)
                 fragments = fragment_sequence.get("fragments", [])
                 stats = fragment_sequence.get("stats", {})
 
-                # 计算实际分割数
+                # 计算实际分割数（兼容字典与对象两种片段形态）
                 split_shots = set()
                 for f in fragments:
-                    if isinstance(f, dict):
-                        metadata = f.get("metadata", {})
-                        if metadata.get("is_split", False):
-                            original_shot = metadata.get("original_shot")
-                            if original_shot:
-                                split_shots.add(original_shot)
+                    metadata = f.get("metadata") if isinstance(f, dict) else getattr(f, "metadata", None)
+                    if isinstance(metadata, dict) and metadata.get("is_split", False):
+                        original_shot = metadata.get("original_shot")
+                        if original_shot:
+                            split_shots.add(original_shot)
 
                 actual_split = len(split_shots)
 
                 # 修复错误的统计
-                if stats.get("fragments_split", 0) != actual_split and actual_split > 0:
+                if actual_split > 0 and stats.get("fragments_split", 0) != actual_split:
                     stats["fragments_split"] = actual_split
                     stats["split_ratio"] = round(actual_split / shot_count, 2) if shot_count > 0 else 0
                     fragment_sequence["stats"] = stats
@@ -184,7 +188,11 @@ class WorkflowOrchestrator:
 
         try:
             result = await self._compiled_graph.ainvoke(input_data)
-            info(f"异步工作流执行完成，状态: {result.get('status', 'unknown')}")
+            if isinstance(result, dict):
+                self._extract_and_fix_stats(result)
+
+            status = result.get('status', 'unknown') if isinstance(result, dict) else getattr(result, 'status', 'unknown')
+            info(f"异步工作流执行完成，状态: {status}")
             return result
         except Exception as e:
             error(f"异步工作流执行失败: {e}")
