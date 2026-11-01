@@ -70,15 +70,76 @@ class JsonResponseParser:
                     result = json.loads(cleaned_text)
                     debug("成功清理后解析JSON响应")
                     return result
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as exc:
                     error(f"所有Json解析尝试都失败: {cleaned_text}")
                     # 尝试从文本中提取JSON
                     json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                     if json_match:
                         try:
                             return json.loads(json_match.group())
-                        except:
-                            raise
+                        except json.JSONDecodeError as inner:
+                            raise JsonResponseParser._describe_error(inner, cleaned_text) from inner
+                    raise JsonResponseParser._describe_error(exc, cleaned_text) from exc
+
+    @staticmethod
+    def _is_incomplete_json(text: str) -> bool:
+        """
+        判断文本中的 JSON 是否不完整（括号或字符串未闭合）
+        通常由 LLM 输出被 max_tokens 截断导致
+
+        Args:
+            text: 待检查的文本
+
+        Returns:
+            如果 JSON 不完整则返回 True
+        """
+        object_depth = 0
+        array_depth = 0
+        in_string = False
+        escaped = False
+
+        for char in text:
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                object_depth += 1
+            elif char == "}":
+                object_depth -= 1
+            elif char == "[":
+                array_depth += 1
+            elif char == "]":
+                array_depth -= 1
+
+        return in_string or object_depth != 0 or array_depth != 0
+
+    @staticmethod
+    def _describe_error(exc: json.JSONDecodeError, text: str) -> json.JSONDecodeError:
+        """
+        为解析错误补充可读的诊断信息
+
+        Args:
+            exc: 原始解析错误
+            text: 解析失败的文本
+
+        Returns:
+            补充诊断信息后的 JSONDecodeError
+        """
+        if JsonResponseParser._is_incomplete_json(text):
+            return json.JSONDecodeError(
+                f"JSON 响应不完整（疑似被 max_tokens 截断，可关闭思考模式或增大 max_tokens）: {exc.msg}",
+                exc.doc,
+                exc.pos,
+            )
+        return exc
 
     @staticmethod
     def _extract_from_markdown_codeblock(text: str) -> Dict[str, Any]:

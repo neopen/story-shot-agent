@@ -211,16 +211,24 @@ def _fill_default_config(config: AIConfig, **kwargs) -> AIConfig:
 
 def llm_chat_complete(llm: BaseLanguageModel, messages: List[Dict[str, str]], **kwargs) -> str:
     """ LLM 聊天接口封装 """
-    # response = self.llm.chat_complete(
-    #     messages=[
-    #         {"role": "system", "content": "你是一个专业的影视剧本解析分镜师，精通标准剧本格式，输出严格的JSON格式。"},
-    #         {"role": "user", "content": prompt}
-    #     ],
-    #     temperature=0.1,
-    #     response_format={"type": "json_object"}
-    # )
+    content, _ = llm_chat_complete_with_metadata(llm, messages, **kwargs)
+    return content
+
+
+def llm_chat_complete_with_metadata(
+    llm: BaseLanguageModel,
+    messages: List[Dict[str, str]],
+    **kwargs
+) -> Tuple[str, Dict[str, Any]]:
+    """ LLM 聊天接口封装，同时返回响应元数据（含 finish_reason / token 用量） """
     response = llm.invoke(_convert_messages(messages), **kwargs)
-    return response.content
+    metadata = dict(getattr(response, "response_metadata", {}) or {})
+    if metadata.get("finish_reason") == "length":
+        warning(
+            "LLM 响应被截断（finish_reason=length），JSON 可能不完整；"
+            "请增大 max_tokens 或在配置中设置 enable_thinking=false"
+        )
+    return response.content, metadata
 
 
 def _convert_messages(messages: List[Dict[str, str]]):

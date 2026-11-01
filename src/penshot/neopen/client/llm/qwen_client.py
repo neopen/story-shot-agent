@@ -111,6 +111,11 @@ class QwenClient(BaseClient):
 
         base_url = self._openai_compatible_base_url(self.base_url)
         info(f"QwenClient -> OpenAI 兼容接口: {base_url}")
+        # Qwen3 等模型默认开启思考模式，会占用大量 max_tokens 导致正文被截断；
+        # 配置 enable_thinking=false 时通过 extra_body 下发关闭开关
+        extra_body = None
+        if self.llm_config.enable_thinking is not None:
+            extra_body = {"enable_thinking": bool(self.llm_config.enable_thinking)}
         return ChatOpenAI(
             model=self.model_name,
             base_url=base_url,
@@ -119,6 +124,7 @@ class QwenClient(BaseClient):
             temperature=self.llm_config.temperature,
             max_retries=self.llm_config.max_retries,
             max_tokens=self.llm_config.max_tokens,
+            extra_body=extra_body,
         )
 
     def llm_embed(self) -> Embeddings:

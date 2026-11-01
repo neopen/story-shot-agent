@@ -31,6 +31,8 @@ llm:
     max_tokens: 5000
     max_retries: 2
     retry_delay: 1
+    # 是否开启思考模式（Qwen3 等模型有效）；关闭可避免思考内容占满 max_tokens 导致 JSON 被截断
+    enable_thinking: false
 
   # 备用llm模型配置
   fallback:

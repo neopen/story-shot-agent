@@ -21,7 +21,7 @@ MAAS_COMPAT_URL = "https://llm-demo.cn-beijing.maas.aliyuncs.com/compatible-mode
 PUBLIC_NATIVE_URL = "https://dashscope.aliyuncs.com/api/v1"
 
 
-def _build_client(llm_base_url: str, embed_base_url: str = "") -> QwenClient:
+def _build_client(llm_base_url: str, embed_base_url: str = "", **llm_overrides) -> QwenClient:
     """构造使用假密钥的 QwenClient，仅用于分支选择校验（不发起网络请求）"""
     config = AIConfig(
         llm=LLMBaseConfig(
@@ -30,6 +30,7 @@ def _build_client(llm_base_url: str, embed_base_url: str = "") -> QwenClient:
             model_name="qwen-test",
             timeout=30,
             max_tokens=128,
+            **llm_overrides,
         ),
         embed=EmbeddingBaseConfig(
             base_url=embed_base_url or llm_base_url,
@@ -89,3 +90,24 @@ def test_embedding_uses_dashscope_for_public_endpoint():
     embeddings = _build_client(PUBLIC_NATIVE_URL).llm_embed()
 
     assert isinstance(embeddings, DashScopeEmbeddings)
+
+
+def test_enable_thinking_false_passed_via_extra_body():
+    """关闭思考模式时应通过 extra_body 下发 enable_thinking"""
+    llm = _build_client(MAAS_API_URL, enable_thinking=False).create_chat_model()
+
+    assert llm.extra_body == {"enable_thinking": False}
+
+
+def test_enable_thinking_defaults_to_false():
+    """默认关闭思考模式（LLMBaseConfig.enable_thinking=False），避免思考内容占满 max_tokens"""
+    llm = _build_client(MAAS_API_URL).create_chat_model()
+
+    assert llm.extra_body == {"enable_thinking": False}
+
+
+def test_enable_thinking_none_does_not_send_extra_body():
+    """显式配置为 None 时不额外下发参数"""
+    llm = _build_client(MAAS_API_URL, enable_thinking=None).create_chat_model()
+
+    assert llm.extra_body is None
