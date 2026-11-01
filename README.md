@@ -31,7 +31,7 @@ ____  _____ _   _ ____  _  _  ___  _____
 </p>
 
 <p align="center">
-    <a href="./README.md">English</a> •
+    <a href="https://github.com/neopen/story-shot-agent/blob/main/README_en.md" target="_blank">English</a> •
     <a href="https://shot.helpenx.com/" target="_blank">官网演示</a> •
     <a href="https://shot.helpenx.com/docs/" target="_blank">官方文档</a> •
     <a href="https://shot.helpenx.com/docs/integration.html" target="_blank">集成指南</a> •
@@ -79,7 +79,7 @@ ____  _____ _   _ ____  _  _  ___  _____
 
 ## 系统架构与创作流程
 
-![PenShot 创作流程](/assets/imgs/penshot-uml-cn.webp)
+![PenShot 创作流程](https://github.com/neopen/story-shot-agent/blob/main/assets/imgs/penshot-uml-cn.webp)
 
 
 <details>
@@ -447,7 +447,7 @@ docker run -d `
 ## 开发路线图
 
 <p align="center">
-  <img src="/assets/imgs/penshot-roadmap-cn.webp" alt="架构演进路线图之基础阶段" width="100%">
+  <img src="https://github.com/neopen/story-shot-agent/blob/main/assets/imgs/penshot-roadmap-cn.webp" alt="架构演进路线图之基础阶段" width="100%">
 </p>
 
 
