@@ -27,6 +27,8 @@ from penshot.logger import info
 # 阿里云公共 DashScope 域名：仅该域名提供原生 DashScope 接口
 PUBLIC_DASHSCOPE_HOST = "dashscope.aliyuncs.com"
 
+from penshot.logger import info
+
 
 class QwenClient(BaseClient):
     """Qwen LLM 客户端实现"""
@@ -126,6 +128,7 @@ class QwenClient(BaseClient):
             max_tokens=self.llm_config.max_tokens,
             extra_body=extra_body,
         )
+
 
     def llm_embed(self) -> Embeddings:
         """创建嵌入模型

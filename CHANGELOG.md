@@ -7,6 +7,13 @@
 
 ---
 
+## [0.3.11](https://github.com/neopen/story-shot-agent/compare/v0.3.10...v0.3.11) (2026-10-14)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 修复qwen模型依赖问题 ([#69](https://github.com/neopen/story-shot-agent/issues/69)) ([9225455](https://github.com/neopen/story-shot-agent/commit/922545582b0bcae936a0bd74e0566f5d23b5fb37))
+
 ## [0.3.10](https://github.com/neopen/story-shot-agent/compare/v0.3.9...v0.3.10) (2026-10-13)
 
 
