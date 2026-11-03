@@ -33,6 +33,13 @@ from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
 from penshot.neopen.tools.result_storage_tool import create_result_storage
 from penshot.utils.log_utils import print_log_exception
+from penshot.neopen.agent.model_adapter import (
+    RouteDecision,
+    RoutePlan,
+    adapt_instructions,
+    get_capability,
+    resolve_model_name,
+)
 
 
 class WorkflowNodes:
@@ -597,6 +604,29 @@ class WorkflowNodes:
                     styles[f.style] = styles.get(f.style, 0) + 1
             if styles:
                 debug(f"风格分布: {styles}")
+
+            # 4.5 目标模型适配（M0.4.0 内联）：把通用提示词转换为目标模型专属提示词包
+            try:
+                target_model = instructions.metadata.get("video_model")
+                adapted_packages = adapt_instructions(instructions, target_model)
+                resolved_model = resolve_model_name(target_model)
+                plan = RoutePlan(
+                    source_model=str(target_model or ""),
+                    decisions=[
+                        RouteDecision(
+                            fragment_id=pkg.fragment_id,
+                            target_model=pkg.target_model,
+                            reason="m0.4.0_inline",
+                            capability=get_capability(pkg.target_model),
+                        )
+                        for pkg in adapted_packages
+                    ],
+                    adapted_packages=adapted_packages,
+                )
+                instructions.route_plan = plan.model_dump(mode="json")
+                info(f"目标模型适配完成: 模型={resolved_model}, 适配片段数={len(adapted_packages)}")
+            except Exception as e:
+                warning(f"目标模型适配失败（不影响主流程）: {e}")
 
             # 5. 保存结果
             self.storage.save_obj_result(
