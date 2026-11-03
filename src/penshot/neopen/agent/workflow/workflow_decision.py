@@ -14,6 +14,10 @@ from typing import Tuple, Any
 
 from langgraph.graph import END
 
+from penshot.neopen.agent.continuity_guardian.contract_validator import (
+    validate_fragment_sequence,
+    validate_shot_sequence,
+)
 from penshot.neopen.agent.human_decision.human_decision_converter import HumanDecisionConverter
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import AuditStatus, SeverityLevel
 from penshot.neopen.agent.workflow.workflow_models import PipelineState, PipelineNode, AgentStage
@@ -176,6 +180,17 @@ class PipelineDecision:
                 warning(f"镜头拆分，发现{len(long_shots)}个过长镜头，但{retry_reason}")
                 return PipelineState.NEEDS_REPAIR
 
+        # 契约校验（Validator）：镜头主角色必须属于一致性契约
+        contract_issues = validate_shot_sequence(shot_sequence, state.domain.contract)
+        if contract_issues:
+            state.domain.contract_violations.extend(contract_issues)
+            for issue in contract_issues:
+                warning(issue.get("message", ""))
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.SEGMENT_SHOT)
+                return PipelineState.NEEDS_RETRY
+            return PipelineState.NEEDS_REPAIR
+
         # 拆分成功，重置该阶段的重试计数（可选）
         state.execution.stage_current_retries[PipelineNode.SEGMENT_SHOT] = 0
 
@@ -241,6 +256,19 @@ class PipelineDecision:
         if short_fragments:
             # 有过短片段，需要修复
             warning(f"发现{len(short_fragments)}个过短片段（<{state.config.min_fragment_duration}秒）")
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.SPLIT_VIDEO)
+                return PipelineState.NEEDS_REPAIR
+            return PipelineState.FAILED
+
+        # 契约校验（Validator）：片段需关联有效镜头，且角色属于一致性契约
+        contract_issues = validate_fragment_sequence(
+            fragment_sequence, state.domain.shot_sequence, state.domain.contract
+        )
+        if contract_issues:
+            state.domain.contract_violations.extend(contract_issues)
+            for issue in contract_issues:
+                warning(issue.get("message", ""))
             if can_retry:
                 state = self._increment_stage_retry(state, PipelineNode.SPLIT_VIDEO)
                 return PipelineState.NEEDS_REPAIR

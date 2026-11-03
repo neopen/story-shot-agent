@@ -85,6 +85,9 @@ class DomainState(BaseModel):
     # 连续性契约（一等公民）：解析阶段构建，切镜/切片/提示词阶段消费
     contract: Optional[Any] = None
 
+    # 契约校验违规项（Validator 写入，供回退/审计）
+    contract_violations: List[Dict[str, Any]] = []
+
     # 连续性管理
     continuity_state: Dict[str, Any] = {}
     continuity_anchors: Dict[str, Any] = {}
