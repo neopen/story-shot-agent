@@ -9,6 +9,7 @@ See LICENSE File For Details.
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/9
 """
+
 import time
 from typing import Dict, Any, Optional, List
 
@@ -27,7 +28,9 @@ class WorkflowOutputFixer:
         # 为True时，返回各个阶段完整的数据处理结果
         self.is_debug = is_debug
 
-    async def enhanced_workflow_invoke(self, workflow, initial_state: WorkflowState) -> Dict[str, Any]:
+    async def enhanced_workflow_invoke(
+        self, workflow, initial_state: WorkflowState
+    ) -> Dict[str, Any]:
         """
         增强的workflow调用，确保返回正确的分割片段
 
@@ -48,7 +51,7 @@ class WorkflowOutputFixer:
             # final_state = await workflow.ainvoke(
             final_state = workflow.invoke(
                 initial_state,
-                config={"configurable": {"thread_id": f"process_{id(initial_state)}"}}
+                config={"configurable": {"thread_id": f"process_{id(initial_state)}"}},
             )
 
             # 2. 分析并修复输出
@@ -70,8 +73,8 @@ class WorkflowOutputFixer:
                 "success": False,
                 "error": str(e),
                 "data": None,
-                "task_id": getattr(initial_state, 'task_id', 'unknown'),
-                "workflow_status": "exception"
+                "task_id": getattr(initial_state, "task_id", "unknown"),
+                "workflow_status": "exception",
             }
 
     def parse_result_to_dict(self, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -86,7 +89,9 @@ class WorkflowOutputFixer:
 
         return result
 
-    def _analyze_and_fix_output(self, final_state: Any, initial_state: WorkflowState) -> Dict[str, Any]:
+    def _analyze_and_fix_output(
+        self, final_state: Any, initial_state: WorkflowState
+    ) -> Dict[str, Any]:
         """
         分析并修复workflow输出
 
@@ -99,9 +104,9 @@ class WorkflowOutputFixer:
             # 转换为字典以便处理
             if isinstance(final_state, dict):
                 state_dict = final_state
-            elif hasattr(final_state, 'dict'):
+            elif hasattr(final_state, "dict"):
                 state_dict = final_state.dict()
-            elif hasattr(final_state, '__dict__'):
+            elif hasattr(final_state, "__dict__"):
                 state_dict = final_state.__dict__
             else:
                 error(f"无法识别的final_state类型: {type(final_state)}")
@@ -114,13 +119,19 @@ class WorkflowOutputFixer:
 
             if not correct_fragment_sequence:
                 warning("未找到正确的fragment_sequence，尝试深度搜索...")
-                correct_fragment_sequence = self._deep_search_fragment_sequence(state_dict)
+                correct_fragment_sequence = self._deep_search_fragment_sequence(
+                    state_dict
+                )
 
             if correct_fragment_sequence:
-                debug(f"找到正确的片段序列: {len(correct_fragment_sequence.fragments)}个片段")
+                debug(
+                    f"找到正确的片段序列: {len(correct_fragment_sequence.fragments)}个片段"
+                )
 
                 # 修复最终输出
-                fixed_result = self._fix_final_result(state_dict, correct_fragment_sequence, initial_state)
+                fixed_result = self._fix_final_result(
+                    state_dict, correct_fragment_sequence, initial_state
+                )
                 return fixed_result
             else:
                 warning("未找到任何正确的片段序列，使用原始输出")
@@ -130,7 +141,9 @@ class WorkflowOutputFixer:
             error(f"分析修复输出时出错: {str(e)}")
             return self._build_fallback_result(initial_state)
 
-    def _find_correct_fragment_sequence(self, state_dict: Dict[str, Any]) -> Optional[FragmentSequence]:
+    def _find_correct_fragment_sequence(
+        self, state_dict: Dict[str, Any]
+    ) -> Optional[FragmentSequence]:
         """
         查找正确的fragment_sequence
 
@@ -140,20 +153,18 @@ class WorkflowOutputFixer:
             # 尝试从多个可能的键中查找
             search_keys = [
                 # 直接键名
-                'fragment_sequence',
-                'video_splitter_output',
-                'splitter_output',
-                'fragments_output',
-
+                "fragment_sequence",
+                "video_splitter_output",
+                "splitter_output",
+                "fragments_output",
                 # 节点输出键名（可能带前缀）
-                'fragment_for_ai_node_output',
-                'fragment_for_ai_result',
-                'split_video_result',
-
+                "fragment_for_ai_node_output",
+                "fragment_for_ai_result",
+                "split_video_result",
                 # 中间状态键名
-                'current_fragments',
-                'generated_fragments',
-                'ai_fragments'
+                "current_fragments",
+                "generated_fragments",
+                "ai_fragments",
             ]
 
             for key in search_keys:
@@ -162,56 +173,70 @@ class WorkflowOutputFixer:
                     debug(f"检查键 '{key}': {type(candidate)}")
 
                     if self._is_valid_fragment_sequence(candidate):
-                        fragment_sequence = self._convert_to_fragment_sequence(candidate)
+                        fragment_sequence = self._convert_to_fragment_sequence(
+                            candidate
+                        )
                         if fragment_sequence:
                             debug(f"从键 '{key}' 找到有效的片段序列")
                             return fragment_sequence
 
             # 检查新状态结构中的domain子状态（处理对象或字典）
-            if 'domain' in state_dict:
-                domain = to_dict(state_dict['domain'])
+            if "domain" in state_dict:
+                domain = to_dict(state_dict["domain"])
                 debug(f"domain内容键: {list(domain.keys())}")
-                
+
                 # 特别检查fragment_sequence字段
-                if 'fragment_sequence' in domain:
-                    candidate = domain['fragment_sequence']
+                if "fragment_sequence" in domain:
+                    candidate = domain["fragment_sequence"]
                     debug(f"找到domain.fragment_sequence，类型: {type(candidate)}")
-                    
+
                     if candidate is not None:
                         # 检查是否是FragmentSequence对象
                         if isinstance(candidate, FragmentSequence):
-                            debug(f"domain.fragment_sequence是FragmentSequence对象，片段数: {len(candidate.fragments)}")
+                            debug(
+                                f"domain.fragment_sequence是FragmentSequence对象，片段数: {len(candidate.fragments)}"
+                            )
                             return candidate
                         # 检查是否是字典
                         elif isinstance(candidate, dict):
-                            debug(f"domain.fragment_sequence是字典，键: {list(candidate.keys())}")
-                            if 'fragments' in candidate:
-                                fragments = candidate['fragments']
-                                debug(f"fragments列表长度: {len(fragments) if isinstance(fragments, list) else '不是列表'}")
+                            debug(
+                                f"domain.fragment_sequence是字典，键: {list(candidate.keys())}"
+                            )
+                            if "fragments" in candidate:
+                                fragments = candidate["fragments"]
+                                debug(
+                                    f"fragments列表长度: {len(fragments) if isinstance(fragments, list) else '不是列表'}"
+                                )
                                 if self._is_valid_fragment_sequence(candidate):
-                                    fragment_sequence = self._convert_to_fragment_sequence(candidate)
+                                    fragment_sequence = (
+                                        self._convert_to_fragment_sequence(candidate)
+                                    )
                                     if fragment_sequence:
                                         return fragment_sequence
-                
+
                 # 继续检查其他键
                 for key in search_keys:
-                    if key in domain and key != 'fragment_sequence':
+                    if key in domain and key != "fragment_sequence":
                         candidate = domain[key]
                         debug(f"检查domain.{key}: {type(candidate)}")
                         if self._is_valid_fragment_sequence(candidate):
-                            fragment_sequence = self._convert_to_fragment_sequence(candidate)
+                            fragment_sequence = self._convert_to_fragment_sequence(
+                                candidate
+                            )
                             if fragment_sequence:
                                 debug(f"从domain.{key}找到有效的片段序列")
                                 return fragment_sequence
 
             # 检查workflow状态中的其他数据
-            if 'intermediate_results' in state_dict:
-                intermediate = state_dict['intermediate_results']
+            if "intermediate_results" in state_dict:
+                intermediate = state_dict["intermediate_results"]
                 if isinstance(intermediate, dict):
                     for key, value in intermediate.items():
-                        if 'fragment' in key.lower() or 'split' in key.lower():
+                        if "fragment" in key.lower() or "split" in key.lower():
                             if self._is_valid_fragment_sequence(value):
-                                fragment_sequence = self._convert_to_fragment_sequence(value)
+                                fragment_sequence = self._convert_to_fragment_sequence(
+                                    value
+                                )
                                 if fragment_sequence:
                                     info(f"从intermediate_results的'{key}'找到片段序列")
                                     return fragment_sequence
@@ -222,7 +247,9 @@ class WorkflowOutputFixer:
             error(f"查找片段序列时出错: {str(e)}")
             return None
 
-    def _deep_search_fragment_sequence(self, state_dict: Dict[str, Any]) -> Optional[FragmentSequence]:
+    def _deep_search_fragment_sequence(
+        self, state_dict: Dict[str, Any]
+    ) -> Optional[FragmentSequence]:
         """深度搜索片段序列数据"""
         try:
             visited = set()
@@ -236,9 +263,11 @@ class WorkflowOutputFixer:
                 if isinstance(obj, dict):
                     # 检查当前字典
                     for key, value in obj.items():
-                        if 'fragment' in key.lower() or 'split' in key.lower():
+                        if "fragment" in key.lower() or "split" in key.lower():
                             if self._is_valid_fragment_sequence(value):
-                                fragment_sequence = self._convert_to_fragment_sequence(value)
+                                fragment_sequence = self._convert_to_fragment_sequence(
+                                    value
+                                )
                                 if fragment_sequence:
                                     debug(f"深度搜索在路径 '{path}.{key}' 找到片段序列")
                                     return fragment_sequence
@@ -274,15 +303,17 @@ class WorkflowOutputFixer:
             # 如果是字典格式
             if isinstance(candidate, dict):
                 # 检查是否有fragments字段
-                if 'fragments' in candidate:
-                    fragments = candidate['fragments']
+                if "fragments" in candidate:
+                    fragments = candidate["fragments"]
                     if isinstance(fragments, list) and len(fragments) > 0:
                         # 检查片段结构（放宽验证）
                         first_fragment = fragments[0]
                         if isinstance(first_fragment, dict):
                             # 检查必要字段
-                            required_fields = ['id', 'shot_id', 'duration']
-                            return all(field in first_fragment for field in required_fields)
+                            required_fields = ["id", "shot_id", "duration"]
+                            return all(
+                                field in first_fragment for field in required_fields
+                            )
 
             return False
 
@@ -290,7 +321,9 @@ class WorkflowOutputFixer:
             debug(f"检查有效性时出错: {str(e)}")
             return False
 
-    def _convert_to_fragment_sequence(self, candidate: Any) -> Optional[FragmentSequence]:
+    def _convert_to_fragment_sequence(
+        self, candidate: Any
+    ) -> Optional[FragmentSequence]:
         """转换为FragmentSequence对象"""
         try:
             if isinstance(candidate, FragmentSequence):
@@ -298,24 +331,24 @@ class WorkflowOutputFixer:
 
             if isinstance(candidate, dict):
                 # 从字典创建FragmentSequence
-                fragments = candidate.get('fragments', [])
-                metadata = candidate.get('metadata', {})
-                source_info = candidate.get('source_info', {})
-                stats = candidate.get('stats', {})
+                fragments = candidate.get("fragments", [])
+                metadata = candidate.get("metadata", {})
+                source_info = candidate.get("source_info", {})
+                stats = candidate.get("stats", {})
 
                 # 确保metadata中有正确的信息
-                if 'total_fragments' not in metadata:
-                    metadata['total_fragments'] = len(fragments)
-                if 'generated_at' not in metadata:
-                    metadata['generated_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
-                if 'cutter_type' not in metadata:
-                    metadata['cutter_type'] = 'LLMVideoSplitter_Fixed'
+                if "total_fragments" not in metadata:
+                    metadata["total_fragments"] = len(fragments)
+                if "generated_at" not in metadata:
+                    metadata["generated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                if "cutter_type" not in metadata:
+                    metadata["cutter_type"] = "LLMVideoSplitter_Fixed"
 
                 return FragmentSequence(
                     fragments=fragments,
                     metadata=metadata,
                     source_info=source_info,
-                    stats=stats
+                    stats=stats,
                 )
 
             return None
@@ -324,36 +357,43 @@ class WorkflowOutputFixer:
             error(f"转换FragmentSequence时出错: {str(e)}")
             return None
 
-    def _fix_final_result(self, state_dict: Dict[str, Any],
-                          correct_fragment_sequence: FragmentSequence,
-                          initial_state: WorkflowState) -> Dict[str, Any]:
+    def _fix_final_result(
+        self,
+        state_dict: Dict[str, Any],
+        correct_fragment_sequence: FragmentSequence,
+        initial_state: WorkflowState,
+    ) -> Dict[str, Any]:
         """修复最终结果"""
         try:
             # 状态为嵌套结构（input/domain/execution/errors/output），统一取子状态
             state_dict = to_dict(state_dict)
-            domain = to_dict(state_dict.get('domain'))
+            domain = to_dict(state_dict.get("domain"))
 
             # 提取需要的数据
             inner_data = {}
 
             # instructions 及各阶段数据始终保留：
             # 修复器不能因为 is_debug=False 就丢失最终输出的核心业务数据
-            instructions = domain.get('instructions')
+            instructions = domain.get("instructions")
             if instructions is None:
                 # 兼容旧的扁平状态结构
-                instructions = state_dict.get('instructions')
+                instructions = state_dict.get("instructions")
             if instructions is not None:
                 inner_data["instructions"] = instructions
 
             # 1. 添加修复后的fragment_sequence
-            inner_data["fragment_sequence"] = self._prepare_fragment_sequence_data(correct_fragment_sequence)
+            inner_data["fragment_sequence"] = self._prepare_fragment_sequence_data(
+                correct_fragment_sequence
+            )
 
             # 2. 添加其他必要的数据
             self._add_other_data(state_dict, inner_data, correct_fragment_sequence)
 
             # 3. 添加处理统计（详细统计仅调试模式输出）
             if self.is_debug:
-                inner_data["processing_stats"] = self._build_processing_stats(state_dict, correct_fragment_sequence)
+                inner_data["processing_stats"] = self._build_processing_stats(
+                    state_dict, correct_fragment_sequence
+                )
 
             # 4. 只有拿到 instructions 才认为修复成功，避免返回空 data 却宣称成功
             success = "instructions" in inner_data
@@ -366,7 +406,7 @@ class WorkflowOutputFixer:
                 "workflow_status": "completed" if success else "failed",
                 "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "completed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "processing_time_ms": int(time.time() * 1000)  # 简化处理
+                "processing_time_ms": int(time.time() * 1000),  # 简化处理
             }
 
             debug(f"修复完成，最终数据结构: {list(inner_data.keys())}")
@@ -377,36 +417,42 @@ class WorkflowOutputFixer:
             error(f"修复最终结果时出错: {str(e)}")
             return self._build_fallback_result(initial_state)
 
-    def _prepare_fragment_sequence_data(self, fragment_sequence: FragmentSequence) -> Dict[str, Any]:
+    def _prepare_fragment_sequence_data(
+        self, fragment_sequence: FragmentSequence
+    ) -> Dict[str, Any]:
         """准备片段序列数据"""
         try:
             # 转换为字典
-            if hasattr(fragment_sequence, 'dict'):
+            if hasattr(fragment_sequence, "dict"):
                 fs_dict = fragment_sequence.model_dump()
-            elif hasattr(fragment_sequence, '__dict__'):
+            elif hasattr(fragment_sequence, "__dict__"):
                 fs_dict = fragment_sequence.__dict__
             else:
                 fs_dict = fragment_sequence.to_dict()
 
             # 确保metadata中有修复标记
-            metadata = fs_dict.get('metadata', {})
-            metadata['fixed_by_output_fixer'] = True
-            metadata['fix_timestamp'] = time.strftime("%Y-%m-%d %H:%M:%S")
-            metadata['fix_version'] = "1.0"
-            fs_dict['metadata'] = metadata
+            metadata = fs_dict.get("metadata", {})
+            metadata["fixed_by_output_fixer"] = True
+            metadata["fix_timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            metadata["fix_version"] = "1.0"
+            fs_dict["metadata"] = metadata
 
             # 验证片段数量
-            fragments = fs_dict.get('fragments', [])
-            if 'stats' not in fs_dict:
-                fs_dict['stats'] = {}
+            fragments = fs_dict.get("fragments", [])
+            if "stats" not in fs_dict:
+                fs_dict["stats"] = {}
 
-            fs_dict['stats']['fragment_count'] = len(fragments)
-            fs_dict['stats']['total_duration'] = sum(f.get('duration', 0) for f in fragments)
+            fs_dict["stats"]["fragment_count"] = len(fragments)
+            fs_dict["stats"]["total_duration"] = sum(
+                f.get("duration", 0) for f in fragments
+            )
 
             if len(fragments) > 0:
-                fs_dict['stats']['avg_duration'] = fs_dict['stats']['total_duration'] / len(fragments)
+                fs_dict["stats"]["avg_duration"] = fs_dict["stats"][
+                    "total_duration"
+                ] / len(fragments)
             else:
-                fs_dict['stats']['avg_duration'] = 0
+                fs_dict["stats"]["avg_duration"] = 0
 
             return fs_dict
 
@@ -414,13 +460,16 @@ class WorkflowOutputFixer:
             error(f"准备片段序列数据时出错: {str(e)}")
             return {}
 
-    def _add_other_data(self, state_dict: Dict[str, Any],
-                        inner_data: Dict[str, Any],
-                        fragment_sequence: FragmentSequence):
+    def _add_other_data(
+        self,
+        state_dict: Dict[str, Any],
+        inner_data: Dict[str, Any],
+        fragment_sequence: FragmentSequence,
+    ):
         """添加其他数据（优先从 domain 子状态读取，兼容旧的扁平结构）"""
         try:
             state_dict = to_dict(state_dict)
-            domain = to_dict(state_dict.get('domain'))
+            domain = to_dict(state_dict.get("domain"))
 
             def _pick(key: str):
                 """取字段：新状态结构在 domain 下，旧结构在顶层"""
@@ -428,72 +477,82 @@ class WorkflowOutputFixer:
                 return state_dict.get(key) if value is None else value
 
             # 添加shot_sequence
-            shot_sequence = _pick('shot_sequence')
+            shot_sequence = _pick("shot_sequence")
             if shot_sequence is not None:
                 inner_data["shot_sequence"] = shot_sequence
 
             # 添加script_analysis
-            parsed_script = _pick('parsed_script')
+            parsed_script = _pick("parsed_script")
             if parsed_script is not None:
                 inner_data["script_analysis"] = parsed_script
 
             # 添加audit_report（如果存在）
-            audit_report = _pick('audit_report')
+            audit_report = _pick("audit_report")
             if audit_report is not None:
                 inner_data["audit_report"] = audit_report
 
             # 添加continuity_issues（如果存在）
-            continuity_issues = _pick('continuity_issues')
+            continuity_issues = _pick("continuity_issues")
             if continuity_issues is not None:
                 inner_data["continuity_issues"] = continuity_issues
+
+            # 添加一致性契约（一等公民，供下游消费）
+            contract = _pick("contract")
+            if contract is not None:
+                inner_data["consistency_contract"] = (
+                    contract.to_dict() if hasattr(contract, "to_dict") else contract
+                )
 
         except Exception as e:
             error(f"添加其他数据时出错: {str(e)}")
 
-    def _build_processing_stats(self, state_dict: Dict[str, Any],
-                                fragment_sequence: Optional[Any] = None) -> Dict[str, Any]:
+    def _build_processing_stats(
+        self, state_dict: Dict[str, Any], fragment_sequence: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """构建处理统计（从 domain/execution/errors 子状态读取）"""
         try:
             state_dict = to_dict(state_dict)
-            domain = to_dict(state_dict.get('domain'))
-            execution = to_dict(state_dict.get('execution'))
-            errors = to_dict(state_dict.get('errors'))
+            domain = to_dict(state_dict.get("domain"))
+            execution = to_dict(state_dict.get("execution"))
+            errors = to_dict(state_dict.get("errors"))
 
             completed_stages = self._get_completed_stages(state_dict)
-            current_node = execution.get('current_node')
-            current_stage = execution.get('current_stage')
+            current_node = execution.get("current_node")
+            current_stage = execution.get("current_stage")
 
             stats = {
                 "completed_stages": completed_stages,
                 "stage_count": len(completed_stages),
                 "has_final_output": True,
-                "current_node": getattr(current_node, 'value', current_node) or "generate_output",
-                "current_stage": getattr(current_stage, 'value', current_stage) or "completed",
-                "global_loops": execution.get('global_current_loops', 0),
-                "global_max_loops": execution.get('global_max_loops', 0),
-                "error_count": len(errors.get('error_messages') or [])
+                "current_node": getattr(current_node, "value", current_node)
+                or "generate_output",
+                "current_stage": getattr(current_stage, "value", current_stage)
+                or "completed",
+                "global_loops": execution.get("global_current_loops", 0),
+                "global_max_loops": execution.get("global_max_loops", 0),
+                "error_count": len(errors.get("error_messages") or []),
             }
 
             # 添加审计信息
-            audit_report = domain.get('audit_report')
+            audit_report = domain.get("audit_report")
             if audit_report is None:
                 # 兼容旧的扁平状态结构
-                audit_report = state_dict.get('audit_report')
+                audit_report = state_dict.get("audit_report")
             if isinstance(audit_report, dict):
                 stats["audit"] = {
-                    "score": audit_report.get('score', 100),
-                    "status": audit_report.get('status', 'passed'),
-                    "passed_checks": audit_report.get('passed_checks', 0),
-                    "total_checks": audit_report.get('total_checks', 0)
+                    "score": audit_report.get("score", 100),
+                    "status": audit_report.get("status", "passed"),
+                    "passed_checks": audit_report.get("passed_checks", 0),
+                    "total_checks": audit_report.get("total_checks", 0),
                 }
 
             # 添加片段统计（兼容 FragmentSequence 对象与字典两种形态）
             fs = to_dict(fragment_sequence) if fragment_sequence is not None else {}
-            fragments = fs.get('fragments') or []
+            fragments = fs.get("fragments") or []
             stats["fragment_stats"] = {
                 "total_fragments": len(fragments),
-                "avg_duration": (fs.get('stats') or {}).get('avg_duration', 0),
-                "fixed_by_output_fixer": True
+                "avg_duration": (fs.get("stats") or {}).get("avg_duration", 0),
+                "fixed_by_output_fixer": True,
             }
 
             return stats
@@ -508,58 +567,64 @@ class WorkflowOutputFixer:
 
         # 兼容字典/对象输入，统一取 domain 子状态
         state_dict = to_dict(state_dict)
-        domain = to_dict(state_dict.get('domain'))
+        domain = to_dict(state_dict.get("domain"))
 
-        if domain.get('parsed_script'):
+        if domain.get("parsed_script"):
             stages.append("PARSER")
-        if domain.get('shot_sequence'):
+        if domain.get("shot_sequence"):
             stages.append("SEGMENTER")
-        if domain.get('fragment_sequence'):
+        if domain.get("fragment_sequence"):
             stages.append("SPLITTER")
-        if domain.get('instructions'):
+        if domain.get("instructions"):
             stages.append("CONVERTER")
-        if domain.get('audit_report'):
+        if domain.get("audit_report"):
             stages.append("AUDITOR")
-        if domain.get('continuity_issues') is not None:
+        if domain.get("continuity_issues") is not None:
             stages.append("CONTINUITY")
 
         return stages
 
-    def _convert_state_to_result(self, state_dict: Dict[str, Any],
-                                 initial_state: WorkflowState) -> Dict[str, Any]:
+    def _convert_state_to_result(
+        self, state_dict: Dict[str, Any], initial_state: WorkflowState
+    ) -> Dict[str, Any]:
         """将状态字典转换为结果格式"""
         try:
             success = False
 
             # 从新状态结构中提取信息（处理嵌套对象）
-            domain = to_dict(state_dict.get('domain'))
-            output = to_dict(state_dict.get('output'))
-            execution = to_dict(state_dict.get('execution'))
-            errors = to_dict(state_dict.get('errors'))
-            input_data = to_dict(state_dict.get('input'))
+            domain = to_dict(state_dict.get("domain"))
+            output = to_dict(state_dict.get("output"))
+            execution = to_dict(state_dict.get("execution"))
+            errors = to_dict(state_dict.get("errors"))
+            input_data = to_dict(state_dict.get("input"))
 
             # 提取最终输出
-            data = output.get('final_output')
+            data = output.get("final_output")
 
             if data is not None:
                 success = True
             else:
                 # 检查是否到达结束状态
-                current_stage = execution.get('current_stage')
-                current_node = execution.get('current_node')
+                current_stage = execution.get("current_stage")
+                current_node = execution.get("current_node")
 
                 # 兼容枚举/字符串：AgentStage.END 的值为 "completed"
-                stage_value = getattr(current_stage, 'value', current_stage)
-                node_value = getattr(current_node, 'value', current_node)
+                stage_value = getattr(current_stage, "value", current_stage)
+                node_value = getattr(current_node, "value", current_node)
 
-                if stage_value in ('END', 'end', 'completed') or node_value == 'generate_output':
+                if (
+                    stage_value in ("END", "end", "completed")
+                    or node_value == "generate_output"
+                ):
                     success = True
                     data = {
-                        "task_id": input_data.get('task_id', initial_state.input.task_id),
-                        "instructions": domain.get('instructions'),
-                        "fragment_sequence": domain.get('fragment_sequence'),
-                        "audit_report": domain.get('audit_report'),
-                        "status": "completed"
+                        "task_id": input_data.get(
+                            "task_id", initial_state.input.task_id
+                        ),
+                        "instructions": domain.get("instructions"),
+                        "fragment_sequence": domain.get("fragment_sequence"),
+                        "audit_report": domain.get("audit_report"),
+                        "status": "completed",
                     }
 
             # 构建结果：processing_stats 统一为 dict 结构（与 _build_processing_stats 一致）
@@ -572,10 +637,12 @@ class WorkflowOutputFixer:
             result = {
                 "success": success,
                 "data": data,
-                "errors": errors.get('error_messages', []),
-                "processing_stats": self._build_processing_stats(state_dict, fragment_sequence),
+                "errors": errors.get("error_messages", []),
+                "processing_stats": self._build_processing_stats(
+                    state_dict, fragment_sequence
+                ),
                 "task_id": initial_state.input.task_id,
-                "workflow_status": "completed" if success else "failed"
+                "workflow_status": "completed" if success else "failed",
             }
 
             return result
@@ -592,7 +659,7 @@ class WorkflowOutputFixer:
             "error": "无法修复workflow输出",
             "data": None,
             "task_id": getattr(input_state, "task_id", "unknown"),
-            "workflow_status": "failed"
+            "workflow_status": "failed",
         }
 
     def _record_fix_history(self, task_id: str, result: Dict[str, Any]):
@@ -601,7 +668,7 @@ class WorkflowOutputFixer:
             "task_id": task_id,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "success": result.get("success", False),
-            "fragment_count": 0
+            "fragment_count": 0,
         }
 
         # 统计片段数量
@@ -610,7 +677,7 @@ class WorkflowOutputFixer:
             fragment_sequence = data.get("fragment_sequence", {})
             fragments = fragment_sequence.get("fragments", [])
             fix_record["fragment_count"] = len(fragments)
-        except:
+        except Exception:
             pass
 
         self.fix_history.append(fix_record)

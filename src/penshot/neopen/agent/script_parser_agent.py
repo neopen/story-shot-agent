@@ -9,6 +9,7 @@ See LICENSE File For Details.
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
+
 import re
 import time
 from typing import Dict, Tuple, List, Optional
@@ -17,10 +18,23 @@ from penshot.logger import debug, info, warning
 from penshot.neopen.agent.script_parser.llm_script_parser import LLMScriptParser
 from .base_models import AgentMode, ScriptType, ElementType
 from .base_repairable_agent import BaseRepairableAgent
-from .continuity_guardian.consistency_contract import GlobalConsistencyContract, SceneContract
-from .quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, IssueType, RuleType
+from .continuity_guardian.consistency_contract import (
+    GlobalConsistencyContract,
+    SceneContract,
+)
+from .quality_auditor.quality_auditor_models import (
+    BasicViolation,
+    SeverityLevel,
+    IssueType,
+    RuleType,
+)
 from .script_parser.rule_script_parser import RuleScriptParser
-from .script_parser.script_parser_models import ParsedScript, SceneInfo, CharacterInfo, CharacterType
+from .script_parser.script_parser_models import (
+    ParsedScript,
+    SceneInfo,
+    CharacterInfo,
+    CharacterType,
+)
 from .workflow.workflow_models import PipelineNode
 from ..shot_config import ShotConfig
 
@@ -49,7 +63,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         self.parsing_history = []
         self.last_parsed_script = None
 
-    def process(self, script_text: str, knowledge_manager=None, script_id=None) -> Optional[ParsedScript]:
+    def process(
+        self, script_text: str, knowledge_manager=None, script_id=None
+    ) -> Optional[ParsedScript]:
         """
         处理剧本解析
 
@@ -69,11 +85,17 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
 
         return parsed_script
 
-    def repair_result(self, parsed_script: ParsedScript, issues: List[BasicViolation],
-                      original_text: str = None) -> ParsedScript:
+    def repair_result(
+        self,
+        parsed_script: ParsedScript,
+        issues: List[BasicViolation],
+        original_text: str = None,
+    ) -> ParsedScript:
         return self.repair_script(parsed_script, issues, original_text)
 
-    def detect_issues(self, parsed_script: ParsedScript, original_text: str) -> List[BasicViolation]:
+    def detect_issues(
+        self, parsed_script: ParsedScript, original_text: str
+    ) -> List[BasicViolation]:
         return self.detect_parse_issues(parsed_script, original_text)
 
     def _on_historical_context_applied(self) -> None:
@@ -144,9 +166,14 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         # 步骤2：AI深度解析（如果提供了修复参数，传递给LLM）
         # debug(" 调用AI进行深度解析...")
         try:
-            info(f"通过 LLM 进行深度解析...")
+            info(
+                "通过 LLM 进行深度解析剧本中，此过程较慢，可能需要数分钟，请耐心等待...."
+            )
             parsed_script = self.script_parser.get(AgentMode.LLM).parser(
-                script_text, format_type, self.current_repair_params, self.current_historical_context
+                script_text,
+                format_type,
+                self.current_repair_params,
+                self.current_historical_context,
             )
 
             # 步骤3：规则校验和补全
@@ -157,11 +184,16 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         except Exception as e:
             warning(f"使用LLM 解析异常: {str(e)}，尝试使用本地规则方式解析")
             parsed_script = self.script_parser.get(AgentMode.RULE).parser(
-                script_text, format_type, self.current_repair_params, self.current_historical_context
+                script_text,
+                format_type,
+                self.current_repair_params,
+                self.current_historical_context,
             )
 
         # 步骤4：质量评估 - 生成问题列表
-        completeness_score, warnings, issues = self._evaluate_completeness(parsed_script, script_text)
+        completeness_score, warnings, issues = self._evaluate_completeness(
+            parsed_script, script_text
+        )
 
         if warnings:
             warning(f"评估解析质量：{warnings}")
@@ -169,11 +201,13 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         # 步骤5：设置解析置信度
         parsing_confidence = self._calculate_confidence(parsed_script)
 
-        parsed_script.stats.update({
-            "completeness_score": round(completeness_score, 2),
-            "parsing_confidence": parsing_confidence,
-            "parse_attempts": len(self.parsing_history)
-        })
+        parsed_script.stats.update(
+            {
+                "completeness_score": round(completeness_score, 2),
+                "parsing_confidence": parsing_confidence,
+                "parse_attempts": len(self.parsing_history),
+            }
+        )
 
         # 保存最后解析结果
         self.last_parsed_script = parsed_script
@@ -186,9 +220,18 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
 
         return parsed_script
 
-    def process_with_contract(self, script_text: str, knowledge_manager=None,
-                              script_id=None, contract: GlobalConsistencyContract = None) -> Tuple[Optional[ParsedScript], GlobalConsistencyContract]:
-        """带契约的剧本解析"""
+    def process_with_contract(
+        self,
+        script_text: str,
+        knowledge_manager=None,
+        script_id=None,
+        contract: GlobalConsistencyContract = None,
+    ) -> Tuple[Optional[ParsedScript], GlobalConsistencyContract]:
+        """带契约的剧本解析
+
+        解析剧本后，从 ParsedScript 的真实结构（SceneInfo.id / elements、
+        GlobalMetadata）填充全局一致性契约，供后续切镜/切片/提示词阶段消费。
+        """
 
         parsed_script = self.parser_process(script_text)
 
@@ -199,35 +242,72 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         if contract is None:
             contract = GlobalConsistencyContract(
                 script_id=script_id or f"script_{int(time.time())}",
-                task_id=script_id or f"task_{int(time.time())}"
+                task_id=script_id or f"task_{int(time.time())}",
             )
 
-        # 从解析结果填充契约
-        for scene in parsed_script.scenes:
+        # 从解析结果填充契约（适配当前 SceneInfo / ParsedScript 模型）
+        for index, scene in enumerate(parsed_script.scenes, start=1):
             scene_contract = SceneContract(
-                scene_num=scene.number,
-                location=getattr(scene, 'location', 'unknown'),
-                time_of_day=getattr(scene, 'time_of_day', 'day'),
-                characters_in_scene=[c.name for c in parsed_script.characters if c.name in scene.get_characters()],
-                main_emotion=getattr(scene, 'emotion', 'neutral')
+                scene_num=self._scene_number(scene, index),
+                location=getattr(scene, "location", None) or "unknown",
+                time_of_day=getattr(scene, "time_of_day", None) or "day",
+                characters_in_scene=self._scene_characters(scene),
+                main_emotion="neutral",
             )
             contract.register_scene(scene_contract)
 
-        # 提取风格锚点
-        if hasattr(parsed_script, 'genre'):
-            contract.set_style_anchor("genre", parsed_script.genre)
-        if hasattr(parsed_script, 'style_description'):
-            contract.set_style_anchor("description", parsed_script.style_description[:200])
+        # 从角色描述中提取外观锚点，统一驱动后续片段中的角色外观
+        for char in getattr(parsed_script, "characters", []) or []:
+            name = getattr(char, "name", None)
+            description = getattr(char, "description", None) or ""
+            if not name or not description:
+                continue
+            char_contract = contract.characters.get(name)
+            if char_contract is not None:
+                char_contract._extract_appearance_features(description)
 
-        # 保存到知识库
+        # 提取风格锚点（ParsedScript 无 genre 字段，改用全局元数据与标题）
+        global_metadata = getattr(parsed_script, "global_metadata", None)
+        if global_metadata is not None:
+            notes = getattr(global_metadata, "continuity_notes", "") or ""
+            if notes:
+                contract.set_style_anchor("description", notes[:200])
+            atmosphere = getattr(global_metadata, "audio_atmosphere", "") or ""
+            if atmosphere and atmosphere != "neutral":
+                contract.set_style_anchor("atmosphere", atmosphere)
+        title = getattr(parsed_script, "title", None)
+        if title:
+            contract.set_style_anchor("title", title)
+
+        # 保存到知识库（契约仅在内存中随状态传递）
         if knowledge_manager:
-            knowledge_manager.add_parsed_script(parsed_script, script_id)
-            # 同时保存契约
-            knowledge_manager.save_contract(contract)
+            try:
+                knowledge_manager.add_parsed_script(parsed_script, script_id)
+            except Exception as e:
+                warning(f"存入知识库失败: {e}")
 
         return parsed_script, contract
 
-    def detect_parse_issues(self, parsed_script: ParsedScript, original_text: str) -> List[BasicViolation]:
+    @staticmethod
+    def _scene_number(scene: SceneInfo, fallback: int) -> int:
+        """从 SceneInfo.id（如 scene_001）提取场景序号，失败则退回顺序号"""
+        scene_id = getattr(scene, "id", "") or ""
+        digits = "".join(ch for ch in scene_id if ch.isdigit())
+        return int(digits) if digits else fallback
+
+    @staticmethod
+    def _scene_characters(scene: SceneInfo) -> List[str]:
+        """从场景元素的 character 字段提取出场角色（去重保序）"""
+        names: List[str] = []
+        for element in getattr(scene, "elements", []) or []:
+            name = getattr(element, "character", None)
+            if name and name not in names:
+                names.append(name)
+        return names
+
+    def detect_parse_issues(
+        self, parsed_script: ParsedScript, original_text: str
+    ) -> List[BasicViolation]:
         """
         检测解析问题 - 供质量审查节点调用
 
@@ -242,117 +322,163 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
 
         # 1. 检查场景完整性
         if not parsed_script.scenes:
-            issues.append(BasicViolation.create_violation(
-                rule_type=RuleType.SCENE_MISSING,
-                severity=SeverityLevel.ERROR,
-                source_node=PipelineNode.PARSE_SCRIPT,
-                suggestion="请检查剧本格式是否规范"
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    rule_type=RuleType.SCENE_MISSING,
+                    severity=SeverityLevel.ERROR,
+                    source_node=PipelineNode.PARSE_SCRIPT,
+                    suggestion="请检查剧本格式是否规范",
+                )
+            )
         elif len(parsed_script.scenes) < 2:
-            issues.append(BasicViolation.create_violation(
-                rule_type=RuleType.SCENE_INSUFFICIENT,
-                severity=SeverityLevel.WARNING,
-                source_node=PipelineNode.PARSE_SCRIPT,
-                suggestion="剧本可能过于简单或格式不完整"
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    rule_type=RuleType.SCENE_INSUFFICIENT,
+                    severity=SeverityLevel.WARNING,
+                    source_node=PipelineNode.PARSE_SCRIPT,
+                    suggestion="剧本可能过于简单或格式不完整",
+                )
+            )
 
         # 2. 检查角色完整性
         if not parsed_script.characters:
-            issues.append(BasicViolation.create_violation(
-                rule_type=RuleType.CHARACTER_MISSING,
-                severity=SeverityLevel.ERROR,
-                source_node=PipelineNode.PARSE_SCRIPT,
-                suggestion="剧本中需要包含角色信息"
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    rule_type=RuleType.CHARACTER_MISSING,
+                    severity=SeverityLevel.ERROR,
+                    source_node=PipelineNode.PARSE_SCRIPT,
+                    suggestion="剧本中需要包含角色信息",
+                )
+            )
 
         # 3. 检查对话提取
-        dialogues = [e for s in parsed_script.scenes for e in s.elements if e.type == ElementType.DIALOGUE]
-        dialogue_indicators = ['"', '说', '道', '：', ':']
-        has_dialogue_in_original = any(ind in original_text for ind in dialogue_indicators)
+        dialogues = [
+            e
+            for s in parsed_script.scenes
+            for e in s.elements
+            if e.type == ElementType.DIALOGUE
+        ]
+        dialogue_indicators = ['"', "说", "道", "：", ":"]
+        has_dialogue_in_original = any(
+            ind in original_text for ind in dialogue_indicators
+        )
 
         if has_dialogue_in_original and not dialogues:
-            issues.append(BasicViolation.create_violation(
-                rule_type=RuleType.DIALOGUE_MISSING,
-                severity=SeverityLevel.MAJOR,
-                source_node=PipelineNode.PARSE_SCRIPT,
-                suggestion="检查对话格式是否正确（需要角色名: 对话内容）"
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    rule_type=RuleType.DIALOGUE_MISSING,
+                    severity=SeverityLevel.MAJOR,
+                    source_node=PipelineNode.PARSE_SCRIPT,
+                    suggestion="检查对话格式是否正确（需要角色名: 对话内容）",
+                )
+            )
 
         # 4. 检查动作提取
-        actions = [e for s in parsed_script.scenes for e in s.elements if e.type == ElementType.ACTION]
-        action_verbs = ['走', '跑', '坐', '站', '拿', '看', '笑', '哭', '转身']
+        actions = [
+            e
+            for s in parsed_script.scenes
+            for e in s.elements
+            if e.type == ElementType.ACTION
+        ]
+        action_verbs = ["走", "跑", "坐", "站", "拿", "看", "笑", "哭", "转身"]
         verb_count = sum(1 for verb in action_verbs if verb in original_text)
 
         if verb_count > 3 and len(actions) < verb_count * 0.3:
-            issues.append(BasicViolation.create_violation(
-                rule_type=RuleType.ACTION_INSUFFICIENT,
-                severity=SeverityLevel.MODERATE,
-                source_node=PipelineNode.PARSE_SCRIPT,
-                suggestion="动作描述需要更明确的表述"
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    rule_type=RuleType.ACTION_INSUFFICIENT,
+                    severity=SeverityLevel.MODERATE,
+                    source_node=PipelineNode.PARSE_SCRIPT,
+                    suggestion="动作描述需要更明确的表述",
+                )
+            )
 
         # 5. 检查角色一致性
         char_names = [c.name for c in parsed_script.characters]
         for scene in parsed_script.scenes:
             for elem in scene.elements:
                 if elem.character and elem.character not in char_names:
-                    issues.append(BasicViolation.create_violation(
-                        rule_type=RuleType.CHARACTER_INCONSISTENT,
-                        severity=SeverityLevel.MAJOR,
-                        source_node=PipelineNode.PARSE_SCRIPT,
-                        suggestion=f"请确保所有引用的角色都在characters列表中（当前引用：'{elem.character}'）"
-                    ))
+                    issues.append(
+                        BasicViolation.create_violation(
+                            rule_type=RuleType.CHARACTER_INCONSISTENT,
+                            severity=SeverityLevel.MAJOR,
+                            source_node=PipelineNode.PARSE_SCRIPT,
+                            suggestion=f"请确保所有引用的角色都在characters列表中（当前引用：'{elem.character}'）",
+                        )
+                    )
 
         # ========== 新增：6. 检查时长合理性 ==========
-        total_duration = sum(e.duration for s in parsed_script.scenes for e in s.elements)
+        total_duration = sum(
+            e.duration for s in parsed_script.scenes for e in s.elements
+        )
         if total_duration > 0:
             # 检查是否有过短的片段
-            short_elements = [e for s in parsed_script.scenes for e in s.elements if e.duration < 1.0]
+            short_elements = [
+                e for s in parsed_script.scenes for e in s.elements if e.duration < 1.0
+            ]
             if short_elements:
-                issues.append(BasicViolation.create_violation(
-                    rule_type=RuleType.ELEMENT_DURATION_TOO_SHORT,
-                    severity=SeverityLevel.WARNING,
-                    source_node=PipelineNode.PARSE_SCRIPT,
-                    suggestion="每个元素时长应至少1秒"
-                ))
+                issues.append(
+                    BasicViolation.create_violation(
+                        rule_type=RuleType.ELEMENT_DURATION_TOO_SHORT,
+                        severity=SeverityLevel.WARNING,
+                        source_node=PipelineNode.PARSE_SCRIPT,
+                        suggestion="每个元素时长应至少1秒",
+                    )
+                )
 
         # ========== 新增：7. 检查元素顺序 ==========
         for scene in parsed_script.scenes:
             sequences = [e.sequence for e in scene.elements]
             if sequences != sorted(sequences):
-                issues.append(BasicViolation.create_violation(
-                    rule_type=RuleType.ELEMENT_SEQUENCE_WRONG,
-                    severity=SeverityLevel.MODERATE,
-                    source_node=PipelineNode.PARSE_SCRIPT,
-                    suggestion="按剧情发展顺序排列元素"
-                ))
+                issues.append(
+                    BasicViolation.create_violation(
+                        rule_type=RuleType.ELEMENT_SEQUENCE_WRONG,
+                        severity=SeverityLevel.MODERATE,
+                        source_node=PipelineNode.PARSE_SCRIPT,
+                        suggestion="按剧情发展顺序排列元素",
+                    )
+                )
 
         # ========== 新增：8. 检查情感标注 ==========
         for scene in parsed_script.scenes:
             for elem in scene.elements:
-                if elem.type == ElementType.DIALOGUE and (not elem.emotion or elem.emotion == "neutral"):
+                if elem.type == ElementType.DIALOGUE and (
+                    not elem.emotion or elem.emotion == "neutral"
+                ):
                     # 对话内容可能包含情感，但标注为中性
-                    if any(word in elem.content.lower() for word in ["笑", "开心", "哭", "伤心", "怒", "生气"]):
-                        issues.append(BasicViolation.create_violation(
-                            rule_type=RuleType.EMOTION_MISMATCH,
-                            severity=SeverityLevel.INFO,
-                            source_node=PipelineNode.PARSE_SCRIPT,
-                            suggestion="根据对话内容标注正确的情感"
-                        ))
+                    if any(
+                        word in elem.content.lower()
+                        for word in ["笑", "开心", "哭", "伤心", "怒", "生气"]
+                    ):
+                        issues.append(
+                            BasicViolation.create_violation(
+                                rule_type=RuleType.EMOTION_MISMATCH,
+                                severity=SeverityLevel.INFO,
+                                source_node=PipelineNode.PARSE_SCRIPT,
+                                suggestion="根据对话内容标注正确的情感",
+                            )
+                        )
 
         # ========== 新增：9. 检查角色描述完整性 ==========
         for char in parsed_script.characters:
             if not char.description or len(char.description) < 5:
-                issues.append(BasicViolation.create_violation(
-                    rule_type=RuleType.CHARACTER_DESC_MISSING,
-                    severity=SeverityLevel.WARNING,
-                    source_node=PipelineNode.PARSE_SCRIPT,
-                    suggestion=f"为角色'{char.name}'添加外貌、性格等描述信息"
-                ))
+                issues.append(
+                    BasicViolation.create_violation(
+                        rule_type=RuleType.CHARACTER_DESC_MISSING,
+                        severity=SeverityLevel.WARNING,
+                        source_node=PipelineNode.PARSE_SCRIPT,
+                        suggestion=f"为角色'{char.name}'添加外貌、性格等描述信息",
+                    )
+                )
 
         return issues
 
-    def repair_script(self, parsed_script: ParsedScript, issues: List[BasicViolation], original_text: str = None) -> ParsedScript:
+    def repair_script(
+        self,
+        parsed_script: ParsedScript,
+        issues: List[BasicViolation],
+        original_text: str = None,
+    ) -> ParsedScript:
         """
         根据问题列表修复剧本 - 供质量审查节点调用
 
@@ -367,13 +493,15 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         info(f"开始修复剧本，发现{len(issues)}个问题")
 
         for issue in issues:
-            debug(f"  问题: issue_code={issue.issue_code}, issue_desc={issue.issue_desc[:50]}...")
+            debug(
+                f"  问题: issue_code={issue.issue_code}, issue_desc={issue.issue_desc[:50]}..."
+            )
 
         # 记录原始状态用于对比
         original_stats = {
             "scene_count": len(parsed_script.scenes),
             "character_count": len(parsed_script.characters),
-            "element_count": sum(len(s.elements) for s in parsed_script.scenes)
+            "element_count": sum(len(s.elements) for s in parsed_script.scenes),
         }
 
         # 问题分类
@@ -397,7 +525,7 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
                     description="默认场景（自动创建）",
                     time_of_day="未知",
                     weather="未知",
-                    elements=[]
+                    elements=[],
                 )
                 parsed_script.scenes.append(default_scene)
                 repair_actions.append("创建默认场景")
@@ -408,9 +536,11 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
                 # 如果原始文本可用，尝试从文本中提取更多场景
                 if original_text:
                     # 简单处理：按段落分割作为不同场景
-                    paragraphs = [p for p in original_text.split('\n\n') if p.strip()]
+                    paragraphs = [p for p in original_text.split("\n\n") if p.strip()]
                     if len(paragraphs) > len(parsed_script.scenes):
-                        for i, para in enumerate(paragraphs[len(parsed_script.scenes):]):
+                        for i, para in enumerate(
+                            paragraphs[len(parsed_script.scenes) :]
+                        ):
                             if i < 3:  # 最多创建3个新场景
                                 new_scene = SceneInfo(
                                     id=f"scene_{len(parsed_script.scenes) + i + 1:03d}",
@@ -418,7 +548,7 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
                                     description=para[:100],
                                     time_of_day="未知",
                                     weather="未知",
-                                    elements=[]
+                                    elements=[],
                                 )
                                 parsed_script.scenes.append(new_scene)
                                 repair_actions.append(f"从段落创建场景: {new_scene.id}")
@@ -431,7 +561,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
             undefined_chars = set()
             for scene in parsed_script.scenes:
                 for elem in scene.elements:
-                    if elem.character and elem.character not in [c.name for c in parsed_script.characters]:
+                    if elem.character and elem.character not in [
+                        c.name for c in parsed_script.characters
+                    ]:
                         undefined_chars.add(elem.character)
 
             # 为每个未定义角色创建默认角色
@@ -446,10 +578,12 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
                 new_char = CharacterInfo(
                     name=char_name,
                     gender=gender,
-                    type=CharacterType.ADULT if "孩" not in char_name else CharacterType.CHILD,
+                    type=CharacterType.ADULT
+                    if "孩" not in char_name
+                    else CharacterType.CHILD,
                     role="配角",
                     description=f"自动创建的角色: {char_name}",
-                    key_traits=[]
+                    key_traits=[],
                 )
                 parsed_script.characters.append(new_char)
                 repair_actions.append(f"创建缺失角色: {char_name}")
@@ -458,12 +592,14 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
             # 检查是否有重复角色（名称相似）
             char_names = [c.name for c in parsed_script.characters]
             for i, name1 in enumerate(char_names):
-                for j, name2 in enumerate(char_names[i + 1:], i + 1):
+                for j, name2 in enumerate(char_names[i + 1 :], i + 1):
                     # 简单相似度检查：一个包含另一个
                     if name1 in name2 or name2 in name1:
                         if len(name1) < len(name2) and name1 in name2:
                             # 可能是简称和全称，保留全称
-                            repair_actions.append(f"检测到相似角色: {name1} 和 {name2}，建议确认")
+                            repair_actions.append(
+                                f"检测到相似角色: {name1} 和 {name2}，建议确认"
+                            )
 
         # ========== 3. 修复对话问题 ==========
         if dialogue_issues:
@@ -488,7 +624,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
                         # 无法推断，使用默认角色
                         if parsed_script.characters:
                             elem.character = parsed_script.characters[0].name
-                            repair_actions.append(f"为对话使用默认角色: {parsed_script.characters[0].name}")
+                            repair_actions.append(
+                                f"为对话使用默认角色: {parsed_script.characters[0].name}"
+                            )
 
             # 检查对话的情感标注
             for elem in all_dialogues:
@@ -538,14 +676,14 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         if format_issues:
             # 统一ID格式
             for i, scene in enumerate(parsed_script.scenes, 1):
-                if not scene.id.startswith('scene_'):
+                if not scene.id.startswith("scene_"):
                     old_id = scene.id
                     scene.id = f"scene_{i:03d}"
                     repair_actions.append(f"统一场景ID: {old_id} -> {scene.id}")
 
                 # 统一元素ID
                 for j, elem in enumerate(scene.elements, 1):
-                    if not elem.id.startswith('elem_'):
+                    if not elem.id.startswith("elem_"):
                         old_id = elem.id
                         elem.id = f"elem_{(i - 1) * 100 + j:03d}"
                         repair_actions.append(f"统一元素ID: {old_id} -> {elem.id}")
@@ -562,7 +700,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
                     if elem.sequence != j:
                         old_seq = elem.sequence
                         elem.sequence = j
-                        repair_actions.append(f"调整元素顺序: {elem.id} {old_seq} -> {j}")
+                        repair_actions.append(
+                            f"调整元素顺序: {elem.id} {old_seq} -> {j}"
+                        )
 
             # 检查时长是否合理
             for scene in parsed_script.scenes:
@@ -579,34 +719,54 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
             "scene_count": len(parsed_script.scenes),
             "character_count": len(parsed_script.characters),
             "element_count": sum(len(s.elements) for s in parsed_script.scenes),
-            "dialogue_count": sum(1 for s in parsed_script.scenes for e in s.elements if e.type == ElementType.DIALOGUE),
-            "action_count": sum(1 for s in parsed_script.scenes for e in s.elements if e.type == ElementType.ACTION),
+            "dialogue_count": sum(
+                1
+                for s in parsed_script.scenes
+                for e in s.elements
+                if e.type == ElementType.DIALOGUE
+            ),
+            "action_count": sum(
+                1
+                for s in parsed_script.scenes
+                for e in s.elements
+                if e.type == ElementType.ACTION
+            ),
         }
 
         # 记录修复历史
-        if not hasattr(parsed_script, 'metadata') or parsed_script.metadata is None:
+        if not hasattr(parsed_script, "metadata") or parsed_script.metadata is None:
             parsed_script.metadata = {}
 
         if "repair_history" not in parsed_script.metadata:
             parsed_script.metadata["repair_history"] = []
 
-        parsed_script.metadata["repair_history"].append({
-            "timestamp": time.time(),
-            "actions": repair_actions,
-            "issue_count": len(issues),
-            "original_stats": original_stats,
-            "new_stats": new_stats,
-            "fixed_issues": len(repair_actions)
-        })
+        parsed_script.metadata["repair_history"].append(
+            {
+                "timestamp": time.time(),
+                "actions": repair_actions,
+                "issue_count": len(issues),
+                "original_stats": original_stats,
+                "new_stats": new_stats,
+                "fixed_issues": len(repair_actions),
+            }
+        )
 
         # 更新剧本的stats
-        parsed_script.stats.update({
-            "total_elements": new_stats["element_count"],
-            "total_duration": sum(e.duration for s in parsed_script.scenes for e in s.elements),
-            "dialogue_count": new_stats["dialogue_count"],
-            "action_count": new_stats["action_count"],
-            "completeness_score": min(1.0, parsed_script.stats.get("completeness_score", 0) + 0.1 * (len(repair_actions) > 0)),
-        })
+        parsed_script.stats.update(
+            {
+                "total_elements": new_stats["element_count"],
+                "total_duration": sum(
+                    e.duration for s in parsed_script.scenes for e in s.elements
+                ),
+                "dialogue_count": new_stats["dialogue_count"],
+                "action_count": new_stats["action_count"],
+                "completeness_score": min(
+                    1.0,
+                    parsed_script.stats.get("completeness_score", 0)
+                    + 0.1 * (len(repair_actions) > 0),
+                ),
+            }
+        )
 
         info(f"修复完成，执行了{len(repair_actions)}个修复操作")
         if repair_actions:
@@ -619,31 +779,32 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         text_lower = text.lower()
 
         # 检查标准剧本格式标记
-        if re.search(r'(INT\.|EXT\.|INT/EXT|内景|外景|场景\d+[:：])', text):
+        if re.search(r"(INT\.|EXT\.|INT/EXT|内景|外景|场景\d+[:：])", text):
             return ScriptType.STANDARD_SCRIPT
 
         # 检查AI分镜格式
-        if re.search(r'(镜头\d+|shot \d+|分镜\d+|画面描述[:：])', text_lower):
+        if re.search(r"(镜头\d+|shot \d+|分镜\d+|画面描述[:：])", text_lower):
             return ScriptType.AI_STORYBOARD
 
         # 检查结构化场景
-        if re.search(r'(场景[:：]|地点[:：]|时间[:：]|角色[:：])', text_lower):
+        if re.search(r"(场景[:：]|地点[:：]|时间[:：]|角色[:：])", text_lower):
             return ScriptType.STRUCTURED_SCENE
 
         # 检查纯对话
-        dialogue_lines = re.findall(r'^[^:：]{1,20}[:：].+$', text, re.MULTILINE)
-        if len(dialogue_lines) > len(text.split('\n')) * 0.7:  # 70%以上是对话行
+        dialogue_lines = re.findall(r"^[^:：]{1,20}[:：].+$", text, re.MULTILINE)
+        if len(dialogue_lines) > len(text.split("\n")) * 0.7:  # 70%以上是对话行
             return ScriptType.DIALOGUE_ONLY
 
         # 检查是否主要是叙述性描述
-        if len(re.findall(r'[。！？]', text)) > len(re.findall(r'[:："\']', text)):
+        if len(re.findall(r"[。！？]", text)) > len(re.findall(r'[:："\']', text)):
             return ScriptType.NATURAL_LANGUAGE
 
         # 默认：混合格式
         return ScriptType.MIXED_FORMAT
 
-    def _evaluate_completeness(self, script: ParsedScript,
-                               original_text: str) -> Tuple[float, List[str], List[BasicViolation]]:
+    def _evaluate_completeness(
+        self, script: ParsedScript, original_text: str
+    ) -> Tuple[float, List[str], List[BasicViolation]]:
         """评估解析完整性，返回评分、警告和问题列表"""
         warnings = []
         issues = []
@@ -653,59 +814,105 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
             "characters": 0.25,
             "dialogues": 0.2,
             "actions": 0.2,
-            "coverage": 0.1
+            "coverage": 0.1,
         }
 
         # 1. 场景完整性 (权重0.25)
         if not script.scenes:
             warnings.append("未识别到明确场景")
-            issues.append(BasicViolation.create_violation(
-                RuleType.SCENE_MISSING, severity=SeverityLevel.ERROR,
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    RuleType.SCENE_MISSING,
+                    severity=SeverityLevel.ERROR,
+                )
+            )
             scene_score = 0.0
         else:
             # 考虑场景数量和质量
             scene_count_score = min(1.0, len(script.scenes) / 3.0)
             # 检查场景描述质量
-            scene_desc_score = sum(1 for s in script.scenes if s.description and len(s.description) > 10) / max(len(script.scenes), 1)
+            scene_desc_score = sum(
+                1 for s in script.scenes if s.description and len(s.description) > 10
+            ) / max(len(script.scenes), 1)
             scene_score = (scene_count_score + scene_desc_score) / 2
         score_factors.append(scene_score * weights["scenes"])
 
         # 2. 角色完整性 (权重0.25)
         if not script.characters:
             warnings.append("未识别到明确角色")
-            issues.append(BasicViolation.create_violation(
-                RuleType.CHARACTER_MISSING, severity=SeverityLevel.ERROR
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    RuleType.CHARACTER_MISSING, severity=SeverityLevel.ERROR
+                )
+            )
             char_score = 0.0
         else:
             char_count_score = min(1.0, len(script.characters) / 2.0)
-            char_desc_score = sum(1 for c in script.characters if c.description and len(c.description) > 5) / max(len(script.characters), 1)
+            char_desc_score = sum(
+                1 for c in script.characters if c.description and len(c.description) > 5
+            ) / max(len(script.characters), 1)
             char_score = (char_count_score + char_desc_score) / 2
         score_factors.append(char_score * weights["characters"])
 
         # 3. 对话完整性 (权重0.2)
-        dialogues = [e for s in script.scenes for e in s.elements if e.type == ElementType.DIALOGUE]
-        dialogue_indicators = ['"', '说', '道', '：', ':']
-        has_dialogue_in_original = any(ind in original_text for ind in dialogue_indicators)
+        dialogues = [
+            e
+            for s in script.scenes
+            for e in s.elements
+            if e.type == ElementType.DIALOGUE
+        ]
+        dialogue_indicators = ['"', "说", "道", "：", ":"]
+        has_dialogue_in_original = any(
+            ind in original_text for ind in dialogue_indicators
+        )
 
         if has_dialogue_in_original and not dialogues:
             warnings.append("对话提取可能不完整")
-            issues.append(BasicViolation.create_violation(
-                RuleType.DIALOGUE_INSUFFICIENT, issue_value=len(dialogues), severity=SeverityLevel.MODERATE,
-            ))
+            issues.append(
+                BasicViolation.create_violation(
+                    RuleType.DIALOGUE_INSUFFICIENT,
+                    issue_value=len(dialogues),
+                    severity=SeverityLevel.MODERATE,
+                )
+            )
             dialogue_score = 0.3
         elif dialogues:
             # 对话数量合理性
-            expected_dialogues = original_text.count('说') + original_text.count('道') + original_text.count('：')
+            expected_dialogues = (
+                original_text.count("说")
+                + original_text.count("道")
+                + original_text.count("：")
+            )
             dialogue_score = min(1.0, len(dialogues) / max(expected_dialogues, 1))
         else:
             dialogue_score = 0.5
         score_factors.append(dialogue_score * weights["dialogues"])
 
         # 4. 动作完整性 (权重0.2)
-        actions = [e for s in script.scenes for e in s.elements if e.type == ElementType.ACTION]
-        action_verbs = ['走', '跑', '坐', '站', '拿', '看', '笑', '哭', '转身', '点头', '摇头', '开门', '关门', '吃', '喝', '打', '跳', '飞', '唱']
+        actions = [
+            e for s in script.scenes for e in s.elements if e.type == ElementType.ACTION
+        ]
+        action_verbs = [
+            "走",
+            "跑",
+            "坐",
+            "站",
+            "拿",
+            "看",
+            "笑",
+            "哭",
+            "转身",
+            "点头",
+            "摇头",
+            "开门",
+            "关门",
+            "吃",
+            "喝",
+            "打",
+            "跳",
+            "飞",
+            "唱",
+        ]
         verb_count = sum(1 for verb in action_verbs if verb in original_text)
 
         if verb_count > 0:
@@ -715,8 +922,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         score_factors.append(action_score * weights["actions"])
 
         # 5. 总体覆盖率 (权重0.1)
-        extracted_content = sum(len(str(e)) for s in script.scenes for e in s.elements) + \
-                            sum(len(str(c)) for c in script.characters)
+        extracted_content = sum(
+            len(str(e)) for s in script.scenes for e in s.elements
+        ) + sum(len(str(c)) for c in script.characters)
         coverage = min(1.0, extracted_content / max(len(original_text), 1) * 2)
         score_factors.append(coverage * weights["coverage"])
 
@@ -736,28 +944,53 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         # 场景置信度：基于场景数量和描述质量
         if script.scenes:
             scene_count_conf = min(1.0, len(script.scenes) / 5.0)
-            scene_desc_conf = sum(1 for s in script.scenes if s.description and len(s.description) > 20) / max(len(script.scenes), 1)
+            scene_desc_conf = sum(
+                1 for s in script.scenes if s.description and len(s.description) > 20
+            ) / max(len(script.scenes), 1)
             confidence["scenes"] = round((scene_count_conf + scene_desc_conf) / 2, 2)
 
         # 角色置信度：基于角色数量和描述质量
         if script.characters:
             char_count_conf = min(1.0, len(script.characters) / 4.0)
-            char_desc_conf = sum(1 for c in script.characters if c.description and len(c.description) > 10) / max(len(script.characters), 1)
+            char_desc_conf = sum(
+                1
+                for c in script.characters
+                if c.description and len(c.description) > 10
+            ) / max(len(script.characters), 1)
             confidence["characters"] = round((char_count_conf + char_desc_conf) / 2, 2)
 
         # 对话置信度：基于对话完整性和情感标注
-        dialogues = [e for s in script.scenes for e in s.elements if e.type == ElementType.DIALOGUE]
+        dialogues = [
+            e
+            for s in script.scenes
+            for e in s.elements
+            if e.type == ElementType.DIALOGUE
+        ]
         if dialogues:
-            dialogue_emotion_conf = sum(1 for e in dialogues if e.emotion and e.emotion != "neutral") / len(dialogues)
-            dialogue_content_conf = sum(1 for e in dialogues if e.content and len(e.content) > 5) / len(dialogues)
-            confidence["dialogues"] = round((dialogue_emotion_conf + dialogue_content_conf) / 2, 2)
+            dialogue_emotion_conf = sum(
+                1 for e in dialogues if e.emotion and e.emotion != "neutral"
+            ) / len(dialogues)
+            dialogue_content_conf = sum(
+                1 for e in dialogues if e.content and len(e.content) > 5
+            ) / len(dialogues)
+            confidence["dialogues"] = round(
+                (dialogue_emotion_conf + dialogue_content_conf) / 2, 2
+            )
 
         # 动作置信度：基于动作描述和强度
-        actions = [e for s in script.scenes for e in s.elements if e.type == ElementType.ACTION]
+        actions = [
+            e for s in script.scenes for e in s.elements if e.type == ElementType.ACTION
+        ]
         if actions:
-            action_desc_conf = sum(1 for e in actions if e.description and len(e.description) > 10) / len(actions)
-            action_intensity_conf = sum(1 for e in actions if e.intensity != 0.5) / len(actions)
-            confidence["actions"] = round((action_desc_conf + action_intensity_conf) / 2, 2)
+            action_desc_conf = sum(
+                1 for e in actions if e.description and len(e.description) > 10
+            ) / len(actions)
+            action_intensity_conf = sum(1 for e in actions if e.intensity != 0.5) / len(
+                actions
+            )
+            confidence["actions"] = round(
+                (action_desc_conf + action_intensity_conf) / 2, 2
+            )
 
         # 总体置信度
         if confidence:

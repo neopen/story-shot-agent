@@ -8,6 +8,7 @@ See LICENSE File For Details.
 @Author: NeoPen
 @Time: 2026/4/28 0:18
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -23,6 +24,7 @@ class ContractStatus(Enum):
 @dataclass
 class CharacterContract:
     """角色一致性契约"""
+
     name: str
     first_scene: int = 0
     last_scene: int = 0
@@ -49,7 +51,7 @@ class CharacterContract:
         """从描述中提取外观特征"""
         features = {}
         # 服装特征
-        clothes_keywords = ['穿', '着', '戴', '衣服', '裙子', '西装', '衬衫']
+        clothes_keywords = ["穿", "着", "戴", "衣服", "裙子", "西装", "衬衫"]
         for kw in clothes_keywords:
             if kw in description:
                 # 提取服装描述
@@ -57,7 +59,7 @@ class CharacterContract:
                 if idx > 0:
                     start = max(0, idx - 10)
                     end = min(len(description), idx + 20)
-                    features['clothing'] = description[start:end]
+                    features["clothing"] = description[start:end]
                     break
 
         if features:
@@ -77,6 +79,7 @@ class CharacterContract:
 @dataclass
 class SceneContract:
     """场景一致性契约"""
+
     scene_num: int
     location: str
     time_of_day: str  # day/night/dawn/dusk
@@ -87,20 +90,50 @@ class SceneContract:
     # 道具状态
     props_in_scene: Dict[str, str] = field(default_factory=dict)  # name -> state
 
-    def is_consistent_with(self, other: 'SceneContract') -> bool:
+    def is_consistent_with(self, other: "SceneContract") -> bool:
         """检查与另一个场景的一致性"""
         # 场景切换时检查合理性
         if self.location != other.location:
             # 不同场景，检查是否有角色重叠
-            common_chars = set(self.characters_in_scene) & set(other.characters_in_scene)
+            common_chars = set(self.characters_in_scene) & set(
+                other.characters_in_scene
+            )
             if common_chars and self.time_of_day != other.time_of_day:
                 return False  # 同一角色在不同时间同时出现在两个场景？不合理
         return True
 
 
 @dataclass
+class AssetContract:
+    """资产锚点契约 - 角色设定图/道具静帧/场景锚点
+
+    M0.4.1 先建立结构占位并挂到全局契约；真实资产生成（三视图/静帧落盘）
+    由 M0.4.2 的资产生成智能体填充 ``asset_ref``。
+    """
+
+    asset_id: str
+    asset_type: str  # character_sheet / prop / scene
+    owner_name: str  # 归属角色/道具/场景名
+    asset_ref: str = ""  # 落盘引用（M0.4.2 填充）
+    image_prompt: str = ""  # 生成该资产的提示词
+    status: str = "pending"  # pending / generated / failed
+
+    def to_dict(self) -> Dict:
+        """序列化"""
+        return {
+            "asset_id": self.asset_id,
+            "asset_type": self.asset_type,
+            "owner_name": self.owner_name,
+            "asset_ref": self.asset_ref,
+            "image_prompt": self.image_prompt,
+            "status": self.status,
+        }
+
+
+@dataclass
 class GlobalConsistencyContract:
     """全局一致性契约 - 贯穿整个工作流"""
+
     script_id: str
     task_id: str
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -112,6 +145,9 @@ class GlobalConsistencyContract:
 
     # 风格锚点
     style_anchor: Dict[str, Any] = field(default_factory=dict)
+
+    # 资产锚点（角色三视图/道具静帧/场景锚点）
+    assets: Dict[str, AssetContract] = field(default_factory=dict)
 
     # 版本控制
     version: int = 1
@@ -132,6 +168,13 @@ class GlobalConsistencyContract:
             self.register_character(char, scene_contract.scene_num)
         self._record_change("scene_registered", {"scene": scene_contract.scene_num})
 
+    def register_asset(self, asset: AssetContract):
+        """注册资产锚点"""
+        self.assets[asset.asset_id] = asset
+        self._record_change(
+            "asset_registered", {"asset_id": asset.asset_id, "type": asset.asset_type}
+        )
+
     def set_style_anchor(self, style_type: str, value: Any):
         """设置风格锚点"""
         self.style_anchor[style_type] = value
@@ -139,12 +182,14 @@ class GlobalConsistencyContract:
 
     def _record_change(self, change_type: str, data: Dict):
         """记录变更历史"""
-        self.history.append({
-            "timestamp": datetime.now().isoformat(),
-            "type": change_type,
-            "data": data,
-            "version": self.version
-        })
+        self.history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "type": change_type,
+                "data": data,
+                "version": self.version,
+            }
+        )
 
     def get_character_appearance_consistency(self) -> List[Dict]:
         """检查角色出现一致性"""
@@ -152,13 +197,15 @@ class GlobalConsistencyContract:
         for char in self.characters.values():
             gap = char.get_gap_scenes()
             if gap > 5 and len(self.scenes) > 10:
-                issues.append({
-                    "type": "character_long_absence",
-                    "character": char.name,
-                    "gap_scenes": gap,
-                    "severity": "moderate",
-                    "suggestion": f"角色{char.name}已消失{gap}个场景，考虑是否应继续出现"
-                })
+                issues.append(
+                    {
+                        "type": "character_long_absence",
+                        "character": char.name,
+                        "gap_scenes": gap,
+                        "severity": "moderate",
+                        "suggestion": f"角色{char.name}已消失{gap}个场景，考虑是否应继续出现",
+                    }
+                )
         return issues
 
     def to_dict(self) -> Dict:
@@ -174,7 +221,7 @@ class GlobalConsistencyContract:
                     "first_scene": c.first_scene,
                     "last_scene": c.last_scene,
                     "appearance_scenes": c.appearance_scenes,
-                    "appearance_anchors": c.appearance_anchors
+                    "appearance_anchors": c.appearance_anchors,
                 }
                 for name, c in self.characters.items()
             },
@@ -182,10 +229,11 @@ class GlobalConsistencyContract:
                 str(num): {
                     "location": s.location,
                     "time_of_day": s.time_of_day,
-                    "characters": s.characters_in_scene
+                    "characters": s.characters_in_scene,
                 }
                 for num, s in self.scenes.items()
             },
             "style_anchor": self.style_anchor,
-            "version": self.version
+            "assets": {asset_id: a.to_dict() for asset_id, a in self.assets.items()},
+            "version": self.version,
         }
