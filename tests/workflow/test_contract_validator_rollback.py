@@ -75,6 +75,13 @@ class TestContractValidatorRollback:
         assert state.domain.contract_violations[0]["type"] == "unknown_character"
         assert state.execution.stage_current_retries[PipelineNode.SEGMENT_SHOT] == 1
 
+        # 契约违规项同时生成 Repairer 修复参数（供下次切镜消费）
+        params = state.domain.repair_params[PipelineNode.SEGMENT_SHOT]
+        assert params.issue_types == ["unknown_character"]
+        suggestion = params.suggestions["shot_002"][0]
+        assert "未登记到一致性契约" in suggestion
+        assert "小明" in suggestion
+
     def test_split_unknown_character_repair_when_retry_exhausted(self, decision):
         """切镜出现契约外角色：重试耗尽时转 NEEDS_REPAIR"""
         contract = _contract(["小明"])
@@ -113,6 +120,22 @@ class TestContractValidatorRollback:
         assert result == PipelineState.NEEDS_REPAIR
         issue_types = {issue["type"] for issue in state.domain.contract_violations}
         assert {"unknown_character", "orphan_fragment"} == issue_types
+
+        # 切片阶段的 Repairer 参数应包含孤立片段的重新关联建议
+        params = state.domain.repair_params[PipelineNode.SPLIT_VIDEO]
+        assert "orphan_fragment" in params.issue_types
+        assert "shot_001" in params.suggestions["frag_002"][0]
+
+    def test_repeated_violation_deduplicates(self, decision):
+        """同一违规项重复触发时审计列表不重复膨胀"""
+        contract = _contract(["小明"])
+        state = _state(contract)
+        state.domain.shot_sequence = ShotSequence(shots=[_shot("shot_001", "路人甲")])
+
+        decision.decide_after_splitting(state)
+        decision.decide_after_splitting(state)
+
+        assert len(state.domain.contract_violations) == 1
 
     def test_fragment_all_valid_passes(self, decision):
         """片段全部合规时返回 SUCCESS"""

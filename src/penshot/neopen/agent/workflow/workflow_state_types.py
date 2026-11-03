@@ -88,9 +88,7 @@ class DomainState(BaseModel):
     # 契约校验违规项（Validator 写入，供回退/审计）
     contract_violations: List[Dict[str, Any]] = []
 
-    # 连续性管理
-    continuity_state: Dict[str, Any] = {}
-    continuity_anchors: Dict[str, Any] = {}
+    # 连续性管理（连续性状态与锚点已统一收敛到 contract，不再保留旧 dict 字段）
     continuity_issues: List[Any] = []
     continuity_passed: bool = False
     continuity_retry_count: int = 0

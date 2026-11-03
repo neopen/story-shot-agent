@@ -21,6 +21,11 @@ from penshot.neopen.agent.continuity_guardian.anchor_recall import (
     build_fragment_anchor_query,
     build_issue_anchor_query,
 )
+from penshot.neopen.agent.continuity_guardian.contract_repair import (
+    build_contract_repair_params,
+    group_violations_by_stage,
+    merge_repair_params,
+)
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
     ContinuityGuardianChecker,
 )
@@ -1187,6 +1192,9 @@ class WorkflowNodes:
             if not hasattr(state.domain, "max_continuity_retries"):
                 state.domain.max_continuity_retries = 3
 
+            # 重置上一轮修复标记，避免历史状态影响本次决策
+            state.domain.needs_continuity_repair = False
+
             # 回忆历史连续性问题（使用 workflow_memory）
             historical_continuity_issues = self.workflow_memory.get_memory_list(
                 "continuity_issues_history", level=MemoryLevel.MEDIUM_TERM, default=[]
@@ -1236,12 +1244,16 @@ class WorkflowNodes:
             if check_result.passed and check_result.total_issues == 0:
                 debug("连续性检查通过")
                 state.domain.continuity_passed = True
+                # 清理上一轮问题，避免决策误读历史结果触发重复修复
+                state.domain.continuity_issues = []
+                state.domain.needs_continuity_repair = False
                 state.execution.current_stage = AgentStage.CONTINUITY
                 state.domain.continuity_retry_count = 0
                 return state
 
             # 4. 获取问题列表
             continuity_issues = check_result.issues
+            state.domain.continuity_passed = False
             state.domain.continuity_issues = continuity_issues
 
             # 使用知识库检索历史解决方案
@@ -1285,10 +1297,30 @@ class WorkflowNodes:
                 state.domain.continuity_retry_count
                 < state.domain.max_continuity_retries
             ):
-                # 7. 生成修复参数并触发重试
+                # 7. 生成修复参数并触发重试（契约锚点驱动）
+                contract_violations_by_stage = group_violations_by_stage(
+                    state.domain.contract_violations
+                )
                 for stage, issues in issues_by_stage.items():
-                    repair_params = self._create_continuity_repair_params(issues, stage)
-                    state.domain.repair_params[stage] = repair_params
+                    repair_params = self._create_continuity_repair_params(
+                        issues,
+                        stage,
+                        state.domain.contract,
+                    )
+                    # 契约违规项与连续性问题合并，保证 Repairer 按契约修复
+                    violations = contract_violations_by_stage.get(stage) or []
+                    if violations:
+                        contract_params = build_contract_repair_params(
+                            violations,
+                            stage,
+                            state.domain.contract,
+                            state.domain.shot_sequence,
+                        )
+                        repair_params = merge_repair_params(
+                            repair_params, contract_params
+                        )
+                    if repair_params:
+                        state.domain.repair_params[stage] = repair_params
                     info(
                         f"为阶段 {stage.value} 生成连续性修复参数，共{len(issues)}个问题"
                     )
@@ -2002,7 +2034,10 @@ class WorkflowNodes:
         return source_mapping.get(issue_type, PipelineNode.CONVERT_PROMPT)
 
     def _create_continuity_repair_params(
-        self, issues: List[ContinuityIssue], stage: PipelineNode
+        self,
+        issues: List[ContinuityIssue],
+        stage: PipelineNode,
+        contract: Any = None,
     ) -> QualityRepairParams:
         """
         创建连续性修复参数
@@ -2010,11 +2045,14 @@ class WorkflowNodes:
         Args:
             issues: 连续性问题列表
             stage: 目标阶段
+            contract: 全局一致性契约（用于注入角色/场景/风格锚点）
 
         Returns:
             修复参数
         """
-        return self.generator.generate_repair_params(issues, stage)
+        return self.generator.generate_repair_params(
+            issues, stage, contract=contract
+        )
 
     def _route_to_fix_stage(
         self,
