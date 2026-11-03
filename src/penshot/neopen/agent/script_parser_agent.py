@@ -22,6 +22,7 @@ from .continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
     SceneContract,
 )
+from .continuity_guardian.style_anchors import infer_style_anchor
 from .quality_auditor.quality_auditor_models import (
     BasicViolation,
     SeverityLevel,
@@ -271,13 +272,18 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         if global_metadata is not None:
             notes = getattr(global_metadata, "continuity_notes", "") or ""
             if notes:
-                contract.set_style_anchor("description", notes[:200])
+                # 原始中文连续性要点保留供审计，英文风格由 infer_style_anchor 归一化
+                contract.set_style_anchor("source_notes", notes[:200])
             atmosphere = getattr(global_metadata, "audio_atmosphere", "") or ""
             if atmosphere and atmosphere != "neutral":
                 contract.set_style_anchor("atmosphere", atmosphere)
         title = getattr(parsed_script, "title", None)
         if title:
             contract.set_style_anchor("title", title)
+
+        # 推断英文 genre / 短英文风格描述，保证 prompt 风格前缀真正生效
+        for key, value in infer_style_anchor(parsed_script).items():
+            contract.set_style_anchor(key, value)
 
         # 保存到知识库（契约仅在内存中随状态传递）
         if knowledge_manager:

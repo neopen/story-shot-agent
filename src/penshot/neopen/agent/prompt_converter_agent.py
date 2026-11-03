@@ -19,6 +19,7 @@ from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
 )
+from penshot.neopen.agent.continuity_guardian.style_anchors import build_style_prefix
 from penshot.neopen.agent.prompt_converter.prompt_converter_factory import (
     PromptConverterFactory,
 )
@@ -195,11 +196,8 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         # 应用风格锚点
         style_anchor = contract.style_anchor
         if style_anchor:
-            genre = style_anchor.get("genre", "")
-            style_desc = style_anchor.get("description", "")
-
-            # 为每个片段添加风格一致性前缀
-            style_prefix = self._build_style_prefix(genre, style_desc)
+            # 为每个片段添加统一的英文风格一致性前缀
+            style_prefix = build_style_prefix(style_anchor)
 
             for fragment in instructions.fragments:
                 if style_prefix and style_prefix not in fragment.prompt:
@@ -211,24 +209,8 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         return instructions
 
     def _build_style_prefix(self, genre: str, style_desc: str) -> str:
-        """构建风格前缀"""
-        prefix_parts = []
-
-        genre_style_map = {
-            "action": "dynamic cinematography, fast-paced editing",
-            "drama": "naturalistic lighting, emotional depth",
-            "comedy": "bright colors, lively camera work",
-            "horror": "dark atmosphere, unsettling angles",
-            "sci-fi": "futuristic aesthetic, sleek design",
-        }
-
-        if genre in genre_style_map:
-            prefix_parts.append(genre_style_map[genre])
-
-        if style_desc and len(style_desc) < 50:
-            prefix_parts.append(style_desc)
-
-        return f"[Style: {', '.join(prefix_parts)}]" if prefix_parts else ""
+        """构建英文风格前缀（保持旧签名，内部复用统一风格构建器）"""
+        return build_style_prefix({"genre": genre, "description": style_desc})
 
     def _apply_character_anchors(
         self,

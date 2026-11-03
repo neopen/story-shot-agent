@@ -17,6 +17,10 @@ from typing import Dict, Any, List, Optional
 
 from penshot.config.config import settings
 from penshot.logger import error, debug, info, warning
+from penshot.neopen.agent.continuity_guardian.anchor_recall import (
+    build_fragment_anchor_query,
+    build_issue_anchor_query,
+)
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
     ContinuityGuardianChecker,
 )
@@ -617,7 +621,20 @@ class WorkflowNodes:
             # 更新状态：开始转换
             self._update_task_progress(state.input.task_id, TaskStage.CONVERT_START, 0)
 
-            # 1. 加载历史上下文（使用 workflow_memory）
+            # 1. 回填片段主角色（从镜头继承），供锚点召回与契约外观锚点注入
+            if state.domain.shot_sequence and state.domain.fragment_sequence:
+                shot_by_id = {
+                    shot.id: shot for shot in state.domain.shot_sequence.shots
+                }
+                for fragment in state.domain.fragment_sequence.fragments:
+                    shot = shot_by_id.get(fragment.shot_id)
+                    if shot and shot.main_character:
+                        fragment.continuity_notes = fragment.continuity_notes or {}
+                        fragment.continuity_notes.setdefault(
+                            "main_character", shot.main_character
+                        )
+
+            # 2. 加载历史上下文（使用 workflow_memory）
             historical_convert_stats = self.workflow_memory.get_memory_dict(
                 "stats_convert_prompt", level=MemoryLevel.MEDIUM_TERM
             )
@@ -628,10 +645,20 @@ class WorkflowNodes:
                 "successful_prompt_patterns", level=MemoryLevel.LONG_TERM, default=[]
             )
 
+            # 2.1 按角色/场景锚点召回历史成功提示词（向量检索）
+            recalled_patterns = self._recall_patterns_by_anchors(state)
+            # 锚点命中的提示词与本片段最相关，优先作为历史成功模式参考
+            merged_patterns = list(recalled_patterns)
+            for pattern in successful_prompts or []:
+                if pattern and pattern not in merged_patterns:
+                    merged_patterns.append(pattern)
+            if recalled_patterns:
+                info(f"按角色/场景锚点召回 {len(recalled_patterns)} 条历史提示词")
+
             historical_context = {
                 "historical_stats": historical_convert_stats,
                 "historical_issues": historical_convert_issues,
-                "successful_patterns": successful_prompts,
+                "successful_patterns": merged_patterns,
             }
 
             if historical_context and any(
@@ -639,7 +666,7 @@ class WorkflowNodes:
             ):
                 self.prompt_converter.apply_historical_context(historical_context)
 
-            # 2. 加载修复参数
+            # 3. 加载修复参数
             repair_params = state.domain.repair_params.get(
                 PipelineNode.CONVERT_PROMPT, None
             )
@@ -660,20 +687,7 @@ class WorkflowNodes:
             # 更新状态：转换中
             self._update_task_progress(state.input.task_id, TaskStage.CONVERTING, 50)
 
-            # 3. 回填片段主角色（从镜头继承），供契约外观锚点注入
-            if state.domain.shot_sequence and state.domain.fragment_sequence:
-                shot_by_id = {
-                    shot.id: shot for shot in state.domain.shot_sequence.shots
-                }
-                for fragment in state.domain.fragment_sequence.fragments:
-                    shot = shot_by_id.get(fragment.shot_id)
-                    if shot and shot.main_character:
-                        fragment.continuity_notes = fragment.continuity_notes or {}
-                        fragment.continuity_notes.setdefault(
-                            "main_character", shot.main_character
-                        )
-
-            # 4. 执行提示词转换（契约存在时注入风格一致性约束）
+            # 4. 执行提示词转换（契约存在时注入风格/角色一致性约束）
             if state.domain.contract:
                 instructions = self.prompt_converter.process_with_style_consistency(
                     state.domain.fragment_sequence,
@@ -706,15 +720,15 @@ class WorkflowNodes:
 
             debug(f"片段指令转换完成，指令片段数: {len(instructions.fragments)}")
 
-            # 4. 使用知识库增强提示词
-            if self.knowledge_manager and self.knowledge_manager.is_available():
-                for fragment in instructions.fragments:
-                    enhanced_prompt = self.knowledge_manager.enhance_prompt(
-                        fragment.prompt, enhancement_mode="append"
-                    )
-                    if enhanced_prompt != fragment.prompt:
-                        fragment.prompt = enhanced_prompt
-                        debug(f"已使用知识库增强提示词: {fragment.fragment_id}")
+            # 记录锚点召回统计（供审计与"检索提升连续性"可量化验收）
+            instructions.metadata["anchor_recall"] = {
+                "queries": (
+                    len(state.domain.fragment_sequence.fragments)
+                    if state.domain.fragment_sequence
+                    else 0
+                ),
+                "hits": len(recalled_patterns),
+            }
 
             # 统计提示词信息
             prompt_lengths = [len(f.prompt) for f in instructions.fragments]
@@ -808,6 +822,54 @@ class WorkflowNodes:
             state.errors.error_source = PipelineNode.CONVERT_PROMPT
 
         return state
+
+    def _recall_patterns_by_anchors(self, state: WorkflowState) -> List[str]:
+        """按角色/场景锚点召回历史成功提示词（向量检索）
+
+        用一致性契约中的角色外观与场景地点/时间构建查询（而非整段 prompt 文本），
+        从剧本级提示词模板知识库召回相似的历史成功提示词，作为提示词转换阶段
+        的历史成功模式参考，强化跨片段一致性。
+
+        Args:
+            state: 工作流状态
+
+        Returns:
+            召回的去重提示词列表（最多 6 条）
+        """
+        contract = state.domain.contract
+        fragment_sequence = state.domain.fragment_sequence
+        if not contract or not fragment_sequence or not self.knowledge_manager:
+            return []
+
+        patterns: List[str] = []
+        hit_count = 0
+        for fragment in fragment_sequence.fragments:
+            query = build_fragment_anchor_query(
+                fragment, state.domain.shot_sequence, contract
+            )
+            if not query:
+                continue
+            try:
+                results = self.knowledge_manager.search_similar(
+                    query, script_id=state.input.script_id, top_k=2
+                )
+            except Exception as e:
+                warning(f"锚点召回失败（fragment={fragment.id}）: {e}")
+                continue
+
+            for result in results or []:
+                prompt_text = ""
+                if isinstance(result, dict):
+                    prompt_text = str(result.get("prompt") or "")
+                if prompt_text and prompt_text not in patterns:
+                    patterns.append(prompt_text)
+                    hit_count += 1
+
+        debug(
+            f"锚点召回: 查询片段数={len(fragment_sequence.fragments)}, 命中={hit_count}"
+        )
+        # 控制注入规模，避免历史提示词挤占转换上下文
+        return patterns[:6]
 
     # ======================== 质量审查节点 ========================
 
@@ -1189,9 +1251,17 @@ class WorkflowNodes:
             ):
                 enhanced_issues = []
                 for issue in continuity_issues:
-                    issue_desc = getattr(issue, "description", str(issue))
+                    # 按问题关联的角色/场景锚点召回历史解决方案
+                    anchor_query = build_issue_anchor_query(
+                        issue,
+                        state.domain.fragment_sequence,
+                        state.domain.shot_sequence,
+                        state.domain.contract,
+                    )
+                    if not anchor_query:
+                        anchor_query = getattr(issue, "description", str(issue))
                     similar_scenes = self.knowledge_manager.search_similar_scene(
-                        issue_desc, script_id=state.input.script_id, top_k=2
+                        anchor_query, script_id=state.input.script_id, top_k=2
                     )
                     if similar_scenes:
                         if hasattr(issue, "historical_solutions"):
