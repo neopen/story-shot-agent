@@ -15,6 +15,10 @@ from datetime import datetime
 from typing import Dict, Optional, List, Any
 
 from penshot.logger import debug, error, info, warning
+from penshot.neopen.agent.continuity_guardian.continuity_report import (
+    build_continuity_report,
+    build_repair_history,
+)
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
@@ -101,20 +105,45 @@ class WorkflowOutputWriter:
         """
         保存所有报告（异步）
 
+        连续性/修复报告的数据在调用线程内同步生成快照，避免后续
+        清理记忆或重置状态后异步任务读到空数据。
+
         Args:
             state: 工作流状态
         """
-        self._run_async(self._save_all_reports_async(state))
+        continuity_report = None
+        repair_history = None
+        try:
+            continuity_report = self._build_continuity_report(state)
+        except Exception as e:
+            error(f"构建连续性报告快照失败: {e}")
+        try:
+            repair_history = self._build_repair_history(state)
+        except Exception as e:
+            error(f"构建修复历史快照失败: {e}")
 
-    async def _save_all_reports_async(self, state: WorkflowState):
+        self._run_async(
+            self._save_all_reports_async(
+                state,
+                continuity_report=continuity_report,
+                repair_history=repair_history,
+            )
+        )
+
+    async def _save_all_reports_async(
+        self,
+        state: WorkflowState,
+        continuity_report: Optional[Dict[str, Any]] = None,
+        repair_history: Optional[Dict[str, Any]] = None,
+    ):
         """异步保存所有报告"""
         tasks = [
             self._save_execution_summary(state),
             self._save_stage_statistics(state),
             self._save_issues_report(state),
-            self._save_repair_history(state),
+            self._save_repair_history(state, repair_history),
             self._save_quality_report(state),
-            self._save_continuity_report(state),
+            self._save_continuity_report(state, continuity_report),
             self._save_memory_report(state.input.script_id, state.input.task_id)
         ]
 
@@ -222,11 +251,7 @@ class WorkflowOutputWriter:
                 level=MemoryLevel.SHORT_TERM,
                 default=[]
             )
-            continuity_issues = self.memory.get(
-                "continuity_issues_history",
-                level=MemoryLevel.MEDIUM_TERM,
-                default=[]
-            )
+            continuity_issues = self._collect_continuity_issues(state)
 
             # 确保所有 issues 都是列表格式
             parse_issues = self._ensure_list(parse_issues)
@@ -296,40 +321,33 @@ class WorkflowOutputWriter:
         except Exception as e:
             error(f"保存问题报告失败: {e}")
 
-    async def _save_repair_history(self, state: WorkflowState):
+    def _build_repair_history(self, state: WorkflowState) -> Dict[str, Any]:
+        """同步构建修复历史（在清理状态前生成快照）"""
+        return build_repair_history(
+            task_id=state.input.task_id,
+            script_id=state.input.script_id,
+            rounds=state.domain.continuity_rounds,
+            repair_params=state.domain.repair_params,
+        )
+
+    async def _save_repair_history(
+        self,
+        state: WorkflowState,
+        repair_history: Optional[Dict[str, Any]] = None,
+    ):
         """保存修复历史记录"""
         try:
-            # 从记忆模块获取修复历史（使用 get 方法）
-            repair_parse = self.memory.get(
-                f"repair_{PipelineNode.PARSE_SCRIPT.value}",
-                level=MemoryLevel.MEDIUM_TERM
+            data = (
+                repair_history
+                if repair_history is not None
+                else self._build_repair_history(state)
             )
-            repair_segment = self.memory.get(
-                f"repair_{PipelineNode.SEGMENT_SHOT.value}",
-                level=MemoryLevel.MEDIUM_TERM
+            await self._save_json_async(
+                state.input.script_id,
+                state.input.task_id,
+                data,
+                "repair_history.json",
             )
-            repair_split = self.memory.get(
-                f"repair_{PipelineNode.SPLIT_VIDEO.value}",
-                level=MemoryLevel.MEDIUM_TERM
-            )
-            repair_convert = self.memory.get(
-                f"repair_{PipelineNode.CONVERT_PROMPT.value}",
-                level=MemoryLevel.MEDIUM_TERM
-            )
-
-            repair_history = {
-                "task_id": state.input.task_id,
-                "script_id": state.input.script_id,
-                "repair_count": sum(1 for r in [repair_parse, repair_segment, repair_split, repair_convert] if r),
-                "repairs": {
-                    "script_parser": repair_parse,
-                    "shot_segmenter": repair_segment,
-                    "video_splitter": repair_split,
-                    "prompt_converter": repair_convert
-                }
-            }
-
-            await self._save_json_async(state.input.script_id, state.input.task_id, repair_history, "repair_history.json")
             debug(f"修复历史已保存: {state.input.script_id} -> {state.input.task_id}")
         except Exception as e:
             error(f"保存修复历史失败: {e}")
@@ -376,49 +394,39 @@ class WorkflowOutputWriter:
         except Exception as e:
             error(f"保存质量报告失败: {e}")
 
-    async def _save_continuity_report(self, state: WorkflowState):
+    def _build_continuity_report(self, state: WorkflowState) -> Dict[str, Any]:
+        """同步构建连续性报告（在清理状态前生成快照）"""
+        return build_continuity_report(
+            task_id=state.input.task_id,
+            script_id=state.input.script_id,
+            rounds=state.domain.continuity_rounds,
+            current_issues=state.domain.continuity_issues,
+            repair_params=state.domain.repair_params,
+            contract_violations=state.domain.contract_violations,
+            continuity_passed=state.domain.continuity_passed,
+            retry_count=state.domain.continuity_retry_count,
+            max_retries=state.domain.max_continuity_retries,
+            needs_continuity_repair=state.domain.needs_continuity_repair,
+        )
+
+    async def _save_continuity_report(
+        self,
+        state: WorkflowState,
+        continuity_report: Optional[Dict[str, Any]] = None,
+    ):
         """保存连续性检查报告"""
         try:
-            # 从记忆模块获取连续性历史（使用 get 方法）
-            continuity_history = self.memory.get(
-                "continuity_issues_history",
-                level=MemoryLevel.MEDIUM_TERM,
-                default=[]
+            data = (
+                continuity_report
+                if continuity_report is not None
+                else self._build_continuity_report(state)
             )
-            continuity_history = self._ensure_list(continuity_history)
-
-            # 按类型分组
-            issues_by_type = {}
-            issues_by_severity = {"critical": 0, "major": 0, "moderate": 0, "warning": 0, "info": 0}
-
-            for issue in continuity_history:
-                if isinstance(issue, dict):
-                    issue_type = issue.get("type", "unknown")
-                    severity = issue.get("severity", "moderate")
-                else:
-                    issue_type = getattr(issue, "type", "unknown")
-                    if hasattr(issue_type, 'value'):
-                        issue_type = issue_type.value
-                    severity = getattr(issue, "severity", "moderate")
-                    if hasattr(severity, 'value'):
-                        severity = severity.value
-
-                issues_by_type[issue_type] = issues_by_type.get(issue_type, 0) + 1
-                if severity in issues_by_severity:
-                    issues_by_severity[severity] += 1
-
-            continuity_report = {
-                "task_id": state.input.task_id,
-                "script_id": state.input.script_id,
-                "total_continuity_issues": len(continuity_history),
-                "issues_by_type": issues_by_type,
-                "issues_by_severity": issues_by_severity,
-                "continuity_retry_count": state.domain.continuity_retry_count,
-                "continuity_passed": state.domain.continuity_passed,
-                "issues": continuity_history[-50:]  # 只保留最近50条
-            }
-
-            await self._save_json_async(state.input.script_id, state.input.task_id, continuity_report, "continuity_report.json")
+            await self._save_json_async(
+                state.input.script_id,
+                state.input.task_id,
+                data,
+                "continuity_report.json",
+            )
             debug(f"连续性报告已保存: {state.input.script_id} -> {state.input.task_id}")
         except Exception as e:
             error(f"保存连续性报告失败: {e}")
@@ -478,6 +486,13 @@ class WorkflowOutputWriter:
         info("WorkflowOutputWriter 已关闭")
 
     # ============================= 辅助方法 =============================
+
+    def _collect_continuity_issues(self, state: WorkflowState) -> List[Any]:
+        """读取最近一轮连续性问题（通过后为空，历史问题保留在连续性报告中）"""
+        rounds = state.domain.continuity_rounds or []
+        if rounds and isinstance(rounds[-1], dict):
+            return list(rounds[-1].get("issues") or [])
+        return self._ensure_list(state.domain.continuity_issues)
 
     def _ensure_list(self, value: Any) -> List:
         """

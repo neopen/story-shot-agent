@@ -95,6 +95,9 @@ class DomainState(BaseModel):
     max_continuity_retries: int = 3
     needs_continuity_repair: bool = False
 
+    # 连续性检查轮次（报告数据源：跨轮次保留，生成输出后仍可读取）
+    continuity_rounds: List[Dict[str, Any]] = []
+
     # 修复参数
     fix_summary: Dict[str, Any] = {}
     repair_params: Dict[PipelineNode, QualityRepairParams] = {}

@@ -37,6 +37,11 @@ from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import 
 from penshot.neopen.agent.continuity_guardian.continuity_repair_generator import (
     ContinuityRepairGenerator,
 )
+from penshot.neopen.agent.continuity_guardian.continuity_report import (
+    MAX_REPORT_ROUNDS,
+    build_repair_entries,
+    build_round_record,
+)
 from penshot.neopen.agent.human_decision.human_decision_intervention import (
     HumanIntervention,
 )
@@ -1195,18 +1200,10 @@ class WorkflowNodes:
             # 重置上一轮修复标记，避免历史状态影响本次决策
             state.domain.needs_continuity_repair = False
 
-            # 回忆历史连续性问题（使用 workflow_memory）
-            historical_continuity_issues = self.workflow_memory.get_memory_list(
-                "continuity_issues_history", level=MemoryLevel.MEDIUM_TERM, default=[]
-            )
-            successful_continuity_fixes = self.workflow_memory.get_memory_list(
-                "successful_continuity_fixes", level=MemoryLevel.LONG_TERM, default=[]
-            )
-
-            # 构建历史上下文
+            # 历史轮次作为本轮检查的上下文（State 为准，避免记忆层键值检索失效）
+            previous_rounds = list(state.domain.continuity_rounds)[-5:]
             historical_context = {
-                "historical_issues": historical_continuity_issues,
-                "successful_fixes": successful_continuity_fixes,
+                "previous_rounds": previous_rounds,
             }
 
             # 1. 收集所有阶段的输出
@@ -1240,9 +1237,29 @@ class WorkflowNodes:
                 },
             )
 
-            # 3. 如果没有问题，通过检查
+            # 3. 分析问题来源（通过时问题列表为空）
+            issues_by_stage = self._analyze_continuity_issues(
+                check_result.issues, continuity_context
+            )
+            stage_counts = {
+                stage.value: len(issues) for stage, issues in issues_by_stage.items()
+            }
+
+            # 4. 如果没有问题，记录本轮通过结果并清理历史状态
             if check_result.passed and check_result.total_issues == 0:
                 debug("连续性检查通过")
+                self._record_continuity_round(
+                    state,
+                    build_round_record(
+                        check_result,
+                        round_index=state.domain.continuity_retry_count + 1,
+                        retry_count=state.domain.continuity_retry_count,
+                        max_retries=state.domain.max_continuity_retries,
+                        phase="passed",
+                        issues_by_stage=stage_counts,
+                        contract_violations=state.domain.contract_violations,
+                    ),
+                )
                 state.domain.continuity_passed = True
                 # 清理上一轮问题，避免决策误读历史结果触发重复修复
                 state.domain.continuity_issues = []
@@ -1251,7 +1268,7 @@ class WorkflowNodes:
                 state.domain.continuity_retry_count = 0
                 return state
 
-            # 4. 获取问题列表
+            # 5. 获取问题列表
             continuity_issues = check_result.issues
             state.domain.continuity_passed = False
             state.domain.continuity_issues = continuity_issues
@@ -1282,11 +1299,6 @@ class WorkflowNodes:
                 state.domain.continuity_issues = enhanced_issues
                 info("已使用知识库检索历史连续性解决方案")
 
-            # 5. 分析问题来源
-            issues_by_stage = self._analyze_continuity_issues(
-                continuity_issues, continuity_context
-            )
-
             warning(
                 f"发现 {len(continuity_issues)} 个连续性问题，分布在: {[s.name for s in issues_by_stage.keys()]}, "
                 f"重试次数: {state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}"
@@ -1301,6 +1313,7 @@ class WorkflowNodes:
                 contract_violations_by_stage = group_violations_by_stage(
                     state.domain.contract_violations
                 )
+                repair_entries = []
                 for stage, issues in issues_by_stage.items():
                     repair_params = self._create_continuity_repair_params(
                         issues,
@@ -1321,9 +1334,31 @@ class WorkflowNodes:
                         )
                     if repair_params:
                         state.domain.repair_params[stage] = repair_params
+                        repair_entries.extend(
+                            build_repair_entries(
+                                {stage: repair_params},
+                                contract_violations_by_stage,
+                            )
+                        )
                     info(
                         f"为阶段 {stage.value} 生成连续性修复参数，共{len(issues)}个问题"
                     )
+
+                # 记录本轮检查与修复动作，供连续性报告使用
+                self._record_continuity_round(
+                    state,
+                    build_round_record(
+                        check_result,
+                        round_index=state.domain.continuity_retry_count + 1,
+                        retry_count=state.domain.continuity_retry_count,
+                        max_retries=state.domain.max_continuity_retries,
+                        phase="needs_repair",
+                        issues_by_stage=stage_counts,
+                        repairs=repair_entries,
+                        repair_stages=[stage.value for stage in issues_by_stage],
+                        contract_violations=state.domain.contract_violations,
+                    ),
+                )
 
                 # 标记需要重试
                 state.domain.continuity_retry_count += 1
@@ -1338,6 +1373,18 @@ class WorkflowNodes:
             else:
                 error(
                     f"连续性修复重试次数超限: {state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}"
+                )
+                self._record_continuity_round(
+                    state,
+                    build_round_record(
+                        check_result,
+                        round_index=state.domain.continuity_retry_count + 1,
+                        retry_count=state.domain.continuity_retry_count,
+                        max_retries=state.domain.max_continuity_retries,
+                        phase="retry_exhausted",
+                        issues_by_stage=stage_counts,
+                        contract_violations=state.domain.contract_violations,
+                    ),
                 )
                 state.execution.needs_human_review = True
                 state.errors.error_source = PipelineNode.CONTINUITY_GUARDIAN
@@ -2053,6 +2100,19 @@ class WorkflowNodes:
         return self.generator.generate_repair_params(
             issues, stage, contract=contract
         )
+
+    def _record_continuity_round(
+        self, state: WorkflowState, record: Dict[str, Any]
+    ) -> None:
+        """记录单轮连续性检查结果
+
+        报告以 State 为数据源：`continuity_issues` 会在通过后清空，
+        而轮次记录需要跨阶段保留，供输出节点生成报告。
+        """
+        rounds = state.domain.continuity_rounds
+        rounds.append(record)
+        if len(rounds) > MAX_REPORT_ROUNDS:
+            del rounds[:-MAX_REPORT_ROUNDS]
 
     def _route_to_fix_stage(
         self,
