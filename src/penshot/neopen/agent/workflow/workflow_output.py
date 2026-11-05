@@ -110,6 +110,9 @@ class WorkflowOutputWriter:
 
         Args:
             state: 工作流状态
+
+        Returns:
+            后台保存任务的 Future（调用方可等待落盘完成）；提交失败时返回 None
         """
         continuity_report = None
         repair_history = None
@@ -122,7 +125,7 @@ class WorkflowOutputWriter:
         except Exception as e:
             error(f"构建修复历史快照失败: {e}")
 
-        self._run_async(
+        return self._run_async(
             self._save_all_reports_async(
                 state,
                 continuity_report=continuity_report,

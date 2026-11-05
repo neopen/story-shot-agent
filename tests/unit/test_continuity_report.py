@@ -141,6 +141,9 @@ def test_report_passed_after_repair():
     assert report["comparison"]["resolved_issue_count"] == 1
     assert report["comparison"]["issue_count_trend"] == [1, 0]
     assert report["comparison"]["resolved_types"] == ["style_inconsistent"]
+    assert report["detected_issue_count"] == 1
+    assert report["detected_issues_by_type"] == {"style_inconsistent": 1}
+    assert report["remaining_issues_by_type"] == {}
     assert report["repair_count"] == 1
     assert report["repairs"][0]["stage"] == "convert_prompt"
     assert report["repairs"][0]["round"] == 1

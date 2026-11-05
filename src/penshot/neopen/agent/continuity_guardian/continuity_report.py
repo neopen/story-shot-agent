@@ -284,6 +284,19 @@ def build_continuity_report(
     resolved_types = sorted(initial_types - final_types)
     remaining_types = sorted(final_types)
 
+    # 累计检测到的问题（含已修复项），用于报告回溯
+    detected_by_type: Dict[str, int] = {}
+    detected_by_severity: Dict[str, int] = {}
+    for item in round_items:
+        for issue_type, count in (item.get("issues_by_type") or {}).items():
+            detected_by_type[issue_type] = detected_by_type.get(issue_type, 0) + int(
+                count or 0
+            )
+        for severity, count in (item.get("issues_by_severity") or {}).items():
+            detected_by_severity[severity] = detected_by_severity.get(
+                severity, 0
+            ) + int(count or 0)
+
     passed = bool(continuity_passed and not current)
     final_status = _derive_final_status(
         passed=passed,
@@ -302,6 +315,13 @@ def build_continuity_report(
         else (last_round or {}).get("total_issues", 0),
         "issues_by_type": issues_by_type,
         "issues_by_severity": issues_by_severity,
+        "remaining_issues_by_type": issues_by_type,
+        "remaining_issues_by_severity": issues_by_severity,
+        "detected_issue_count": sum(
+            int(item.get("total_issues") or 0) for item in round_items
+        ),
+        "detected_issues_by_type": detected_by_type,
+        "detected_issues_by_severity": detected_by_severity,
         "issues": latest_issues,
         "continuity_retry_count": max(
             [int(item.get("retry_count") or 0) for item in round_items] + [retry_count]
