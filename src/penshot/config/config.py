@@ -17,8 +17,9 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from penshot.config.config_loader import ConfigLoader
-from penshot.config.config_models import (AppConfig, APIConfig, LLMConfig, EmbeddingConfig,
-                                          PathsConfig, StoryboardConfig, LLMBaseConfig, EmbeddingBaseConfig, RetrieverConfig)
+from penshot.config.config_models import (AppConfig, APIConfig, LLMConfig, EmbeddingConfig, ImageConfig,
+                                          PathsConfig, StoryboardConfig, LLMBaseConfig, EmbeddingBaseConfig, RetrieverConfig,
+                                          ImageBaseConfig)
 from penshot.logger import info, warning
 from penshot.utils.dotenv_loader import DotEnvLoader
 from penshot.utils.path_utils import PathResolver
@@ -44,6 +45,8 @@ class Settings(BaseSettings):
     # AI 模型配置
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embed: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    # 文生图配置（M0.4.2 角色资产锚点）
+    image: ImageConfig = Field(default_factory=ImageConfig)
     # 检索器配置
     retriever: RetrieverConfig = Field(default_factory=RetrieverConfig)
 
@@ -93,6 +96,12 @@ class Settings(BaseSettings):
     def get_embedding_config(self, provider: str = "default") -> EmbeddingBaseConfig:
         """获取嵌入模型配置"""
         return self.embed.fallback if provider == "fallback" else self.embed.default
+
+    def get_image_config(self, provider: str = "default") -> ImageBaseConfig:
+        """获取文生图配置（default/fallback）"""
+        if provider == "fallback":
+            return self.image.fallback or self.image.default
+        return self.image.default
 
     def get_config_summary(self) -> Dict[str, Any]:
         """获取当前配置摘要（用于日志/调试）"""

@@ -123,6 +123,44 @@ class PipelineDecision:
         # 解析成功，可以继续下一步
         return PipelineState.SUCCESS
 
+    def decide_after_assets(self, state: WorkflowState) -> PipelineState:
+        """资产锚点生成后的决策（M0.4.2）
+
+        决策逻辑：
+        1. 缺少剧本解析结果时判定失败；
+        2. 资产生成失败或未启用不阻断主流程（仅保留提示词，由下游首帧指令兜底）；
+        3. 其余情况继续进入镜头拆分。
+
+        Returns:
+            PipelineState: SUCCESS/VALID 均进入镜头拆分；FAILED 进入错误处理
+        """
+        stage = PipelineNode.GENERATE_ASSETS
+        state.execution.last_node = stage
+
+        loop_decision, loop_reason = self._check_and_increment_node_loop(state, stage)
+        if loop_decision != PipelineState.SUCCESS:
+            state.errors.error_messages.append(
+                f"资产锚点生成节点循环检查失败: {loop_reason}"
+            )
+            return PipelineState.FAILED
+
+        if state.domain.parsed_script is None:
+            error("资产锚点生成后，剧本解析结果为空")
+            return PipelineState.FAILED
+
+        report = state.domain.asset_report or {}
+        if report.get("enabled") and not report.get("generated"):
+            # 已启用文生图但全部失败：保留提示词并继续，避免阻断分镜产出
+            warning(
+                f"资产锚点全部生成失败，继续主流程: "
+                f"errors={report.get('errors', [])[:3]}"
+            )
+            return PipelineState.VALID
+
+        # 成功（含未启用/部分失败）重置该阶段重试计数
+        state.execution.stage_current_retries[stage] = 0
+        return PipelineState.SUCCESS
+
     def decide_after_splitting(self, state: WorkflowState) -> PipelineState:
         """镜头拆分后的决策
 

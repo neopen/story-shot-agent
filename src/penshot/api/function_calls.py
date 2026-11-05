@@ -127,7 +127,8 @@ class PenshotFunction:
             style: Optional[VideoStyle] = None,
             language: Optional[ShotLanguage] = None,
             wait_timeout: float = 300.0,
-            priority: TaskPriority = TaskPriority.NORMAL
+            priority: TaskPriority = TaskPriority.NORMAL,
+            asset_manifest: Optional[Dict[str, Any]] = None
     ) -> PenshotResult:
         """
         同步执行剧本分镜拆分（等待完成）
@@ -139,6 +140,7 @@ class PenshotFunction:
             style: 视频风格
             wait_timeout: 等待超时时间（秒）
             priority: 任务优先级
+            asset_manifest: 下游回填的资产清单（asset_id -> asset_ref），可选
 
         Returns:
             PenshotResult: 执行结果
@@ -148,7 +150,8 @@ class PenshotFunction:
             script_id=script_id,
             style=style,
             language=language,
-            priority=priority
+            priority=priority,
+            asset_manifest=asset_manifest,
         )
         return self.wait_for_result(task_id, timeout=wait_timeout)
 
@@ -159,7 +162,8 @@ class PenshotFunction:
             style: Optional[VideoStyle] = None,
             language: Optional[ShotLanguage] = None,
             callback: Optional[Callable] = None,
-            priority: TaskPriority = TaskPriority.NORMAL
+            priority: TaskPriority = TaskPriority.NORMAL,
+            asset_manifest: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         异步执行剧本分镜拆分（立即返回 task_id）
@@ -171,6 +175,7 @@ class PenshotFunction:
             language: 输出语言
             callback: 任务完成回调函数
             priority: 任务优先级
+            asset_manifest: 下游回填的资产清单（asset_id -> asset_ref），可选
 
         Returns:
             str: 任务ID
@@ -221,6 +226,7 @@ class PenshotFunction:
             config=self.config,
             language=lang,
             priority=priority,
+            asset_manifest=asset_manifest,
             # callback=lambda r: self._on_task_complete(task_id, r)
             callback=_internal_callback
         )
@@ -390,17 +396,22 @@ class PenshotFunction:
             scripts: List[str],
             language: Optional[ShotLanguage] = None,
             wait_timeout: float = 600.0,
-            priority: TaskPriority = TaskPriority.NORMAL
+            priority: TaskPriority = TaskPriority.NORMAL,
+            asset_manifests: Optional[List[Optional[Dict[str, Any]]]] = None
     ) -> List[PenshotResult]:
         """
         批量处理多个剧本（同步，等待全部完成）
+
+        Args:
+            asset_manifests: 与 scripts 按下标对应的资产回填清单，可选
         """
         results = self.task_factory.batch(
             scripts=scripts,
             config=self.config,
             language=language.value if language else self.language.value,
             priority=priority,
-            timeout=wait_timeout
+            timeout=wait_timeout,
+            asset_manifests=asset_manifests,
         )
 
         # 每个 result 已经是 TaskResponse
@@ -421,17 +432,22 @@ class PenshotFunction:
             scripts: List[str],
             language: Optional[ShotLanguage] = None,
             max_concurrent: int = 3,
-            priority: TaskPriority = TaskPriority.NORMAL
+            priority: TaskPriority = TaskPriority.NORMAL,
+            asset_manifests: Optional[List[Optional[Dict[str, Any]]]] = None
     ) -> List[PenshotResult]:
         """
         批量处理多个剧本（异步，支持并发控制）
+
+        Args:
+            asset_manifests: 与 scripts 按下标对应的资产回填清单，可选
         """
         results = await self.task_factory.batch_async(
             scripts=scripts,
             config=self.config,
             language=language.value if language else self.language.value,
             priority=priority,
-            max_concurrent=max_concurrent
+            max_concurrent=max_concurrent,
+            asset_manifests=asset_manifests,
         )
 
         return [

@@ -121,7 +121,8 @@ class TaskLifecycleService:
     # ==================== 核心业务方法 ====================
     def create_task(self, script: str, script_id: Optional[str] = None,
                     style: Optional[VideoStyle] = None,
-                    config: Optional[ShotConfig] = None) -> Tuple[str, str]:
+                    config: Optional[ShotConfig] = None,
+                    asset_manifest: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
         """
         创建任务
 
@@ -130,6 +131,7 @@ class TaskLifecycleService:
             script_id: 剧本ID（可选）
             style: 视频风格（可选）
             config: 配置（可选）
+            asset_manifest: 下游回填的资产清单（可选，JSON 可序列化）
 
         Returns:
             (script_id, task_id)
@@ -149,6 +151,8 @@ class TaskLifecycleService:
             "script_id": script_id,
             "script": script,
             "config": shot_config,
+            # 下游回填的资产清单（asset_id -> asset_ref），随任务持久化
+            "asset_manifest": asset_manifest,
             "status": TaskStatus.PENDING,
             "stage": TaskStage.INIT.code,
             "progress": 0,

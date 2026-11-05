@@ -47,6 +47,41 @@ class LLMBaseConfig(BaseModel):
         return v
 
 
+class ImageBaseConfig(BaseModel):
+    """文生图提供商配置（M0.4.2：仅生成静态资产，不做视频生成）"""
+
+    provider: str = Field(default="flux", description="文生图供应商：flux/openai")
+    base_url: str = Field(default="", description="OpenAI 兼容的图片生成接口地址")
+    api_key: Optional[SecretStr] = Field(default=SecretStr(""))
+    model_name: str = Field(default="flux-1.1-pro")
+    size: str = Field(default="1024x1024", description="输出尺寸，如 1024x1024")
+    timeout: int = Field(default=120, ge=1)
+    max_retries: int = Field(default=2, ge=0, le=10)
+    output_dir: str = Field(default="", description="资产落盘目录；为空时使用 data_output/assets")
+    enabled: bool = Field(default=False, description="是否启用真实文生图调用")
+
+    @field_validator("provider", "base_url", "model_name", "size", mode="before")
+    @classmethod
+    def strip_whitespace(cls, v: Any) -> Any:
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def validate_api_key(cls, v):
+        """API密钥验证（支持 ${ENV_VAR} 引用）"""
+        if isinstance(v, str) and v.startswith("$"):
+            env_var = v[2:-1] if v.startswith("${") else v[1:]
+            return os.getenv(env_var, "")
+        return v
+
+
+class ImageConfig(BaseModel):
+    """文生图主配置（default + fallback）"""
+
+    default: ImageBaseConfig = Field(default_factory=ImageBaseConfig)
+    fallback: Optional[ImageBaseConfig] = Field(default=None)
+
+
 class EmbeddingBaseConfig(BaseModel):
     """嵌入模型提供商配置"""
     base_url: str = Field(default="")  # https://api.openai.com/v1

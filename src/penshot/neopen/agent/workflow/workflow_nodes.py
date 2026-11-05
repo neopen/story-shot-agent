@@ -69,9 +69,11 @@ from penshot.neopen.agent.model_adapter import (
     RouteDecision,
     RoutePlan,
     adapt_instructions,
+    apply_image_to_video_routing,
     get_capability,
     resolve_model_name,
 )
+from penshot.neopen.agent.asset_generator import AssetGeneratorAgent
 
 
 class WorkflowNodes:
@@ -165,6 +167,9 @@ class WorkflowNodes:
         # 初始化连续性守护组件
         self.generator = ContinuityRepairGenerator()
         self.checker = ContinuityGuardianChecker()
+
+        # 初始化资产锚点生成智能体（M0.4.2：默认只产出声明式计划，不调用生图接口）
+        self.asset_generator = AssetGeneratorAgent()
 
         # 初始化输出写入器
         self.output_writer = WorkflowOutputWriter(self.storage, self._memory)
@@ -322,6 +327,95 @@ class WorkflowNodes:
             state.execution.current_node = PipelineNode.PARSE_SCRIPT
             state.execution.current_stage = AgentStage.ERROR_HANDLER
             state.errors.error_source = PipelineNode.PARSE_SCRIPT
+
+        return state
+
+    # ======================== 资产锚点生成节点 ========================
+
+    def generate_assets_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        资产锚点生成节点（M0.4.2）
+
+        功能：基于剧本解析结果与全局一致性契约，产出角色三视图/关键道具/场景锚点的
+        声明式资产计划。
+        - 默认不调用任何生图接口，仅输出 ``asset_plan`` 供下游按需生成；
+        - 输入携带 ``asset_manifest`` 时直接复用下游回填的真实 ``asset_ref``；
+        - 显式启用生成执行器时才在本地生成并落盘，失败不阻断主工作流。
+
+        Args:
+            state: 工作流状态
+
+        Returns:
+            更新后的工作流状态
+        """
+        try:
+            parsed_script = state.domain.parsed_script
+            if parsed_script is None:
+                raise ValueError("资产锚点生成前缺少剧本解析结果")
+
+            # 始终产出声明式资产计划（默认不触发任何外部生成调用）
+            plan = self.asset_generator.plan_assets(
+                parsed_script,
+                state.domain.contract,
+                task_id=state.input.task_id,
+                script_id=state.input.script_id,
+            )
+            state.domain.asset_plan = plan.to_dict()
+            self.storage.save_obj_result(
+                state.input.script_id,
+                state.input.task_id,
+                plan,
+                "asset_plan.json",
+            )
+
+            report = self.asset_generator.generate_assets(
+                parsed_script,
+                state.domain.contract,
+                task_id=state.input.task_id,
+                plan=plan,
+                manifest=state.input.asset_manifest,
+                script_id=state.input.script_id,
+            )
+            state.domain.asset_report = report.to_dict()
+
+            # 回填清单优先取本轮产出（输入带入或执行器产出），供后续路由解析
+            if report.manifest is not None:
+                state.domain.asset_manifest = report.manifest.to_dict()
+            elif state.input.asset_manifest:
+                state.domain.asset_manifest = state.input.asset_manifest
+
+            self.storage.save_obj_result(
+                state.input.script_id,
+                state.input.task_id,
+                report,
+                "asset_generation_report.json",
+            )
+
+            if report.generated > 0:
+                self._update_task_status(
+                    state.input.task_id, TaskStatus.PROCESSING
+                )
+            debug(
+                f"资产锚点处理完成: 模式={report.mode}, 已生成={report.generated}, "
+                f"待生成={report.pending}, 失败={report.failed}, 跳过={report.skipped}"
+            )
+
+            state.execution.current_stage = AgentStage.ASSETS
+            state.execution.current_node = PipelineNode.GENERATE_ASSETS
+        except Exception as e:
+            # 资产生成属于增强能力，失败不阻断主流程，仅记录警告
+            warning(f"资产锚点生成异常（不影响主流程）: {e}")
+            state.domain.asset_report = {
+                "enabled": False,
+                "mode": "plan",
+                "total": 0,
+                "generated": 0,
+                "failed": 0,
+                "pending": 0,
+                "errors": [str(e)],
+            }
+            state.execution.current_stage = AgentStage.ASSETS
+            state.execution.current_node = PipelineNode.GENERATE_ASSETS
 
         return state
 
@@ -764,13 +858,29 @@ class WorkflowNodes:
                 target_model = instructions.metadata.get("video_model")
                 adapted_packages = adapt_instructions(instructions, target_model)
                 resolved_model = resolve_model_name(target_model)
+
+                # 4.6 图生视频优先路由（M0.4.2）：critical_text / high_consistency
+                # 片段标注两段式「文生图 -> 图生视频」，并按 asset_id 挂载资产引用
+                two_stage_count = apply_image_to_video_routing(
+                    adapted_packages,
+                    instructions,
+                    state.domain.contract,
+                    state.domain.asset_manifest,
+                )
+
                 plan = RoutePlan(
                     source_model=str(target_model or ""),
                     decisions=[
                         RouteDecision(
                             fragment_id=pkg.fragment_id,
                             target_model=pkg.target_model,
-                            reason="m0.4.0_inline",
+                            reason=(
+                                "m0.4.2_image_to_video"
+                                if pkg.mode.value == "image_to_video"
+                                else "m0.4.0_inline"
+                            ),
+                            mode=pkg.mode,
+                            asset_ref=pkg.asset_ref,
                             capability=get_capability(pkg.target_model),
                         )
                         for pkg in adapted_packages
@@ -778,8 +888,12 @@ class WorkflowNodes:
                     adapted_packages=adapted_packages,
                 )
                 instructions.route_plan = plan.model_dump(mode="json")
+                # 指令集内嵌资产计划与回填清单，下游可只消费 instructions
+                instructions.asset_plan = state.domain.asset_plan
+                instructions.asset_manifest = state.domain.asset_manifest
                 info(
-                    f"目标模型适配完成: 模型={resolved_model}, 适配片段数={len(adapted_packages)}"
+                    f"目标模型适配完成: 模型={resolved_model}, 适配片段数={len(adapted_packages)}, "
+                    f"图生视频优先片段数={two_stage_count}"
                 )
             except Exception as e:
                 warning(f"目标模型适配失败（不影响主流程）: {e}")
@@ -1505,6 +1619,9 @@ class WorkflowNodes:
                 "consistency_contract": state.domain.contract.to_dict()
                 if state.domain.contract
                 else None,
+                "asset_generation": state.domain.asset_report,
+                "asset_plan": state.domain.asset_plan,
+                "asset_manifest": state.domain.asset_manifest,
                 "created_at": datetime.now().isoformat(),
                 "completed_at": datetime.now().isoformat(),
                 "status": "completed",

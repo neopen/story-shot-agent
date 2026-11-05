@@ -79,9 +79,14 @@ class TaskFactory:
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
             callback: Optional[Callable] = None,
-            callback_url: Optional[str] = None
+            callback_url: Optional[str] = None,
+            asset_manifest: Optional[Dict[str, Any]] = None
     ) -> tuple[str, str]:
-        """提交任务（异步，立即返回task_id）"""
+        """提交任务（异步，立即返回task_id）
+
+        Args:
+            asset_manifest: 下游回填的资产清单（asset_id -> asset_ref），可选
+        """
         config = config or self.default_config
         language = language or self.default_language
 
@@ -90,6 +95,7 @@ class TaskFactory:
             script=script,
             style=style,
             config=config,
+            asset_manifest=asset_manifest,
         )
 
         debug(f"[TaskFactory] 任务已创建: {task_id}")
@@ -143,7 +149,8 @@ class TaskFactory:
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
             timeout: float = 300,
-            callback_url: Optional[str] = None
+            callback_url: Optional[str] = None,
+            asset_manifest: Optional[Dict[str, Any]] = None
     ) -> TaskResponse:
         """提交任务并等待完成（同步）"""
         script_id2, task_id = self.submit(
@@ -152,7 +159,8 @@ class TaskFactory:
             config=config,
             language=language,
             priority=priority,
-            callback_url=callback_url
+            callback_url=callback_url,
+            asset_manifest=asset_manifest,
         )
         return self.wait_for_result(task_id, timeout)
 
@@ -164,7 +172,8 @@ class TaskFactory:
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
             timeout: float = 300,
-            callback_url: Optional[str] = None
+            callback_url: Optional[str] = None,
+            asset_manifest: Optional[Dict[str, Any]] = None
     ) -> TaskResponse:
         """
         提交任务并等待完成（异步）
@@ -177,6 +186,7 @@ class TaskFactory:
             priority: 优先级
             timeout: 超时时间
             callback_url: 回调URL
+            asset_manifest: 下游回填的资产清单（可选）
 
         Returns:
             TaskResponse: 任务结果
@@ -188,7 +198,8 @@ class TaskFactory:
             config=config,
             language=language,
             priority=priority,
-            callback_url=callback_url
+            callback_url=callback_url,
+            asset_manifest=asset_manifest,
         )
 
         # 异步等待结果
@@ -435,17 +446,23 @@ class TaskFactory:
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
             timeout: float = 600,
-            callback_url: Optional[str] = None
+            callback_url: Optional[str] = None,
+            asset_manifests: Optional[List[Optional[Dict[str, Any]]]] = None
     ) -> List[TaskResponse]:
-        """批量处理（同步，等待全部完成）"""
+        """批量处理（同步，等待全部完成）
+
+        Args:
+            asset_manifests: 与 scripts 按下标对应的资产回填清单，可选
+        """
         task_ids = []
-        for script in scripts:
+        for index, script in enumerate(scripts):
             script_id, task_id = self.submit(
                 script=script,
                 config=config,
                 language=language,
                 priority=priority,
-                callback_url=callback_url
+                callback_url=callback_url,
+                asset_manifest=self._manifest_at(asset_manifests, index),
             )
             task_ids.append(task_id)
 
@@ -464,12 +481,17 @@ class TaskFactory:
             priority: TaskPriority = TaskPriority.NORMAL,
             timeout: float = 600,
             callback_url: Optional[str] = None,
-            max_concurrent: int = 5
+            max_concurrent: int = 5,
+            asset_manifests: Optional[List[Optional[Dict[str, Any]]]] = None
     ) -> List[TaskResponse]:
-        """批量处理（异步，支持并发控制）"""
+        """批量处理（异步，支持并发控制）
+
+        Args:
+            asset_manifests: 与 scripts 按下标对应的资产回填清单，可选
+        """
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def process_one(script: str) -> TaskResponse:
+        async def process_one(script: str, manifest: Optional[Dict[str, Any]]) -> TaskResponse:
             async with semaphore:
                 return await self.submit_and_wait_async(
                     script=script,
@@ -477,10 +499,14 @@ class TaskFactory:
                     language=language,
                     priority=priority,
                     timeout=timeout,
-                    callback_url=callback_url
+                    callback_url=callback_url,
+                    asset_manifest=manifest,
                 )
 
-        tasks = [process_one(script) for script in scripts]
+        tasks = [
+            process_one(script, self._manifest_at(asset_manifests, index))
+            for index, script in enumerate(scripts)
+        ]
         return await asyncio.gather(*tasks)
 
     def batch_submit(
@@ -489,21 +515,26 @@ class TaskFactory:
             config: Optional[ShotConfig] = None,
             language: ShotLanguage = None,
             priority: TaskPriority = TaskPriority.NORMAL,
-            callback_url: Optional[str] = None
+            callback_url: Optional[str] = None,
+            asset_manifests: Optional[List[Optional[Dict[str, Any]]]] = None
     ) -> BatchTaskResponse:
         """
         批量提交（不等待完成）
+
+        Args:
+            asset_manifests: 与 scripts 按下标对应的资产回填清单，可选
         """
         batch_id = self._generate_batch_id()
         task_ids = []
 
-        for script in scripts:
+        for index, script in enumerate(scripts):
             script_id, task_id = self.submit(
                 script=script,
                 config=config,
                 language=language,
                 priority=priority,
-                callback_url=callback_url
+                callback_url=callback_url,
+                asset_manifest=self._manifest_at(asset_manifests, index),
             )
             task_ids.append(task_id)
 
@@ -523,6 +554,15 @@ class TaskFactory:
             task_ids=task_ids,
             status=TaskStatus.PENDING
         )
+
+    @staticmethod
+    def _manifest_at(
+            asset_manifests: Optional[List[Optional[Dict[str, Any]]]], index: int
+    ) -> Optional[Dict[str, Any]]:
+        """按脚本下标取回填清单；缺省或越界返回 None"""
+        if not asset_manifests or index >= len(asset_manifests):
+            return None
+        return asset_manifests[index]
 
     def batch_get_status(self, batch_id: str) -> List[ProcessingStatus]:
         """

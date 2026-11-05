@@ -43,6 +43,9 @@ class InputState(BaseModel):
     task_id: str = str(uuid.uuid4())
     timeout: int = 600
 
+    # 下游回填的资产清单（M0.4.2）：允许调用方在提交任务时带回真实 asset_ref
+    asset_manifest: Optional[Dict[str, Any]] = None
+
     @field_validator("raw_script")
     def script_not_empty(cls, v):
         if not v or not v.strip():
@@ -84,6 +87,13 @@ class DomainState(BaseModel):
 
     # 连续性契约（一等公民）：解析阶段构建，切镜/切片/提示词阶段消费
     contract: Optional[Any] = None
+
+    # 资产锚点生成报告（M0.4.2：角色三视图/道具/场景静帧，可序列化）
+    asset_report: Optional[Dict[str, Any]] = None
+    # 声明式资产计划（PenShot 始终产出，供下游按需生成）
+    asset_plan: Optional[Dict[str, Any]] = None
+    # 下游回填清单（输入带入或在节点内由执行器产出）
+    asset_manifest: Optional[Dict[str, Any]] = None
 
     # 契约校验违规项（Validator 写入，供回退/审计）
     contract_violations: List[Dict[str, Any]] = []
@@ -129,6 +139,7 @@ class ExecutionState(BaseModel):
     # 节点循环控制
     node_max_loops: Dict[PipelineNode, int] = {
         PipelineNode.PARSE_SCRIPT: 3,
+        PipelineNode.GENERATE_ASSETS: 2,
         PipelineNode.SEGMENT_SHOT: 5,
         PipelineNode.SPLIT_VIDEO: 5,
         PipelineNode.CONVERT_PROMPT: 5,
@@ -143,6 +154,7 @@ class ExecutionState(BaseModel):
     # 阶段重试控制
     stage_max_retries: Dict[PipelineNode, int] = {
         PipelineNode.PARSE_SCRIPT: 3,
+        PipelineNode.GENERATE_ASSETS: 2,
         PipelineNode.SEGMENT_SHOT: 3,
         PipelineNode.SPLIT_VIDEO: 3,
         PipelineNode.CONVERT_PROMPT: 3,
