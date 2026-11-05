@@ -7,6 +7,13 @@
 
 ---
 
+## [0.3.12](https://github.com/neopen/story-shot-agent/compare/v0.3.11...v0.3.12) (2026-11-01)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 修复 Qwen 私有 MaaS 连接、嵌入兼容与 JSON 截断，对齐路径配置结构 ([#76](https://github.com/neopen/story-shot-agent/issues/76)) ([c456bd8](https://github.com/neopen/story-shot-agent/commit/c456bd8367f0f681c6d3028ef8144a6b8629e5d2))
+
 ## [0.3.11](https://github.com/neopen/story-shot-agent/compare/v0.3.10...v0.3.11) (2026-10-14)
 
 
