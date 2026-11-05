@@ -7,6 +7,13 @@
 
 ---
 
+## [0.4.1](https://github.com/neopen/story-shot-agent/compare/v0.4.0...v0.4.1) (2026-11-05)
+
+
+### ✨ Features (新功能)
+
+* M0.4.1 连续性前置约束收尾与报告加固 ([#83](https://github.com/neopen/story-shot-agent/issues/83)) ([ff39355](https://github.com/neopen/story-shot-agent/commit/ff393559abb822da02172942c009aec13ed0fcf9))
+
 ## [0.4.0](https://github.com/neopen/story-shot-agent/compare/v0.3.12...v0.4.0) (2026-11-03)
 
 
