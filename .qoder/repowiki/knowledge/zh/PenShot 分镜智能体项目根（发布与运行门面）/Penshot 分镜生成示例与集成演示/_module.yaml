@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: examples
+title: Penshot 分镜生成示例与集成演示
+scope:
+    - examples/
+source_files: []
+depends_on: []
+related_to: []
