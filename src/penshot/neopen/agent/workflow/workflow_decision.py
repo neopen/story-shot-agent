@@ -10,10 +10,19 @@ See LICENSE File For Details.
 @Time: 2026/1/26 16:12
 """
 from datetime import datetime
-from typing import Tuple, Any
+from typing import Any, Dict, List, Tuple, Union
 
 from langgraph.graph import END
 
+from penshot.neopen.agent.continuity_guardian.contract_repair import (
+    build_contract_repair_params,
+    merge_repair_params,
+    merge_violations,
+)
+from penshot.neopen.agent.continuity_guardian.contract_validator import (
+    validate_fragment_sequence,
+    validate_shot_sequence,
+)
 from penshot.neopen.agent.human_decision.human_decision_converter import HumanDecisionConverter
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import AuditStatus, SeverityLevel
 from penshot.neopen.agent.workflow.workflow_models import PipelineState, PipelineNode, AgentStage
@@ -176,6 +185,18 @@ class PipelineDecision:
                 warning(f"镜头拆分，发现{len(long_shots)}个过长镜头，但{retry_reason}")
                 return PipelineState.NEEDS_REPAIR
 
+        # 契约校验（Validator）：镜头主角色必须属于一致性契约
+        contract_issues = validate_shot_sequence(shot_sequence, state.domain.contract)
+        if contract_issues:
+            # 契约违规项同时转换为 Repairer 修复参数，供下次切镜消费
+            self._attach_contract_repair_params(
+                state, contract_issues, PipelineNode.SEGMENT_SHOT, shot_sequence
+            )
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.SEGMENT_SHOT)
+                return PipelineState.NEEDS_RETRY
+            return PipelineState.NEEDS_REPAIR
+
         # 拆分成功，重置该阶段的重试计数（可选）
         state.execution.stage_current_retries[PipelineNode.SEGMENT_SHOT] = 0
 
@@ -241,6 +262,23 @@ class PipelineDecision:
         if short_fragments:
             # 有过短片段，需要修复
             warning(f"发现{len(short_fragments)}个过短片段（<{state.config.min_fragment_duration}秒）")
+            if can_retry:
+                state = self._increment_stage_retry(state, PipelineNode.SPLIT_VIDEO)
+                return PipelineState.NEEDS_REPAIR
+            return PipelineState.FAILED
+
+        # 契约校验（Validator）：片段需关联有效镜头，且角色属于一致性契约
+        contract_issues = validate_fragment_sequence(
+            fragment_sequence, state.domain.shot_sequence, state.domain.contract
+        )
+        if contract_issues:
+            # 契约违规项同时转换为 Repairer 修复参数，供下次切片消费
+            self._attach_contract_repair_params(
+                state,
+                contract_issues,
+                PipelineNode.SPLIT_VIDEO,
+                state.domain.shot_sequence,
+            )
             if can_retry:
                 state = self._increment_stage_retry(state, PipelineNode.SPLIT_VIDEO)
                 return PipelineState.NEEDS_REPAIR
@@ -486,71 +524,70 @@ class PipelineDecision:
         return decision
 
 
-    def decide_after_continuity(self, state: WorkflowState) -> PipelineState:
+    def decide_after_continuity(
+        self, state: WorkflowState
+    ) -> Union[PipelineState, str]:
         """连续性检查后的决策
 
         决策逻辑：
-        1. 检查是否有连续性问题
-        2. 根据问题严重性分类
-        3. 返回相应的决策状态
-
-        问题分类：
-        - critical: 严重问题，需要修复
-        - moderate: 中度问题，需要修复
-        - minor: 轻微问题，需要修复
-        - 其他: 验证通过
+        1. 从 DomainState 读取连续性检查结果
+        2. 节点已生成修复参数时，按来源阶段动态路由（返回节点名）
+        3. 重试耗尽或无法定位修复阶段时，按问题严重性兜底
 
         可能的返回状态：
-        - SUCCESS: 没有连续性问题
-        - NEEDS_REPAIR: 有连续性问题，需要修复
-        - NEEDS_HUMAN: 需要人工干预
-        - VALID: 验证通过但有小问题
-        - FAILED: 严重失败
+        - SUCCESS: 没有连续性问题（同时重置重试计数）
+        - VALID: 仅轻微问题，继续执行
+        - NEEDS_HUMAN: 修复重试耗尽或存在需人工确认的问题
+        - 阶段节点名（如 ``segment_shot``）：回到问题来源阶段修复
 
         Args:
             state: 包含连续性问题的的工作流状态
 
         Returns:
-            PipelineState: 决策结果
+            PipelineState 或目标阶段节点名
         """
         # 检查节点循环限制
-        loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.CONTINUITY_CHECK)
+        loop_decision, loop_reason = self._check_and_increment_node_loop(
+            state, PipelineNode.CONTINUITY_CHECK
+        )
         if loop_decision != PipelineState.SUCCESS:
-            state.errors.error_messages.append(f"连续性检查节点循环检查失败: {loop_reason}")
+            state.errors.error_messages.append(
+                f"连续性检查节点循环检查失败: {loop_reason}"
+            )
             return loop_decision
 
-        # 使用统一的重试判断
-        can_retry, retry_reason = self._can_retry_stage(state, PipelineNode.CONTINUITY_CHECK)
+        # 连续性问题由 continuity_check_node 写入 DomainState
+        issues = list(state.domain.continuity_issues or [])
 
-        # 获取连续性问题
-        issues = getattr(state, 'continuity_issues', [])
-
-        # 如果没有问题，成功
+        # 如果没有问题，成功并重置重试计数
         if not issues:
             state.execution.stage_current_retries[PipelineNode.CONTINUITY_CHECK] = 0
+            state.domain.continuity_retry_count = 0
+            state.domain.needs_continuity_repair = False
             return PipelineState.SUCCESS
 
-        # 分类问题严重性
-        critical_issues, moderate_issues, minor_issues = self._classify_continuity_issues(issues)
+        # 节点已完成修复参数生成并选定修复阶段：按来源阶段动态路由
+        if state.domain.needs_continuity_repair:
+            target = state.execution.current_node
+            if target and target != PipelineNode.CONTINUITY_CHECK:
+                info(f"连续性修复路由到阶段 {target.value}，共{len(issues)}个问题")
+                return target.value
 
-        # 根据问题严重性决定
-        if critical_issues:
-            if can_retry and len(critical_issues) < 5:
-                state = self._increment_stage_retry(state, PipelineNode.CONTINUITY_CHECK)
-                warning(f"发现{len(critical_issues)}个严重问题，{retry_reason}，准备重试")
-                return PipelineState.NEEDS_RETRY
-            else:
-                warning(f"发现{len(critical_issues)}个严重问题，且{retry_reason}，需要人工干预")
-                return PipelineState.NEEDS_HUMAN
-
-        if moderate_issues:
-            if can_retry:
-                state = self._increment_stage_retry(state, PipelineNode.CONTINUITY_CHECK)
-                warning(f"发现{len(moderate_issues)}个中度问题，{retry_reason}，准备重试")
-                return PipelineState.NEEDS_RETRY
-            else:
-                warning(f"发现{len(moderate_issues)}个中度问题，且{retry_reason}，需要人工干预")
-                return PipelineState.NEEDS_HUMAN
+        # 重试耗尽或未准备修复参数：按严重性兜底，避免无修复目标时反复重试
+        critical_issues, moderate_issues, minor_issues = (
+            self._classify_continuity_issues(issues)
+        )
+        if (
+            state.domain.continuity_retry_count >= state.domain.max_continuity_retries
+            or critical_issues
+            or moderate_issues
+        ):
+            warning(
+                f"连续性修复无法继续（重试 "
+                f"{state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}，"
+                f"严重问题{len(critical_issues)}，中度问题{len(moderate_issues)}），需要人工干预"
+            )
+            return PipelineState.NEEDS_HUMAN
 
         # 轻微问题可以继续
         if minor_issues:
@@ -941,6 +978,47 @@ class PipelineDecision:
         state.execution.total_retries += 1
 
         return state
+
+    def _attach_contract_repair_params(
+        self,
+        state: WorkflowState,
+        violations: List[Dict[str, Any]],
+        stage: PipelineNode,
+        shot_sequence: Any = None,
+    ) -> None:
+        """记录契约违规项并生成契约驱动的修复参数
+
+        Validator 在切镜/切片阶段发现的违规项会同时写入审计列表
+        与目标阶段的修复参数，让下次执行（Repairer）按契约锚点修正。
+
+        Args:
+            state: 工作流状态
+            violations: Validator 产出的违规项字典列表
+            stage: 目标修复阶段
+            shot_sequence: 镜头序列（用于向孤立片段建议有效镜头）
+        """
+        if not violations:
+            return
+
+        state.domain.contract_violations = merge_violations(
+            state.domain.contract_violations, violations
+        )
+        for issue in violations:
+            warning(issue.get("message", ""))
+
+        params = build_contract_repair_params(
+            violations, stage, state.domain.contract, shot_sequence
+        )
+        if params is None:
+            return
+
+        state.domain.repair_params[stage] = merge_repair_params(
+            state.domain.repair_params.get(stage), params
+        )
+        info(
+            f"阶段 {stage.value} 收到契约驱动修复参数，"
+            f"问题类型: {params.issue_types}"
+        )
 
     def _check_node_loop_limit(self, state: WorkflowState, stage_node: PipelineNode) -> Tuple[bool, str]:
         """检查指定节点的循环限制

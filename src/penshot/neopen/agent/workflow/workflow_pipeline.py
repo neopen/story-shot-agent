@@ -232,7 +232,12 @@ class MultiAgentPipeline:
                 PipelineState.VALID: PipelineNode.GENERATE_OUTPUT.value,
                 PipelineState.NEEDS_REPAIR: PipelineNode.CONVERT_PROMPT.value,
                 PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
-                PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value
+                PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value,
+                # 连续性修复按问题来源阶段动态路由（决策返回节点名）
+                PipelineNode.PARSE_SCRIPT.value: PipelineNode.PARSE_SCRIPT.value,
+                PipelineNode.SEGMENT_SHOT.value: PipelineNode.SEGMENT_SHOT.value,
+                PipelineNode.SPLIT_VIDEO.value: PipelineNode.SPLIT_VIDEO.value,
+                PipelineNode.CONVERT_PROMPT.value: PipelineNode.CONVERT_PROMPT.value,
             }
         )
 

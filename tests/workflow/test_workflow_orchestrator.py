@@ -233,6 +233,39 @@ class TestWorkflowOrchestratorIntegration:
         result2 = orchestrator.run({"value": 3})
         assert result2["result"] == "failure"
 
+    def test_conditional_edge_routes_by_node_name(self, orchestrator):
+        """条件边支持以节点名作为返回值（连续性修复动态路由依赖）"""
+        from langgraph.graph import END
+        from typing import Dict, Any
+
+        def start_node(state):
+            return {**state, "target": PipelineNode.SEGMENT_SHOT.value}
+
+        def segment_node(state):
+            return {**state, "result": "repaired"}
+
+        def fallback_node(state):
+            return {**state, "result": "fallback"}
+
+        orchestrator.add_node("start", start_node)
+        orchestrator.add_node(PipelineNode.SEGMENT_SHOT.value, segment_node)
+        orchestrator.add_node("fallback", fallback_node)
+        orchestrator.add_conditional_edge(
+            "start",
+            lambda state: state["target"],
+            {
+                PipelineNode.SEGMENT_SHOT.value: PipelineNode.SEGMENT_SHOT.value,
+                PipelineState.SUCCESS: "fallback",
+            },
+        )
+        orchestrator.add_edge(PipelineNode.SEGMENT_SHOT.value, END)
+        orchestrator.add_edge("fallback", END)
+        orchestrator.build(state_schema=Dict[str, Any])
+
+        result = orchestrator.run({})
+
+        assert result["result"] == "repaired"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
