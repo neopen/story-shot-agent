@@ -1,5 +1,61 @@
 name: release-please  # 工作流名称：自动化版本与发布管理
 
+# =============================================================================
+# 版本升级与发布说明（详细步骤）
+# =============================================================================
+# 版本号由 release-please 依据 Conventional Commits 自动计算。
+# 完整发布/升级文档：.github/RELEASE.md
+# 配置文件：.github/release-please-config.json
+# 版本基线：.github/.release-please-manifest.json
+#
+# 注意：release-please-config.json 必须是严格 JSON（不支持 // 注释，
+# 且 schema 设置了 additionalProperties: false），因此升级步骤统一写在本文件。
+#
+# 一、当前版本策略（0.x 阶段）
+#   release-please-config.json 已开启 "bump-patch-for-minor-pre-major": true
+#   - 效果：feat / fix / perf 等在 0.x 阶段都按 patch 递增
+#   - 示例：0.4.0 --feat--> 0.4.1；0.4.1 --feat--> 0.4.2
+#   - 目的：让 M0.4.1、M0.4.2 等里程碑与补丁版本号对齐
+#
+# 二、升小版本（0.4.x -> 0.5.0）
+#   1. 同步分支
+#        git fetch origin
+#        git checkout dev
+#        git merge origin/main
+#   2. 在 dev 上创建带 Release-As 的空提交（必须放在普通提交上，
+#      merge commit 的消息不会被解析）
+#        git commit --allow-empty -m "chore: release 0.5.0" -m "Release-As: 0.5.0"
+#   3. 推送 dev，创建 dev -> main 的 PR，使用 Squash and merge 合并
+#   4. release-please 自动生成 "chore(main): release 0.5.0" PR，合并该 PR
+#   5. 自动创建 v0.5.0 tag 与 GitHub Release，并触发 publish-pypi.yml 发布 PyPI
+#   说明：Release-As 只影响紧随其后的下一次发布，不需要手工改版本文件。
+#
+# 三、升大版本（0.x -> 1.0.0）
+#   方式 A（推荐，显式指定）：
+#     与升小版本步骤相同，仅把 Release-As 改为目标大版本：
+#        git commit --allow-empty -m "chore: release 1.0.0" -m "Release-As: 1.0.0"
+#
+#   方式 B（用破坏性变更标记，release-please 自动 major bump）：
+#        feat!: 移除旧版 API
+#     或在提交正文写：
+#        feat: 重构公共接口
+#
+#        BREAKING CHANGE: 说明不兼容变更
+#
+#   注意：
+#   - 0.x 阶段 "bump-patch-for-minor-pre-major": true 只会把 feat 降为 patch，
+#     不会影响 breaking change 的 major 递增
+#   - 版本达到 1.0.0 后该配置不再生效：feat -> minor，feat! -> major
+#
+# 四、通用规则
+#   - 不要手工修改 pyproject.toml、src/penshot/__init__.py、manifest 的版本号，
+#     也不要手工打 tag；release-please 以 manifest 为基线，手工改会与基线冲突
+#   - 配置和版本基线改动必须随 PR 合入 main 后才会生效
+#   - 若确实需要在配置中临时固定版本，可在 packages."." 下增加
+#     "release-as": "x.y.z"，发布完成后必须移除，否则后续发布会被持续固定在该版本
+#   - release-please 生成发布 PR 后，需要合并该 PR 才会真正打 tag 并发布 PyPI
+# =============================================================================
+
 on:
   push:
     branches:
