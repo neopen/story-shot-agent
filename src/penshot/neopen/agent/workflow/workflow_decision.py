@@ -663,6 +663,12 @@ class PipelineDecision:
         Returns:
             PipelineState: 决策结果
         """
+        # 中止标志优先级最高：人工已选择中止或恢复策略判定不可恢复时，
+        # 不应再被重试/人工干预分支覆盖。
+        if state.execution.should_abort or state.execution.recovery_flags.get('should_abort', False):
+            info("检测到中止标志，结束流程")
+            return PipelineState.ABORT
+
         # 检查节点循环限制
         loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.ERROR_HANDLER)
         if loop_decision != PipelineState.SUCCESS:
@@ -673,11 +679,6 @@ class PipelineDecision:
         if state.execution.total_retries >= sum(state.execution.stage_max_retries.values()):
             warning(f"总重试次数已达上限: {state.execution.total_retries}")
             return PipelineState.NEEDS_HUMAN
-
-        # 检查是否有中止标志（recovery_flags 挂在嵌套的 execution 状态上）
-        if state.execution.recovery_flags.get('should_abort', False):
-            info("检测到中止标志，结束流程")
-            return PipelineState.ABORT
 
         # 检查是否需要人工干预
         if state.execution.needs_human_review:
@@ -834,6 +835,12 @@ class PipelineDecision:
             # 中止流程
             return END  # ← 直接返回 END
 
+        elif decision_state == PipelineState.FAILED:
+            # 错误处理节点已超限或错误不可恢复，终止流程。
+            # 不能回退到剧本解析，否则会无限重复解析。
+            error("错误处理已超限且无法恢复，终止流程")
+            return END
+
         else:
             # 默认情况，重新开始
             warning(f"未知错误决策: {decision_state}，默认回到剧本解析")
@@ -852,12 +859,6 @@ class PipelineDecision:
 
         注意：不同决策应该路由到不同的节点，而不是统一到 GENERATE_OUTPUT
         """
-        # 检查节点循环限制
-        loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.HUMAN_INTERVENTION)
-        if loop_decision != PipelineState.SUCCESS:
-            state.errors.error_messages.append(f"人工干预节点循环检查失败: {loop_reason}")
-            return loop_decision
-
         # 从状态中获取人工输入
         human_feedback = state.execution.human_feedback or {}
         raw_input = human_feedback.get("decision", "CONTINUE")
@@ -891,6 +892,21 @@ class PipelineDecision:
         description = self.converter.get_decision_description(decision_state)
 
         info(f"决策完成: {raw_input} -> {normalized_input} -> {decision_state.value} ({description})")
+
+        # 中止是终态决策，必须优先于循环限制。
+        # 否则第一次人工干预就会因循环计数被判超限并转成 FAILED，
+        # 错误处理器又会再次转回人工干预，形成死循环。
+        if decision_state == PipelineState.ABORT:
+            state.execution.should_abort = True
+            state.execution.recovery_flags["should_abort"] = True
+            info("人工决策中止流程，跳过节点循环检查")
+            return PipelineState.ABORT
+
+        # 仅对继续/重试/修复等决策计入人工节点循环
+        loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.HUMAN_INTERVENTION)
+        if loop_decision != PipelineState.SUCCESS:
+            state.errors.error_messages.append(f"人工干预节点循环检查失败: {loop_reason}")
+            return loop_decision
 
         # 注意：返回的 PipelineState 会被 workflow 的路由映射使用
         # 路由映射在 workflow_pipeline.py 的 HUMAN_INTERVENTION 条件边中定义

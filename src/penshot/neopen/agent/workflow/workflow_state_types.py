@@ -146,7 +146,8 @@ class ExecutionState(BaseModel):
         PipelineNode.AUDIT_QUALITY: 3,
         PipelineNode.CONTINUITY_CHECK: 5,
         PipelineNode.ERROR_HANDLER: 5,
-        PipelineNode.HUMAN_INTERVENTION: 1,
+        # 循环计数使用 >= 判断，2 表示允许一次人工决策
+        PipelineNode.HUMAN_INTERVENTION: 2,
     }
     node_current_loops: Dict[PipelineNode, int] = {}
     node_loop_exceeded: Dict[PipelineNode, bool] = {}
