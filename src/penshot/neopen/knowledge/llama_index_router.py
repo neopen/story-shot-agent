@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Any
 
 from penshot.logger import info, warning, error
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
+from penshot.neopen.constants.rag import DEFAULT_CHUNK_OVERLAP, SCRIPT_KB_CHUNK_SIZE
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.knowledge.llamaIndex.llama_index_retriever import DocumentRetriever
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
@@ -538,8 +539,8 @@ def create_knowledge_router(
     # 创建 LlamaIndex 知识库
     script_kb = ScriptKnowledgeBase(
         embeddings=embeddings,
-        chunk_size=512,
-        chunk_overlap=20
+        chunk_size=SCRIPT_KB_CHUNK_SIZE,
+        chunk_overlap=DEFAULT_CHUNK_OVERLAP
     )
 
     # 创建路由器

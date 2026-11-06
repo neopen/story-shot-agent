@@ -29,6 +29,7 @@ from pydantic import SerializeAsAny
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, warning
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
+from penshot.neopen.constants.rag import DEFAULT_CHUNK_OVERLAP, SCRIPT_KB_CHUNK_SIZE
 from penshot.neopen.knowledge.embedding_adapter import embed_query_vector, to_llama_index_embedding
 from penshot.neopen.tools.script_parser_tool import parse_script_to_documents, parse_script_file_to_documents
 
@@ -44,8 +45,8 @@ class ScriptKnowledgeBase:
                  embeddings: Optional[BaseEmbedding],
                  script_id: str,
                  storage_dir: str = None,
-                 chunk_size: int = 512,
-                 chunk_overlap: int = 20):
+                 chunk_size: int = SCRIPT_KB_CHUNK_SIZE,
+                 chunk_overlap: int = DEFAULT_CHUNK_OVERLAP):
         """
         初始化剧本知识库
 
@@ -920,7 +921,7 @@ class ScriptKnowledgeBase:
                     vector_store_path = os.path.join(script_dir, "default__vector_store.json")
                     docstore_path = os.path.join(script_dir, "docstore.json")
                     if os.path.exists(vector_store_path) and os.path.exists(docstore_path):
-                        debug(f"验证通过: vector_store 和 docstore 都已保存")
+                        debug("验证通过: vector_store 和 docstore 都已保存")
                     else:
                         warning(f"保存不完整: vector_store={os.path.exists(vector_store_path)}, docstore={os.path.exists(docstore_path)}")
         except Exception as e:

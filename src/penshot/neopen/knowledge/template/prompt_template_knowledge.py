@@ -17,13 +17,28 @@ from llama_index.core.storage import StorageContext
 
 from penshot.config.config import settings
 from penshot.logger import debug, info, error, warning
+from penshot.neopen.constants.rag import (
+    DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_CHUNK_SIZE,
+    PROMPT_TEMPLATE_METADATA_TYPE,
+)
 from penshot.neopen.knowledge.embedding_adapter import to_llama_index_embedding
+from penshot.neopen.knowledge.metadata_policy import (
+    MetadataPolicy,
+    PROMPT_TEMPLATE_METADATA_POLICY,
+)
 
 
 class PromptTemplateKB:
     """提示词模板知识库 - 专门存储成功的提示词模板"""
 
-    def __init__(self, embeddings, script_id: str, storage_dir: Optional[str] = None):
+    def __init__(
+        self,
+        embeddings,
+        script_id: str,
+        storage_dir: Optional[str] = None,
+        metadata_policy: Optional[MetadataPolicy] = None,
+    ):
         """
         初始化提示词模板知识库
 
@@ -35,6 +50,7 @@ class PromptTemplateKB:
         # 统一适配为 llama_index BaseEmbedding，兼容 LangChain 嵌入模型
         self.embeddings = to_llama_index_embedding(embeddings)
         self.script_id = script_id
+        self.metadata_policy = metadata_policy or PROMPT_TEMPLATE_METADATA_POLICY
         if storage_dir is None:
             base_dir = settings.get_data_paths().get("data_embedding", "data/embedding")
             self.storage_dir = Path(base_dir) / "prompt_templates" / script_id
@@ -46,8 +62,8 @@ class PromptTemplateKB:
 
         # 节点解析器配置
         self.node_parser = SentenceSplitter(
-            chunk_size=512,
-            chunk_overlap=20
+            chunk_size=DEFAULT_CHUNK_SIZE,
+            chunk_overlap=DEFAULT_CHUNK_OVERLAP,
         )
 
         # 确保目录存在
@@ -88,7 +104,6 @@ class PromptTemplateKB:
             except Exception as e:
                 warning(f"保存提示词模板索引失败: {e}")
 
-
     def add_template(self, prompt_text: str, metadata: Dict[str, Any]):
         """
         添加成功提示词模板
@@ -100,16 +115,7 @@ class PromptTemplateKB:
         try:
             doc = Document(
                 text=prompt_text,
-                metadata={
-                    "type": "prompt_template",
-                    "prompt": prompt_text,
-                    "timestamp": metadata.get("timestamp", ""),
-                    "fragment_id": metadata.get("fragment_id", ""),
-                    "scene": metadata.get("scene", ""),
-                    "style": metadata.get("style", ""),
-                    "quality_score": metadata.get("quality_score", 0),
-                    **metadata
-                }
+                metadata=self.metadata_policy.sanitize(metadata),
             )
 
             if not self.index:
@@ -184,7 +190,7 @@ class PromptTemplateKB:
                     continue
 
                 # 只返回提示词类型的文档
-                if node.node.metadata.get("type") != "prompt_template":
+                if node.node.metadata.get("type") != PROMPT_TEMPLATE_METADATA_TYPE:
                     continue
 
                 results.append({

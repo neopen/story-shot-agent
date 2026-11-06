@@ -23,10 +23,21 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.storage import StorageContext
 
 from penshot.logger import debug, info, error, warning
+from penshot.neopen.constants.rag import (
+    DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_CHUNK_SIZE,
+    MAX_METADATA_LENGTH,
+    PROMPT_TEMPLATE_METADATA_TYPE,
+    SCRIPT_KB_CHUNK_SIZE,
+)
 from penshot.neopen.knowledge.embedding_adapter import to_llama_index_embedding
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
+from penshot.neopen.knowledge.metadata_policy import (
+    MetadataPolicy,
+    PROMPT_TEMPLATE_METADATA_POLICY,
+)
 
 
 class PromptTemplateManager:
@@ -51,12 +62,13 @@ class PromptTemplateManager:
             script_id,
             storage_dir: str = "data/embedding",
             memory_manager: Optional[MemoryManager] = None,
-            chunk_size: int = 512,
-            chunk_overlap: int = 20,
+            chunk_size: int = DEFAULT_CHUNK_SIZE,
+            chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
             min_similarity_score: float = 0.5,
             top_k: int = 3,
             max_cache_size: int = 200,
-            max_metadata_length: int = 256
+            max_metadata_length: int = MAX_METADATA_LENGTH,
+            metadata_policy: Optional[MetadataPolicy] = None,
     ):
         """
         初始化提示词模板管理器
@@ -82,6 +94,7 @@ class PromptTemplateManager:
         self.top_k = top_k
         self.max_cache_size = max_cache_size
         self.max_metadata_length = max_metadata_length
+        self.metadata_policy = metadata_policy or PROMPT_TEMPLATE_METADATA_POLICY
 
         # 当前剧本ID（用于数据隔离）
         self._current_script_id: str = script_id
@@ -337,21 +350,14 @@ class PromptTemplateManager:
                     continue
 
                 metadata = item.get("metadata", {})
-                doc = Document(
-                    text=prompt_text,
-                    metadata={
-                        "type": "prompt_template",
-                        "prompt": prompt_text,
-                        "hash": self._generate_template_hash(prompt_text),
-                        "script_id": script_id,
-                        "timestamp": item.get("added_at", datetime.now().isoformat()),
-                        "quality_score": metadata.get("quality_score", 0),
-                        "fragment_id": metadata.get("fragment_id", ""),
-                        "scene": metadata.get("scene", ""),
-                        "style": metadata.get("style", ""),
-                        **metadata
-                    }
-                )
+                # 提示词原文只写入 text，metadata 统一交给策略清洗
+                doc_metadata = {
+                    **self.metadata_policy.sanitize(metadata),
+                    "hash": self._generate_template_hash(prompt_text),
+                    "script_id": script_id,
+                    "timestamp": item.get("added_at", datetime.now().isoformat()),
+                }
+                doc = Document(text=prompt_text, metadata=doc_metadata)
                 documents.append(doc)
 
             if documents:
@@ -435,8 +441,8 @@ class PromptTemplateManager:
                 embeddings=self.embedding_model,
                 storage_dir=storage_dir,
                 script_id=self._current_script_id,
-                chunk_size=512,
-                chunk_overlap=20
+                chunk_size=SCRIPT_KB_CHUNK_SIZE,
+                chunk_overlap=DEFAULT_CHUNK_OVERLAP
             )
             info("剧本知识库初始化完成")
         except Exception as e:
@@ -565,7 +571,7 @@ class PromptTemplateManager:
         # 防止递归
         stack_key = f"add_template_{target_script_id}_{hash(prompt_text[:100])}"
         if stack_key in self._processing_stack:
-            warning(f"检测到递归调用，跳过添加模板")
+            warning("检测到递归调用，跳过添加模板")
             return False
 
         self._processing_stack.add(stack_key)
@@ -574,7 +580,7 @@ class PromptTemplateManager:
             # 限制提示词长度
             if len(prompt_text) > 2000:
                 prompt_text = prompt_text[:1997] + "..."
-                warning(f"提示词过长，已截断")
+                warning("提示词过长，已截断")
 
             # 去重检查
             if self._is_duplicate(target_script_id, prompt_text):
@@ -587,20 +593,12 @@ class PromptTemplateManager:
             # 生成哈希
             template_hash = self._generate_template_hash(prompt_text)
 
-            # 创建文档
+            # 创建文档；提示词原文只写入 text，metadata 由策略统一清洗
             doc_metadata = {
-                "type": "prompt_template",
-                "prompt": prompt_text,
+                **self.metadata_policy.sanitize(truncated_metadata),
                 "hash": template_hash,
                 "script_id": target_script_id,
                 "timestamp": datetime.now().isoformat(),
-                "quality_score": truncated_metadata.get("quality_score", 0),
-                "fragment_id": truncated_metadata.get("fragment_id", ""),
-                "scene": truncated_metadata.get("scene", ""),
-                "style": truncated_metadata.get("style", ""),
-                "shot_type": truncated_metadata.get("shot_type", ""),
-                "duration": truncated_metadata.get("duration", 0),
-                **truncated_metadata
             }
 
             doc = Document(
@@ -619,7 +617,7 @@ class PromptTemplateManager:
                 # 创建新索引
                 success = self._create_index_for_script(target_script_id, [doc])
                 if not success:
-                    error(f"创建索引失败，无法添加模板")
+                    error("创建索引失败，无法添加模板")
                     return False
             else:
                 # 插入到现有索引
@@ -768,7 +766,7 @@ class PromptTemplateManager:
                 if score < min_score:
                     continue
 
-                if node.node.metadata.get("type") != "prompt_template":
+                if node.node.metadata.get("type") != PROMPT_TEMPLATE_METADATA_TYPE:
                     continue
 
                 results.append({

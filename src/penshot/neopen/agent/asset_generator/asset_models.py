@@ -17,9 +17,10 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from penshot.neopen.agent.continuity_guardian.consistency_contract import AssetContract
+from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
 
 # 资产计划/回填清单的契约版本号；下游升级字段时据此判断兼容性
-ASSET_SCHEMA_VERSION = "0.4.2"
+ASSET_SCHEMA_VERSION = CONTRACT_SCHEMA_VERSION
 
 
 class AssetType(str, Enum):

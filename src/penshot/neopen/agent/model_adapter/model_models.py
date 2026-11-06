@@ -16,8 +16,10 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
+
 # 提示词适配/路由契约版本号；下游据此判断字段兼容性
-PROMPT_SCHEMA_VERSION = "0.4.2"
+PROMPT_SCHEMA_VERSION = CONTRACT_SCHEMA_VERSION
 
 
 class AestheticBias(str, Enum):

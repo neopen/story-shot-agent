@@ -18,6 +18,7 @@ from pydantic import Field, BaseModel
 from pydantic.v1 import validator
 
 from penshot.neopen.agent.base_models import AudioModelType, VideoStyle
+from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
 
 
 class AudioVoiceType(str, Enum):
@@ -297,7 +298,7 @@ class AIVideoInstructions(BaseModel):
 
     # 指令契约版本（M0.4.2：下游据此判断资产引用/路由字段是否可用）
     schema_version: str = Field(
-        default="0.4.2", description="指令集契约版本"
+        default=CONTRACT_SCHEMA_VERSION, description="指令集契约版本"
     )
 
     # 元数据
