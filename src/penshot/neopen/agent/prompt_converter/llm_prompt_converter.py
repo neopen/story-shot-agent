@@ -62,7 +62,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
                 repair_params: Optional[QualityRepairParams],
                 historical_context: Optional[Dict[str, Any]]) -> AIVideoInstructions:
         """使用LLM转换提示词 - 同时生成视频和音频提示词"""
-        info(f"使用LLM转换提示词，片段数: {len(fragment_sequence.fragments)}")
+        info(f"使用LLM转换提示词，片段数: {len(fragment_sequence.fragments)}。此过程较耗时，可能需要数分钟，请耐心等待....")
 
         # 保存历史上下文
         self.current_historical_context = historical_context
