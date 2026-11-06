@@ -184,6 +184,8 @@ class ExecutionState(BaseModel):
     needs_human_review: bool = False
     human_feedback: Dict[str, Any] = {}
     human_intervention_info: Dict[str, Any] = {}
+    # 人工对资产提示词的编辑记录，跨多次生成节点累计保留
+    asset_prompt_edits: List[Dict[str, Any]] = []
 
     # 中止控制
     should_abort: bool = False

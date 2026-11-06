@@ -12,7 +12,7 @@ See LICENSE File For Details.
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from penshot.logger import info, warning, error
 from penshot.neopen.agent.human_decision.human_decision_converter import HumanDecisionConverter
@@ -40,6 +40,7 @@ class ConsoleInputHandler:
         "4": "REPAIR",
         "5": "ESCALATE",
         "6": "ABORT",
+        "7": "EDIT_ASSET",
     }
 
     def __init__(self, timeout_seconds: int = 180):
@@ -96,7 +97,7 @@ class ConsoleInputHandler:
         print("\n" + "=" * 60)
         print("AI视频生成系统 - 人工干预节点")
         print("=" * 60)
-        print(f"\n系统需要人工决策以继续处理")
+        print("\n系统需要人工决策以继续处理")
         print(f"等待时间: {self.timeout_seconds}秒 ({self.timeout_seconds // 60}分钟)")
 
         print("\n请选择下一步操作:")
@@ -107,11 +108,12 @@ class ConsoleInputHandler:
             ("4", "REPAIR", "修复问题"),
             ("5", "ESCALATE", "升级处理"),
             ("6", "ABORT", "中止流程"),
+            ("7", "EDIT_ASSET", "编辑资产提示词"),
         ]
         for num, code, desc in options:
             print(f"  [{num}] {code:10} - {desc}")
 
-        print("\n输入选项编号 (1-6) 或输入选项名称: ", end="", flush=True)
+        print("\n输入选项编号 (1-7) 或输入选项名称: ", end="", flush=True)
 
     def _input_thread(self):
         """输入采集线程"""
@@ -185,17 +187,32 @@ class HumanIntervention:
         # 获取用户输入
         result = self.input_handler.get_input_with_timeout()
 
+        decision = result.decision
+        asset_edits = []
+
+        # 选择编辑资产时，继续采集具体修改内容；无资产或未修改则回退为继续
+        if self.converter.normalize_input(decision) == "EDIT_ASSET":
+            asset_edits = self._collect_asset_edits(graph_state)
+            if not asset_edits:
+                warning("未进行有效的资产提示词编辑，回退为继续流程")
+                decision = "CONTINUE"
+
         # 更新状态
         graph_state.execution.human_feedback = {
-            "decision": result.decision,
+            "decision": decision,
             "timeout": result.timeout,
             "auto_decision": result.auto_decision,
             "timestamp": result.timestamp,
             "raw_input": result.raw_input,
+            "asset_edits": asset_edits,
         }
 
+        # 编辑记录跨多次人工干预累计保留，避免后续回填/重试覆盖
+        if asset_edits:
+            graph_state.execution.asset_prompt_edits.extend(asset_edits)
+
         # 显示用户选择结果
-        self._display_decision_result(result.decision)
+        self._display_decision_result(decision)
 
         return graph_state
 
@@ -223,7 +240,102 @@ class HumanIntervention:
         if state.domain.continuity_issues:
             print(f"连续性: {len(state.domain.continuity_issues)}个问题")
 
+        self._display_asset_plan(state)
+
         print("-" * 40)
+
+    def _display_asset_plan(self, state: WorkflowState):
+        """显示资产提示词摘要，便于人工判断是否需要编辑"""
+        plan = state.domain.asset_plan or {}
+        assets = plan.get("assets", [])
+        if not assets:
+            return
+
+        print(f"资产计划: {len(assets)}个")
+        for index, asset in enumerate(assets, 1):
+            asset_id = asset.get("asset_id", "")
+            asset_type = asset.get("asset_type", "")
+            owner = asset.get("owner_name", "")
+            status = asset.get("status", "")
+            prompt = asset.get("image_prompt", "")
+            if len(prompt) > 80:
+                prompt = prompt[:80] + "..."
+            print(f"  [{index}] {asset_id} ({asset_type}/{owner}) 状态={status}")
+            print(f"      正向: {prompt}")
+            negative = asset.get("negative_prompt", "")
+            if negative:
+                if len(negative) > 60:
+                    negative = negative[:60] + "..."
+                print(f"      负向: {negative}")
+
+    def _collect_asset_edits(self, state: WorkflowState) -> List[Dict[str, Any]]:
+        """采集人工资产提示词编辑，返回可回写的编辑记录"""
+        plan = state.domain.asset_plan or {}
+        assets = plan.get("assets", [])
+        if not assets:
+            print("\n当前没有可编辑的资产计划。")
+            return []
+
+        print("\n资产编辑说明: 输入编号选择资产，仅修改提示词字段，回车保持原值。")
+        edits: List[Dict[str, Any]] = []
+
+        while True:
+            try:
+                raw_index = input("\n请输入要编辑的资产编号（直接回车结束）: ").strip()
+                if not raw_index:
+                    break
+
+                index = int(raw_index)
+                if index < 1 or index > len(assets):
+                    print(f"编号超出范围，请输入 1-{len(assets)}")
+                    continue
+
+                asset = assets[index - 1]
+                asset_id = asset.get("asset_id", "")
+                print(f"\n当前资产: {asset_id}")
+                print(f"正向提示词: {asset.get('image_prompt', '')}")
+                print(f"负向提示词: {asset.get('negative_prompt', '')}")
+
+                field = input(
+                    "选择字段 [1] 正向 [2] 负向 [3] 两者（默认1）: "
+                ).strip() or "1"
+
+                edit: Dict[str, Any] = {
+                    "asset_id": asset_id,
+                    "source": "human_intervention",
+                    "revision_id": f"human-{int(time.time())}",
+                }
+
+                if field in ("1", "3"):
+                    image_prompt = input("新的正向提示词（回车保持不变）: ").strip()
+                    if image_prompt:
+                        edit["image_prompt"] = image_prompt
+
+                if field in ("2", "3"):
+                    negative_prompt = input(
+                        "新的负向提示词（回车保持不变）: "
+                    ).strip()
+                    if negative_prompt:
+                        edit["negative_prompt"] = negative_prompt
+
+                if "image_prompt" not in edit and "negative_prompt" not in edit:
+                    print("未修改任何字段，已跳过。")
+                    continue
+
+                edits.append(edit)
+                print(f"已记录对 {asset_id} 的提示词编辑。")
+
+                again = input("继续编辑其他资产？[y/N]: ").strip().lower()
+                if again not in ("y", "yes", "是"):
+                    break
+            except (EOFError, KeyboardInterrupt):
+                print("\n已结束资产编辑。")
+                break
+            except ValueError:
+                print("请输入有效的数字编号。")
+                continue
+
+        return edits
 
     def _display_decision_result(self, decision: str):
         """显示决策结果"""

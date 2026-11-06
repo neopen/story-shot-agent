@@ -60,6 +60,7 @@ class PipelineState(str, Enum):
 
     # 人工状态
     NEEDS_HUMAN = "needs_human"  # 需要人工干预
+    NEEDS_ASSET_EDIT = "needs_asset_edit"  # 人工已编辑资产提示词，需重建资产
 
     # 失败状态
     FAILED = "failed"  # 一般失败

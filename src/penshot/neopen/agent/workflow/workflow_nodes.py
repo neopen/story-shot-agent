@@ -360,14 +360,6 @@ class WorkflowNodes:
                 task_id=state.input.task_id,
                 script_id=state.input.script_id,
             )
-            state.domain.asset_plan = plan.to_dict()
-            self.storage.save_obj_result(
-                state.input.script_id,
-                state.input.task_id,
-                plan,
-                "asset_plan.json",
-            )
-
             report = self.asset_generator.generate_assets(
                 parsed_script,
                 state.domain.contract,
@@ -375,6 +367,15 @@ class WorkflowNodes:
                 plan=plan,
                 manifest=state.input.asset_manifest,
                 script_id=state.input.script_id,
+                prompt_edits=state.execution.asset_prompt_edits,
+            )
+            # 人工编辑可能修改了资产提示词，保存最终生效的计划
+            state.domain.asset_plan = plan.to_dict()
+            self.storage.save_obj_result(
+                state.input.script_id,
+                state.input.task_id,
+                plan,
+                "asset_plan.json",
             )
             state.domain.asset_report = report.to_dict()
 

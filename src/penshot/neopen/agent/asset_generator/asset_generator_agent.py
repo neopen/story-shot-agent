@@ -18,6 +18,7 @@ from penshot.neopen.agent.asset_generator.asset_models import (
     AssetGenerationReport,
     AssetManifest,
     AssetPlanDocument,
+    AssetPromptEdit,
     AssetSpec,
     AssetStatus,
 )
@@ -117,6 +118,100 @@ class AssetGeneratorAgent:
             assets=specs,
         )
 
+    def apply_prompt_edits(
+        self,
+        plan: AssetPlanDocument,
+        contract: Optional[GlobalConsistencyContract],
+        edits: List[Any],
+    ) -> List[str]:
+        """把人工编辑的资产提示词写回计划与契约
+
+        只允许修改 ``image_prompt`` / ``negative_prompt``；提示词变化后旧资产
+        视为失效，状态回到 ``pending`` 并清空 ``asset_ref``，确保下游按新提示词
+        重新生成。返回实际修改的 asset_id 列表。
+        """
+        by_id = {spec.asset_id: spec for spec in plan.assets}
+        changed: List[str] = []
+
+        for raw_edit in edits or []:
+            try:
+                edit = (
+                    raw_edit
+                    if isinstance(raw_edit, AssetPromptEdit)
+                    else AssetPromptEdit.model_validate(raw_edit)
+                )
+            except Exception as e:
+                warning(f"资产提示词编辑记录解析失败（忽略）: {e}")
+                continue
+
+            spec = by_id.get(edit.asset_id)
+            if spec is None:
+                warning(f"人工编辑的资产不存在，已忽略: {edit.asset_id}")
+                continue
+
+            updated = False
+            if edit.image_prompt and edit.image_prompt.strip() != spec.image_prompt:
+                spec.image_prompt = edit.image_prompt.strip()
+                updated = True
+            if (
+                edit.negative_prompt is not None
+                and edit.negative_prompt.strip() != spec.negative_prompt
+            ):
+                spec.negative_prompt = edit.negative_prompt.strip()
+                updated = True
+
+            if not updated:
+                continue
+
+            # 提示词已变化，旧资产引用必须失效，等待下游重新生成
+            if spec.asset_ref:
+                spec.asset_ref = ""
+                spec.status = AssetStatus.PENDING
+
+            spec.metadata.update(
+                {
+                    "human_edited": True,
+                    "edit_source": edit.source,
+                    "edit_revision": edit.revision_id,
+                }
+            )
+
+            asset = getattr(contract, "assets", {}).get(edit.asset_id) if contract else None
+            if asset is not None:
+                asset.image_prompt = spec.image_prompt
+                if spec.status == AssetStatus.PENDING:
+                    asset.status = AssetStatus.PENDING.value
+                    asset.asset_ref = ""
+
+            changed.append(edit.asset_id)
+            info(
+                f"人工编辑资产提示词: {edit.asset_id} "
+                f"(来源={edit.source}, 修订={edit.revision_id or '未指定'})"
+            )
+
+        return changed
+
+    def invalidate_manifest(
+        self, manifest: Optional[AssetManifest], asset_ids: List[str]
+    ) -> Optional[AssetManifest]:
+        """移除指定资产的回填绑定，强制下游按人工编辑后的提示词重新生成"""
+        if manifest is None or not asset_ids:
+            return manifest
+
+        drop_ids = set(asset_ids)
+        for asset_id in asset_ids:
+            mapped = manifest.asset_id_map.get(asset_id)
+            if mapped:
+                drop_ids.add(mapped)
+
+        bindings = [b for b in manifest.bindings if b.asset_id not in drop_ids]
+        id_map = {
+            key: value
+            for key, value in manifest.asset_id_map.items()
+            if key not in asset_ids and value not in drop_ids
+        }
+        return manifest.model_copy(update={"bindings": bindings, "asset_id_map": id_map})
+
     def generate_assets(
         self,
         parsed_script: Any,
@@ -126,6 +221,7 @@ class AssetGeneratorAgent:
         manifest: Optional[Any] = None,
         plan: Optional[AssetPlanDocument] = None,
         script_id: Optional[str] = None,
+        prompt_edits: Optional[List[Any]] = None,
     ) -> AssetGenerationReport:
         """产出资产计划，按需消费回填清单或调用执行器，并挂载到契约
 
@@ -133,10 +229,14 @@ class AssetGeneratorAgent:
         1. 输入 ``manifest``：以下游回填为唯一事实来源，不重复调用生成；
         2. 无 manifest 且执行器可用：调用执行器生成，产出新的 manifest；
         3. 其余情况：仅保留 ``pending`` 计划，等待下游执行。
+
+        传入 ``prompt_edits`` 时，先应用人工编辑，再让对应资产的旧回填绑定失效，
+        确保下游按新提示词重新生成。
         """
         plan = plan or self.plan_assets(
             parsed_script, contract, task_id=task_id, script_id=script_id
         )
+        changed_ids = self.apply_prompt_edits(plan, contract, prompt_edits or [])
         specs = plan.assets
         if not specs:
             return AssetGenerationReport.from_specs(
@@ -147,6 +247,9 @@ class AssetGeneratorAgent:
             )
 
         coerced_manifest = self._coerce_manifest(manifest)
+        # 人工编辑过的资产，旧回填引用已失效，需要下游重新生成
+        if coerced_manifest is not None and changed_ids:
+            coerced_manifest = self.invalidate_manifest(coerced_manifest, changed_ids)
         errors: List[str] = []
         applied = 0
         mode = "plan"

@@ -89,6 +89,20 @@ class AssetSpec(BaseModel):
         )
 
 
+class AssetPromptEdit(BaseModel):
+    """人工对资产提示词的编辑记录；仅允许修改提示词字段"""
+
+    asset_id: str = Field(..., description="要编辑的资产ID")
+    image_prompt: Optional[str] = Field(
+        default=None, description="新的正向提示词；None 或空表示不修改"
+    )
+    negative_prompt: Optional[str] = Field(
+        default=None, description="新的负向提示词；None 表示不修改"
+    )
+    source: str = Field(default="human_intervention", description="编辑来源")
+    revision_id: str = Field(default="", description="编辑修订号，便于追溯")
+
+
 class AssetPlanDocument(BaseModel):
     """资产计划文档：PenShot 产出的声明式生图指令，默认不触发任何外部调用"""
 

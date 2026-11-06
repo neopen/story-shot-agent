@@ -275,6 +275,7 @@ class MultiAgentPipeline:
                 PipelineState.NEEDS_RETRY: PipelineNode.PARSE_SCRIPT.value,
                 PipelineState.NEEDS_REPAIR: PipelineNode.CONVERT_PROMPT.value,
                 PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
+                PipelineState.NEEDS_ASSET_EDIT: PipelineNode.GENERATE_ASSETS.value,
                 PipelineState.ABORT: END,
                 PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value,
             }

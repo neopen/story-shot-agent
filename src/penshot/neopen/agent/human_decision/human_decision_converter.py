@@ -33,6 +33,7 @@ class HumanDecisionConverter:
         "4": "REPAIR",
         "5": "ESCALATE",
         "6": "ABORT",
+        "7": "EDIT_ASSET",
 
         # 常见输入变体
         "CONTINUE": "CONTINUE",
@@ -75,6 +76,11 @@ class HumanDecisionConverter:
         "SUPERVISOR": "ESCALATE",
         "HELP": "ESCALATE",
 
+        "EDIT_ASSET": "EDIT_ASSET",
+        "ASSET_EDIT": "EDIT_ASSET",
+        "资产编辑": "EDIT_ASSET",
+        "编辑资产": "EDIT_ASSET",
+
         "ABORT": "ABORT",
         "STOP": "ABORT",
         "CANCEL": "ABORT",
@@ -90,6 +96,7 @@ class HumanDecisionConverter:
         "RETRY": PipelineState.NEEDS_RETRY,
         "REPAIR": PipelineState.NEEDS_REPAIR,
         "ESCALATE": PipelineState.NEEDS_HUMAN,
+        "EDIT_ASSET": PipelineState.NEEDS_ASSET_EDIT,
         "ABORT": PipelineState.ABORT
     }
 
@@ -207,6 +214,7 @@ class HumanDecisionConverter:
             PipelineState.NEEDS_REPAIR: "修复问题",
             PipelineState.NEEDS_RETRY: "重新开始",
             PipelineState.NEEDS_HUMAN: "需要人工干预",
+            PipelineState.NEEDS_ASSET_EDIT: "编辑资产提示词",
             PipelineState.FAILED: "处理失败",
             PipelineState.ABORT: "中止流程",
         }
@@ -227,6 +235,7 @@ class HumanDecisionConverter:
             "RETRY": "重新开始",
             "REPAIR": "修复问题",
             "ESCALATE": "升级处理",
+            "EDIT_ASSET": "编辑资产提示词",
             "ABORT": "中止流程",
         }
         return descriptions.get(standard_input, "未知输入")

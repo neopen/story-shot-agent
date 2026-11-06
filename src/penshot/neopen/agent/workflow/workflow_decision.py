@@ -902,6 +902,12 @@ class PipelineDecision:
             info("人工决策中止流程，跳过节点循环检查")
             return PipelineState.ABORT
 
+        # 资产编辑属于一次性修正动作，编辑记录已写入 execution.asset_prompt_edits，
+        # 直接回到资产生成节点重建计划，不占用人工节点循环次数。
+        if decision_state == PipelineState.NEEDS_ASSET_EDIT:
+            info("人工编辑资产提示词，返回资产生成节点重建计划")
+            return PipelineState.NEEDS_ASSET_EDIT
+
         # 仅对继续/重试/修复等决策计入人工节点循环
         loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.HUMAN_INTERVENTION)
         if loop_decision != PipelineState.SUCCESS:
