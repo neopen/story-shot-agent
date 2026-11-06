@@ -3,7 +3,7 @@
   <p align="center">
     <strong>A multi-agent collaborative screenplay storyboarding system with narrative continuity.</strong>
   </p>
-  
+
 <p align="center">
   <!-- 第一行：技术栈与生态依赖 -->
   <a href="https://langchain-ai.github.io/langgraph/"><img src="https://img.shields.io/badge/LangGraph-1C3C3C.svg?style=flat-square&logo=langchain&logoColor=white" alt="LangGraph"></a>
@@ -20,14 +20,14 @@
   <a href="https://github.com/neopen/story-shot-agent"><img src="https://img.shields.io/github/stars/neopen/story-shot-agent?style=flat-square&logo=github" alt="GitHub Stars"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
 </p>
-  
   <p align="center">
     <a href="https://github.com/neopen/story-shot-agent/blob/main/README.md">中文文档</a> •
-    <a href="https://shot.helpenx.com" target="_blank">WebSite</a> •
+    <a href="https://shot.helpenx.com" target="_blank"><b>WebSite</b></a> •
     <a href="https://shot.helpenx.com/docs/" target="_blank">Documentation</a> • 
-    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP Service</a> •
-    <a href="https://pypi.org/project/penshot/" target="_blank">PyPI</a>
+    <a href="https://shot.helpenx.com/docs/architecture.html" target="_blank">Architecture</a> •
+    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP Service</a> 
   </p>
+
 
 
 ---

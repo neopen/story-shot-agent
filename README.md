@@ -5,8 +5,9 @@ ____  _____ _   _ ____  _  _  ___  _____
 | |_) |  _| |  \| \___ \| || | | | | | |  
 |  __/| |___| |\  |___) | __ | |_| | | |  
 |_|   |_____|_| \_|____/|_||_|\___/  |_|  
-
 </pre>
+
+
 
   <h1 align="center">🎬 剧本分镜智能体 (PenShot)</h1>
   <p align="center">
@@ -29,15 +30,15 @@ ____  _____ _   _ ____  _  _  ___  _____
   <a href="https://github.com/neopen/story-shot-agent"><img src="https://img.shields.io/github/stars/neopen/story-shot-agent?style=flat-square&logo=github" alt="GitHub Stars"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
 </p>
-
 <p align="center">
     <a href="https://github.com/neopen/story-shot-agent/blob/main/README_en.md" target="_blank">English</a> •
-    <a href="https://shot.helpenx.com/" target="_blank">官网演示</a> •
-    <a href="https://shot.helpenx.com/docs/" target="_blank">官方文档</a> •
+    <a href="https://shot.helpenx.com/" target="_blank"><b>官网</b></a> •
+    <a href="https://shot.helpenx.com/docs/architecture.html" target="_blank">技术架构</a> •
     <a href="https://shot.helpenx.com/docs/integration.html" target="_blank">集成指南</a> •
-    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP 服务</a> •
-    <a href="https://pypi.org/project/penshot/" target="_blank">PyPI</a>
+    <a href="https://github.com/neopen/story-shot-agent/issues/58" target="_blank">（问题反馈</a> & 
+    <a href="https://github.com/neopen/story-shot-agent/issues/85" target="_blank">需求采集）</a> 
 </p>
+
 
 ---
 > 🚀 **一键转换**：支持任意格式剧本（电影、短剧、动漫、小说等） → 镜头级描述 → **Sora / Veo / Runway / 可灵 Ready Prompt**  
