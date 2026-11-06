@@ -18,6 +18,7 @@ from pydantic import Field, BaseModel
 from pydantic.v1 import validator
 
 from penshot.neopen.agent.base_models import AudioModelType, VideoStyle
+from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
 
 
 class AudioVoiceType(str, Enum):
@@ -295,6 +296,11 @@ class AIVideoPrompt(BaseModel):
 class AIVideoInstructions(BaseModel):
     """MVP AI视频指令集输出"""
 
+    # 指令契约版本（M0.4.2：下游据此判断资产引用/路由字段是否可用）
+    schema_version: str = Field(
+        default=CONTRACT_SCHEMA_VERSION, description="指令集契约版本"
+    )
+
     # 元数据
     metadata: Dict[str, Any] = Field(
         default_factory=lambda: {
@@ -341,6 +347,14 @@ class AIVideoInstructions(BaseModel):
     route_plan: Optional[Dict[str, Any]] = Field(
         default=None,
         description="目标模型路由计划（含每片段的模型专属适配提示词包），可序列化供下游消费",
+    )
+
+    # 声明式资产计划与下游回填清单（M0.4.2）：下游可只消费指令集完成生图/生视频
+    asset_plan: Optional[Dict[str, Any]] = Field(
+        default=None, description="资产计划文档（PenShot 产出的声明式生图指令）"
+    )
+    asset_manifest: Optional[Dict[str, Any]] = Field(
+        default=None, description="下游回填的资产清单（asset_id -> asset_ref）"
     )
 
     def to_dict(self) -> dict:

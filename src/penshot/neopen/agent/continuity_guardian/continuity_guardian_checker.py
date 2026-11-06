@@ -33,6 +33,8 @@ class ContinuityGuardianChecker:
         self._seen_issues: Set[str] = set()
         self._processed_shots: Set[str] = set()
         self._processed_fragments: Set[str] = set()
+        # 已上报过修复的场景跳转（跨轮保留，避免对结构性场景切换反复重试）
+        self._reported_scene_jumps: Set[str] = set()
 
     def check_all_continuity(self, context: Dict[str, Any]) -> ContinuityCheckResult:
         """执行所有连续性检查"""
@@ -224,24 +226,40 @@ class ContinuityGuardianChecker:
                     seen_jumps.add(jump_key)
                     scene_jump_count += 1
 
-                    # 检查是否需要过渡镜头
-                    if i > 0 and i < len(shot_sequence.shots) - 1:
-                        prev_shot = shot_sequence.shots[i - 1]
-                        next_shot = shot_sequence.shots[i + 1] if i + 1 < len(shot_sequence.shots) else None
+                    # 已尝试过修复仍未消除，说明是剧本固有的场景结构，不再重复触发修复
+                    if jump_key in self._reported_scene_jumps:
+                        info(f"场景跳转已尝试修复，跳过重复上报: {jump_key}")
+                        prev_scene = shot.scene_id
+                        continue
 
-                        if next_shot and prev_shot.shot_type == next_shot.shot_type:
-                            issue = self._create_issue(
-                                issue_type=ContinuityIssueType.SCENE_JUMP,
-                                description=f"场景切换突兀: {prev_scene} -> {shot.scene_id}",
-                                severity=ContinuitySeverity.WARNING,
-                                shot_id=shot.id,
-                                position=i,
-                                suggestion="添加过渡镜头使场景切换更自然",
-                                source_stage=PipelineNode.SEGMENT_SHOT.value,
-                                auto_fixable=True
-                            )
-                            if issue:
-                                result.add_issue(issue)
+                    # 过渡镜头本身或紧随过渡镜头的切点视为已平滑
+                    prev_shot = shot_sequence.shots[i - 1]
+                    if prev_shot.is_transition or shot.is_transition:
+                        prev_scene = shot.scene_id
+                        continue
+
+                    # 仅当上一镜头与当前场景首镜头景别相同（缺乏视觉切换提示）时才判定为突兀
+                    if prev_shot.shot_type == shot.shot_type:
+                        self._reported_scene_jumps.add(jump_key)
+                        issue = self._create_issue(
+                            issue_type=ContinuityIssueType.SCENE_JUMP,
+                            description=f"场景切换突兀: {prev_scene} -> {shot.scene_id}",
+                            severity=ContinuitySeverity.WARNING,
+                            shot_id=shot.id,
+                            scene_id=shot.scene_id,
+                            position=i,
+                            suggestion="在场景边界插入过渡镜头（空镜/角色反应镜头）",
+                            source_stage=PipelineNode.SEGMENT_SHOT.value,
+                            auto_fixable=True,
+                            metadata={
+                                "prev_scene": prev_scene,
+                                "next_scene": shot.scene_id,
+                                "boundary_shot_id": shot.id,
+                                "prev_shot_type": prev_shot.shot_type.value,
+                            },
+                        )
+                        if issue:
+                            result.add_issue(issue)
             prev_scene = shot.scene_id
 
         if scene_jump_count > len(shot_sequence.shots) * 0.3:
@@ -250,7 +268,9 @@ class ContinuityGuardianChecker:
                 description=f"场景切换过于频繁: {scene_jump_count}次切换于{len(shot_sequence.shots)}个镜头中",
                 severity=ContinuitySeverity.MODERATE,
                 suggestion="减少场景切换频率或增加过渡效果",
-                source_stage=PipelineNode.SEGMENT_SHOT.value
+                source_stage=PipelineNode.SEGMENT_SHOT.value,
+                # 场景数量由剧本结构决定，分镜阶段无法自动削减，仅记录
+                auto_fixable=False,
             )
             if issue:
                 result.add_issue(issue)

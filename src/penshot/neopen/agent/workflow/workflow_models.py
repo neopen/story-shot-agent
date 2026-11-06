@@ -18,6 +18,7 @@ class AgentStage(str, Enum):
     START = "loaded"  # 开始状态
     INIT = "initialized"  # 初始化状态
     PARSER = "parsed"  # 剧本解析完成
+    ASSETS = "assets_generated"  # 资产锚点生成完成
     SEGMENTER = "segmented"  # 分镜拆分完成
     SPLITTER = "split"  # 片段分隔完成
     CONVERTER = "converted"  # 指令转换完成
@@ -59,6 +60,7 @@ class PipelineState(str, Enum):
 
     # 人工状态
     NEEDS_HUMAN = "needs_human"  # 需要人工干预
+    NEEDS_ASSET_EDIT = "needs_asset_edit"  # 人工已编辑资产提示词，需重建资产
 
     # 失败状态
     FAILED = "failed"  # 一般失败
@@ -86,6 +88,7 @@ class PipelineNode(str, Enum):
     """
     # 核心处理阶段
     PARSE_SCRIPT = "parse_script"  # 剧本解析节点
+    GENERATE_ASSETS = "generate_assets"  # 资产锚点生成节点（角色三视图/道具/场景）
     SEGMENT_SHOT = "segment_shot"  # 分镜拆分节点
     SPLIT_VIDEO = "split_video"  # 片段分隔节点
     CONVERT_PROMPT = "convert_prompt"  # 指令转换节点

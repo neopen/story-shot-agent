@@ -58,6 +58,24 @@ class TestTaskLifecycleService:
         assert task["script"] == script
         assert task["status"] == TaskStatus.PENDING
 
+    def test_create_task_with_asset_manifest(self, lifecycle_service):
+        """创建任务时应持久化下游回填的资产清单"""
+        manifest = {
+            "schema_version": "0.4.2",
+            "task_id": "t1",
+            "bindings": [
+                {"asset_id": "char_001", "asset_ref": "/cdn/char_001.png"}
+            ],
+            "asset_id_map": {"char_001": "ds_char_001"},
+        }
+        script_id, task_id = lifecycle_service.create_task(
+            "测试剧本", asset_manifest=manifest
+        )
+
+        task = lifecycle_service.get_task(task_id)
+        assert task is not None
+        assert task["asset_manifest"] == manifest
+
     def test_update_progress(self, lifecycle_service):
         """测试更新任务进度"""
         script_id, task_id = lifecycle_service.create_task("测试剧本")

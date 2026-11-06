@@ -5,8 +5,9 @@ ____  _____ _   _ ____  _  _  ___  _____
 | |_) |  _| |  \| \___ \| || | | | | | |  
 |  __/| |___| |\  |___) | __ | |_| | | |  
 |_|   |_____|_| \_|____/|_||_|\___/  |_|  
-
 </pre>
+
+
 
   <h1 align="center">🎬 剧本分镜智能体 (PenShot)</h1>
   <p align="center">
@@ -29,15 +30,15 @@ ____  _____ _   _ ____  _  _  ___  _____
   <a href="https://github.com/neopen/story-shot-agent"><img src="https://img.shields.io/github/stars/neopen/story-shot-agent?style=flat-square&logo=github" alt="GitHub Stars"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
 </p>
-
 <p align="center">
     <a href="https://github.com/neopen/story-shot-agent/blob/main/README_en.md" target="_blank">English</a> •
-    <a href="https://shot.helpenx.com/" target="_blank">官网演示</a> •
-    <a href="https://shot.helpenx.com/docs/" target="_blank">官方文档</a> •
+    <a href="https://shot.helpenx.com/" target="_blank"><b>官网</b></a> •
+    <a href="https://shot.helpenx.com/docs/architecture.html" target="_blank">技术架构</a> •
     <a href="https://shot.helpenx.com/docs/integration.html" target="_blank">集成指南</a> •
-    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP 服务</a> •
-    <a href="https://pypi.org/project/penshot/" target="_blank">PyPI</a>
+    <a href="https://github.com/neopen/story-shot-agent/issues/58" target="_blank">（问题反馈</a> & 
+    <a href="https://github.com/neopen/story-shot-agent/issues/85" target="_blank">需求采集）</a> 
 </p>
+
 
 ---
 > 🚀 **一键转换**：支持任意格式剧本（电影、短剧、动漫、小说等） → 镜头级描述 → **Sora / Veo / Runway / 可灵 Ready Prompt**  
@@ -245,6 +246,34 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
 客户端调用工具 `breakdown_script` 与 `get_task_result` 即可无缝接入支持 MCP 的 IDE 或 Agent 框架。 完整示例：[mcp/mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/examples/mcp/mcp_client.py)
+
+#### 6. 下游节点接入资产提示词
+
+PenShot 只产出声明式指令，**默认不调用任何生图/生视频 API**。下游可直接消费结果中的资产提示词：
+
+```python
+data = result.data
+plan = data["asset_plan"]                       # 角色三视图/道具/场景提示词
+packages = data["instructions"]["route_plan"]["adapted_packages"]
+
+for asset in plan["assets"]:
+    if asset["status"] == "pending":
+        image_ref = image_service.generate(
+            prompt=asset["image_prompt"],
+            negative_prompt=asset["negative_prompt"],
+            size=asset["size"],
+        )
+
+for package in packages:
+    first = next((r for r in package["references"] if r["as_first_frame"]), None)
+    if first:
+        video_service.image_to_video(package["prompt"], first_frame=image_ref)
+```
+
+下游生成资产后，可通过 REST / SDK / MCP 的 `asset_manifest` 参数回填真实引用，PenShot 会按规范 `asset_id` 自动解析；下游改名使用显式 `asset_id_map`。
+
+完整文档：[docs/api/资产交接与下游接入.md](docs/api/资产交接与下游接入.md)  
+可运行示例：[examples/sdk/08_asset_handoff.py](examples/sdk/08_asset_handoff.py)（无需 LLM）
 
 
 

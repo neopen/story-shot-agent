@@ -91,11 +91,43 @@ class PenshotMCPServer:
         }
 
     def get_tools_list(self) -> list:
+        # breakdown_script 需要显式声明参数，才能让 MCP 客户端传入 asset_manifest
+        schemas = {
+            "breakdown_script": {
+                "type": "object",
+                "properties": {
+                    "script": {"type": "string", "description": "剧本文本"},
+                    "language": {
+                        "type": "string",
+                        "enum": ["zh", "en"],
+                        "default": "zh",
+                        "description": "剧本语言",
+                    },
+                    "wait": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "是否同步等待完成",
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "default": 300,
+                        "description": "同步等待超时时间（秒）",
+                    },
+                    "asset_manifest": {
+                        "type": "object",
+                        "description": "下游回填的资产清单（asset_id -> asset_ref），可选",
+                    },
+                },
+                "required": ["script"],
+            }
+        }
         return [
             {
                 "name": name,
                 "description": tool["description"],
-                "parameters": {"type": "object", "properties": {}}
+                "parameters": schemas.get(
+                    name, {"type": "object", "properties": {}}
+                ),
             }
             for name, tool in self._tools.items()
         ]
@@ -111,10 +143,16 @@ class PenshotMCPServer:
         language = arguments.get("language", "zh")
         wait = arguments.get("wait", False)
         timeout = arguments.get("timeout", 300)
+        asset_manifest = arguments.get("asset_manifest")
         lang = ShotLanguage.ZH if language == "zh" else ShotLanguage.EN
 
         if wait:
-            result = self.penshot.breakdown_script(script, lang, wait_timeout=timeout)
+            result = self.penshot.breakdown_script(
+                script,
+                language=lang,
+                wait_timeout=timeout,
+                asset_manifest=asset_manifest,
+            )
             return {
                 "task_id": result.task_id,
                 "status": result.status,
@@ -124,7 +162,9 @@ class PenshotMCPServer:
                 "processing_time_ms": result.processing_time_ms
             }
         else:
-            task_id = self.penshot.breakdown_script_async(script, lang)
+            task_id = self.penshot.breakdown_script_async(
+                script, language=lang, asset_manifest=asset_manifest
+            )
             return {
                 "task_id": task_id,
                 "status": TaskStatus.PENDING,

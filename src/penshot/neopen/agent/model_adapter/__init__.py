@@ -21,20 +21,35 @@ from penshot.neopen.agent.model_adapter.model_adapter_factory import (
     get_adapter,
     resolve_model_name,
 )
+from penshot.neopen.agent.model_adapter.image_to_video import (
+    apply_image_to_video_routing,
+    has_critical_text,
+    should_use_image_to_video,
+)
 from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
     AestheticBias,
     ModelCapability,
+    PROMPT_SCHEMA_VERSION,
+    PromptOverride,
+    PromptReference,
     RouteDecision,
+    RouteMode,
     RoutePlan,
+    apply_overrides,
 )
 
 __all__ = [
     "ModelCapability",
     "AdaptedPromptPackage",
+    "PROMPT_SCHEMA_VERSION",
+    "PromptOverride",
+    "PromptReference",
     "RouteDecision",
     "RoutePlan",
+    "RouteMode",
     "AestheticBias",
+    "apply_overrides",
     "register_model",
     "get_capability",
     "list_model_names",
@@ -42,4 +57,7 @@ __all__ = [
     "get_adapter",
     "resolve_model_name",
     "adapt_instructions",
+    "apply_image_to_video_routing",
+    "has_critical_text",
+    "should_use_image_to_video",
 ]

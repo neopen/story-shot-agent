@@ -38,6 +38,7 @@ examples/
 | `05_custom_config.py` | 自定义 ShotConfig（LLM/Embedding） | `ShotConfig`、`LLMBaseConfig`、`EmbeddingBaseConfig` | 无需 LLM（演示配置） |
 | `06_parse_result.py` | 解析 `data.instructions` 结构、存 JSON | `result.data` 契约 | 🔑；`--offline` 解析样例 |
 | `07_script_from_file.py` | 从文件读取剧本后拆分 | `breakdown_script` | 🔑 |
+| `08_asset_handoff.py` | 下游节点消费资产提示词：直接生成 + 回填 `asset_manifest` | `asset_plan`、`route_plan.adapted_packages[].references`、`asset_manifest` | 无需 LLM |
 
 ### rest/ — REST API（httpx）
 
@@ -108,3 +109,7 @@ python -m penshot.http_server --host 127.0.0.1 --port 8000
   `project_info{total_fragments,total_duration}` 与 `fragments[]`（每项含
   `prompt/negative_prompt/duration/model/audio`，**音频字段是 `audio`**）。
 - REST 服务器端点在 `src/penshot/api/rest_api.py`；MCP 工具见 `src/penshot/mcp_server.py`。
+- 资产提示词交接：结果中的 `data.asset_plan` 与
+  `data.instructions.route_plan.adapted_packages[].references` 交给下游生成参考图；
+  下游可通过 `asset_manifest`（REST/SDK/MCP 均支持）回填真实 `asset_ref`。
+  详见 `../docs/api/资产交接与下游接入.md` 与 `sdk/08_asset_handoff.py`。

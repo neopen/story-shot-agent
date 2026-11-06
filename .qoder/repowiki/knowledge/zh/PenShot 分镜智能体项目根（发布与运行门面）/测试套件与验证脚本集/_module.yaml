@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: tests
+title: 测试套件与验证脚本集
+scope:
+    - tests/
+source_files: []
+depends_on: []
+related_to: []

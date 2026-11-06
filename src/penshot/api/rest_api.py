@@ -56,6 +56,9 @@ class SyncProcessRequest(BaseModel):
     language: ShotLanguage = ShotLanguage.ZH
     config: Optional[ShotConfig] = None
     timeout: float = 300
+    asset_manifest: Optional[Dict[str, Any]] = Field(
+        default=None, description="下游回填的资产清单（asset_id -> asset_ref），可选"
+    )
 
 
 class ProcessRequest(BaseModel):
@@ -71,6 +74,9 @@ class ProcessRequest(BaseModel):
     callback_url: Optional[str] = Field(default=None, description="回调URL，处理完成后通知（可选）")
     script_id: Optional[str] = Field(default=None, description="剧本ID：如果是属于同一个剧本的不同请求，可以使用相同的ID，否则就是不同（可选）")
     language: Optional[ShotLanguage] = Field(default=ShotLanguage.ZH, description='剧本语言，例如 "zh" 或 "en"')
+    asset_manifest: Optional[Dict[str, Any]] = Field(
+        default=None, description="下游回填的资产清单（asset_id -> asset_ref），可选"
+    )
 
     @field_validator("language")
     def validate_language(cls, v):
@@ -110,6 +116,18 @@ class BatchProcessRequest(BaseModel):
     config: Optional[Dict[str, Any]] = Field(default_factory=dict)
     batch_id: Optional[str] = None
     language: ShotLanguage = Field(default=ShotLanguage.ZH, description='剧本语言，例如 "zh" 或 "en"')
+    asset_manifests: Optional[List[Optional[Dict[str, Any]]]] = Field(
+        default=None,
+        description="与 scripts 按下标对应的资产回填清单，可选（允许某条为 null）",
+    )
+
+    @field_validator("asset_manifests")
+    def validate_asset_manifests(cls, v, info):
+        """确保回填清单与剧本数量一一对应"""
+        scripts = info.data.get("scripts")
+        if v is not None and scripts is not None and len(v) != len(scripts):
+            raise ValueError("asset_manifests 长度必须与 scripts 一致")
+        return v
 
     @field_validator("language")
     def validate_language(cls, v):
@@ -179,7 +197,8 @@ def generate_storyboard(
             style=request.style,
             config=request.config,
             language=request.language,
-            callback_url=request.callback_url
+            callback_url=request.callback_url,
+            asset_manifest=request.asset_manifest,
         )
 
         info(f"任务创建成功: {task_id}")
@@ -235,7 +254,8 @@ async def generate_storyboard_sync(
                 script_id=request.script_id,
                 config=request.config,
                 language=request.language,
-                timeout=request.timeout
+                timeout=request.timeout,
+                asset_manifest=request.asset_manifest,
             )
         )
 
@@ -303,7 +323,8 @@ def batch_process_scripts(
         batch_response = factory.batch_submit(
             scripts=request.scripts,
             config=request.config,
-            language=request.language
+            language=request.language,
+            asset_manifests=request.asset_manifests,
         )
 
         # 返回批次状态，包含已创建的任务信息
@@ -371,7 +392,8 @@ async def batch_process_scripts_sync(
             scripts=request.scripts,
             config=request.config,
             language=request.language,
-            timeout=600  # 10分钟超时
+            timeout=600,  # 10分钟超时
+            asset_manifests=request.asset_manifests,
         )
 
         # 将同步阻塞操作放到线程池中执行

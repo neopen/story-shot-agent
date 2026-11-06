@@ -11,7 +11,7 @@ See LICENSE File For Details.
 """
 import asyncio
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from langgraph.graph import END
 
@@ -96,6 +96,11 @@ class MultiAgentPipeline:
         )
 
         orchestrator.add_node(
+            PipelineNode.GENERATE_ASSETS.value,
+            lambda graph_state: self.workflow_nodes.generate_assets_node(graph_state)
+        )
+
+        orchestrator.add_node(
             PipelineNode.SEGMENT_SHOT.value,
             lambda graph_state: self.workflow_nodes.split_shots_node(graph_state)
         )
@@ -147,8 +152,20 @@ class MultiAgentPipeline:
             PipelineNode.PARSE_SCRIPT.value,
             lambda graph_state: self.decision_funcs.decide_after_parsing(graph_state),
             {
-                PipelineState.SUCCESS: PipelineNode.SEGMENT_SHOT.value,
+                PipelineState.SUCCESS: PipelineNode.GENERATE_ASSETS.value,
                 PipelineState.NEEDS_RETRY: PipelineNode.PARSE_SCRIPT.value,
+                PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
+                PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value
+            }
+        )
+
+        # 资产锚点生成后的分支（M0.4.2）
+        orchestrator.add_conditional_edge(
+            PipelineNode.GENERATE_ASSETS.value,
+            lambda graph_state: self.decision_funcs.decide_after_assets(graph_state),
+            {
+                PipelineState.SUCCESS: PipelineNode.SEGMENT_SHOT.value,
+                PipelineState.VALID: PipelineNode.SEGMENT_SHOT.value,
                 PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
                 PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value
             }
@@ -258,6 +275,7 @@ class MultiAgentPipeline:
                 PipelineState.NEEDS_RETRY: PipelineNode.PARSE_SCRIPT.value,
                 PipelineState.NEEDS_REPAIR: PipelineNode.CONVERT_PROMPT.value,
                 PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
+                PipelineState.NEEDS_ASSET_EDIT: PipelineNode.GENERATE_ASSETS.value,
                 PipelineState.ABORT: END,
                 PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value,
             }
@@ -279,8 +297,19 @@ class MultiAgentPipeline:
 
         return compiled_graph
 
-    async def run_process(self, raw_script: str, config: ShotConfig) -> Dict:
-        """执行完整的工作流"""
+    async def run_process(
+        self,
+        raw_script: str,
+        config: ShotConfig,
+        asset_manifest: Optional[Dict[str, Any]] = None,
+    ) -> Dict:
+        """执行完整的工作流
+
+        Args:
+            raw_script: 原始剧本
+            config: 运行时配置
+            asset_manifest: 可选的下游资产回填清单（asset_id -> asset_ref）
+        """
         # 计算全局循环限制：所有节点最大循环次数之和
         total_node_max_loops = config.max_total_loops
         default_global_max_loops = total_node_max_loops * 2  # 2倍安全系数
@@ -292,6 +321,7 @@ class MultiAgentPipeline:
                 user_config=config,
                 task_id=self.task_id,
                 script_id=self.script_id,
+                asset_manifest=asset_manifest,
             ),
             config=ConfigState(
                 max_shot_duration=config.max_shot_duration,

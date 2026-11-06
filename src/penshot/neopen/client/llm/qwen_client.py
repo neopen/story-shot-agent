@@ -22,7 +22,7 @@ from penshot.neopen.client.embedding_compat import (
     supports_dimensions_field,
 )
 
-from penshot.logger import info
+from penshot.logger import info, debug
 
 # 阿里云公共 DashScope 域名：仅该域名提供原生 DashScope 接口
 PUBLIC_DASHSCOPE_HOST = "dashscope.aliyuncs.com"
@@ -112,7 +112,7 @@ class QwenClient(BaseClient):
             )
 
         base_url = self._openai_compatible_base_url(self.base_url)
-        info(f"QwenClient -> OpenAI 兼容接口: {base_url}")
+        debug(f"QwenClient -> OpenAI 兼容接口: {base_url}")
         # Qwen3 等模型默认开启思考模式，会占用大量 max_tokens 导致正文被截断；
         # 配置 enable_thinking=false 时通过 extra_body 下发关闭开关
         extra_body = None
@@ -151,7 +151,7 @@ class QwenClient(BaseClient):
         from langchain_openai import OpenAIEmbeddings
 
         base_url = self._openai_compatible_base_url(embed_base_url)
-        info(f"QwenClient 嵌入 -> OpenAI 兼容接口: {base_url}")
+        debug(f"QwenClient 嵌入 -> OpenAI 兼容接口: {base_url}")
         embedding_kwargs = {
             "model": self.embed_config.model_name,
             "base_url": base_url,

@@ -338,7 +338,9 @@ class AsyncTaskProcessor:
 
             # 执行处理 - 工作流内部会更新详细进度
             self.task_manager.update_task_progress_detail(task_id, TaskStage.PARSING_START, 0)
-            result_dict = await workflow.run_process(task["script"], config)
+            result_dict = await workflow.run_process(
+                task["script"], config, asset_manifest=task.get("asset_manifest")
+            )
 
             # 更新最终进度
             self.task_manager.update_task_progress_detail(task_id, TaskStage.COMPLETE, 100)

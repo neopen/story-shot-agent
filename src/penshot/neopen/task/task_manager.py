@@ -49,7 +49,8 @@ class TaskManager:
 
     # ==================== 任务创建 ====================
     def create_task(self, script: str, script_id: Optional[str] = None,
-                    style: Optional[VideoStyle] = None, config: Optional[ShotConfig] = None) -> (str, str):
+                    style: Optional[VideoStyle] = None, config: Optional[ShotConfig] = None,
+                    asset_manifest: Optional[Dict[str, Any]] = None) -> (str, str):
         """
         创建任务
 
@@ -58,11 +59,14 @@ class TaskManager:
             script_id: 剧本ID（可选）
             style: 视频风格（可选）
             config: 配置（可选）
+            asset_manifest: 下游回填的资产清单（可选）
 
         Returns:
             (script_id, task_id)
         """
-        return self.lifecycle_service.create_task(script, script_id, style, config)
+        return self.lifecycle_service.create_task(
+            script, script_id, style, config, asset_manifest
+        )
 
     # ==================== 任务读取 ====================
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
