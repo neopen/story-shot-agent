@@ -159,7 +159,15 @@ class ContinuityRepairGenerator:
         return "统一角色外观描述，按契约外观锚点重新生成该片段"
 
     def _repair_scene_jump(self, issue: ContinuityIssue) -> str:
-        return "添加过渡镜头（如空镜、角色反应镜头）使场景切换更自然"
+        metadata = getattr(issue, "metadata", None) or {}
+        prev_scene = metadata.get("prev_scene") if isinstance(metadata, dict) else None
+        next_scene = metadata.get("next_scene") if isinstance(metadata, dict) else None
+        if prev_scene and next_scene:
+            return (
+                f"在场景 {prev_scene} 与 {next_scene} 的切换处插入1个过渡镜头"
+                "（空镜或角色反应镜头），并使用与相邻镜头不同的景别"
+            )
+        return "在场景切换处插入过渡镜头（如空镜、角色反应镜头），并使用与相邻镜头不同的景别"
 
     def _repair_scene_inconsistent(self, issue: ContinuityIssue) -> str:
         return "统一场景地点与时间描述，按契约场景锚点修正该片段"

@@ -185,8 +185,8 @@ class PipelineDecision:
         loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.SEGMENT_SHOT)
         if loop_decision != PipelineState.SUCCESS:
             state.errors.error_messages.append(f"镜头拆分节点循环检查失败: {loop_reason}")
-            # 循环超限时，直接返回 FAILED，让错误处理器决定是否可恢复
-            return PipelineState.FAILED
+            # 保留决策层原始语义（NEEDS_HUMAN / FAILED），避免把人工干预改写成错误处理
+            return loop_decision
 
         # 检查阶段重试限制
         can_retry, retry_reason = self._can_retry_stage(state, PipelineNode.SEGMENT_SHOT)
@@ -611,28 +611,34 @@ class PipelineDecision:
                 info(f"连续性修复路由到阶段 {target.value}，共{len(issues)}个问题")
                 return target.value
 
-        # 重试耗尽或未准备修复参数：按严重性兜底，避免无修复目标时反复重试
+        # 重试耗尽或未准备修复参数：按严重性与可修复性兜底
         critical_issues, moderate_issues, minor_issues = (
             self._classify_continuity_issues(issues)
         )
-        if (
-            state.domain.continuity_retry_count >= state.domain.max_continuity_retries
-            or critical_issues
-            or moderate_issues
-        ):
+        if critical_issues:
+            warning(f"存在{len(critical_issues)}个严重问题，需要人工干预")
+            return PipelineState.NEEDS_HUMAN
+
+        # 仍有可自动修复的中度/严重问题未被处理（重试耗尽或无法定位阶段）→ 人工
+        minor_ids = {id(i) for i in minor_issues}
+        repairable_issues = [
+            i
+            for i in issues
+            if getattr(i, "auto_fixable", True) and id(i) not in minor_ids
+        ]
+        if repairable_issues:
             warning(
                 f"连续性修复无法继续（重试 "
                 f"{state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}，"
-                f"严重问题{len(critical_issues)}，中度问题{len(moderate_issues)}），需要人工干预"
+                f"待修复问题{len(repairable_issues)}），需要人工干预"
             )
             return PipelineState.NEEDS_HUMAN
 
-        # 轻微问题可以继续
-        if minor_issues:
-            warning(f"发现{len(minor_issues)}个轻微问题，继续执行")
-            return PipelineState.VALID
-
-        return PipelineState.SUCCESS
+        # 仅剩剧本结构导致的不可自动修复问题，记录后继续
+        warning(
+            f"发现{len(moderate_issues) + len(minor_issues)}个不可自动修复的连续性问题，继续执行"
+        )
+        return PipelineState.VALID
 
     def decide_after_error(self, state: WorkflowState) -> PipelineState:
         """错误处理后的决策
@@ -923,7 +929,7 @@ class PipelineDecision:
 
         决策逻辑：
         1. 检查全局循环是否超限
-        2. 检查节点循环是否超限
+        2. 节点循环上限由各阶段决策函数统一维护
         3. 根据当前阶段决定下一个节点（返回节点枚举）
 
         Args:
@@ -938,21 +944,7 @@ class PipelineDecision:
             error(f"全局循环超限: {graph_state.execution.global_current_loops}/{graph_state.execution.global_max_loops}")
             return PipelineState.FAILED  # 返回FAILED状态
 
-        # 2. 检查当前节点循环是否超限
-        current_node = graph_state.execution.current_node
-        if current_node:
-            node_max_loops = graph_state.execution.node_max_loops.get(current_node, 3)
-            node_current_loops = graph_state.execution.node_current_loops.get(current_node, 0)
-
-            if node_current_loops >= node_max_loops:
-                graph_state.execution.node_loop_exceeded[current_node] = True
-                warning(f"节点 {current_node.value} 循环超限: {node_current_loops}/{node_max_loops}")
-
-                # 根据节点类型决定处理方式
-                if current_node in [PipelineNode.SEGMENT_SHOT, PipelineNode.SPLIT_VIDEO]:
-                    return PipelineState.NEEDS_HUMAN
-                else:
-                    return PipelineState.FAILED
+        # 2. 节点循环上限已由各阶段决策函数统一判定，这里不再重复检查
 
         # 3. 发出循环警告（如果需要）
         if (graph_state.execution.global_current_loops >= graph_state.execution.global_max_loops * 0.8

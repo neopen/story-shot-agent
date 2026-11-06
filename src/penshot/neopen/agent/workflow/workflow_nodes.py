@@ -1424,12 +1424,28 @@ class WorkflowNodes:
                 state.domain.continuity_retry_count
                 < state.domain.max_continuity_retries
             ):
+                # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
+                repairable_by_stage = {
+                    stage: [i for i in issues if getattr(i, "auto_fixable", True)]
+                    for stage, issues in issues_by_stage.items()
+                }
+                repairable_by_stage = {
+                    stage: issues
+                    for stage, issues in repairable_by_stage.items()
+                    if issues
+                }
+                if not repairable_by_stage:
+                    warning("连续性问题均不支持自动修复，跳过自动重试")
+                    state.domain.needs_continuity_repair = False
+                    state.execution.current_stage = AgentStage.CONTINUITY
+                    return state
+
                 # 7. 生成修复参数并触发重试（契约锚点驱动）
                 contract_violations_by_stage = group_violations_by_stage(
                     state.domain.contract_violations
                 )
                 repair_entries = []
-                for stage, issues in issues_by_stage.items():
+                for stage, issues in repairable_by_stage.items():
                     repair_params = self._create_continuity_repair_params(
                         issues,
                         stage,
@@ -1470,7 +1486,7 @@ class WorkflowNodes:
                         phase="needs_repair",
                         issues_by_stage=stage_counts,
                         repairs=repair_entries,
-                        repair_stages=[stage.value for stage in issues_by_stage],
+                        repair_stages=[stage.value for stage in repairable_by_stage],
                         contract_violations=state.domain.contract_violations,
                     ),
                 )
@@ -1484,7 +1500,7 @@ class WorkflowNodes:
                     f"连续性修复重试 ({state.domain.continuity_retry_count}/{state.domain.max_continuity_retries})"
                 )
 
-                return self._route_to_fix_stage(state, issues_by_stage)
+                return self._route_to_fix_stage(state, repairable_by_stage)
             else:
                 error(
                     f"连续性修复重试次数超限: {state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}"
@@ -1748,14 +1764,12 @@ class WorkflowNodes:
         Returns:
             更新后的工作流状态
         """
-        graph_state.execution.global_current_loops += 1
-
         current_node = graph_state.execution.current_node or None
 
-        current_node_loops = (
-            graph_state.execution.node_current_loops.get(current_node, 0) + 1
+        # 循环计数由各阶段决策函数统一维护，这里只读取快照，避免重复自增
+        current_node_loops = graph_state.execution.node_current_loops.get(
+            current_node, 0
         )
-        graph_state.execution.node_current_loops[current_node] = current_node_loops
 
         node_max_loops = graph_state.execution.node_max_loops.get(current_node, 3)
 

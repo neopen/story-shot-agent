@@ -125,6 +125,12 @@ class ShotInfo(BaseModel):
         description="分镜决策置信度"
     )
 
+    # 是否为场景切换处的过渡镜头（由连续性修复插入）
+    is_transition: bool = Field(
+        default=False,
+        description="是否为场景切换过渡镜头"
+    )
+
 
 class ShotSequence(BaseModel):
     """MVP镜头序列输出"""
