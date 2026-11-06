@@ -889,6 +889,7 @@ class WorkflowNodes:
                     adapted_packages=adapted_packages,
                 )
                 instructions.route_plan = plan.model_dump(mode="json")
+
                 # 指令集内嵌资产计划与回填清单，下游可只消费 instructions
                 instructions.asset_plan = state.domain.asset_plan
                 instructions.asset_manifest = state.domain.asset_manifest
@@ -1424,6 +1425,7 @@ class WorkflowNodes:
                 state.domain.continuity_retry_count
                 < state.domain.max_continuity_retries
             ):
+
                 # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
                 repairable_by_stage = {
                     stage: [i for i in issues if getattr(i, "auto_fixable", True)]
@@ -1445,6 +1447,7 @@ class WorkflowNodes:
                     state.domain.contract_violations
                 )
                 repair_entries = []
+
                 for stage, issues in repairable_by_stage.items():
                     repair_params = self._create_continuity_repair_params(
                         issues,
