@@ -7,6 +7,13 @@
 
 ---
 
+## [0.4.2](https://github.com/neopen/story-shot-agent/compare/v0.4.1...v0.4.2) (2026-11-06)
+
+
+### ✨ Features (新功能)
+
+* M0.4.2 声明式资产计划、下游交接与人工资产编辑 ([#86](https://github.com/neopen/story-shot-agent/issues/86)) ([b71bcc7](https://github.com/neopen/story-shot-agent/commit/b71bcc7e8e223ff25e2f2ab923df9adeca278869))
+
 ## [0.4.1](https://github.com/neopen/story-shot-agent/compare/v0.4.0...v0.4.1) (2026-11-05)
 
 
