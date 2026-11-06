@@ -410,7 +410,31 @@ class PipelineDecision:
         # 成功，重置重试计数
         state.execution.stage_current_retries[PipelineNode.CONVERT_PROMPT] = 0
 
-        # 提示词可用，进入质量审查
+        # 提示词可用，进入目标模型路由
+        return PipelineState.VALID
+
+    def decide_after_routing(self, state: WorkflowState) -> PipelineState:
+        """目标模型路由后的决策（M0.4.3）
+
+        路由为确定性步骤：成功则进入循环检查，失败不阻断主流程（仅记录告警）。
+        """
+        loop_decision, loop_reason = self._check_and_increment_node_loop(
+            state, PipelineNode.ROUTE_MODEL
+        )
+        if loop_decision != PipelineState.SUCCESS:
+            state.errors.error_messages.append(
+                f"目标模型路由节点循环检查失败: {loop_reason}"
+            )
+            return loop_decision
+
+        instructions = state.domain.instructions
+        if not instructions or not instructions.fragments:
+            error("目标模型路由后提示词为空")
+            return PipelineState.FAILED
+
+        if not instructions.route_plan:
+            warning("目标模型路由结果为空，跳过路由并继续质量审查")
+
         return PipelineState.VALID
 
     def decide_after_audit(self, state: WorkflowState) -> PipelineState:

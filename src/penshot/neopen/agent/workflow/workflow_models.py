@@ -92,6 +92,7 @@ class PipelineNode(str, Enum):
     SEGMENT_SHOT = "segment_shot"  # 分镜拆分节点
     SPLIT_VIDEO = "split_video"  # 片段分隔节点
     CONVERT_PROMPT = "convert_prompt"  # 指令转换节点
+    ROUTE_MODEL = "route_model"  # 目标模型路由节点（M0.4.3）
     AUDIT_QUALITY = "audit_quality"  # 质量审查节点
     CONTINUITY_CHECK = "continuity_check"  # 连续性检查节点
 

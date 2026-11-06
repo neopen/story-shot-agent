@@ -17,7 +17,10 @@ from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
     ModelCapability,
 )
-from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoPrompt
+from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
+    AIVideoPrompt,
+    CameraControl,
+)
 
 # 镜头类型关键词 -> 结构化景别（用于从通用 prompt 文本探测相机表述）
 _SHOT_TYPE_KEYWORDS: Dict[str, str] = {
@@ -76,8 +79,18 @@ class BaseModelAdapter(ABC):
         return self.capability.model_name
 
     def adapt(self, prompt: AIVideoPrompt) -> AdaptedPromptPackage:
-        """适配单个片段（模板方法）；各子类通过覆写钩子产生结构差异"""
-        camera = _detect_camera(prompt.prompt)
+        """适配单个片段（模板方法）；各子类通过覆写钩子产生结构差异
+
+        相机参数优先消费提示词阶段产出的结构化 ``camera``：目标模型支持结构化
+        相机控制时直接透传，不支持时降级为模型惯用的文字描述。
+        """
+        camera_control: Optional[CameraControl] = None
+        if prompt.camera is not None and self.capability.supports_camera_control:
+            camera_control = prompt.camera
+            camera_text = None
+        else:
+            camera_text = self.format_camera(_detect_camera(prompt.prompt))
+
         return AdaptedPromptPackage(
             fragment_id=prompt.fragment_id,
             target_model=self.model_name,
@@ -85,7 +98,8 @@ class BaseModelAdapter(ABC):
             negative_prompt=self.build_negative_prompt(prompt),
             duration=self._clamp_duration(prompt.duration),
             style=self._resolve_style(prompt),
-            camera=self.format_camera(camera),
+            camera=camera_text,
+            camera_control=camera_control,
             model_params=self.build_model_config(prompt),
         )
 

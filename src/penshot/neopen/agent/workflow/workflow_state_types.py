@@ -143,6 +143,7 @@ class ExecutionState(BaseModel):
         PipelineNode.SEGMENT_SHOT: 5,
         PipelineNode.SPLIT_VIDEO: 5,
         PipelineNode.CONVERT_PROMPT: 5,
+        PipelineNode.ROUTE_MODEL: 5,
         PipelineNode.AUDIT_QUALITY: 3,
         PipelineNode.CONTINUITY_CHECK: 5,
         PipelineNode.ERROR_HANDLER: 5,
@@ -159,6 +160,7 @@ class ExecutionState(BaseModel):
         PipelineNode.SEGMENT_SHOT: 3,
         PipelineNode.SPLIT_VIDEO: 3,
         PipelineNode.CONVERT_PROMPT: 3,
+        PipelineNode.ROUTE_MODEL: 2,
         PipelineNode.AUDIT_QUALITY: 2,
         PipelineNode.CONTINUITY_CHECK: 2,
     }

@@ -591,6 +591,9 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
                     id=fragment_id,
                     shot_id=shot.id,
                     element_ids=shot.element_ids,
+                    shot_type=shot.shot_type.value
+                    if hasattr(shot.shot_type, "value")
+                    else str(shot.shot_type),
                     start_time=round(segment_start_time, 2),
                     duration=segment["duration"],
                     description=description,
@@ -631,6 +634,9 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
                 id=fragment_id,
                 shot_id=shot.id,
                 element_ids=shot.element_ids,
+                shot_type=shot.shot_type.value
+                if hasattr(shot.shot_type, "value")
+                else str(shot.shot_type),
                 start_time=current_time,
                 duration=min(shot.duration, self.max_split_segment),
                 description=shot.description,

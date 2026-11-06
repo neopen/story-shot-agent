@@ -99,6 +99,9 @@ class RuleVideoSplitter(BaseVideoSplitter):
                 id=fragment_id,
                 shot_id=shot.id,
                 element_ids=shot.element_ids,
+                shot_type=shot.shot_type.value
+                if hasattr(shot.shot_type, "value")
+                else str(shot.shot_type),
                 start_time=start_time,
                 duration=shot.duration,
                 description=shot.description,
@@ -129,6 +132,9 @@ class RuleVideoSplitter(BaseVideoSplitter):
                     id=fragment_id,
                     shot_id=shot.id,
                     element_ids=shot.element_ids if seg_idx == 0 else [],
+                    shot_type=shot.shot_type.value
+                    if hasattr(shot.shot_type, "value")
+                    else str(shot.shot_type),
                     start_time=round(start_time + seg_idx * segment_duration, 2),
                     duration=round(segment_duration, 2),
                     description=f"{shot.description} (部分{seg_idx + 1}/{num_segments})",
