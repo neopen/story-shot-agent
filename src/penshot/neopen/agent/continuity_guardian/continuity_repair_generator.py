@@ -42,6 +42,13 @@ _SCENE_ISSUE_TYPES = {"scene_jump", "scene_inconsistent", "scene_too_frequent"}
 # 需要道具资产锚点驱动的连续性问题类型
 _PROP_ISSUE_TYPES = {"prop_change", "prop_disappear", "prop_appear"}
 
+# 连续性问题类型到分割阶段修复参数码的映射
+# 分割器消费质量审查器的 fragment_* 风格问题码，未映射会导致修复参数被忽略
+_ISSUE_TYPE_ALIASES = {
+    "time_gap": "fragment_time_gap",
+    "time_overlap": "fragment_overlap",
+}
+
 
 class ContinuityRepairGenerator:
     """连续性修复参数生成器"""
@@ -82,11 +89,12 @@ class ContinuityRepairGenerator:
         Returns:
             可直接交给各阶段 Agent 消费的修复参数
         """
-        issue_types = list(set([i.type for i in issues]))
+        issue_types = sorted({self._repair_issue_type(i) for i in issues})
         suggestions = {}
 
         for issue in issues:
-            strategy = self.repair_strategies.get(issue.type)
+            issue_type = self._issue_type_value(issue)
+            strategy = self.repair_strategies.get(issue_type)
             if strategy is not None:
                 suggestion = strategy(issue)
             else:
@@ -111,6 +119,16 @@ class ContinuityRepairGenerator:
             suggestions=suggestions,
             severity_summary=self._get_severity_summary(issues),
         )
+
+    @staticmethod
+    def _issue_type_value(issue: ContinuityIssue) -> str:
+        """把枚举或字符串形式的问题类型统一为字符串值"""
+        return str(getattr(issue.type, "value", issue.type))
+
+    def _repair_issue_type(self, issue: ContinuityIssue) -> str:
+        """把问题类型映射为修复阶段可消费的问题码"""
+        raw_type = self._issue_type_value(issue)
+        return _ISSUE_TYPE_ALIASES.get(raw_type, raw_type)
 
     def _contract_anchor_hint(
         self, issue: ContinuityIssue, contract: Optional[Any]

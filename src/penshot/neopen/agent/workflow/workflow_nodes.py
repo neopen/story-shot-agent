@@ -72,6 +72,7 @@ from penshot.neopen.agent.model_adapter import (
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
 from penshot.neopen.agent.asset_generator import AssetGeneratorAgent
+from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
 
 
 class WorkflowNodes:
@@ -558,6 +559,31 @@ class WorkflowNodes:
 
         return state
 
+    @staticmethod
+    def _clamp_fragments_timeline(
+        fragments: List[VideoFragment], max_duration: float
+    ) -> bool:
+        """收敛超长片段时长并按实际时长重建时间轴。
+
+        只截断时长而不重排 start_time 会凭空产生时间间隙，导致连续性检查
+        反复报 time_gap 且修复无效。
+
+        Returns:
+            是否发生了时长调整
+        """
+        adjusted = False
+        for fragment in fragments:
+            if fragment.duration > max_duration:
+                fragment.duration = max_duration
+                adjusted = True
+
+        if adjusted:
+            current_time = 0.0
+            for fragment in fragments:
+                fragment.start_time = round(current_time, 2)
+                current_time += fragment.duration
+        return adjusted
+
     # ======================== 视频分割节点 ========================
 
     def fragment_for_ai_node(self, state: WorkflowState) -> WorkflowState:
@@ -623,12 +649,11 @@ class WorkflowNodes:
                 parsed_script=state.domain.parsed_script,
             )
 
-            # 自动调整超长片段（软限制）
-            max_duration = state.config.max_fragment_duration
-            for fragment in fragment_sequence.fragments:
-                if fragment.duration > max_duration:
-                    fragment.duration = max_duration
-                    info("已自动调整超长片段时长")
+            # 自动调整超长片段（软限制），并重建时间轴，避免截断后产生间隙
+            if self._clamp_fragments_timeline(
+                fragment_sequence.fragments, state.config.max_fragment_duration
+            ):
+                info("已自动调整超长片段时长")
 
             # 更新状态：分段完成
             self._update_task_progress(
@@ -1530,7 +1555,7 @@ class WorkflowNodes:
                     ),
                 )
                 state.execution.needs_human_review = True
-                state.errors.error_source = PipelineNode.CONTINUITY_GUARDIAN
+                state.errors.error_source = PipelineNode.CONTINUITY_CHECK
                 state.execution.current_stage = AgentStage.CONTINUITY
 
         except Exception as e:

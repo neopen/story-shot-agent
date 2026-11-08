@@ -317,12 +317,12 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
         if "fragment_description_missing" in issue_types:
             fragments = self._fix_description_issues(fragments, shot_sequence)
 
-        # 3. 修复时间间隔问题
-        if "fragment_time_gap" in issue_types:
+        # 3. 修复时间间隔问题（兼容连续性问题码 time_gap）
+        if "fragment_time_gap" in issue_types or "time_gap" in issue_types:
             fragments = self._fix_time_gap_issues(fragments)
 
-        # 4. 修复重叠问题
-        if "fragment_overlap" in issue_types:
+        # 4. 修复重叠问题（兼容连续性问题码 time_overlap）
+        if "fragment_overlap" in issue_types or "time_overlap" in issue_types:
             fragments = self._fix_overlap_issues(fragments)
 
         # 5. 修复连续性注释
