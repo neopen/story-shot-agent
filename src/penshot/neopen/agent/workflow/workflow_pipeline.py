@@ -116,6 +116,11 @@ class MultiAgentPipeline:
         )
 
         orchestrator.add_node(
+            PipelineNode.ROUTE_MODEL.value,
+            lambda graph_state: self.workflow_nodes.route_model_node(graph_state)
+        )
+
+        orchestrator.add_node(
             PipelineNode.AUDIT_QUALITY.value,
             lambda graph_state: self.workflow_nodes.quality_audit_node(graph_state)
         )
@@ -202,10 +207,24 @@ class MultiAgentPipeline:
             PipelineNode.CONVERT_PROMPT.value,
             lambda graph_state: self.decision_funcs.decide_after_prompts(graph_state),
             {
-                PipelineState.SUCCESS: PipelineNode.LOOP_CHECK.value,
-                PipelineState.VALID: PipelineNode.LOOP_CHECK.value,
+                PipelineState.SUCCESS: PipelineNode.ROUTE_MODEL.value,
+                PipelineState.VALID: PipelineNode.ROUTE_MODEL.value,
                 PipelineState.NEEDS_REPAIR: PipelineNode.CONVERT_PROMPT.value,
                 PipelineState.NEEDS_RETRY: PipelineNode.CONVERT_PROMPT.value,
+                PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
+                PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value
+            }
+        )
+
+        # 目标模型路由后的分支（M0.4.3）
+        orchestrator.add_conditional_edge(
+            PipelineNode.ROUTE_MODEL.value,
+            lambda graph_state: self.decision_funcs.decide_after_routing(graph_state),
+            {
+                PipelineState.SUCCESS: PipelineNode.LOOP_CHECK.value,
+                PipelineState.VALID: PipelineNode.LOOP_CHECK.value,
+                PipelineState.NEEDS_REPAIR: PipelineNode.ROUTE_MODEL.value,
+                PipelineState.NEEDS_RETRY: PipelineNode.ROUTE_MODEL.value,
                 PipelineState.NEEDS_HUMAN: PipelineNode.HUMAN_INTERVENTION.value,
                 PipelineState.FAILED: PipelineNode.ERROR_HANDLER.value
             }

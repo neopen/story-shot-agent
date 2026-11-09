@@ -188,6 +188,50 @@ class StoryboardConfig(BaseModel):
     output: StoryboardOutputConfig = Field(default_factory=StoryboardOutputConfig)
 
 
+class RoutingConditionConfig(BaseModel):
+    """路由规则条件（字段为 None 表示不约束）"""
+
+    has_critical_text: Optional[bool] = Field(default=None)
+    character_consistency_need: Optional[Literal["low", "medium", "high"]] = Field(
+        default=None
+    )
+    motion_complexity: Optional[Literal["low", "medium", "high"]] = Field(
+        default=None
+    )
+    style_bias: Optional[Literal["cinematic", "anime", "realistic"]] = Field(
+        default=None
+    )
+    min_duration: Optional[float] = Field(default=None, ge=0)
+    max_duration: Optional[float] = Field(default=None, ge=0)
+    needs_first_last_frame: Optional[bool] = Field(default=None)
+
+
+class RoutingRuleConfig(BaseModel):
+    """单条模型路由规则"""
+
+    name: str = Field(..., description="规则名，会写入 RouteDecision.reason")
+    priority: int = Field(default=50, description="优先级，数值越大越先匹配")
+    conditions: RoutingConditionConfig = Field(
+        default_factory=RoutingConditionConfig
+    )
+    model: str = Field(..., description="命中的目标模型名")
+    mode: Literal["text_to_video", "image_to_video"] = Field(
+        default="text_to_video", description="命中后的生成模式"
+    )
+
+
+class RoutingConfig(BaseModel):
+    """模型路由配置"""
+
+    enabled: bool = Field(default=True, description="是否启用规则路由")
+    default_model: str = Field(
+        default="kling_3", description="无规则命中且原模型不可用时的兜底模型"
+    )
+    rules: List[RoutingRuleConfig] = Field(
+        default_factory=list, description="按优先级匹配的路由规则"
+    )
+
+
 class DataPathsConfig(BaseModel):
     """数据目录配置（对应 settings.yaml 的 paths.data）"""
     input: str = Field(default="./data/input")

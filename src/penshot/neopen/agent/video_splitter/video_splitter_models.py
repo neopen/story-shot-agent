@@ -11,7 +11,7 @@ See LICENSE File For Details.
 """
 import time
 from datetime import datetime
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 
 from pydantic import Field, BaseModel
 
@@ -49,6 +49,12 @@ class VideoFragment(BaseModel):
     description: str = Field(
         default="",
         description="片段内容简洁描述"
+    )
+
+    # 来源镜头的景别（M0.4.3 用于结构化相机控制）
+    shot_type: Optional[str] = Field(
+        default=None,
+        description="来源镜头景别，如 wide/medium/close_up"
     )
 
     # 极简的连续性标记

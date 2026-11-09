@@ -25,7 +25,7 @@ from penshot.neopen.task.task_processor import AsyncTaskProcessor
 def _manifest() -> dict:
     """构造一个最小的下游资产回填清单"""
     return {
-        "schema_version": "0.4.2",
+        "schema_version": "0.4.3",
         "task_id": "t1",
         "bindings": [
             {

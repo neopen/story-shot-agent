@@ -16,6 +16,7 @@ from penshot.logger import info, error
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.prompt_converter.base_prompt_converter import BasePromptConverter
+from penshot.neopen.agent.prompt_converter.camera_builder import build_camera_control
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoPrompt,
     AIVideoInstructions,
@@ -358,7 +359,8 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
             duration=fragment.duration,
             model=self.config.video_model,
             style=result.get("style_hint"),
-            audio=audio
+            audio=audio,
+            camera=build_camera_control(fragment.description, fragment.shot_type),
         )
 
 

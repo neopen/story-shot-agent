@@ -28,6 +28,7 @@ from penshot.config.config_models import (
     LLMConfig,
     PathsConfig,
     RetrieverConfig,
+    RoutingConfig,
     StoryboardConfig,
 )
 from penshot.config.security import trusted_env_expansion
@@ -67,6 +68,8 @@ class Settings(BaseSettings):
 
     # 业务配置
     storyboard: StoryboardConfig = Field(default_factory=StoryboardConfig)
+    # 模型路由配置（M0.4.3）
+    routing: RoutingConfig = Field(default_factory=RoutingConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
 
     model_config = SettingsConfigDict(
