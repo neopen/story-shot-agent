@@ -12,16 +12,18 @@ See LICENSE File For Details.
 from __future__ import annotations
 
 import asyncio
+import functools
 import ipaddress
 import json
 import random
 import socket
-from dataclasses import is_dataclass
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass, is_dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from threading import RLock
-from typing import Optional, Dict, Any, List, Tuple
-from urllib.parse import urlparse
+from threading import BoundedSemaphore, RLock
+from typing import Any, Callable, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, urlunparse
 
 from penshot.logger import info, error, warning, debug
 from penshot.neopen.agent.base_models import VideoStyle
@@ -35,14 +37,44 @@ from .workflow_registry import WorkflowRegistry
 
 _FORBIDDEN_HOSTNAMES = {"localhost", "localhost.localdomain"}
 _FORBIDDEN_HOST_SUFFIXES = (".localhost", ".local", ".internal")
+_NAT64_WELL_KNOWN_NETWORK = ipaddress.ip_network("64:ff9b::/96")
+_NAT64_LOCAL_USE_NETWORK = ipaddress.ip_network("64:ff9b:1::/48")
+_DNS_RESOLVE_TIMEOUT_SECONDS: float = 5.0
+_DNS_MAX_CONCURRENT_LOOKUPS: int = 8
+_DNS_CONCURRENCY_SEMAPHORE = BoundedSemaphore(_DNS_MAX_CONCURRENT_LOOKUPS)
+_DNS_EXECUTOR = ThreadPoolExecutor(max_workers=_DNS_MAX_CONCURRENT_LOOKUPS, thread_name_prefix="penshot-dns")
 
 
-def _assert_public_ip(ip_str: str) -> None:
-    """校验 IP 地址为全局公网可达地址，拒绝回环、私网、链路本地、多播与保留地址。"""
-    ip_obj = ipaddress.ip_address(ip_str)
-    if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped is not None:
-        ip_obj = ip_obj.ipv4_mapped
-    if (
+@dataclass(frozen=True)
+class PinnedCallbackTarget:
+    """经过 SSRF 与 DNS 校验并固定目标公网 IP 的回调请求参数。"""
+
+    original_url: str
+    pinned_url: str
+    pinned_ip: str
+    hostname: str
+    headers: Dict[str, str]
+    extensions: Dict[str, Any]
+
+
+def _extract_embedded_ipv4(ip_obj: ipaddress.IPv6Address) -> Optional[ipaddress.IPv4Address]:
+    """提取 IPv6 过渡机制（IPv4-mapped / 6to4 / Teredo / RFC 6052 NAT64 /96）内嵌的 IPv4 地址。"""
+    if ip_obj.ipv4_mapped is not None:
+        return ip_obj.ipv4_mapped
+    if ip_obj.sixtofour is not None:
+        return ip_obj.sixtofour
+    if ip_obj.teredo is not None:
+        return ip_obj.teredo[1]
+    if ip_obj in _NAT64_WELL_KNOWN_NETWORK:
+        return ipaddress.IPv4Address(int(ip_obj) & 0xFFFFFFFF)
+    return None
+
+
+def _is_non_public_ip_object(ip_obj: ipaddress._BaseAddress) -> bool:
+    """判断单个 IP 对象是否属于非公网可达地址（含 RFC 8215 本地 NAT64 前缀 64:ff9b:1::/48）。"""
+    if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj in _NAT64_LOCAL_USE_NETWORK:
+        return True
+    return (
         ip_obj.is_private
         or ip_obj.is_loopback
         or ip_obj.is_link_local
@@ -50,33 +82,50 @@ def _assert_public_ip(ip_str: str) -> None:
         or ip_obj.is_reserved
         or ip_obj.is_unspecified
         or not ip_obj.is_global
-    ):
+    )
+
+
+def _assert_public_ip(ip_str: str) -> None:
+    """校验 IP 地址为全局公网可达地址，拒绝回环、私网、链路本地、多播、保留及过渡内嵌私网地址。"""
+    if "%" in ip_str:
+        raise ValueError(f"Callback URL target IP must not include zone identifier: {ip_str}")
+    ip_obj = ipaddress.ip_address(ip_str)
+    if isinstance(ip_obj, ipaddress.IPv6Address):
+        embedded_v4 = _extract_embedded_ipv4(ip_obj)
+        if embedded_v4 is not None and _is_non_public_ip_object(embedded_v4):
+            raise ValueError(f"Callback URL target IP is not a public routable address: {ip_str}")
+    if _is_non_public_ip_object(ip_obj):
         raise ValueError(f"Callback URL target IP is not a public routable address: {ip_str}")
 
 
-def validate_callback_url(callback_url: str, *, resolve_dns: bool = False) -> str:
-    """
-    校验 Webhook 回调 URL 的安全性以防范 SSRF：
-    1. 仅允许 http / https 协议，且不得包含内嵌认证凭据；
-    2. 拒绝 localhost / .local / .internal 等内部主机名及私网、回环、链路本地（如云实例元数据网段）字面量 IP；
-    3. 当 resolve_dns=True（实际发起请求前）时，解析全部 DNS 记录并验证所有目标 IP 均为公网地址。
-    """
-    if not isinstance(callback_url, str) or not callback_url.strip():
-        raise ValueError("callback_url must be a non-empty URL string")
-
-    cleaned = callback_url.strip()
-    parsed = urlparse(cleaned)
-    if parsed.scheme.lower() not in ("http", "https"):
+def _validate_url_scheme_and_auth(parsed: Any) -> Tuple[str, Optional[int]]:
+    """校验回调 URL 的协议、认证凭据及端口合法性。"""
+    scheme = parsed.scheme.lower()
+    if scheme not in ("http", "https"):
         raise ValueError("callback_url scheme must be http or https")
     if parsed.username is not None or parsed.password is not None or "@" in (parsed.netloc or ""):
         raise ValueError("callback_url must not contain embedded credentials")
-
     try:
         explicit_port = parsed.port
     except ValueError as e:
         raise ValueError(f"callback_url contains an invalid port: {e}") from e
     if explicit_port is not None and not (1 <= explicit_port <= 65535):
         raise ValueError(f"callback_url port out of valid range: {explicit_port}")
+    return scheme, explicit_port
+
+
+def _parse_and_validate_callback_parts(
+    callback_url: str,
+    *,
+    ip_validator: Callable[[str], None] = _assert_public_ip,
+) -> Tuple[str, Any, str, Optional[int], str, bool]:
+    """解析回调 URL 并执行静态协议、端口、凭据及字面量 IP 校验。"""
+    if not isinstance(callback_url, str) or not callback_url.strip():
+        raise ValueError("callback_url must be a non-empty URL string")
+
+    cleaned = callback_url.strip()
+    parsed = urlparse(cleaned)
+    scheme, explicit_port = _validate_url_scheme_and_auth(parsed)
 
     hostname = (parsed.hostname or "").strip().lower().rstrip(".")
     if not hostname:
@@ -85,25 +134,140 @@ def validate_callback_url(callback_url: str, *, resolve_dns: bool = False) -> st
         raise ValueError(f"callback_url hostname is not permitted: {hostname}")
 
     try:
-        _assert_public_ip(hostname)
+        ipaddress.ip_address(hostname.split("%", 1)[0])
         is_literal_ip = True
-    except ValueError as e:
-        if "not a public routable address" in str(e):
-            raise
+    except ValueError:
         is_literal_ip = False
 
-    if resolve_dns and not is_literal_ip:
-        port = explicit_port or (443 if parsed.scheme.lower() == "https" else 80)
-        try:
-            addr_infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
-        except socket.gaierror as e:
-            raise ValueError(f"Failed to resolve callback_url hostname '{hostname}': {e}") from e
-        if not addr_infos:
-            raise ValueError(f"No DNS records resolved for callback_url hostname '{hostname}'")
-        for info_item in addr_infos:
-            resolved_ip = info_item[4][0]
-            _assert_public_ip(resolved_ip)
+    if is_literal_ip:
+        ip_validator(hostname)
 
+    return cleaned, parsed, scheme, explicit_port, hostname, is_literal_ip
+
+
+def _resolve_public_ips_with_guard(
+    hostname: str,
+    port: int,
+    *,
+    timeout: float = _DNS_RESOLVE_TIMEOUT_SECONDS,
+    semaphore: BoundedSemaphore = _DNS_CONCURRENCY_SEMAPHORE,
+    ip_validator: Callable[[str], None] = _assert_public_ip,
+) -> List[str]:
+    """在并发信号量与超时限制下执行 DNS 解析，并校验全部记录均为公网 IP。"""
+    if timeout <= 0:
+        raise ValueError("dns_timeout must be positive")
+    if not semaphore.acquire(timeout=timeout):
+        raise ValueError(f"DNS resolution concurrency limit exceeded for callback_url hostname '{hostname}'")
+
+    try:
+        future = _DNS_EXECUTOR.submit(lambda: socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM))
+    except Exception:
+        semaphore.release()
+        raise
+
+    # 仅在底层 DNS 查询真正结束（或未启动即取消）后释放并发信号量，
+    # 防止慢速/阻塞的 getaddrinfo 超时后提前释放配额导致在途查询数突破上限。
+    future.add_done_callback(lambda _f: semaphore.release())
+
+    try:
+        addr_infos = future.result(timeout=timeout)
+    except FuturesTimeoutError as e:
+        future.cancel()
+        raise ValueError(f"DNS resolution timed out for callback_url hostname '{hostname}'") from e
+    except socket.gaierror as e:
+        raise ValueError(f"Failed to resolve callback_url hostname '{hostname}': {e}") from e
+
+    if not addr_infos:
+        raise ValueError(f"No DNS records resolved for callback_url hostname '{hostname}'")
+
+    validated_ips: List[str] = []
+    for info_item in addr_infos:
+        resolved_ip = info_item[4][0]
+        ip_validator(resolved_ip)
+        normalized_ip = str(ipaddress.ip_address(resolved_ip))
+        if normalized_ip not in validated_ips:
+            validated_ips.append(normalized_ip)
+
+    return validated_ips
+
+
+def _format_netloc_host(host_str: str) -> str:
+    """为 IPv6 字面量添加方括号以构造合法的 URL netloc 或 Host 头。"""
+    return f"[{host_str}]" if ":" in host_str else host_str
+
+
+def _format_host_with_port(host_base: str, explicit_port: Optional[int]) -> str:
+    """按需拼接显式端口。"""
+    return f"{host_base}:{explicit_port}" if explicit_port is not None else host_base
+
+
+def resolve_and_pin_callback_target(
+    callback_url: str,
+    *,
+    dns_timeout: float = _DNS_RESOLVE_TIMEOUT_SECONDS,
+    semaphore: BoundedSemaphore = _DNS_CONCURRENCY_SEMAPHORE,
+    ip_validator: Callable[[str], None] = _assert_public_ip,
+) -> PinnedCallbackTarget:
+    """
+    解析并固定回调 URL 的实际 TCP 目标 IP，防范 DNS Rebinding：
+    - 将请求 URL 的连接主机固定为已验证的公网 IP 字面量；
+    - 保留原始域名用于 HTTP Host 请求头；
+    - 在 HTTPS 域名场景通过 extensions['sni_hostname'] 保留 TLS SNI 与证书主机名校验。
+    """
+    cleaned, parsed, scheme, explicit_port, hostname, is_literal_ip = _parse_and_validate_callback_parts(
+        callback_url, ip_validator=ip_validator
+    )
+    port = explicit_port or (443 if scheme == "https" else 80)
+
+    if is_literal_ip:
+        pinned_ip = str(ipaddress.ip_address(hostname))
+        ascii_host = pinned_ip
+        header_host_base = _format_netloc_host(ascii_host)
+    else:
+        try:
+            ascii_host = hostname.encode("idna").decode("ascii")
+        except UnicodeError as e:
+            raise ValueError(f"Invalid IDNA hostname in callback_url: {hostname!r}") from e
+        validated_ips = _resolve_public_ips_with_guard(
+            ascii_host,
+            port,
+            timeout=dns_timeout,
+            semaphore=semaphore,
+            ip_validator=ip_validator,
+        )
+        pinned_ip = validated_ips[0]
+        header_host_base = ascii_host
+
+    pinned_netloc = _format_host_with_port(_format_netloc_host(pinned_ip), explicit_port)
+    pinned_url = urlunparse((scheme, pinned_netloc, parsed.path or "", parsed.params or "", parsed.query or "", ""))
+    host_header = _format_host_with_port(header_host_base, explicit_port)
+    extensions: Dict[str, Any] = {"sni_hostname": ascii_host} if (scheme == "https" and not is_literal_ip) else {}
+
+    return PinnedCallbackTarget(
+        original_url=cleaned,
+        pinned_url=pinned_url,
+        pinned_ip=pinned_ip,
+        hostname=ascii_host,
+        headers={"Host": host_header},
+        extensions=extensions,
+    )
+
+
+def validate_callback_url(
+    callback_url: str,
+    *,
+    resolve_dns: bool = False,
+    dns_timeout: float = _DNS_RESOLVE_TIMEOUT_SECONDS,
+) -> str:
+    """
+    校验 Webhook 回调 URL 的安全性以防范 SSRF：
+    1. 仅允许 http / https 协议，且不得包含内嵌认证凭据；
+    2. 拒绝 localhost / .local / .internal 等内部主机名及私网、回环、链路本地字面量 IP；
+    3. 当 resolve_dns=True 时，在超时与并发控制下解析全部 DNS 记录并验证所有目标 IP 均为公网地址。
+    """
+    if resolve_dns:
+        return resolve_and_pin_callback_target(callback_url, dns_timeout=dns_timeout).original_url
+    cleaned, *_ = _parse_and_validate_callback_parts(callback_url)
     return cleaned
 
 
@@ -470,20 +634,41 @@ class TaskLifecycleService:
         self._callback_tasks.add(task_ref)
         task_ref.add_done_callback(self._callback_tasks.discard)
 
-    async def _trigger_callback_async(self, task_id: str, callback_url: str, result: Dict[str, Any]) -> None:
-        """异步触发HTTP回调"""
+    async def _trigger_callback_async(
+        self,
+        task_id: str,
+        callback_url: str,
+        result: Dict[str, Any],
+        *,
+        ssl_verify: Any = True,
+        ip_validator: Callable[[str], None] = _assert_public_ip,
+    ) -> None:
+        """异步触发HTTP回调（将实际TCP连接固定到已验证IP，保留原始Host请求头与HTTPS SNI）"""
         try:
-            validated_url = await asyncio.to_thread(
-                validate_callback_url, callback_url, resolve_dns=True
+            pinned_target = await asyncio.to_thread(
+                functools.partial(
+                    resolve_and_pin_callback_target,
+                    callback_url,
+                    ip_validator=ip_validator,
+                )
             )
             import httpx
-            async with httpx.AsyncClient(follow_redirects=False, trust_env=False) as client:
-                await client.post(
-                    validated_url,
-                    json={"task_id": task_id, **result},
-                    timeout=30
+            client_kwargs: Dict[str, Any] = {"follow_redirects": False, "trust_env": False}
+            if ssl_verify is not True:
+                client_kwargs["verify"] = ssl_verify
+            async with httpx.AsyncClient(**client_kwargs) as client:
+                post_kwargs: Dict[str, Any] = {
+                    "json": {"task_id": task_id, **result},
+                    "headers": pinned_target.headers,
+                    "timeout": 30,
+                }
+                if pinned_target.extensions:
+                    post_kwargs["extensions"] = pinned_target.extensions
+                await client.post(pinned_target.pinned_url, **post_kwargs)
+                debug(
+                    f"回调触发成功: {task_id} -> {pinned_target.original_url} "
+                    f"(pinned_ip={pinned_target.pinned_ip})"
                 )
-                debug(f"回调触发成功: {task_id} -> {validated_url}")
         except Exception as e:
             error(f"回调触发失败: {task_id}, error={e}")
 

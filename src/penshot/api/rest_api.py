@@ -18,7 +18,14 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from penshot.config.config import settings
-from penshot.config.config_models import EmbeddingBaseConfig, LLMBaseConfig
+from penshot.config.config_models import (
+    EmbeddingBaseConfig,
+    EmbeddingConfig,
+    ImageBaseConfig,
+    ImageConfig,
+    LLMBaseConfig,
+    LLMConfig,
+)
 from penshot.logger import info, error, log_with_context
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
@@ -38,6 +45,27 @@ def _sanitize_request_shot_config(cfg: Optional[ShotConfig]) -> Optional[ShotCon
         cfg.checkpoint_dir = settings.get_data_paths().get("data_checkpoint")
         cfg.postgres_uri = None
     return cfg
+
+
+def _validate_batch_provider_section(
+    section: Any,
+    base_cls: type[BaseModel],
+    group_cls: type[BaseModel],
+) -> None:
+    """校验批量请求配置中的模型提供商子项（同时覆盖平铺配置与 default/fallback 嵌套结构）。"""
+    if section is None:
+        return
+    if isinstance(section, BaseModel):
+        section = section.model_dump()
+    if not isinstance(section, dict):
+        raise ValueError(f"Provider configuration must be a mapping, got {type(section).__name__}")
+    if "default" in section or "fallback" in section:
+        nested = {k: section[k] for k in ("default", "fallback") if k in section}
+        group_cls(**nested)
+        if "api_key" in section:
+            base_cls(api_key=section["api_key"])
+        return
+    base_cls(**section)
 
 
 # ============================================================================
@@ -156,10 +184,9 @@ class BatchProcessRequest(BaseModel):
             cleaned = dict(v)
             cleaned.pop("checkpoint_dir", None)
             cleaned.pop("postgres_uri", None)
-            if isinstance(cleaned.get("llm"), dict):
-                LLMBaseConfig(**cleaned["llm"])
-            if isinstance(cleaned.get("embed"), dict):
-                EmbeddingBaseConfig(**cleaned["embed"])
+            _validate_batch_provider_section(cleaned.get("llm"), LLMBaseConfig, LLMConfig)
+            _validate_batch_provider_section(cleaned.get("embed"), EmbeddingBaseConfig, EmbeddingConfig)
+            _validate_batch_provider_section(cleaned.get("image"), ImageBaseConfig, ImageConfig)
             return cleaned
         return v
 

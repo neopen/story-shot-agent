@@ -17,9 +17,20 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from penshot.config.config_loader import ConfigLoader
-from penshot.config.config_models import (AppConfig, APIConfig, LLMConfig, EmbeddingConfig, ImageConfig,
-                                          PathsConfig, StoryboardConfig, LLMBaseConfig, EmbeddingBaseConfig, RetrieverConfig,
-                                          ImageBaseConfig, trusted_env_expansion)
+from penshot.config.config_models import (
+    APIConfig,
+    AppConfig,
+    EmbeddingBaseConfig,
+    EmbeddingConfig,
+    ImageBaseConfig,
+    ImageConfig,
+    LLMBaseConfig,
+    LLMConfig,
+    PathsConfig,
+    RetrieverConfig,
+    StoryboardConfig,
+)
+from penshot.config.security import trusted_env_expansion
 from penshot.logger import info, warning
 from penshot.utils.dotenv_loader import DotEnvLoader
 from penshot.utils.path_utils import PathResolver
