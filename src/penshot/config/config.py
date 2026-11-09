@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 from penshot.config.config_loader import ConfigLoader
 from penshot.config.config_models import (AppConfig, APIConfig, LLMConfig, EmbeddingConfig, ImageConfig,
                                           PathsConfig, StoryboardConfig, LLMBaseConfig, EmbeddingBaseConfig, RetrieverConfig,
-                                          ImageBaseConfig)
+                                          ImageBaseConfig, trusted_env_expansion)
 from penshot.logger import info, warning
 from penshot.utils.dotenv_loader import DotEnvLoader
 from penshot.utils.path_utils import PathResolver
@@ -37,6 +37,10 @@ DotEnvLoader().load()
 # ==================== 主配置类 ====================
 class Settings(BaseSettings):
     """主配置 - 优先级: 环境变量 > YAML > 模型默认值"""
+
+    def __init__(self, **values: Any):
+        with trusted_env_expansion():
+            super().__init__(**values)
 
     # 基础配置
     app: AppConfig = Field(default_factory=AppConfig)

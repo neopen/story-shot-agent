@@ -12,13 +12,16 @@ See LICENSE File For Details.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import random
+import socket
 from dataclasses import is_dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from threading import RLock
 from typing import Optional, Dict, Any, List, Tuple
+from urllib.parse import urlparse
 
 from penshot.logger import info, error, warning, debug
 from penshot.neopen.agent.base_models import VideoStyle
@@ -29,6 +32,79 @@ from penshot.utils.hash_utils import text_to_id
 from penshot.utils.obj_utils import obj_to_dict
 from .task_repository import TaskRepository
 from .workflow_registry import WorkflowRegistry
+
+_FORBIDDEN_HOSTNAMES = {"localhost", "localhost.localdomain"}
+_FORBIDDEN_HOST_SUFFIXES = (".localhost", ".local", ".internal")
+
+
+def _assert_public_ip(ip_str: str) -> None:
+    """校验 IP 地址为全局公网可达地址，拒绝回环、私网、链路本地、多播与保留地址。"""
+    ip_obj = ipaddress.ip_address(ip_str)
+    if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped is not None:
+        ip_obj = ip_obj.ipv4_mapped
+    if (
+        ip_obj.is_private
+        or ip_obj.is_loopback
+        or ip_obj.is_link_local
+        or ip_obj.is_multicast
+        or ip_obj.is_reserved
+        or ip_obj.is_unspecified
+        or not ip_obj.is_global
+    ):
+        raise ValueError(f"Callback URL target IP is not a public routable address: {ip_str}")
+
+
+def validate_callback_url(callback_url: str, *, resolve_dns: bool = False) -> str:
+    """
+    校验 Webhook 回调 URL 的安全性以防范 SSRF：
+    1. 仅允许 http / https 协议，且不得包含内嵌认证凭据；
+    2. 拒绝 localhost / .local / .internal 等内部主机名及私网、回环、链路本地（如云实例元数据网段）字面量 IP；
+    3. 当 resolve_dns=True（实际发起请求前）时，解析全部 DNS 记录并验证所有目标 IP 均为公网地址。
+    """
+    if not isinstance(callback_url, str) or not callback_url.strip():
+        raise ValueError("callback_url must be a non-empty URL string")
+
+    cleaned = callback_url.strip()
+    parsed = urlparse(cleaned)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError("callback_url scheme must be http or https")
+    if parsed.username is not None or parsed.password is not None or "@" in (parsed.netloc or ""):
+        raise ValueError("callback_url must not contain embedded credentials")
+
+    try:
+        explicit_port = parsed.port
+    except ValueError as e:
+        raise ValueError(f"callback_url contains an invalid port: {e}") from e
+    if explicit_port is not None and not (1 <= explicit_port <= 65535):
+        raise ValueError(f"callback_url port out of valid range: {explicit_port}")
+
+    hostname = (parsed.hostname or "").strip().lower().rstrip(".")
+    if not hostname:
+        raise ValueError("callback_url must include a valid hostname")
+    if hostname in _FORBIDDEN_HOSTNAMES or hostname.endswith(_FORBIDDEN_HOST_SUFFIXES):
+        raise ValueError(f"callback_url hostname is not permitted: {hostname}")
+
+    try:
+        _assert_public_ip(hostname)
+        is_literal_ip = True
+    except ValueError as e:
+        if "not a public routable address" in str(e):
+            raise
+        is_literal_ip = False
+
+    if resolve_dns and not is_literal_ip:
+        port = explicit_port or (443 if parsed.scheme.lower() == "https" else 80)
+        try:
+            addr_infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+        except socket.gaierror as e:
+            raise ValueError(f"Failed to resolve callback_url hostname '{hostname}': {e}") from e
+        if not addr_infos:
+            raise ValueError(f"No DNS records resolved for callback_url hostname '{hostname}'")
+        for info_item in addr_infos:
+            resolved_ip = info_item[4][0]
+            _assert_public_ip(resolved_ip)
+
+    return cleaned
 
 
 class TaskLifecycleService:
@@ -397,14 +473,17 @@ class TaskLifecycleService:
     async def _trigger_callback_async(self, task_id: str, callback_url: str, result: Dict[str, Any]) -> None:
         """异步触发HTTP回调"""
         try:
+            validated_url = await asyncio.to_thread(
+                validate_callback_url, callback_url, resolve_dns=True
+            )
             import httpx
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=False, trust_env=False) as client:
                 await client.post(
-                    callback_url,
+                    validated_url,
                     json={"task_id": task_id, **result},
                     timeout=30
                 )
-                debug(f"回调触发成功: {task_id} -> {callback_url}")
+                debug(f"回调触发成功: {task_id} -> {validated_url}")
         except Exception as e:
             error(f"回调触发失败: {task_id}, error={e}")
 
@@ -590,6 +669,7 @@ class TaskLifecycleService:
 
     def set_callback(self, task_id: str, callback_url: str) -> bool:
         """设置任务回调URL"""
+        callback_url = validate_callback_url(callback_url)
 
         def updater(rec: Dict[str, Any]) -> None:
             rec.setdefault("callbacks", [])

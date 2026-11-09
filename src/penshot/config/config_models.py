@@ -10,11 +10,42 @@ See LICENSE File For Details.
 """
 import os
 import random
-from typing import Any, List, Literal, Optional
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Iterator, List, Literal, Optional
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from penshot.neopen.agent.base_models import VideoStyle
+
+_ALLOW_ENV_EXPANSION: ContextVar[bool] = ContextVar("_ALLOW_ENV_EXPANSION", default=False)
+
+
+@contextmanager
+def trusted_env_expansion() -> Iterator[None]:
+    """仅在加载受信任的本地配置（settings.yaml / .env）时允许展开环境变量引用。"""
+    token = _ALLOW_ENV_EXPANSION.set(True)
+    try:
+        yield
+    finally:
+        _ALLOW_ENV_EXPANSION.reset(token)
+
+
+def _resolve_api_key_value(v: Any) -> Any:
+    """校验并按信任上下文解析 API 密钥，拒绝在非受信请求负载中展开宿主机环境变量。"""
+    if isinstance(v, str) and v.strip().startswith("$"):
+        raw = v.strip()
+        if not _ALLOW_ENV_EXPANSION.get():
+            raise ValueError(
+                "Environment variable expansion in api_key is only allowed in trusted local configuration"
+            )
+        if raw.startswith("${") and raw.endswith("}"):
+            inner = raw[2:-1]
+            env_var, _, default_val = inner.partition(":")
+            return os.getenv(env_var.strip(), default_val)
+        env_var = raw[1:]
+        return os.getenv(env_var, "")
+    return v
 
 
 class LLMBaseConfig(BaseModel):
@@ -40,11 +71,8 @@ class LLMBaseConfig(BaseModel):
     @field_validator("api_key", mode="before")
     @classmethod
     def validate_api_key(cls, v):
-        """API密钥验证"""
-        if isinstance(v, str) and v.startswith("$"):
-            env_var = v[2:-1] if v.startswith("${") else v[1:]
-            return os.getenv(env_var, "")
-        return v
+        """API密钥验证（仅在受信本地配置加载时允许 ${ENV_VAR} 引用）"""
+        return _resolve_api_key_value(v)
 
 
 class ImageBaseConfig(BaseModel):
@@ -68,11 +96,8 @@ class ImageBaseConfig(BaseModel):
     @field_validator("api_key", mode="before")
     @classmethod
     def validate_api_key(cls, v):
-        """API密钥验证（支持 ${ENV_VAR} 引用）"""
-        if isinstance(v, str) and v.startswith("$"):
-            env_var = v[2:-1] if v.startswith("${") else v[1:]
-            return os.getenv(env_var, "")
-        return v
+        """API密钥验证（仅在受信本地配置加载时允许 ${ENV_VAR} 引用）"""
+        return _resolve_api_key_value(v)
 
 
 class ImageConfig(BaseModel):
@@ -101,11 +126,8 @@ class EmbeddingBaseConfig(BaseModel):
     @field_validator("api_key", mode="before")
     @classmethod
     def validate_api_key(cls, v):
-        """API密钥验证"""
-        if isinstance(v, str) and v.startswith("$"):
-            env_var = v[2:-1] if v.startswith("${") else v[1:]
-            return os.getenv(env_var, "")
-        return v
+        """API密钥验证（仅在受信本地配置加载时允许 ${ENV_VAR} 引用）"""
+        return _resolve_api_key_value(v)
 
 
 class LLMConfig(BaseModel):
