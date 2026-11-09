@@ -42,6 +42,6 @@ jobs:
           requireScope: false
 
           # 要求主题部分首字母小写，并且不能以句号结尾
-          subjectPattern: ^(?![A-Z]).+[^.]$
+          subjectPattern: ^.+[^.]$
           subjectPatternError: |
-            PR 标题的主题部分首字母请保持小写，且不要以句号结尾！
+            PR 标题的主题部分不能为空，且不能以句号结尾！

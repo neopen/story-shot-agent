@@ -187,6 +187,7 @@ class ContinuityRepairGenerator:
             )
         return "在场景切换处插入过渡镜头（如空镜、角色反应镜头），并使用与相邻镜头不同的景别"
 
+
     def _repair_scene_inconsistent(self, issue: ContinuityIssue) -> str:
         return "统一场景地点与时间描述，按契约场景锚点修正该片段"
 

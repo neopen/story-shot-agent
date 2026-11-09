@@ -43,8 +43,10 @@ class InputState(BaseModel):
     task_id: str = str(uuid.uuid4())
     timeout: int = 600
 
+
     # 下游回填的资产清单（M0.4.2）：允许调用方在提交任务时带回真实 asset_ref
     asset_manifest: Optional[Dict[str, Any]] = None
+
 
     @field_validator("raw_script")
     def script_not_empty(cls, v):
