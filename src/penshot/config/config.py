@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 from penshot.config.config_loader import ConfigLoader
 from penshot.config.config_models import (AppConfig, APIConfig, LLMConfig, EmbeddingConfig, ImageConfig,
                                           PathsConfig, StoryboardConfig, LLMBaseConfig, EmbeddingBaseConfig, RetrieverConfig,
-                                          ImageBaseConfig)
+                                          ImageBaseConfig, RoutingConfig)
 from penshot.logger import info, warning
 from penshot.utils.dotenv_loader import DotEnvLoader
 from penshot.utils.path_utils import PathResolver
@@ -52,6 +52,8 @@ class Settings(BaseSettings):
 
     # 业务配置
     storyboard: StoryboardConfig = Field(default_factory=StoryboardConfig)
+    # 模型路由配置（M0.4.3）
+    routing: RoutingConfig = Field(default_factory=RoutingConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
 
     model_config = SettingsConfigDict(

@@ -81,6 +81,44 @@ image:
     output_dir: ""
     enabled: false
 
+#################### 模型路由配置（M0.4.3） #####################
+# 按规则为每个片段选择目标视频模型与生成模式，规则按 priority 从大到小匹配。
+routing:
+  enabled: true
+  default_model: "kling_3"
+  rules:
+    - name: "critical_text"
+      priority: 100
+      conditions:
+        has_critical_text: true
+      model: "kling_3"
+      mode: "image_to_video"
+    - name: "high_consistency"
+      priority: 90
+      conditions:
+        character_consistency_need: "high"
+      model: "kling_3"
+      mode: "image_to_video"
+    - name: "complex_motion"
+      priority: 80
+      conditions:
+        motion_complexity: "high"
+      model: "sora_2"
+      mode: "text_to_video"
+    - name: "anime_style"
+      priority: 70
+      conditions:
+        style_bias: "anime"
+      model: "kling_3"
+      mode: "text_to_video"
+    - name: "cinematic_long_take"
+      priority: 60
+      conditions:
+        style_bias: "cinematic"
+        min_duration: 8.0
+      model: "runway_gen4"
+      mode: "text_to_video"
+
 #################### 分镜配置 #####################
 storyboard:
   generation:

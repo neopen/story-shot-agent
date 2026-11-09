@@ -12,6 +12,7 @@ See LICENSE File For Details.
 from typing import Optional, Dict, Any
 
 from penshot.neopen.agent.prompt_converter.base_prompt_converter import BasePromptConverter
+from penshot.neopen.agent.prompt_converter.camera_builder import build_camera_control
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions, AIVideoPrompt
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
@@ -109,7 +110,8 @@ class TemplatePromptConverter(BasePromptConverter):
             main_character=character,
             model=self.config.video_model,
             style=style_hint,
-            requires_special_attention=fragment.requires_special_attention
+            requires_special_attention=fragment.requires_special_attention,
+            camera=build_camera_control(fragment.description, fragment.shot_type),
         )
 
     def _infer_shot_type(self, description: str) -> ShotType:

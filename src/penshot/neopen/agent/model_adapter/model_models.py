@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from penshot.neopen.agent.prompt_converter.prompt_converter_models import CameraControl
 from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
 
 # 提示词适配/路由契约版本号；下游据此判断字段兼容性
@@ -28,6 +29,45 @@ class AestheticBias(str, Enum):
     CINEMATIC = "cinematic"  # 电影感
     ANIME = "anime"  # 二次元/动画
     REALISTIC = "realistic"  # 写实
+
+
+class MotionComplexity(str, Enum):
+    """动作复杂度（路由特征）"""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ConsistencyNeed(str, Enum):
+    """人物一致性需求（路由特征）"""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class RouteFeatures(BaseModel):
+    """片段路由特征；由确定性规则抽取，供 model_router 匹配"""
+
+    has_critical_text: bool = Field(default=False, description="是否含关键文字")
+    motion_complexity: MotionComplexity = Field(
+        default=MotionComplexity.MEDIUM, description="动作复杂度"
+    )
+    character_consistency_need: ConsistencyNeed = Field(
+        default=ConsistencyNeed.MEDIUM, description="人物一致性需求"
+    )
+    style_bias: AestheticBias = Field(
+        default=AestheticBias.CINEMATIC, description="风格倾向"
+    )
+    duration: float = Field(default=5.0, ge=0.5, description="片段时长（秒）")
+    needs_first_last_frame: bool = Field(
+        default=False, description="是否需要首尾帧控制"
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典表示"""
+        return self.model_dump()
 
 
 class RouteMode(str, Enum):
@@ -103,6 +143,9 @@ class AdaptedPromptPackage(BaseModel):
         default=None, description="风格描述（模型美学偏好兜底）"
     )
     camera: Optional[str] = Field(default=None, description="模型专属相机表述")
+    camera_control: Optional[CameraControl] = Field(
+        default=None, description="结构化相机控制参数（目标模型支持时直出）"
+    )
     mode: RouteMode = Field(
         default=RouteMode.TEXT_TO_VIDEO, description="生成模式（文生视频/图生视频）"
     )

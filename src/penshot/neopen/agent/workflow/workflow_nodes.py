@@ -66,14 +66,13 @@ from penshot.neopen.task.task_models import TaskStage, TaskStatus
 from penshot.neopen.tools.result_storage_tool import create_result_storage
 from penshot.utils.log_utils import print_log_exception
 from penshot.neopen.agent.model_adapter import (
-    RouteDecision,
-    RoutePlan,
     adapt_instructions,
     apply_image_to_video_routing,
-    get_capability,
     resolve_model_name,
 )
+from penshot.neopen.agent.model_adapter.model_router import build_route_plan
 from penshot.neopen.agent.asset_generator import AssetGeneratorAgent
+from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
 
 
 class WorkflowNodes:
@@ -560,6 +559,31 @@ class WorkflowNodes:
 
         return state
 
+    @staticmethod
+    def _clamp_fragments_timeline(
+        fragments: List[VideoFragment], max_duration: float
+    ) -> bool:
+        """收敛超长片段时长并按实际时长重建时间轴。
+
+        只截断时长而不重排 start_time 会凭空产生时间间隙，导致连续性检查
+        反复报 time_gap 且修复无效。
+
+        Returns:
+            是否发生了时长调整
+        """
+        adjusted = False
+        for fragment in fragments:
+            if fragment.duration > max_duration:
+                fragment.duration = max_duration
+                adjusted = True
+
+        if adjusted:
+            current_time = 0.0
+            for fragment in fragments:
+                fragment.start_time = round(current_time, 2)
+                current_time += fragment.duration
+        return adjusted
+
     # ======================== 视频分割节点 ========================
 
     def fragment_for_ai_node(self, state: WorkflowState) -> WorkflowState:
@@ -625,12 +649,11 @@ class WorkflowNodes:
                 parsed_script=state.domain.parsed_script,
             )
 
-            # 自动调整超长片段（软限制）
-            max_duration = state.config.max_fragment_duration
-            for fragment in fragment_sequence.fragments:
-                if fragment.duration > max_duration:
-                    fragment.duration = max_duration
-                    info("已自动调整超长片段时长")
+            # 自动调整超长片段（软限制），并重建时间轴，避免截断后产生间隙
+            if self._clamp_fragments_timeline(
+                fragment_sequence.fragments, state.config.max_fragment_duration
+            ):
+                info("已自动调整超长片段时长")
 
             # 更新状态：分段完成
             self._update_task_progress(
@@ -854,51 +877,11 @@ class WorkflowNodes:
             if styles:
                 debug(f"风格分布: {styles}")
 
-            # 4.5 目标模型适配（M0.4.0 内联）：把通用提示词转换为目标模型专属提示词包
-            try:
-                target_model = instructions.metadata.get("video_model")
-                adapted_packages = adapt_instructions(instructions, target_model)
-                resolved_model = resolve_model_name(target_model)
-
-                # 4.6 图生视频优先路由（M0.4.2）：critical_text / high_consistency
-                # 片段标注两段式「文生图 -> 图生视频」，并按 asset_id 挂载资产引用
-                two_stage_count = apply_image_to_video_routing(
-                    adapted_packages,
-                    instructions,
-                    state.domain.contract,
-                    state.domain.asset_manifest,
-                )
-
-                plan = RoutePlan(
-                    source_model=str(target_model or ""),
-                    decisions=[
-                        RouteDecision(
-                            fragment_id=pkg.fragment_id,
-                            target_model=pkg.target_model,
-                            reason=(
-                                "m0.4.2_image_to_video"
-                                if pkg.mode.value == "image_to_video"
-                                else "m0.4.0_inline"
-                            ),
-                            mode=pkg.mode,
-                            asset_ref=pkg.asset_ref,
-                            capability=get_capability(pkg.target_model),
-                        )
-                        for pkg in adapted_packages
-                    ],
-                    adapted_packages=adapted_packages,
-                )
-                instructions.route_plan = plan.model_dump(mode="json")
-
-                # 指令集内嵌资产计划与回填清单，下游可只消费 instructions
-                instructions.asset_plan = state.domain.asset_plan
-                instructions.asset_manifest = state.domain.asset_manifest
-                info(
-                    f"目标模型适配完成: 模型={resolved_model}, 适配片段数={len(adapted_packages)}, "
-                    f"图生视频优先片段数={two_stage_count}"
-                )
-            except Exception as e:
-                warning(f"目标模型适配失败（不影响主流程）: {e}")
+            # 4.5 目标模型路由（M0.4.3）：由独立 ROUTE_MODEL 节点执行，
+            # 这里只清理上一轮路由结果，避免修复轮次复用过期计划
+            instructions.route_plan = None
+            instructions.asset_plan = state.domain.asset_plan
+            instructions.asset_manifest = state.domain.asset_manifest
 
             # 5. 保存结果
             self.storage.save_obj_result(
@@ -946,6 +929,59 @@ class WorkflowNodes:
             state.execution.current_node = PipelineNode.CONVERT_PROMPT
             state.execution.current_stage = AgentStage.ERROR_HANDLER
             state.errors.error_source = PipelineNode.CONVERT_PROMPT
+
+        return state
+
+    def route_model_node(self, state: WorkflowState) -> WorkflowState:
+        """目标模型路由节点（M0.4.3）
+
+        在提示词生成之后独立执行「目标模型适配 -> 规则路由 -> 路由计划落盘」，
+        使提示词重建与路由决策解耦；路由失败不阻断主流程。
+        """
+        instructions = state.domain.instructions
+        try:
+            if not instructions or not instructions.fragments:
+                raise ValueError("提示词指令为空，无法执行目标模型路由")
+
+            target_model = instructions.metadata.get("video_model")
+            adapted_packages = adapt_instructions(instructions, target_model)
+
+            # 图生视频优先（M0.4.2）：先挂载资产引用，再由规则路由覆盖模型与生成模式
+            two_stage_count = apply_image_to_video_routing(
+                adapted_packages,
+                instructions,
+                state.domain.contract,
+                state.domain.asset_manifest,
+            )
+
+            plan = build_route_plan(
+                adapted_packages, instructions, state.domain.contract
+            )
+            plan.adapted_packages = adapted_packages
+            instructions.route_plan = plan.model_dump(mode="json")
+            instructions.asset_plan = state.domain.asset_plan
+            instructions.asset_manifest = state.domain.asset_manifest
+
+            self.storage.save_obj_result(
+                state.input.script_id,
+                state.input.task_id,
+                instructions,
+                "prompt_converter_result.json",
+            )
+
+            resolved_model = resolve_model_name(target_model)
+            info(
+                f"目标模型路由完成: 模型={resolved_model}, 路由片段数={len(plan.decisions)}, "
+                f"图生视频优先片段数={two_stage_count}"
+            )
+        except Exception as e:
+            # 路由失败不阻断主流程，route_plan 保持为空，由决策层记录告警
+            warning(f"目标模型路由失败（不影响主流程）: {e}")
+            if instructions is not None:
+                instructions.route_plan = None
+        finally:
+            state.execution.current_node = PipelineNode.ROUTE_MODEL
+            state.execution.current_stage = AgentStage.CONVERTER
 
         return state
 
@@ -1425,7 +1461,6 @@ class WorkflowNodes:
                 state.domain.continuity_retry_count
                 < state.domain.max_continuity_retries
             ):
-
                 # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
                 repairable_by_stage = {
                     stage: [i for i in issues if getattr(i, "auto_fixable", True)]
@@ -1447,7 +1482,6 @@ class WorkflowNodes:
                     state.domain.contract_violations
                 )
                 repair_entries = []
-
                 for stage, issues in repairable_by_stage.items():
                     repair_params = self._create_continuity_repair_params(
                         issues,
@@ -1521,7 +1555,7 @@ class WorkflowNodes:
                     ),
                 )
                 state.execution.needs_human_review = True
-                state.errors.error_source = PipelineNode.CONTINUITY_GUARDIAN
+                state.errors.error_source = PipelineNode.CONTINUITY_CHECK
                 state.execution.current_stage = AgentStage.CONTINUITY
 
         except Exception as e:

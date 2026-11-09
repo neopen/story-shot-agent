@@ -250,6 +250,38 @@ class AIAudioPrompt(BaseModel):
         return self.model_type in [AudioModelType.AUDIOLDM_3]
 
 
+class CameraMotion(str, Enum):
+    """运镜方式（结构化相机控制）"""
+
+    STATIC = "static"
+    PAN = "pan"
+    TILT = "tilt"
+    DOLLY = "dolly"
+    ZOOM = "zoom"
+    HANDHELD = "handheld"
+    CRANE = "crane"
+    ORBIT = "orbit"
+
+
+class CameraControl(BaseModel):
+    """结构化相机控制参数，供支持运镜的目标模型直接消费"""
+
+    shot_type: str = Field(default="medium", description="景别")
+    motion: CameraMotion = Field(
+        default=CameraMotion.STATIC, description="运镜方式"
+    )
+    intensity: float = Field(default=0.3, ge=0.0, le=1.0, description="运镜强度")
+    rack_focus: bool = Field(default=False, description="是否使用移焦")
+    fps: int = Field(default=24, ge=1, le=120, description="帧率")
+    shutter_angle: float = Field(
+        default=180.0, ge=0.0, le=360.0, description="快门角度"
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典表示"""
+        return self.model_dump()
+
+
 class AIVideoPrompt(BaseModel):
     """MVP AI视频提示词模型"""
 
@@ -286,6 +318,11 @@ class AIVideoPrompt(BaseModel):
 
     audio: Optional[AIAudioPrompt] = Field(
         default=None, description="关联的音频提示词（如果有）"
+    )
+
+    # 结构化相机控制（M0.4.3）：由分镜景别与动作描述提取，供支持运镜的模型消费
+    camera: Optional[CameraControl] = Field(
+        default=None, description="结构化相机控制参数"
     )
 
     def to_dict(self) -> dict:
@@ -343,7 +380,7 @@ class AIVideoInstructions(BaseModel):
         ]
     )
 
-    # 目标模型适配结果（M0.4.0）：由 model_adapter 内联填充的 route_plan 指令包
+    # 目标模型适配结果（M0.4.3）：由 ROUTE_MODEL 节点填充的路由计划指令包
     route_plan: Optional[Dict[str, Any]] = Field(
         default=None,
         description="目标模型路由计划（含每片段的模型专属适配提示词包），可序列化供下游消费",

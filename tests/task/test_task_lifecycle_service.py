@@ -61,7 +61,7 @@ class TestTaskLifecycleService:
     def test_create_task_with_asset_manifest(self, lifecycle_service):
         """创建任务时应持久化下游回填的资产清单"""
         manifest = {
-            "schema_version": "0.4.2",
+            "schema_version": "0.4.3",
             "task_id": "t1",
             "bindings": [
                 {"asset_id": "char_001", "asset_ref": "/cdn/char_001.png"}
