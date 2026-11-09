@@ -137,14 +137,15 @@ class WorkflowNodes:
             ),
         )
 
-        # 初始化提示词模板管理器
+        # 初始化提示词模板管理器（召回参数统一取自配置，0.4.4 实测校准）
+        prompt_template_config = settings.prompt_templates
         self.knowledge_manager = PromptTemplateManager(
             embedding_model=self.embeddings,
             script_id=self.script_id,
             storage_dir=settings.get_data_paths().get("data_embedding"),
             memory_manager=self._memory,
-            min_similarity_score=0.7,
-            top_k=3,
+            min_similarity_score=prompt_template_config.min_similarity_score,
+            top_k=prompt_template_config.top_k,
         )
 
         # 初始化工作流记忆管理器（统一记忆访问入口）：内部封装了三层记忆存储（短期、中期、长期）
@@ -1013,7 +1014,9 @@ class WorkflowNodes:
                 continue
             try:
                 results = self.knowledge_manager.search_similar(
-                    query, script_id=state.input.script_id, top_k=2
+                    query,
+                    script_id=state.input.script_id,
+                    top_k=settings.prompt_templates.top_k,
                 )
             except Exception as e:
                 warning(f"锚点召回失败（fragment={fragment.id}）: {e}")
@@ -1031,7 +1034,7 @@ class WorkflowNodes:
             f"锚点召回: 查询片段数={len(fragment_sequence.fragments)}, 命中={hit_count}"
         )
         # 控制注入规模，避免历史提示词挤占转换上下文
-        return patterns[:6]
+        return patterns[: settings.prompt_templates.max_injected_patterns]
 
     # ======================== 质量审查节点 ========================
 
