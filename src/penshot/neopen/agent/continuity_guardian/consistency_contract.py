@@ -12,7 +12,13 @@ See LICENSE File For Details.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Any, Set
+from typing import Any, Dict, List, Mapping, Optional, Set
+
+from .appearance_anchors import (
+    APPEARANCE_FIELDS,
+    extract_appearance_anchors,
+    merge_appearance_anchors,
+)
 
 
 class ContractStatus(Enum):
@@ -47,23 +53,23 @@ class CharacterContract:
         # 提取外观特征
         self._extract_appearance_features(description)
 
-    def _extract_appearance_features(self, description: str):
-        """从描述中提取外观特征"""
-        features = {}
-        # 服装特征
-        clothes_keywords = ["穿", "着", "戴", "衣服", "裙子", "西装", "衬衫"]
-        for kw in clothes_keywords:
-            if kw in description:
-                # 提取服装描述
-                idx = description.find(kw)
-                if idx > 0:
-                    start = max(0, idx - 10)
-                    end = min(len(description), idx + 20)
-                    features["clothing"] = description[start:end]
-                    break
+    def _extract_appearance_features(
+        self, description: str, outfit: Optional[Mapping[str, Any]] = None
+    ) -> None:
+        """从描述（及可选结构化服装）提取外观特征
 
-        if features:
-            self.appearance_anchors.update(features)
+        提取规则统一委托 `appearance_anchors` 共享模块；同一字段首值优先，
+        保证锚点在所有片段中完全一致（FR-005）。
+        """
+        features = extract_appearance_anchors(description=description, outfit=outfit)
+        if not features:
+            return
+
+        merged = merge_appearance_anchors(self.appearance_anchors, features)
+        self.appearance_anchors.clear()
+        self.appearance_anchors.update(
+            {key: value for key, value in merged.items() if key in APPEARANCE_FIELDS}
+        )
 
     def get_gap_scenes(self) -> int:
         """获取最大缺席场景数"""

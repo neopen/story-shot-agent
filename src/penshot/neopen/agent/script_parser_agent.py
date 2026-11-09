@@ -40,6 +40,116 @@ from .workflow.workflow_models import PipelineNode
 from ..shot_config import ShotConfig
 
 
+def _scene_number(scene: SceneInfo, fallback: int) -> int:
+    """从 SceneInfo.id（如 scene_001）提取场景序号，失败则退回顺序号"""
+    scene_id = getattr(scene, "id", "") or ""
+    digits = "".join(ch for ch in scene_id if ch.isdigit())
+    return int(digits) if digits else fallback
+
+
+def _scene_characters(scene: SceneInfo) -> List[str]:
+    """从场景元素的 character 字段提取出场角色（去重保序）"""
+    names: List[str] = []
+    for element in getattr(scene, "elements", []) or []:
+        name = getattr(element, "character", None)
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _character_outfit_index(global_metadata: object) -> Dict[str, Dict[str, str]]:
+    """把 global_metadata.character_outfits 归一化为“角色名 -> 结构化服装”
+
+    结构化服装是外观锚点的优先来源（FR-001），自由文本只在缺失时回退（FR-002）。
+    """
+    index: Dict[str, Dict[str, str]] = {}
+    for outfit in getattr(global_metadata, "character_outfits", None) or []:
+        name = str(getattr(outfit, "character", "") or "").strip()
+        if not name:
+            continue
+        record = {
+            field_name: value
+            for field_name in ("description", "color", "style", "material")
+            if (value := str(getattr(outfit, field_name, "") or "").strip())
+        }
+        if record:
+            index[name] = record
+    return index
+
+
+def build_contract_from_parsed(
+    parsed_script: ParsedScript,
+    script_id: Optional[str] = None,
+    contract: Optional[GlobalConsistencyContract] = None,
+) -> GlobalConsistencyContract:
+    """从 ParsedScript 构建全局一致性契约（纯函数，不触发 LLM / 磁盘 IO）
+
+    契约填充逻辑从 ``ScriptParserAgent.process_with_contract`` 原样抽取，
+    供解析链路与离线校准脚本共用，确保召回查询所依赖的契约与生产一致。
+
+    Args:
+        parsed_script: 剧本解析结果
+        script_id: 剧本ID（新建契约时用于生成默认 ID）
+        contract: 既有契约；传入时在原契约上追加填充
+
+    Returns:
+        填充后的全局一致性契约
+    """
+    # 创建或更新契约
+    if contract is None:
+        contract = GlobalConsistencyContract(
+            script_id=script_id or f"script_{int(time.time())}",
+            task_id=script_id or f"task_{int(time.time())}",
+        )
+
+    # 从解析结果填充契约（适配当前 SceneInfo / ParsedScript 模型）
+    for index, scene in enumerate(parsed_script.scenes, start=1):
+        scene_contract = SceneContract(
+            scene_num=_scene_number(scene, index),
+            location=getattr(scene, "location", None) or "unknown",
+            time_of_day=getattr(scene, "time_of_day", None) or "day",
+            characters_in_scene=_scene_characters(scene),
+            main_emotion="neutral",
+        )
+        contract.register_scene(scene_contract)
+
+    # 结构化服装按角色建索引，供外观锚点优先使用
+    global_metadata = getattr(parsed_script, "global_metadata", None)
+    outfit_index = _character_outfit_index(global_metadata)
+
+    # 从角色描述中提取外观锚点，统一驱动后续片段中的角色外观
+    for char in getattr(parsed_script, "characters", []) or []:
+        name = getattr(char, "name", None)
+        if not name:
+            continue
+        description = getattr(char, "description", None) or ""
+        outfit = outfit_index.get(name)
+        if not description and not outfit:
+            continue
+        char_contract = contract.characters.get(name)
+        if char_contract is not None:
+            char_contract._extract_appearance_features(description, outfit)
+
+    # 提取风格锚点（ParsedScript 无 genre 字段，改用全局元数据与标题）
+    if global_metadata is not None:
+        notes = getattr(global_metadata, "continuity_notes", "") or ""
+        if notes:
+            # 原始中文连续性要点保留供审计，英文风格由 infer_style_anchor 归一化
+            contract.set_style_anchor("source_notes", notes[:200])
+        atmosphere = getattr(global_metadata, "audio_atmosphere", "") or ""
+        if atmosphere and atmosphere != "neutral":
+            contract.set_style_anchor("atmosphere", atmosphere)
+    title = getattr(parsed_script, "title", None)
+    if title:
+        contract.set_style_anchor("title", title)
+
+    # 推断英文 genre / 短英文风格描述，保证 prompt 风格前缀真正生效
+    for key, value in infer_style_anchor(parsed_script).items():
+        contract.set_style_anchor(key, value)
+
+    return contract
+
+
 class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
     """优化版剧本解析智能体 - 支持工作流联动和修复"""
 
@@ -239,51 +349,9 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         if not parsed_script:
             return None, contract
 
-        # 创建或更新契约
-        if contract is None:
-            contract = GlobalConsistencyContract(
-                script_id=script_id or f"script_{int(time.time())}",
-                task_id=script_id or f"task_{int(time.time())}",
-            )
-
-        # 从解析结果填充契约（适配当前 SceneInfo / ParsedScript 模型）
-        for index, scene in enumerate(parsed_script.scenes, start=1):
-            scene_contract = SceneContract(
-                scene_num=self._scene_number(scene, index),
-                location=getattr(scene, "location", None) or "unknown",
-                time_of_day=getattr(scene, "time_of_day", None) or "day",
-                characters_in_scene=self._scene_characters(scene),
-                main_emotion="neutral",
-            )
-            contract.register_scene(scene_contract)
-
-        # 从角色描述中提取外观锚点，统一驱动后续片段中的角色外观
-        for char in getattr(parsed_script, "characters", []) or []:
-            name = getattr(char, "name", None)
-            description = getattr(char, "description", None) or ""
-            if not name or not description:
-                continue
-            char_contract = contract.characters.get(name)
-            if char_contract is not None:
-                char_contract._extract_appearance_features(description)
-
-        # 提取风格锚点（ParsedScript 无 genre 字段，改用全局元数据与标题）
-        global_metadata = getattr(parsed_script, "global_metadata", None)
-        if global_metadata is not None:
-            notes = getattr(global_metadata, "continuity_notes", "") or ""
-            if notes:
-                # 原始中文连续性要点保留供审计，英文风格由 infer_style_anchor 归一化
-                contract.set_style_anchor("source_notes", notes[:200])
-            atmosphere = getattr(global_metadata, "audio_atmosphere", "") or ""
-            if atmosphere and atmosphere != "neutral":
-                contract.set_style_anchor("atmosphere", atmosphere)
-        title = getattr(parsed_script, "title", None)
-        if title:
-            contract.set_style_anchor("title", title)
-
-        # 推断英文 genre / 短英文风格描述，保证 prompt 风格前缀真正生效
-        for key, value in infer_style_anchor(parsed_script).items():
-            contract.set_style_anchor(key, value)
+        contract = build_contract_from_parsed(
+            parsed_script, script_id=script_id, contract=contract
+        )
 
         # 保存到知识库（契约仅在内存中随状态传递）
         if knowledge_manager:
@@ -295,21 +363,23 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         return parsed_script, contract
 
     @staticmethod
+    def build_contract_from_parsed(
+        parsed_script: ParsedScript,
+        script_id: Optional[str] = None,
+        contract: Optional[GlobalConsistencyContract] = None,
+    ) -> GlobalConsistencyContract:
+        """从解析结果构建契约（兼容入口，逻辑见模块级同名函数）"""
+        return build_contract_from_parsed(parsed_script, script_id, contract)
+
+    @staticmethod
     def _scene_number(scene: SceneInfo, fallback: int) -> int:
         """从 SceneInfo.id（如 scene_001）提取场景序号，失败则退回顺序号"""
-        scene_id = getattr(scene, "id", "") or ""
-        digits = "".join(ch for ch in scene_id if ch.isdigit())
-        return int(digits) if digits else fallback
+        return _scene_number(scene, fallback)
 
     @staticmethod
     def _scene_characters(scene: SceneInfo) -> List[str]:
         """从场景元素的 character 字段提取出场角色（去重保序）"""
-        names: List[str] = []
-        for element in getattr(scene, "elements", []) or []:
-            name = getattr(element, "character", None)
-            if name and name not in names:
-                names.append(name)
-        return names
+        return _scene_characters(scene)
 
     def detect_parse_issues(
         self, parsed_script: ParsedScript, original_text: str
