@@ -358,6 +358,20 @@ def test_second_apply_is_noop(tmp_path, monkeypatch, capsys):
     assert "本次变更剧本: 0 个" in capsys.readouterr().out
 
 
+def test_apply_without_changes_omits_quarantine_line(tmp_path, monkeypatch, capsys):
+    """无隔离记录时不生成隔离清单，也不打印其路径"""
+    root = tmp_path / "prompt_templates"
+    _write_cache(root, "SN1", [_active_entry()])
+    _patch_rebuild(monkeypatch, [])
+
+    assert migration.main(["--root", str(root), "--apply"]) == 0
+
+    out = capsys.readouterr().out
+    assert "本次变更剧本: 0 个" in out
+    assert "隔离清单" not in out
+    assert not (root / migration.QUARANTINE_FILENAME).exists()
+
+
 def test_write_failure_restores_backup(tmp_path, monkeypatch, capsys):
     """AC-067：写入/重建失败时从备份恢复缓存与索引并输出回滚指令"""
     root = tmp_path / "prompt_templates"

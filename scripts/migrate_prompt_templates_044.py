@@ -571,7 +571,9 @@ def _print_summary(report: Dict[str, Any]) -> None:
     else:
         print(f"本次变更剧本: {report['changed_scripts']} 个")
         print(f"报告: {report['root']}/{REPORT_FILENAME}")
-        print(f"隔离清单: {report['quarantine_file']}")
+        # 无隔离记录时不写清单（可能是首次全活跃或全部在 legacy 分支）
+        if Path(report["quarantine_file"]).is_file():
+            print(f"隔离清单: {report['quarantine_file']}")
 
 
 def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
