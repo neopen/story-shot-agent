@@ -384,6 +384,7 @@ class BaseQualityAuditor(ABC):
                             issue_value: Optional[Any] = None, standard_value: Optional[Any] = None,
                             severity: SeverityLevel = SeverityLevel.WARNING,
                             fragment_id: Optional[str] = None,
+                            asset_id: Optional[str] = None,
                             suggestion: Optional[str] = None,
                             source_node: PipelineNode = PipelineNode.AUDIT_QUALITY) -> None:
         """添加违规记录"""
@@ -396,6 +397,7 @@ class BaseQualityAuditor(ABC):
             source_node=source_node,
             severity=severity,
             fragment_id=fragment_id,
+            asset_id=asset_id,
             suggestion=suggestion
         )
         report.violations.append(violation)
@@ -404,9 +406,11 @@ class BaseQualityAuditor(ABC):
                        rule_type: RuleType,
                        issue_value: Optional[Any] = None, standard_value: Optional[Any] = None,
                        severity: SeverityLevel = SeverityLevel.WARNING,
-                       fragment_id: Optional[str] = None, suggestion: Optional[str] = None,
+                       fragment_id: Optional[str] = None, asset_id: Optional[str] = None,
+                       suggestion: Optional[str] = None,
                        source_node: PipelineNode = PipelineNode.AUDIT_QUALITY) -> None:
         """添加违规记录"""
         self._add_base_violation(report, issue_code=rule_type.code, issue_type=rule_type.issue_type, issue_desc=rule_type.description,
                                  issue_value=issue_value, standard_value=standard_value,
-                                 severity=severity, fragment_id=fragment_id, suggestion=suggestion, source_node=source_node)
+                                 severity=severity, fragment_id=fragment_id, asset_id=asset_id,
+                                 suggestion=suggestion, source_node=source_node)

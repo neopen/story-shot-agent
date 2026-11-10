@@ -1225,7 +1225,10 @@ class WorkflowNodes:
         try:
             # 执行质量审查
             result = self.quality_auditor.qa_process(
-                state.domain.instructions, all_stage_issues, historical_context
+                state.domain.instructions,
+                all_stage_issues,
+                historical_context,
+                contract=state.domain.contract,
             )
 
             debug("质量审查完成:")

@@ -110,6 +110,20 @@ _ACCESSORY_KEYWORDS = (
     "发带",
 )
 
+# 服装域与配饰域重叠的“围巾/手套/帽子”统一归服装，避免同一服饰被判成两个语义域
+_ACCESSORY_ONLY_KEYWORDS = tuple(
+    keyword for keyword in _ACCESSORY_KEYWORDS if keyword not in GARMENT_NOUNS
+)
+
+# 语义域 -> 关键词；顺序即返回顺序
+_ANCHOR_DOMAIN_KEYWORDS = (
+    ("hair", _HAIR_KEYWORDS),
+    ("face", _FACE_KEYWORDS),
+    ("body", _BODY_KEYWORDS),
+    ("accessories", _ACCESSORY_ONLY_KEYWORDS),
+    ("clothing", GARMENT_NOUNS),
+)
+
 _AGE_RE = re.compile(r"\d{1,3}\s*岁")
 _CLAUSE_SPLIT_RE = re.compile(r"[，。；！？\n\r]+")
 # “因雨水”属于场景成因，剔除后保留外观状态本身
@@ -188,6 +202,21 @@ def _contains_appearance_signal(clause: str) -> bool:
     if any(noun in clause for noun in GARMENT_NOUNS):
         return True
     return any(keyword in clause for keyword in STATE_KEYWORDS)
+
+
+def classify_anchor_domains(value: Any) -> List[str]:
+    """把锚点文本归类到外观语义域（FR-060 混域检测）
+
+    返回命中的域列表，可能为空；长度 ≥2 表示同一锚点混入了多个语义域。
+    """
+    text = str(value or "")
+    if not text:
+        return []
+    return [
+        domain
+        for domain, keywords in _ANCHOR_DOMAIN_KEYWORDS
+        if any(keyword in text for keyword in keywords)
+    ]
 
 
 def _split_tokens(value: Any) -> List[str]:

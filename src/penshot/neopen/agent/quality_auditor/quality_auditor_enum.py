@@ -283,6 +283,7 @@ class RuleType(str, Enum):
     CHARACTER_NOT_IN_SHOTS = Rule("character_not_in_shots", "角色未在镜头中出现", IssueType.CHARACTER)
     CHARACTER_CLOTHING_INCONSISTENT = Rule("character_clothing_inconsistent", "角色服装不一致", IssueType.CHARACTER)
     CHARACTER_APPEARANCE_ERROR = Rule("character_appearance_error", "角色外观错误分配", IssueType.CHARACTER)
+    APPEARANCE_ANCHOR_POLLUTED = Rule("appearance_anchor_polluted", "外观锚点字段污染", IssueType.CHARACTER)
 
     # 对话相关
     DIALOGUE_MISSING = Rule("dialogue_missing", "对话缺失", IssueType.DIALOGUE)
@@ -335,6 +336,7 @@ class RuleType(str, Enum):
     SHOT_TYPE_INVALID = Rule("shot_type_invalid", "无效的镜头类型", IssueType.STYLE)
     SHOT_REPETITIVE = Rule("shot_repetitive", "镜头类型重复连续", IssueType.CONTINUITY)
     SHOT_TYPE_MISMATCH = Rule("shot_type_mismatch", "镜头类型与内容不匹配", IssueType.STYLE)
+    SHOT_TYPE_PROMPT_MISMATCH = Rule("shot_type_prompt_mismatch", "景别与提示词表述不一致", IssueType.STYLE)
 
     # 角色相关
     SHOT_MAIN_CHARACTER_MISSING = Rule("shot_main_character_missing", "镜头缺少主要角色标识", IssueType.CHARACTER)
@@ -393,6 +395,7 @@ class RuleType(str, Enum):
     STYLE_INCONSISTENT = Rule("style_inconsistent", "风格不一致", IssueType.STYLE)
     STYLE_INVALID = Rule("style_invalid", "无效的风格", IssueType.STYLE)
     STYLE_MISSING = Rule("style_missing", "风格描述缺失", IssueType.STYLE)
+    STYLE_LIGHTING_CONFLICT = Rule("style_lighting_conflict", "风格前缀互斥打光并存", IssueType.STYLE)
     NEGATIVE_PROMPT_MISSING = Rule("negative_prompt_missing", "缺少负面提示词", IssueType.PROMPT)
     NEGATIVE_PROMPT_INSUFFICIENT = Rule("negative_prompt_insufficient", "负面提示词不足", IssueType.PROMPT)
 
@@ -429,6 +432,7 @@ class RuleType(str, Enum):
     COMPLETENESS_GENERAL = Rule("completeness_general", "内容不完整", IssueType.COMPLETENESS)
     METADATA_MISSING = Rule("metadata_missing", "元数据缺失", IssueType.COMPLETENESS)
     REFERENCE_MISSING = Rule("reference_missing", "引用信息缺失", IssueType.COMPLETENESS)
+    ASSET_USAGE_MISSING = Rule("asset_usage_missing", "路由引用资产未声明使用片段", IssueType.CONTINUITY)
 
     # 性能相关
     PERFORMANCE_SLOW = Rule("performance_slow", "处理速度过慢", IssueType.OTHER)

@@ -133,8 +133,11 @@ _MOTION_KEYWORDS = {
 }
 
 
-def _detect_from_text(text: Optional[str]) -> str:
-    """从最终提示词文本探测景别；无法识别返回空串（FR-031/FR-032）"""
+def detect_shot_type_from_text(text: Optional[str]) -> str:
+    """从最终提示词文本探测景别；无法识别返回空串（FR-031/FR-032）
+
+    质量审查（FR-061）复用同一份别名表与匹配顺序，保证审计口径与构建口径一致。
+    """
     lowered = str(text or "").lower()
     if not lowered:
         return ""
@@ -172,7 +175,7 @@ def _normalize_shot_type(
     source_raw = str(shot_type or "").strip()
     source_normalized = _resolve_source(source_raw) if source_raw else ""
 
-    detected = _detect_from_text(description)
+    detected = detect_shot_type_from_text(description)
     if detected:
         return detected, source_normalized, source_raw
 
