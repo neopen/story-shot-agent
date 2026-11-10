@@ -12,7 +12,7 @@ See LICENSE File For Details.
 import json
 from typing import Optional, Dict, Any
 
-from penshot.logger import info, error
+from penshot.logger import info, error, warning
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.prompt_converter.base_prompt_converter import BasePromptConverter
@@ -586,6 +586,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         if elements_text:
             return "本片段包含的原始元素：\n" + "\n".join(elements_text)
 
+        warning(f"片段 {fragment.id} 的 element_ids 无法对应任何剧本元素: {element_ids}")
         return "本片段无对应原始元素"
 
     def _get_full_script_context(self, fragment: VideoFragment) -> str:

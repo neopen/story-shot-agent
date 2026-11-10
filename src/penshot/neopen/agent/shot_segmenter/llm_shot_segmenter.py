@@ -110,7 +110,7 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
         global_context = self._format_global_metadata(global_metadata, scene_id=scene.id, format_type="shot")
 
         elements_list = "\n".join([
-            f"  {i + 1}. [{elem.type.value}] {elem.character or '场景'}, {elem.emotion}: {elem.content} (预估时长: {elem.duration}秒)"
+            f"  {i + 1}. [{elem.id}][{elem.type.value}] {elem.character or '场景'}, {elem.emotion}: {elem.content} (预估时长: {elem.duration}秒)"
             for i, elem in enumerate(scene.elements)
         ])
 
@@ -146,7 +146,7 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
         debug(f"场景{scene.id}分镜提示词长度: {len(user_prompt)}字符")
 
         response = self._call_llm_chat_with_retry(self.system_prompt, user_prompt)
-        shots_data = self._parse_ai_response(response, scene.id, start_time, shot_offset)
+        shots_data = self._parse_ai_response(response, scene, start_time, shot_offset)
 
         return shots_data
 
@@ -193,9 +193,12 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
         ])
 
 
-    def _parse_ai_response(self, response: str, scene_id: str, start_time: float, shot_offset: int) -> List[ShotInfo]:
+    def _parse_ai_response(
+        self, response: str, scene: SceneInfo, start_time: float, shot_offset: int
+    ) -> List[ShotInfo]:
         """解析LLM响应并构建镜头列表"""
         shots = []
+        scene_id = scene.id
 
         try:
             # 尝试解析JSON
@@ -215,6 +218,15 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
             # 如果返回的是单个镜头对象，转换为列表
             if isinstance(shots_data, dict):
                 shots_data = [shots_data]
+
+            element_id_mode = self._detect_element_id_mode(
+                scene,
+                [
+                    item.get("element_ids", [])
+                    for item in shots_data
+                    if isinstance(item, dict)
+                ],
+            )
 
             current_time = start_time
 
@@ -245,7 +257,9 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
                     emotion=shot_data.get("emotion", "neutral"),
                     shot_type=shot_type,
                     main_character=shot_data.get("main_character"),
-                    element_ids=shot_data.get("element_ids", []),
+                    element_ids=self._normalize_element_ids(
+                        scene, shot_data.get("element_ids", []), element_id_mode
+                    ),
                     confidence=shot_data.get("confidence", 0.8)
                 )
 
@@ -260,13 +274,85 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
             # 尝试从文本中提取JSON
             shots_data = self._extract_json_from_text(response)
             if shots_data:
-                return self._parse_ai_response(json.dumps(shots_data), scene_id, start_time, shot_offset)
+                return self._parse_ai_response(
+                    json.dumps(shots_data), scene, start_time, shot_offset
+                )
 
         except Exception as e:
             error(f"解析镜头数据异常: {e}")
             print_log_exception()
 
         return shots
+
+    def _normalize_element_ids(
+        self, scene: SceneInfo, raw_ids: Any, mode: str = "global"
+    ) -> List[str]:
+        """将LLM返回的元素ID对齐到剧本解析产出的真实元素ID
+
+        场景提示中的元素按序号排列，LLM 容易按场景重新从 elem_001 编号，
+        导致第二场景起 element_ids 指向第一场景的元素。mode 由整批镜头判定：
+        global 保留真实ID；local 按场景序号映射；strict 仅保留真实存在的ID。
+        """
+        if not isinstance(raw_ids, list) or not scene.elements:
+            return []
+
+        scene_ids = [elem.id for elem in scene.elements]
+        valid_ids = set(scene_ids)
+        texts: List[str] = []
+        for raw in raw_ids:
+            if isinstance(raw, str):
+                texts.append(raw.strip())
+            else:
+                warning(f"场景{scene.id}元素ID类型非法，已忽略: {raw!r}")
+
+        if not texts:
+            return []
+
+        if mode == "local":
+            remapped: List[str] = []
+            dropped: List[str] = []
+            for text in texts:
+                index = self._element_index(text, len(scene_ids))
+                if index is None:
+                    dropped.append(text)
+                else:
+                    remapped.append(scene_ids[index - 1])
+            if dropped:
+                warning(f"场景{scene.id}存在无法解析的元素ID，已丢弃: {dropped}")
+            return list(dict.fromkeys(remapped))
+
+        kept = [text for text in texts if text in valid_ids]
+        dropped = [text for text in texts if text not in valid_ids]
+        if dropped:
+            warning(f"场景{scene.id}存在无法解析的元素ID，已丢弃: {dropped}")
+        return list(dict.fromkeys(kept))
+
+    def _detect_element_id_mode(self, scene: SceneInfo, raw_id_lists: List[Any]) -> str:
+        """按整批镜头判定元素ID语义：global（真实ID）/ local（场景内重编号）/ strict"""
+        texts: List[str] = []
+        for raw_ids in raw_id_lists:
+            if isinstance(raw_ids, list):
+                texts.extend(item.strip() for item in raw_ids if isinstance(item, str))
+        if not texts or not scene.elements:
+            return "global"
+
+        valid_ids = {elem.id for elem in scene.elements}
+        if all(text in valid_ids for text in texts):
+            return "global"
+        if all(
+            self._element_index(text, len(scene.elements)) is not None for text in texts
+        ):
+            warning(f"场景{scene.id}元素ID按场景序号重新编号，已按场景元素顺序重映射")
+            return "local"
+        return "strict"
+
+    @staticmethod
+    def _element_index(text: str, size: int) -> Optional[int]:
+        match = re.fullmatch(r"elem[_-]?(\d+)", text, re.IGNORECASE)
+        if not match:
+            return None
+        index = int(match.group(1))
+        return index if 1 <= index <= size else None
 
     def _extract_json_from_text(self, text: str) -> Optional[List[Dict]]:
         """从文本中提取JSON数据"""

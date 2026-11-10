@@ -1,8 +1,9 @@
-version: "1.3"
+version: "1.4"
 changelog: |
   - 2026-03-18: 规范化提示词，添加错误处理、镜头类型、完整示例和相关规则
   - 2026-03-27: 添加修复参数，通过修复建议和问题修复问题
   - 2026-03-30: 添加 history_hint 参数，支持记忆功能的 历史上下文提示
+  - 2026-11-10: 元素列表携带真实元素ID，约束 element_ids 全剧唯一、不得按场景重新编号
 
 
 shot_segmenter_system:
@@ -47,6 +48,7 @@ shot_segmenter_system:
       10. 如果元素时长较短（<3秒），通常用一个镜头完整呈现，不要分割
       11. 如果元素时长中等（3-6秒），评估内部是否有自然的视觉停顿点，否则保持单一镜头
       12. 如果元素确实需要分割（>7秒），确保分割后的每个片段都有独立的视觉焦点或情感递进
+      13. 元素ID对齐: element_ids 必须原样复制【元素列表】每行方括号中的真实元素ID；元素ID全剧唯一，不同场景编号不重新开始（第二场景可能从 elem_005 起），禁止自行从 elem_001 重新编号
     
     【镜头衔接规则】
       - wide_shot → medium_shot：空间定位
@@ -132,7 +134,7 @@ shot_segmenter_user:
           "main_character": "主要角色（如果有）",
           "emotion": "neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/heavy/other",
           "confidence": 置信度评分（0.0-1.0，表示分镜决策置信度）,
-          "element_ids": ["元素列表中对应的元素ID，如：elem_001，elem_002"]
+          "element_ids": ["元素列表中对应的真实元素ID，如：elem_001，elem_005"]
         }}
       ]
     
@@ -140,8 +142,8 @@ shot_segmenter_user:
       输入：
         场景信息：咖啡店外长椅 | 下午 | 雨天 | 灰蒙蒙雨天，林小雨蹲在长椅旁擦书，神情焦急
         元素列表：
-          1. [scene] 雨声淅沥，镜头下摇，聚焦长椅。林小雨蹲在长椅旁擦书，神情焦急。 (4.0秒)
-          2. [dialogue] 林小雨：明明说好今天还书的……这雨下得，他会不会不来了？ (3.5秒)
+          1. [elem_001][scene] 雨声淅沥，镜头下摇，聚焦长椅。林小雨蹲在长椅旁擦书，神情焦急。 (4.0秒)
+          2. [elem_002][dialogue] 林小雨：明明说好今天还书的……这雨下得，他会不会不来了？ (3.5秒)
         全剧上下文：
           【角色服装】林小雨：米白长裙配浅灰开衫
           【关键道具】《飞鸟集》：钴蓝色硬壳
