@@ -12,57 +12,13 @@ See LICENSE File For Details.
 
 from typing import Any, Dict, List
 
-# 非角色占位词：LLM 在"无角色"镜头中常误填这些值，应视为"无角色"而不是契约违规
-_NON_CHARACTER_TOKENS = {
-    "场景",
-    "环境",
-    "背景",
-    "空镜",
-    "空镜头",
-    "画面",
-    "镜头",
-    "视角",
-    "主观镜头",
-    "旁白",
-    "声音",
-    "音效",
-    "字幕",
-    "道具",
-    "物品",
-    "人群",
-    "无人",
-    "无",
-    "none",
-    "null",
-    "n/a",
-    "na",
-}
-
-
-def _normalize_character(name: Any) -> str:
-    """归一化角色名
-
-    去掉首尾空白，并把非角色占位词（如"场景"）归一化为空串，
-    避免把"无角色"的镜头误判为契约外的角色。
-
-    Args:
-        name: 原始角色名（可能是任意类型）
-
-    Returns:
-        归一化后的角色名；非角色/空值返回空串
-    """
-    if not isinstance(name, str):
-        return ""
-    value = name.strip()
-    if not value or value.lower() in _NON_CHARACTER_TOKENS:
-        return ""
-    return value
+from penshot.neopen.agent.character_names import normalize_character_name
 
 
 def _known_characters(contract: Any) -> set[str]:
     """提取契约中已登记的角色名集合（已归一化）"""
     characters = getattr(contract, "characters", {}) or {}
-    known = {_normalize_character(name) for name in characters}
+    known = {normalize_character_name(name) for name in characters}
     known.discard("")
     return known
 
@@ -86,7 +42,7 @@ def validate_shot_sequence(shot_sequence: Any, contract: Any) -> List[Dict[str, 
 
     known_characters = _known_characters(contract)
     for shot in getattr(shot_sequence, "shots", []) or []:
-        character = _normalize_character(getattr(shot, "main_character", None))
+        character = normalize_character_name(getattr(shot, "main_character", None))
         if character and character not in known_characters:
             shot_id = getattr(shot, "id", None)
             issues.append(
@@ -145,7 +101,7 @@ def validate_fragment_sequence(
             )
             continue
 
-        character = _normalize_character(getattr(shot, "main_character", None))
+        character = normalize_character_name(getattr(shot, "main_character", None))
         if character and character not in known_characters:
             issues.append(
                 {

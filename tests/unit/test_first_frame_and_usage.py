@@ -6,6 +6,7 @@ AC-011（片段专属首帧提示词不等于三视图提示词，且包含场�
 """
 
 from types import SimpleNamespace
+from typing import Optional
 
 from penshot.neopen.agent.asset_generator.asset_generator_agent import (
     backfill_usage,
@@ -85,12 +86,13 @@ def _contract() -> GlobalConsistencyContract:
 
 def _prompt(
     text: str = "A young man waits for someone by the coffee shop",
+    main_character: Optional[str] = "林然",
 ) -> AIVideoPrompt:
     return AIVideoPrompt(
         fragment_id="frag_001",
         prompt=text,
         duration=3.0,
-        main_character="林然",
+        main_character=main_character,
         camera=CameraControl(shot_type="close_up"),
     )
 
@@ -140,6 +142,19 @@ def test_first_frame_prompt_strips_style_prefix_from_action():
 
     assert first_frame.count("[Style:") == 0
     assert "action: 林然蹲下擦拭雨水" in first_frame
+
+
+def test_first_frame_prompt_drops_placeholder_subject():
+    """frag_013 缺陷回归：main_character 为“无”时不再拼出 of 无"""
+    contract = _contract()
+
+    first_frame = build_first_frame_prompt(
+        _prompt(main_character="无"), contract, scene=contract.scenes[1]
+    )
+
+    assert "无" not in first_frame
+    assert "of the scene" not in first_frame
+    assert first_frame.startswith("close-up shot, at ")
 
 
 def test_package_references_character_identity_scene_first_frame_prop_non_first():

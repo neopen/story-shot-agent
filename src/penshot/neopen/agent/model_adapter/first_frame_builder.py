@@ -13,6 +13,7 @@ See LICENSE File For Details.
 import re
 from typing import Any, Dict, List, Optional
 
+from penshot.neopen.agent.character_names import normalize_character_name
 from penshot.neopen.agent.continuity_guardian.appearance_anchors import (
     APPEARANCE_FIELDS,
 )
@@ -170,14 +171,16 @@ def build_first_frame_prompt(
         英文为主的首帧静帧提示词；无任何上下文时仍包含片段动作
     """
     resolved_scene = _resolve_scene(contract, prompt, scene)
-    main_character = _attr(prompt, "main_character")
+    # 旧产物可能已把“无角色”占位符写进 main_character，首帧拼接时同样视为无角色
+    main_character = normalize_character_name(_attr(prompt, "main_character"))
     location = _attr(resolved_scene, "location")
 
     subject = main_character
     appearance = _appearance_text(contract, main_character)
     if appearance:
         subject = f"{subject} ({appearance})"
-    parts: List[str] = [f"{_shot_phrase(prompt, fragment)} of {subject or 'the scene'}"]
+    shot_phrase = _shot_phrase(prompt, fragment)
+    parts: List[str] = [f"{shot_phrase} of {subject}" if subject else shot_phrase]
 
     # 场景地点独立声明：FR-011 要求首帧同时锚定角色与所处环境
     if location:

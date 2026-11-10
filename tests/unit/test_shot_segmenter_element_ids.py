@@ -161,6 +161,50 @@ def test_missing_element_ids_defaults_to_empty(segmenter, scene_002):
     assert shots[0].element_ids == []
 
 
+@pytest.mark.parametrize(
+    "placeholder",
+    ["无", " none ", "N/A", "无角色", "The Scene", "no one", None],
+)
+def test_placeholder_main_character_normalized_to_none(
+    segmenter, scene_002, placeholder
+):
+    """frag_013 缺陷回归：“无/none”等占位符不得作为角色名向下游传播（中英剧本同规则）"""
+    payload = _shots_json(
+        [
+            {
+                "description": "走廊空镜",
+                "duration": 3.0,
+                "shot_type": "wide_shot",
+                "main_character": placeholder,
+                "element_ids": ["elem_005"],
+            }
+        ]
+    )
+
+    shots = segmenter._parse_ai_response(payload, scene_002, 0.0, 0)
+
+    assert shots[0].main_character is None
+
+
+def test_real_main_character_is_kept(segmenter, scene_002):
+    """真实角色名原样保留"""
+    payload = _shots_json(
+        [
+            {
+                "description": "张晨走来",
+                "duration": 3.0,
+                "shot_type": "medium_shot",
+                "main_character": "张晨",
+                "element_ids": ["elem_007"],
+            }
+        ]
+    )
+
+    shots = segmenter._parse_ai_response(payload, scene_002, 0.0, 0)
+
+    assert shots[0].main_character == "张晨"
+
+
 def test_scene_prompt_carries_real_element_ids(monkeypatch, segmenter, scene_002):
     """场景提示词必须携带真实元素ID，供LLM原样引用"""
     captured = {}

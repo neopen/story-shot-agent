@@ -15,6 +15,7 @@ from typing import Optional, List, Dict, Any
 
 from penshot.logger import info, error, debug, warning
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
+from penshot.neopen.agent.character_names import optional_character_name
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, SceneInfo, GlobalMetadata
 from penshot.neopen.agent.shot_segmenter.base_shot_segmenter import BaseShotSegmenter
@@ -256,7 +257,9 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
                     duration=round(duration, 2),
                     emotion=shot_data.get("emotion", "neutral"),
                     shot_type=shot_type,
-                    main_character=shot_data.get("main_character"),
+                    main_character=optional_character_name(
+                        shot_data.get("main_character")
+                    ),
                     element_ids=self._normalize_element_ids(
                         scene, shot_data.get("element_ids", []), element_id_mode
                     ),
