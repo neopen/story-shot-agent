@@ -17,6 +17,7 @@ from penshot.neopen.agent.asset_generator import (
     AssetBinding,
     AssetGeneratorAgent,
     AssetManifest,
+    backfill_usage,
 )
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
@@ -45,13 +46,6 @@ def build_demo_output() -> dict:
     contract.style_anchor = {"genre": "neo-noir", "description": "cinematic, moody lighting"}
     contract.register_character("林然", 1, "他穿着黑色西装，戴金丝眼镜")
 
-    agent = AssetGeneratorAgent()
-    plan = agent.plan_assets(
-        None, contract, task_id="demo-task", script_id="demo-script"
-    )
-    # 默认没有执行器，只把 pending 资产计划挂到契约，不生成真实图片
-    agent.generate_assets(None, contract, task_id="demo-task", plan=plan)
-
     instructions = AIVideoInstructions(
         fragments=[
             AIVideoPrompt(
@@ -64,6 +58,13 @@ def build_demo_output() -> dict:
         ]
     )
     instructions.metadata["video_model"] = "runway_gen2"
+
+    agent = AssetGeneratorAgent()
+    plan = agent.plan_assets(
+        None, contract, task_id="demo-task", script_id="demo-script"
+    )
+    # 默认没有执行器，只把 pending 资产计划挂到契约，不生成真实图片
+    agent.generate_assets(None, contract, task_id="demo-task", plan=plan)
 
     packages = adapt_instructions(instructions, "runway_gen2")
     apply_image_to_video_routing(packages, instructions, contract, None)
@@ -86,6 +87,15 @@ def build_demo_output() -> dict:
     )
 
     instructions.route_plan = route_plan.model_dump(mode="json")
+
+    # 回填 usage.fragments：路由显式引用的片段会并入使用范围，
+    # 下游据此按片段按需生成，质量审查也据此校验引用声明（FR-063）
+    plan = backfill_usage(
+        plan,
+        fragments=instructions.fragments,
+        contract=contract,
+        route_plan=instructions.route_plan,
+    )
     instructions.asset_plan = plan.to_dict()
 
     return {
@@ -235,10 +245,11 @@ def main() -> None:
     for asset in plan["assets"]:
         print(
             f"- {asset['asset_id']} [{asset['status']}] "
+            f"usage.fragments={asset['usage']['fragments']} "
             f"{asset['image_prompt'][:70]}..."
         )
 
-    print("\n== 片段引用 ==")
+    print("\n== 片段引用（只有 as_first_frame=true 的引用用于首帧）==")
     print(json.dumps(package["references"], ensure_ascii=False, indent=2))
     print("first_frame_instruction:", package["first_frame_instruction"][:90] + "...")
 
