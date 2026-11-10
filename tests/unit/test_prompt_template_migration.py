@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pytest
+from llama_index.core.embeddings import MockEmbedding
+
+from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 
 _SCRIPT_PATH = (
     Path(__file__).resolve().parents[2] / "scripts" / "migrate_prompt_templates_044.py"
@@ -246,3 +249,154 @@ def test_sample_script_union_signature_counts(tmp_path):
         if str(record.get("added_at", "")).startswith("2026-11-09")
     ]
     assert len(latest_run) == 11
+
+
+def _active_entry(prompt: str = CLEAN_PROMPT) -> Dict[str, Any]:
+    """构造已符合 0.4.4 契约的活跃模板"""
+    entry = _entry(prompt)
+    entry["metadata"].update({"schema_version": "0.4.4", "audit_status": "passed"})
+    return entry
+
+
+def _write_fake_index(script_dir: Path, doc_count: int) -> Path:
+    """写入可被只读统计识别的假索引（不触发嵌入）"""
+    index_dir = script_dir / migration.INDEX_DIR_NAME
+    index_dir.mkdir(parents=True, exist_ok=True)
+    embeddings = {f"node_{index}": [] for index in range(doc_count)}
+    (index_dir / "default__vector_store.json").write_text(
+        json.dumps({"embedding_dict": embeddings}), encoding="utf-8"
+    )
+    return index_dir
+
+
+def _patch_rebuild(monkeypatch, calls: List[Any]) -> None:
+    """替换真实重建：记录调用并按活跃条目数写假索引"""
+
+    def _rebuild(script_dir, script_id, entries):
+        active = [
+            entry
+            for entry in entries
+            if (entry.get("metadata") or {}).get("schema_version") != "legacy"
+        ]
+        calls.append((script_id, [entry["prompt"] for entry in active]))
+        _write_fake_index(script_dir, len(active))
+        return len(active)
+
+    monkeypatch.setattr(migration, "_rebuild_index", _rebuild)
+
+
+def test_apply_rebuilds_index_from_active_entries(tmp_path, monkeypatch):
+    """FR-067：迁移后按活跃缓存重建索引，报告迁移前后文档数"""
+    root = tmp_path / "prompt_templates"
+    _write_cache(root, "SN1", [_active_entry(), _entry(POLLUTED_PROMPT)])
+    calls: List[Any] = []
+    _patch_rebuild(monkeypatch, calls)
+
+    assert migration.main(["--root", str(root), "--apply"]) == 0
+
+    report = _read_json(root / migration.REPORT_FILENAME)
+    counts = report["scripts"]["SN1"]
+    assert counts["quarantined_count"] == 1
+    assert counts["legacy_count"] == 0
+    assert counts["active_count"] == 1
+    assert counts["index_docs_before"] == 0
+    assert counts["index_docs_after"] == 1
+    assert calls == [("SN1", [CLEAN_PROMPT])]
+    assert migration.count_index_docs(root / "SN1" / migration.INDEX_DIR_NAME) == 1
+
+
+def test_apply_clears_index_when_no_active_templates(tmp_path):
+    """全部被隔离时索引必须清空，保证活跃模板数与索引文档数相等"""
+    root = tmp_path / "prompt_templates"
+    _write_cache(root, "SN1", [_entry(POLLUTED_PROMPT), _entry(CONFLICT_PROMPT)])
+    _write_fake_index(root / "SN1", 2)
+
+    assert migration.main(["--root", str(root), "--apply"]) == 0
+
+    report = _read_json(root / migration.REPORT_FILENAME)
+    counts = report["scripts"]["SN1"]
+    assert counts["active_count"] == 0
+    assert counts["index_docs_before"] == 2
+    assert counts["index_docs_after"] == 0
+    assert not (root / "SN1" / migration.INDEX_DIR_NAME).exists()
+
+
+def test_second_apply_is_noop(tmp_path, monkeypatch, capsys):
+    """AC-065：重复 --apply 输出 0 变更，计数不变且守恒式仍成立"""
+    root = tmp_path / "prompt_templates"
+    cache_path = _write_cache(
+        root, "SN1", [_entry(POLLUTED_PROMPT), _entry(CLEAN_PROMPT)]
+    )
+    calls: List[Any] = []
+    _patch_rebuild(monkeypatch, calls)
+
+    assert migration.main(["--root", str(root), "--apply"]) == 0
+    first = _read_json(root / migration.REPORT_FILENAME)["scripts"]["SN1"]
+    cache_after_first = cache_path.read_bytes()
+    index_after_first = (
+        root / "SN1" / migration.INDEX_DIR_NAME / "default__vector_store.json"
+    ).read_bytes()
+    calls.clear()
+
+    assert migration.main(["--root", str(root), "--apply"]) == 0
+
+    second = _read_json(root / migration.REPORT_FILENAME)["scripts"]["SN1"]
+    assert second["quarantined_count"] == first["quarantined_count"]
+    assert second["legacy_count"] == first["legacy_count"]
+    assert second["active_count"] == first["active_count"]
+    assert second["legacy_marked"] == 0
+    assert second["index_docs_after"] == second["active_count"]
+    assert (
+        second["quarantined_count"] + second["legacy_count"] + second["active_count"]
+        == second["template_count_before"]
+    )
+    assert cache_path.read_bytes() == cache_after_first
+    assert (
+        root / "SN1" / migration.INDEX_DIR_NAME / "default__vector_store.json"
+    ).read_bytes() == index_after_first
+    assert calls == []
+    assert "本次变更剧本: 0 个" in capsys.readouterr().out
+
+
+def test_write_failure_restores_backup(tmp_path, monkeypatch, capsys):
+    """AC-067：写入/重建失败时从备份恢复缓存与索引并输出回滚指令"""
+    root = tmp_path / "prompt_templates"
+    cache_path = _write_cache(root, "SN1", [_entry(POLLUTED_PROMPT), _active_entry()])
+    before_cache = cache_path.read_bytes()
+    index_dir = _write_fake_index(root / "SN1", 2)
+    before_index = (index_dir / "default__vector_store.json").read_bytes()
+
+    def _fail(*args, **kwargs):
+        raise RuntimeError("嵌入服务不可用")
+
+    monkeypatch.setattr(migration, "_rebuild_index", _fail)
+
+    exit_code = migration.main(["--root", str(root), "--apply"])
+
+    assert exit_code == migration.EXIT_WRITE_FAILED
+    assert cache_path.read_bytes() == before_cache
+    assert (index_dir / "default__vector_store.json").read_bytes() == before_index
+    err = capsys.readouterr().err
+    assert "已回滚" in err
+    assert "手动恢复指令" in err
+
+
+def test_manager_rebuild_index_from_entries_skips_legacy(tmp_path):
+    """管理器公开重建入口：只重建活跃条目并落盘"""
+    manager = PromptTemplateManager(
+        embedding_model=MockEmbedding(embed_dim=8),
+        script_id="SN1",
+        storage_dir=str(tmp_path),
+    )
+    entries = [_active_entry(), _entry(CLEAN_PROMPT, source="legacy_source")]
+    entries[1]["metadata"]["schema_version"] = "legacy"
+    entries[1]["metadata"]["audit_status"] = "unknown"
+
+    docs = manager.rebuild_index_from_entries("SN1", entries)
+
+    assert docs == 1
+    index_dir = Path(manager._get_index_dir("SN1"))
+    assert (index_dir / "default__vector_store.json").is_file()
+
+    with pytest.raises(RuntimeError):
+        manager.rebuild_index_from_entries("SN1", [])

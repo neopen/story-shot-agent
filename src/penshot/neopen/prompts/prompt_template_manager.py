@@ -506,6 +506,39 @@ class PromptTemplateManager:
         )
         return rebuilt
 
+    def rebuild_index_from_entries(
+        self,
+        script_id: str,
+        entries: List[Dict[str, Any]],
+        persist: bool = True,
+    ) -> int:
+        """按给定缓存条目全量重建索引并落盘（0.4.4 迁移脚本使用，FR-067）
+
+        与 ``_ensure_index_ready`` 不同，本方法不读取磁盘缓存：迁移脚本在
+        改写缓存后用同一份条目重建索引，避免读到迁移前的旧数据。legacy 与
+        隔离条目不参与重建。
+
+        Args:
+            script_id: 剧本ID
+            entries: 迁移后的活跃缓存条目
+            persist: 是否落盘
+
+        Returns:
+            重建后的索引文档数
+
+        Raises:
+            RuntimeError: 无活跃条目或重建失败
+        """
+        active_entries = [item for item in entries if not is_legacy_template(item)]
+        if not active_entries:
+            raise RuntimeError(f"无活跃模板可重建索引: {script_id}")
+
+        self._caches[script_id] = active_entries
+        self._cache_loaded.add(script_id)
+        if not self._rebuild_index_for_script(script_id, persist=persist):
+            raise RuntimeError(f"重建索引失败: {script_id}")
+        return self._count_index_docs(self._indices.get(script_id))
+
     def _get_current_index(self) -> Optional[BaseIndex]:
         """
         获取当前剧本的索引

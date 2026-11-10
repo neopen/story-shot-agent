@@ -21,7 +21,7 @@
     - 隔离模板只是从活跃缓存移出并完整写入 quarantine_044.json，
       不删除底层数据（FR-066）；
     - 未被隔离且缺少 schema_version 的模板标记 legacy + audit_status=unknown
-      （FR-067）；索引重建属于后续任务，本脚本不触发嵌入调用。
+      （FR-067）；写入后按迁移结果重建索引，无活跃模板时清空索引目录（FR-067）。
 """
 
 import argparse
@@ -33,11 +33,14 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 from penshot.neopen.agent.continuity_guardian.style_anchors import (
     LIGHTING_FAMILY_MARKERS,
 )
+
+if TYPE_CHECKING:
+    from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 
 DEFAULT_ROOT = "data/embedding/prompt_templates"
 CACHE_FILENAME = "templates_cache.json"
@@ -63,12 +66,17 @@ AUDIT_STATUS_UNKNOWN = "unknown"
 
 EXIT_OK = 0
 EXIT_ERROR = 2
+EXIT_WRITE_FAILED = 3
 
 _STYLE_PREFIX_RE = re.compile(r"\[\s*style\s*:([^\]]*)\]", re.IGNORECASE)
 
 
 class MigrationError(Exception):
     """迁移前置或执行异常（不写半成品）"""
+
+
+class MigrationWriteError(MigrationError):
+    """写入失败且已尝试从备份回滚（FR-068 / AC-067）"""
 
 
 @dataclass
@@ -83,11 +91,14 @@ class ScriptMigration:
     legacy_marked: int = 0
     legacy_count: int = 0
     active_count: int = 0
+    quarantined_prior_count: int = 0
+    index_docs_before: int = 0
+    index_docs_after: Optional[int] = None
     backup_dir: str = ""
 
     @property
     def quarantined_count(self) -> int:
-        return len(self.quarantine)
+        return len(self.quarantine) + self.quarantined_prior_count
 
     @property
     def changed(self) -> bool:
@@ -134,6 +145,117 @@ def _legacy_aux_reason(entry: Dict[str, Any]) -> str:
     if metadata.get("audit_status"):
         return ""
     return "旧模板辅助判定：source=quality_audit_passed 且无 audit_status"
+
+
+def _is_legacy_template(entry: Dict[str, Any]) -> bool:
+    """判定缓存条目是否 legacy（与 PromptTemplateManager 同口径）"""
+    if entry.get("legacy") is True:
+        return True
+    metadata = entry.get("metadata")
+    if isinstance(metadata, dict):
+        if metadata.get("legacy") is True:
+            return True
+        return metadata.get("schema_version") == LEGACY_SCHEMA_VERSION
+    return False
+
+
+def count_index_docs(index_dir: Path) -> int:
+    """统计已持久化索引的文档数（只读文件，不加载索引、不触发嵌入）"""
+    vector_path = index_dir / "default__vector_store.json"
+    try:
+        store = json.loads(vector_path.read_text(encoding="utf-8"))
+        embeddings = store.get("embedding_dict")
+        if isinstance(embeddings, dict):
+            return len(embeddings)
+    except (OSError, json.JSONDecodeError):
+        pass
+    docstore_path = index_dir / "docstore.json"
+    try:
+        store = json.loads(docstore_path.read_text(encoding="utf-8"))
+        data = store.get("docstore/data")
+        if isinstance(data, dict):
+            return len(data)
+    except (OSError, json.JSONDecodeError):
+        pass
+    return 0
+
+
+def _build_manager(script_dir: Path, script_id: str) -> "PromptTemplateManager":
+    """按目录布局构造模板管理器（仅 apply 且存在活跃模板时使用）"""
+    from penshot.neopen.client.client_factory import get_default_embedding
+    from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
+
+    # 管理器按 <base>/prompt_templates/<script_id> 定位存储目录
+    storage_dir = script_dir.parent.parent
+    manager = PromptTemplateManager(
+        embedding_model=get_default_embedding(),
+        script_id=script_id,
+        storage_dir=str(storage_dir),
+    )
+    expected = script_dir / INDEX_DIR_NAME
+    actual = Path(manager._get_index_dir(script_id))
+    if actual.resolve() != expected.resolve():
+        raise MigrationError(f"存储目录布局与模板管理器不一致: {actual} != {expected}")
+    return manager
+
+
+def _rebuild_index(
+    script_dir: Path, script_id: str, entries: Sequence[Dict[str, Any]]
+) -> int:
+    """从迁移后的活跃缓存重建索引（FR-067），返回重建后文档数
+
+    无活跃模板时清空索引目录（内容已在备份中），避免残留旧索引继续参与召回。
+    """
+    index_dir = script_dir / INDEX_DIR_NAME
+    active_entries = [entry for entry in entries if not _is_legacy_template(entry)]
+    if not active_entries:
+        if index_dir.is_dir():
+            shutil.rmtree(index_dir)
+        return 0
+
+    manager = _build_manager(script_dir, script_id)
+    rebuilt_docs = manager.rebuild_index_from_entries(script_id, active_entries)
+    return rebuilt_docs
+
+
+def _restore_from_backup(migration: ScriptMigration) -> bool:
+    """用备份恢复单个剧本的缓存与索引（FR-068）"""
+    backup_dir = Path(migration.backup_dir)
+    backup_cache = backup_dir / CACHE_FILENAME
+    if not backup_cache.is_file():
+        return False
+    shutil.copy2(backup_cache, migration.cache_path)
+    index_dir = migration.cache_path.parent / INDEX_DIR_NAME
+    backup_index = backup_dir / INDEX_DIR_NAME
+    if index_dir.is_dir():
+        shutil.rmtree(index_dir)
+    if backup_index.is_dir():
+        shutil.copytree(backup_index, index_dir)
+    return True
+
+
+def _print_rollback(
+    migrations: Sequence[ScriptMigration], restored: Sequence[bool]
+) -> None:
+    """输出回滚结果与手动恢复指令（写入失败时调用）"""
+    print("迁移写入失败，已尝试从备份回滚：", file=sys.stderr)
+    for migration, ok in zip(migrations, restored):
+        state = "已回滚" if ok else "回滚失败，请手工恢复"
+        print(
+            f"  {migration.script_id}: {state}；备份目录 {migration.backup_dir}",
+            file=sys.stderr,
+        )
+    print("手动恢复指令（单个剧本）：", file=sys.stderr)
+    for migration in migrations:
+        backup_dir = Path(migration.backup_dir)
+        script_dir = migration.cache_path.parent
+        print(
+            f'  cp "{backup_dir / CACHE_FILENAME}" '
+            f'"{migration.cache_path}" && rm -rf "{script_dir / INDEX_DIR_NAME}" '
+            f'&& cp -r "{backup_dir / INDEX_DIR_NAME}" '
+            f'"{script_dir / INDEX_DIR_NAME}"',
+            file=sys.stderr,
+        )
 
 
 def _read_cache(cache_path: Path) -> List[Dict[str, Any]]:
@@ -228,16 +350,60 @@ def discover_script_ids(root: Path, script_id: Optional[str]) -> List[str]:
     return discovered
 
 
+def _load_quarantine_scripts(root: Path) -> Dict[str, Dict[str, Any]]:
+    """读取既有隔离清单的逐剧本记录（用于重复执行时保持统计一致）"""
+    path = root / QUARANTINE_FILENAME
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    scripts = payload.get("scripts") if isinstance(payload, dict) else None
+    if not isinstance(scripts, dict):
+        return {}
+    return {
+        script_id: record
+        for script_id, record in scripts.items()
+        if isinstance(record, dict)
+    }
+
+
+def _merge_prior_quarantine(
+    migration: ScriptMigration, prior: Optional[Dict[str, Any]]
+) -> None:
+    """把首次迁移的隔离统计并入本次计划（AC-065：重复执行计数不变）
+
+    隔离模板已从活跃缓存移除，重复执行时无法再次检出；模板总数改为
+    “当前缓存 + 累计隔离”，守恒式对累计口径仍然成立。
+    """
+    if not prior:
+        return
+    migration.quarantined_prior_count = int(prior.get("quarantined_count") or 0)
+    migration.template_count_before = (
+        len(migration.cache_after) + migration.quarantined_count
+    )
+    if (
+        migration.quarantined_count + migration.legacy_count + migration.active_count
+        != migration.template_count_before
+    ):
+        raise MigrationError(f"累计守恒式不成立: {migration.script_id}")
+
+
 def collect_migrations(
     root: Path, script_id: Optional[str] = None
 ) -> List[ScriptMigration]:
     """收集所有目标剧本的迁移计划（dry-run 与 apply 共用）"""
+    prior_scripts = _load_quarantine_scripts(root)
     migrations: List[ScriptMigration] = []
     for name in discover_script_ids(root, script_id):
         cache_path = root / name / CACHE_FILENAME
-        migrations.append(
-            build_script_migration(name, cache_path, _read_cache(cache_path))
+        migration = build_script_migration(name, cache_path, _read_cache(cache_path))
+        _merge_prior_quarantine(migration, prior_scripts.get(name))
+        migration.index_docs_before = count_index_docs(
+            cache_path.parent / INDEX_DIR_NAME
         )
+        migrations.append(migration)
     return migrations
 
 
@@ -282,10 +448,15 @@ def _write_quarantine(root: Path, migrations: Sequence[ScriptMigration]) -> str:
     for migration in migrations:
         if not migration.quarantine:
             continue
+        prior = payload["scripts"].get(migration.script_id)
+        prior_records = prior.get("quarantined") if isinstance(prior, dict) else None
+        records = (
+            prior_records if isinstance(prior_records, list) else []
+        ) + migration.quarantine
         payload["scripts"][migration.script_id] = {
             "template_count_before": migration.template_count_before,
-            "quarantined_count": migration.quarantined_count,
-            "quarantined": migration.quarantine,
+            "quarantined_count": len(records),
+            "quarantined": records,
         }
     payload["schema_version"] = SCHEMA_VERSION
     payload["generated_at"] = datetime.now().isoformat()
@@ -313,6 +484,8 @@ def _build_report(
             **counts,
             "legacy_marked": migration.legacy_marked,
             "changed": migration.changed,
+            "index_docs_before": migration.index_docs_before,
+            "index_docs_after": migration.index_docs_after,
             "backup_dir": migration.backup_dir,
         }
         for key in totals:
@@ -324,6 +497,7 @@ def _build_report(
         "apply_stamp": stamp,
         "root": str(root),
         "quarantine_file": quarantine_path,
+        "changed_scripts": sum(1 for migration in migrations if migration.changed),
         "scripts": scripts,
         "totals": totals,
     }
@@ -332,7 +506,10 @@ def _build_report(
 def run_migration(
     root: Path, script_id: Optional[str] = None, apply: bool = False
 ) -> Dict[str, Any]:
-    """执行迁移：dry-run 不写文件，apply 先备份再改写缓存并落盘清单与报告"""
+    """执行迁移：dry-run 不写文件；apply 先备份、再改写缓存并重建索引
+
+    任一写入或重建失败都会从备份恢复已处理的剧本（FR-068），并输出回滚指令。
+    """
     migrations = collect_migrations(root, script_id)
     stamp = _timestamp()
     quarantine_path = str(root / QUARANTINE_FILENAME)
@@ -340,16 +517,34 @@ def run_migration(
     if not apply:
         return _build_report(root, migrations, True, quarantine_path, stamp)
 
-    written = [migration for migration in migrations if migration.changed]
-    for migration in written:
-        _backup_script(root, migration, stamp)
-        _write_json(migration.cache_path, migration.cache_after)
+    written: List[ScriptMigration] = []
+    try:
+        for migration in migrations:
+            if not migration.changed:
+                continue
+            _backup_script(root, migration, stamp)
+            written.append(migration)
+            _write_json(migration.cache_path, migration.cache_after)
+            migration.index_docs_after = _rebuild_index(
+                migration.cache_path.parent,
+                migration.script_id,
+                migration.cache_after,
+            )
 
-    if written:
-        quarantine_path = _write_quarantine(root, written)
-    report = _build_report(root, migrations, False, quarantine_path, stamp)
-    _write_json(root / REPORT_FILENAME, report)
-    return report
+        # 未变更的剧本不重建索引，报告中的“迁移后”沿用磁盘现状
+        for migration in migrations:
+            if not migration.changed:
+                migration.index_docs_after = migration.index_docs_before
+
+        if written:
+            quarantine_path = _write_quarantine(root, written)
+        report = _build_report(root, migrations, False, quarantine_path, stamp)
+        _write_json(root / REPORT_FILENAME, report)
+        return report
+    except Exception as exc:
+        restored = [_restore_from_backup(migration) for migration in written]
+        _print_rollback(written, restored)
+        raise MigrationWriteError(f"迁移写入失败（已回滚）: {exc}") from exc
 
 
 def _print_summary(report: Dict[str, Any]) -> None:
@@ -362,7 +557,8 @@ def _print_summary(report: Dict[str, Any]) -> None:
             f"  {script_id}: 模板 {counts['template_count_before']} → "
             f"隔离 {counts['quarantined_count']} / "
             f"legacy {counts['legacy_count']} / "
-            f"活跃 {counts['active_count']}（本次标记 {counts['legacy_marked']}）"
+            f"活跃 {counts['active_count']}（本次标记 {counts['legacy_marked']}），"
+            f"索引 {counts['index_docs_before']} → {counts['index_docs_after']}"
         )
     totals = report["totals"]
     print(
@@ -373,6 +569,7 @@ def _print_summary(report: Dict[str, Any]) -> None:
     if report["dry_run"]:
         print("dry-run 未写入任何文件；核对无误后加 --apply 执行写入。")
     else:
+        print(f"本次变更剧本: {report['changed_scripts']} 个")
         print(f"报告: {report['root']}/{REPORT_FILENAME}")
         print(f"隔离清单: {report['quarantine_file']}")
 
@@ -405,6 +602,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report = run_migration(
             Path(args.root), script_id=args.script_id, apply=args.apply
         )
+    except MigrationWriteError as exc:
+        print(f"迁移失败: {exc}", file=sys.stderr)
+        return EXIT_WRITE_FAILED
     except MigrationError as exc:
         print(f"迁移失败: {exc}", file=sys.stderr)
         return EXIT_ERROR
