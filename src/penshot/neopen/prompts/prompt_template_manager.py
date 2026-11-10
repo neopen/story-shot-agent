@@ -31,6 +31,7 @@ from penshot.neopen.constants.rag import (
     PROMPT_TEMPLATE_METADATA_TYPE,
     SCRIPT_KB_CHUNK_SIZE,
 )
+from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
 from penshot.neopen.knowledge.embedding_adapter import to_llama_index_embedding
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
@@ -39,6 +40,7 @@ from penshot.neopen.knowledge.metadata_policy import (
     MetadataPolicy,
     PROMPT_TEMPLATE_METADATA_POLICY,
 )
+from penshot.neopen.prompts.ingestion_policy import AUDIT_STATUS_UNKNOWN
 from penshot.neopen.prompts.recall_status import (
     RecallFacts,
     derive_status,
@@ -723,6 +725,12 @@ class PromptTemplateManager:
             # 截断过长的元数据
             truncated_metadata = self._truncate_metadata(metadata)
 
+            # 审计字段同时写入缓存与索引两侧：迁移据此区分 legacy（FR-045/067）
+            if not truncated_metadata.get("schema_version"):
+                truncated_metadata["schema_version"] = CONTRACT_SCHEMA_VERSION
+            if not truncated_metadata.get("audit_status"):
+                truncated_metadata["audit_status"] = AUDIT_STATUS_UNKNOWN
+
             # 生成哈希
             template_hash = self._generate_template_hash(prompt_text)
 
@@ -1003,6 +1011,33 @@ class PromptTemplateManager:
         # 同剧本结果已优先占用名额，这里只按分数挑选补足部分
         candidates.sort(key=lambda item: item["score"], reverse=True)
         return candidates[:top_k], scores, errors, attempted
+
+    def count_active_templates(self, script_id: Optional[str] = None) -> int:
+        """
+        只读统计活跃模板数，供入库策略判定首次运行例外（FR-045）
+
+        不加载索引、不触发重建；缓存未加载时直接读文件统计，
+        避免为被拒绝入库的剧本创建存储目录。
+
+        Args:
+            script_id: 剧本ID（不指定则使用当前剧本）
+
+        Returns:
+            未被标记为 legacy 的模板数
+        """
+        target_script_id = script_id or self._current_script_id or ""
+        if not target_script_id:
+            return 0
+
+        if target_script_id in self._cache_loaded:
+            cache = self._caches.get(target_script_id, [])
+            return sum(1 for item in cache if not is_legacy_template(item))
+
+        script_dir = os.path.join(
+            self.base_storage_dir, "prompt_templates", target_script_id
+        )
+        total, legacy, _ = self._read_global_cache(script_dir)
+        return total - legacy
 
     def get_recall_diagnostics(
         self, script_id: Optional[str] = None, include_global: bool = True
@@ -1333,15 +1368,20 @@ class PromptTemplateManager:
         return f"{template}\n\n根据当前片段调整:\n{original}"
 
     def save_successful_prompt(
-            self,
-            fragment_id: str,
-            prompt_text: str,
-            quality_score: float,
-            script_id: str,
-            additional_metadata: Optional[Dict] = None
+        self,
+        fragment_id: str,
+        prompt_text: str,
+        quality_score: float,
+        script_id: str,
+        additional_metadata: Optional[Dict] = None,
+        source: str = "",
+        audit_status: str = AUDIT_STATUS_UNKNOWN,
     ) -> bool:
         """
         保存成功的提示词（在质量审查通过后调用）
+
+        source 与 audit_status 必须由调用方按 ingestion_policy 的判定结果传入，
+        本方法不再自行标注来源，避免 minor_issues 冒充 quality_audit_passed（FR-045）。
 
         Args:
             fragment_id: 片段ID
@@ -1349,18 +1389,22 @@ class PromptTemplateManager:
             quality_score: 质量分数
             script_id: 剧本ID
             additional_metadata: 额外元数据
+            source: 入库来源（cold_start_seed / quality_audit_score / quality_audit_passed）
+            audit_status: 真实审计状态
 
         Returns:
             是否保存成功
         """
-        metadata = {
+        metadata: Dict[str, Any] = {
             "fragment_id": fragment_id,
             "quality_score": quality_score,
-            "source": "quality_audit_passed"
         }
 
         if additional_metadata:
             metadata.update(additional_metadata)
+
+        metadata["source"] = source
+        metadata["audit_status"] = audit_status
 
         return self.add_template(prompt_text, metadata, script_id=script_id)
 

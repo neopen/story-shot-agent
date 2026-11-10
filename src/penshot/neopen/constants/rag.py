@@ -36,5 +36,7 @@ PROMPT_TEMPLATE_METADATA_KEYS = frozenset(
         "duration",
         "task_id",
         "source",
+        "schema_version",
+        "audit_status",
     }
 )

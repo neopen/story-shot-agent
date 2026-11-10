@@ -61,6 +61,7 @@ from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
+from penshot.neopen.prompts.ingestion_policy import decide_ingestion
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 from penshot.neopen.prompts.recall_status import build_anchor_recall
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
@@ -1275,25 +1276,45 @@ class WorkflowNodes:
                 f"审计结果汇总: 状态={result.status.value}, 分数={result.score}%, 问题统计={result.stats}"
             )
 
-            # 审查通过后，保存成功的提示词
-            if result.status == AuditStatus.PASSED and state.domain.instructions:
-                for fragment in state.domain.instructions.fragments:
-                    self.knowledge_manager.save_successful_prompt(
-                        fragment_id=fragment.fragment_id,
-                        prompt_text=fragment.prompt,
-                        quality_score=result.score,
-                        script_id=state.input.script_id,
-                        additional_metadata={
-                            "scene": getattr(fragment, "scene", ""),
-                            "style": getattr(fragment, "style", ""),
-                            "duration": getattr(fragment, "duration", 0),
-                            "task_id": state.input.task_id,
-                            "script_id": state.input.script_id,
-                        },
-                    )
-                info(
-                    f"质量审查通过，已保存 {len(state.domain.instructions.fragments)} 个成功提示词"
+            # 入库策略与 WorkflowMemory 共用；按整批审计结果判定一次（FR-045）
+            if state.domain.instructions:
+                decision = decide_ingestion(
+                    audit_status=result.status.value,
+                    quality_score=result.score,
+                    active_template_count=self.knowledge_manager.count_active_templates(
+                        state.input.script_id
+                    ),
+                    severities=[v.severity for v in result.violations],
                 )
+                if decision.allowed:
+                    for fragment in state.domain.instructions.fragments:
+                        self.knowledge_manager.save_successful_prompt(
+                            fragment_id=fragment.fragment_id,
+                            prompt_text=fragment.prompt,
+                            quality_score=result.score,
+                            script_id=state.input.script_id,
+                            additional_metadata={
+                                "scene": getattr(fragment, "scene", ""),
+                                "style": getattr(fragment, "style", ""),
+                                "duration": getattr(fragment, "duration", 0),
+                                "task_id": state.input.task_id,
+                                "script_id": state.input.script_id,
+                            },
+                            source=decision.source,
+                            audit_status=decision.audit_status,
+                        )
+                    info(
+                        f"审计入库: source={decision.source}, "
+                        f"audit_status={decision.audit_status}, "
+                        f"片段数={len(state.domain.instructions.fragments)}"
+                    )
+                else:
+                    info(
+                        f"审计结果不满足入库策略，跳过入库: "
+                        f"reason={decision.reason}, "
+                        f"audit_status={decision.audit_status}, "
+                        f"score={result.score}"
+                    )
 
             # 记录错误来源
             if result.status in [AuditStatus.FAILED, AuditStatus.CRITICAL_ISSUES]:

@@ -16,6 +16,7 @@ from datetime import datetime
 
 from penshot.logger import error, debug, info, warning
 from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
+from penshot.neopen.prompts.ingestion_policy import decide_ingestion
 from penshot.utils.log_utils import print_log_exception
 
 
@@ -729,14 +730,29 @@ class WorkflowMemory:
 
     def _update_knowledge_manager_with_success(self, result: Any, stats: Dict) -> None:
         """
-        更新知识管理器中的成功提示词
+        按统一入库策略处理成功提示词的持久化
+
+        与 quality_audit_node 共用 ingestion_policy；本方法在 convert_prompt
+        阶段被调用时尚无审计结果，策略会以 pre_audit 拒绝，因此不会在审计前入库（FR-045）。
 
         Args:
             result: 提示词转换结果
-            stats: 统计信息
+            stats: 统计信息（可携带 audit_status / severities）
         """
         try:
-            if not hasattr(result, 'fragments'):
+            if not hasattr(result, 'fragments') or not self.knowledge_manager:
+                return
+
+            decision = decide_ingestion(
+                audit_status=stats.get("audit_status"),
+                quality_score=stats.get("completeness_score"),
+                active_template_count=self.knowledge_manager.count_active_templates(
+                    self.script_id
+                ),
+                severities=stats.get("severities", ()),
+            )
+            if not decision.allowed:
+                debug(f"入库策略拒绝（{decision.reason}），本阶段不写入模板库")
                 return
 
             for fragment in result.fragments:
@@ -755,7 +771,9 @@ class WorkflowMemory:
                             "style": style,
                             "duration": duration,
                             "stage": "convert_prompt"
-                        }
+                        },
+                        source=decision.source,
+                        audit_status=decision.audit_status,
                     )
 
             debug(f"已更新知识管理器: {len(result.fragments)} 个成功提示词")
