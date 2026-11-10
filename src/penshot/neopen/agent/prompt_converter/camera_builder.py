@@ -1,29 +1,126 @@
-"""结构化相机控制构建（M0.4.3）。
+"""结构化相机控制构建（M0.4.3 / 0.4.4 景别一致性）。
 
 由来源镜头景别与片段描述推导相机参数，供支持运镜的目标模型直出。
+景别探测顺序为「最终提示词文本 > 来源镜头景别 > 默认值」（FR-031），
+别名表覆盖 ``ShotType`` 全部值并按长词优先匹配（FR-030）。
 """
 
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
+from penshot.logger import warning
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     CameraControl,
     CameraMotion,
 )
+from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotType
 
-_SHOT_TYPE_ALIASES = {
-    "close_up": "close_up",
-    "closeup": "close_up",
-    "close": "close_up",
-    "特写": "close_up",
-    "wide_shot": "wide_shot",
-    "wide": "wide_shot",
-    "全景": "wide_shot",
-    "long_shot": "long_shot",
-    "远景": "long_shot",
-    "medium_shot": "medium_shot",
-    "medium": "medium_shot",
-    "中景": "medium_shot",
+DEFAULT_SHOT_TYPE = ShotType.MEDIUM_SHOT.value
+
+# 来源景别精确别名：归一化（小写、空格/连字符转下划线）后精确匹配
+_EXACT_ALIASES: Dict[str, str] = {
+    "close_up": ShotType.CLOSE_UP.value,
+    "closeup": ShotType.CLOSE_UP.value,
+    "close": ShotType.CLOSE_UP.value,
+    "near": ShotType.CLOSE_UP.value,
+    "特写": ShotType.CLOSE_UP.value,
+    "近景": ShotType.CLOSE_UP.value,
+    "extreme_close_up": ShotType.EXTREME_CLOSE_UP.value,
+    "extremecloseup": ShotType.EXTREME_CLOSE_UP.value,
+    "极特写": ShotType.EXTREME_CLOSE_UP.value,
+    "大特写": ShotType.EXTREME_CLOSE_UP.value,
+    "medium_shot": ShotType.MEDIUM_SHOT.value,
+    "medium": ShotType.MEDIUM_SHOT.value,
+    "中景": ShotType.MEDIUM_SHOT.value,
+    "wide_shot": ShotType.WIDE_SHOT.value,
+    "wide": ShotType.WIDE_SHOT.value,
+    "广角": ShotType.WIDE_SHOT.value,
+    "全景": ShotType.WIDE_SHOT.value,
+    "long_shot": ShotType.LONG_SHOT.value,
+    "long": ShotType.LONG_SHOT.value,
+    "远景": ShotType.LONG_SHOT.value,
+    "over_shoulder": ShotType.OVER_SHOULDER.value,
+    "过肩": ShotType.OVER_SHOULDER.value,
+    "pov": ShotType.POV.value,
+    "point_of_view": ShotType.POV.value,
+    "主观": ShotType.POV.value,
+    "第一人称": ShotType.POV.value,
+    "two_shot": ShotType.TWO_SHOT.value,
+    "双人": ShotType.TWO_SHOT.value,
+    "following_shot": ShotType.FOLLOWING_SHOT.value,
+    "follow_shot": ShotType.FOLLOWING_SHOT.value,
+    "跟拍": ShotType.FOLLOWING_SHOT.value,
+    "panorama": ShotType.PANORAMA.value,
+    "摇摄": ShotType.PANORAMA.value,
+    "全景移动": ShotType.PANORAMA.value,
+    "zoom": ShotType.ZOOM.value,
+    "变焦": ShotType.ZOOM.value,
+    "推拉": ShotType.ZOOM.value,
+    "action": ShotType.ACTION.value,
+    "动作镜头": ShotType.ACTION.value,
+    "moving": ShotType.MOVING.value,
+    "移动镜头": ShotType.MOVING.value,
 }
+
+# 文本别名（按长度倒序匹配，保证 "extreme close-up" 不被 "close-up" 截胡）
+_TEXT_ALIASES: List[Tuple[str, str]] = sorted(
+    [
+        ("extreme close-up", ShotType.EXTREME_CLOSE_UP.value),
+        ("extreme close up", ShotType.EXTREME_CLOSE_UP.value),
+        ("extreme_close_up", ShotType.EXTREME_CLOSE_UP.value),
+        ("极特写", ShotType.EXTREME_CLOSE_UP.value),
+        ("大特写", ShotType.EXTREME_CLOSE_UP.value),
+        ("medium close-up", ShotType.CLOSE_UP.value),
+        ("medium close up", ShotType.CLOSE_UP.value),
+        ("over-the-shoulder", ShotType.OVER_SHOULDER.value),
+        ("over the shoulder", ShotType.OVER_SHOULDER.value),
+        ("over_shoulder", ShotType.OVER_SHOULDER.value),
+        ("过肩", ShotType.OVER_SHOULDER.value),
+        ("point-of-view", ShotType.POV.value),
+        ("point of view", ShotType.POV.value),
+        ("following_shot", ShotType.FOLLOWING_SHOT.value),
+        ("following shot", ShotType.FOLLOWING_SHOT.value),
+        ("follow shot", ShotType.FOLLOWING_SHOT.value),
+        ("跟拍", ShotType.FOLLOWING_SHOT.value),
+        ("panoramic shot", ShotType.PANORAMA.value),
+        ("medium_shot", ShotType.MEDIUM_SHOT.value),
+        ("medium shot", ShotType.MEDIUM_SHOT.value),
+        ("中景", ShotType.MEDIUM_SHOT.value),
+        ("中近景", ShotType.CLOSE_UP.value),
+        ("close-up", ShotType.CLOSE_UP.value),
+        ("close up", ShotType.CLOSE_UP.value),
+        ("close_up", ShotType.CLOSE_UP.value),
+        ("closeup", ShotType.CLOSE_UP.value),
+        ("特写", ShotType.CLOSE_UP.value),
+        ("近景", ShotType.CLOSE_UP.value),
+        ("wide_shot", ShotType.WIDE_SHOT.value),
+        ("wide shot", ShotType.WIDE_SHOT.value),
+        ("全景", ShotType.WIDE_SHOT.value),
+        ("广角", ShotType.WIDE_SHOT.value),
+        ("long_shot", ShotType.LONG_SHOT.value),
+        ("long shot", ShotType.LONG_SHOT.value),
+        ("远景", ShotType.LONG_SHOT.value),
+        ("two_shot", ShotType.TWO_SHOT.value),
+        ("two shot", ShotType.TWO_SHOT.value),
+        ("two-shot", ShotType.TWO_SHOT.value),
+        ("双人", ShotType.TWO_SHOT.value),
+        ("pov", ShotType.POV.value),
+        ("主观", ShotType.POV.value),
+        ("第一人称", ShotType.POV.value),
+        ("panorama", ShotType.PANORAMA.value),
+        ("摇摄", ShotType.PANORAMA.value),
+        ("全景移动", ShotType.PANORAMA.value),
+        ("zoom shot", ShotType.ZOOM.value),
+        ("zoom", ShotType.ZOOM.value),
+        ("变焦", ShotType.ZOOM.value),
+        ("推拉", ShotType.ZOOM.value),
+        ("action shot", ShotType.ACTION.value),
+        ("动作镜头", ShotType.ACTION.value),
+        ("moving shot", ShotType.MOVING.value),
+        ("移动镜头", ShotType.MOVING.value),
+    ],
+    key=lambda item: len(item[0]),
+    reverse=True,
+)
 
 _MOTION_KEYWORDS = {
     CameraMotion.PAN: ("pan", "摇镜", "横向移动"),
@@ -36,17 +133,43 @@ _MOTION_KEYWORDS = {
 }
 
 
-def _normalize_shot_type(shot_type: Optional[str], description: str) -> str:
-    """归一化景别，优先使用来源镜头景别，缺失时从描述推断"""
-    raw = (shot_type or "").lower()
-    if raw in _SHOT_TYPE_ALIASES:
-        return _SHOT_TYPE_ALIASES[raw]
-
-    lowered = (description or "").lower()
-    for alias, normalized in _SHOT_TYPE_ALIASES.items():
+def _detect_from_text(text: Optional[str]) -> str:
+    """从最终提示词文本探测景别；无法识别返回空串（FR-031/FR-032）"""
+    lowered = str(text or "").lower()
+    if not lowered:
+        return ""
+    for alias, normalized in _TEXT_ALIASES:
         if alias in lowered:
             return normalized
-    return "medium_shot"
+    return ""
+
+
+def _normalize_source(shot_type: Optional[str]) -> str:
+    """把来源景别归一化为精确匹配键（小写、空格/连字符转下划线）"""
+    raw = str(shot_type or "").strip().lower()
+    return raw.replace("-", "_").replace(" ", "_")
+
+
+def _normalize_shot_type(shot_type: Optional[str], description: str) -> str:
+    """按「提示词文本 > 来源景别 > 默认值」归一化景别（FR-031~033）
+
+    来源景别为已知扩展值时原样输出；完全未知时保留原始值并告警，
+    不静默降级为默认景别。
+    """
+    detected = _detect_from_text(description)
+    if detected:
+        return detected
+
+    source = str(shot_type or "").strip()
+    if not source:
+        return DEFAULT_SHOT_TYPE
+
+    normalized = _EXACT_ALIASES.get(_normalize_source(source))
+    if normalized:
+        return normalized
+
+    warning(f"未知景别来源，保留原始值: {source}")
+    return source
 
 
 def _detect_motion(description: str) -> tuple[CameraMotion, float]:
@@ -69,7 +192,7 @@ def build_camera_control(
         shot_type=normalized_shot_type,
         motion=motion,
         intensity=intensity,
-        rack_focus=normalized_shot_type == "close_up",
+        rack_focus=normalized_shot_type == ShotType.CLOSE_UP.value,
         fps=24,
         shutter_angle=180.0,
     )
