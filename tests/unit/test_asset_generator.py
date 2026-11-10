@@ -353,6 +353,81 @@ def test_character_sheet_prompt_excludes_performance_and_duplicates():
     assert "soft even studio lighting" in prompt
 
 
+def test_character_sheet_prompt_keeps_outfit_accessories():
+    """char_002 缺陷回归：结构化服装里的“佩戴眼镜”必须进入三视图提示词"""
+    parsed = SimpleNamespace(
+        characters=[SimpleNamespace(name="语文老师", description="", key_traits=[])],
+        scenes=[SimpleNamespace(id="scene_001", location="教室", elements=[])],
+        global_metadata=SimpleNamespace(
+            character_outfits=[
+                SimpleNamespace(
+                    character="语文老师",
+                    description="得体的浅色连衣裙或套装，佩戴眼镜，气质温婉。",
+                    color="浅色",
+                    style="知性教师风",
+                    material="棉质",
+                )
+            ],
+            key_props=[],
+            key_locations=[],
+            continuity_notes="",
+            audio_atmosphere="neutral",
+        ),
+        title="走廊",
+    )
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    prompt = build_character_sheet_specs(parsed, contract)[0].image_prompt
+
+    assert "佩戴眼镜" in prompt
+    assert "连衣裙" in prompt
+    assert "气质温婉" not in prompt
+
+
+def test_character_sheet_prompt_supports_english_script():
+    """英文剧本：结构化服装与配饰进入三视图提示词，情绪/动作子句不混入"""
+    parsed = SimpleNamespace(
+        characters=[
+            SimpleNamespace(
+                name="Ethan",
+                description=(
+                    "25-year-old male, short black hair, wearing a yellow raincoat, "
+                    "holding a wet notebook, smiling nervously."
+                ),
+                key_traits=[],
+            )
+        ],
+        scenes=[SimpleNamespace(id="scene_001", location="Corridor", elements=[])],
+        global_metadata=SimpleNamespace(
+            character_outfits=[
+                SimpleNamespace(
+                    character="Ethan",
+                    description=(
+                        "A yellow hooded raincoat with dark trousers, wearing glasses, "
+                        "a kind expression."
+                    ),
+                    color="yellow",
+                    style="functional workwear",
+                    material="PVC",
+                )
+            ],
+            key_props=[],
+            key_locations=[],
+            continuity_notes="",
+            audio_atmosphere="neutral",
+        ),
+        title="The Memory Wall",
+    )
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    prompt = build_character_sheet_specs(parsed, contract)[0].image_prompt
+
+    assert "yellow hooded raincoat with dark trousers" in prompt
+    assert "glasses" in prompt
+    for banned in ("holding", "smiling", "kind expression"):
+        assert banned not in prompt
+
+
 def test_character_sheet_prompt_dedupes_across_anchor_fields():
     """同一描述出现在多个白名单字段时只拼接一次"""
     parsed = _anchor_script()

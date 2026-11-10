@@ -15,12 +15,13 @@ from typing import Any, Dict, List, Optional
 from penshot.logger import info, warning
 from penshot.neopen.agent.base_models import parse_model_name
 from penshot.neopen.agent.continuity_guardian.appearance_anchors import (
-    EXCLUDE_KEYWORDS,
     classify_anchor_domains,
+    contains_keyword,
 )
 from penshot.neopen.agent.continuity_guardian.style_anchors import (
     LIGHTING_FAMILY_MARKERS,
 )
+from penshot.neopen.constants.appearance import EXCLUDE_KEYWORDS
 from penshot.neopen.agent.prompt_converter.camera_builder import (
     detect_shot_type_from_text,
 )
@@ -252,8 +253,8 @@ class RuleQualityAuditor(BaseQualityAuditor):
                     continue
 
                 reasons: List[str] = []
-                if field_name == "clothing" and any(
-                    keyword in text for keyword in EXCLUDE_KEYWORDS
+                if field_name == "clothing" and contains_keyword(
+                    text, EXCLUDE_KEYWORDS
                 ):
                     reasons.append("含情绪/动作/表演词")
                 if text.endswith(_DANGLING_TAIL_MARKERS):

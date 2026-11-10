@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 from penshot.neopen.agent.continuity_guardian.appearance_anchors import (
     APPEARANCE_FIELDS,
+    contains_keyword,
     extract_appearance_anchors,
     extract_appearance_from_text,
     is_appearance_clause,
@@ -15,6 +16,7 @@ from penshot.neopen.agent.continuity_guardian.appearance_anchors import (
     normalize_clothing_value,
     truncate_at_clause_boundary,
 )
+from penshot.neopen.constants.appearance import GARMENT_NOUNS
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     CharacterContract,
     GlobalConsistencyContract,
@@ -39,6 +41,20 @@ CHEN_OUTFIT = {
     "color": "黄色",
     "style": "功能性工装",
     "material": "PVC/防水尼龙",
+}
+
+EN_DESCRIPTION = (
+    "25-year-old male, short black hair, wearing a yellow raincoat, "
+    "holding a wet notebook, smiling nervously."
+)
+EN_OUTFIT = {
+    "description": (
+        "A yellow hooded raincoat with dark trousers, wearing glasses, "
+        "a kind expression."
+    ),
+    "color": "yellow",
+    "style": "functional workwear",
+    "material": "PVC",
 }
 
 
@@ -90,6 +106,68 @@ def test_structured_outfit_does_not_mix_free_text_noise():
     anchors = extract_appearance_anchors(LIN_DESCRIPTION, LIN_OUTFIT)
 
     assert anchors == {"clothing": "素色浅灰棉质外套，肩头微湿"}
+
+
+def test_outfit_accessories_kept_as_separate_anchor():
+    """char_002 缺陷回归：结构化服装中的“佩戴眼镜”应落入 accessories"""
+    outfit = {
+        "description": "得体的浅色连衣裙或套装，佩戴眼镜，气质温婉。",
+        "color": "浅色",
+        "style": "知性教师风",
+        "material": "棉质",
+    }
+
+    anchors = extract_appearance_anchors("", outfit)
+
+    assert anchors["accessories"] == "佩戴眼镜"
+    assert anchors["clothing"] == "得体的浅色连衣裙或套装"
+    assert "气质温婉" not in anchors["clothing"]
+
+
+def test_english_outfit_extracts_clothing_and_accessories():
+    """英文结构化服装：引导词/冠词剥离，配饰单列，情绪子句排除"""
+    anchors = extract_appearance_anchors("", EN_OUTFIT)
+
+    assert anchors["clothing"] == "yellow hooded raincoat with dark trousers"
+    assert anchors["accessories"] == "glasses"
+    assert "kind" not in anchors["clothing"]
+    assert "，" not in anchors["clothing"]
+
+
+def test_english_free_text_extracts_whitelist_fields():
+    """英文自由文本：年龄/性别/发型/服装按白名单提取，动作情绪子句排除"""
+    anchors = extract_appearance_from_text(EN_DESCRIPTION)
+
+    assert anchors["age"] == "25-year-old"
+    assert anchors["gender"] == "male"
+    assert anchors["hair"] == "short black hair"
+    assert anchors["clothing"] == "yellow raincoat"
+    for banned in ("holding", "wet notebook", "smiling", "nervously"):
+        assert banned not in anchors["clothing"]
+
+
+def test_english_clause_boundary_uses_comma_space():
+    """英文子句截断按 “, ” 拼接，不产生中文逗号或半截词"""
+    text = "yellow hooded raincoat, dark trousers, glasses"
+
+    assert truncate_at_clause_boundary(text, 30) == "yellow hooded raincoat"
+    assert (
+        truncate_at_clause_boundary("yellow hooded raincoat", 10)
+        == "yellow hooded raincoat"
+    )
+
+
+def test_english_keywords_match_on_word_boundary():
+    """英文按单词边界匹配：“raincoat”命中，“captain”不因 cap 误命中"""
+    assert contains_keyword("a yellow raincoat", GARMENT_NOUNS)
+    assert not contains_keyword("captain of the team", GARMENT_NOUNS)
+
+
+def test_english_clause_classification_excludes_emotion_and_actions():
+    """英文外观判定与中文同规则：动作/情绪/道具子句不属于外观"""
+    assert is_appearance_clause("wearing a yellow raincoat")
+    assert not is_appearance_clause("smiling nervously")
+    assert not is_appearance_clause("holding a wet notebook")
 
 
 def test_whitelist_fields_only():
