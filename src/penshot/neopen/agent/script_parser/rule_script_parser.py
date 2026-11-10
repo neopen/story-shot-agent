@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: RuleScriptParser.py
 @Description: 规则剧本解析器 - 基于正则表达式的本地解析，作为 LLM 解析器的备用方案
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 14:38
 """

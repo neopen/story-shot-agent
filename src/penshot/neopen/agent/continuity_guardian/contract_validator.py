@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: contract_validator.py
 @Description: 一致性契约校验器（Validator）
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/3
 """

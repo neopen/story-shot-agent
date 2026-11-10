@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: check_docs.py
 @Description: 查看实际存储的文档内容
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/5/21 16:31
 """
 import asyncio

@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: quality_auditor_models.py
 @Description: 质量审核模型
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19 22:58
 """

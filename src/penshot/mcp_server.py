@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: mcp_server.py
 @Description: MCP Server - 所有日志输出到 stderr
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/23 18:39
 """

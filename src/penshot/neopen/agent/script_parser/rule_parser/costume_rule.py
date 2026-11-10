@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE For Details.
 
 @FileName: costume_rule.py
 @Description: 服装规则 - 从服装词表与穿着描述句里抽取角色服装
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/9/17
 """

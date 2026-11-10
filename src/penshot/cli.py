@@ -1,5 +1,5 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
@@ -16,7 +16,8 @@ See LICENSE File For Details.
     story-shot-agent cancel <task_id>      # 取消任务
     story-shot-agent batch -f scripts.txt  # 批量处理
     story-shot-agent-serve                 # 直接启动 REST API 服务器
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/23 18:56
 """
 

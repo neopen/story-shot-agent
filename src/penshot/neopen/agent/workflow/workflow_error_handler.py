@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: workflow_error_handler.py
 @Description: 统一错误处理服务 - 集中管理工作流中的错误处理逻辑
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/4/29
 """
 

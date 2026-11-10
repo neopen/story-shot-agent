@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: task_lifecycle_service.py
 @Description: 任务生命周期服务 - 负责任务状态机管理和生命周期控制
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/4/29
 """
 

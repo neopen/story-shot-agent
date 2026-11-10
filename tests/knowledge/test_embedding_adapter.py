@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_embedding_adapter.py
 @Description: 嵌入模型适配层单元测试（离线，不依赖真实嵌入服务）
-@Author: NeoPen
+@Author: neopen
 """
 from langchain_core.embeddings import Embeddings
 from llama_index.core import Document, VectorStoreIndex

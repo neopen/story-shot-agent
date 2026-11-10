@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_redis_chat_history.py
 @Description: 短期记忆 Redis 会话历史测试（不再依赖 langchain_community）
-@Author: NeoPen
+@Author: neopen
 """
 import json
 from typing import List

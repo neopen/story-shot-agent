@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: llama_index_knowledge.py
 @Description: 剧本知识库管理模块，提供基于LlamaIndex的结构化剧本知识库管理功能
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/12/18
 """

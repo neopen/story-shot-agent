@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: adaptive_llm_cache.py
 @Description: 短期缓存 + 人工反馈清除
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/5/20 18:52
 """
 from datetime import datetime, timedelta

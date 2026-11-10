@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_asset_manifest_plumbing.py
 @Description: 验证 asset_manifest 在任务层、处理器与 REST/SDK 入参中的透传
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/05
 """
 

@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: script_parser_tool.py
 @Description: 剧本解析工具 - 规则解析引擎的适配层，负责解析与文档转换
-@Author: NeoPen
+@Author: neopen
 """
 
 import re

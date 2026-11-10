@@ -1,12 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: 08_asset_handoff.py
 @Description: 下游节点接入示例：消费 asset_plan / route_plan references，
               或将生成的 asset_manifest 回填给 PenShot。
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/5
 """

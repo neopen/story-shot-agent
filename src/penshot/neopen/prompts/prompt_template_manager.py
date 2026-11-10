@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: prompt_template_manager.py
 @Description: 提示词模板管理器 - 负责成功提示词模板的存储、检索和应用，支持剧本ID数据隔离
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/05/05
 """

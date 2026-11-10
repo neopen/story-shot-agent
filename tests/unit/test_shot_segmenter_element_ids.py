@@ -1,7 +1,7 @@
 """
 @FileName: test_shot_segmenter_element_ids.py
 @Description: 校验 LLM 分镜输出的 element_ids 与剧本解析的全局元素ID对齐
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/10
 """

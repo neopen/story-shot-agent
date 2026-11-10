@@ -417,7 +417,7 @@ pytest tests/
 
 This project is licensed under the [MIT](LICENSE) License.
 
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 
 
 ------

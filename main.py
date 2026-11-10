@@ -1,5 +1,5 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
@@ -13,7 +13,7 @@ See LICENSE File For Details.
         5. 通过 uvicorn 启动 FastAPI 应用
 
     步骤严格按顺序执行，只有上一步成功才执行下一步
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/08 - 2025/11
 """
