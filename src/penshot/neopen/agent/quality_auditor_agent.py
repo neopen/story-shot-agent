@@ -10,12 +10,13 @@ See LICENSE File For Details.
 @Time: 2026/1/25 21:59
 """
 import time
-from typing import Optional, Dict, List, Any, Set
+from typing import Optional, Dict, List, Any, Set, cast
 
 from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
 from penshot.neopen.agent.quality_auditor.quality_auditor_factory import QualityAuditorFactory
+from penshot.neopen.agent.quality_auditor.rule_quality_auditor import RuleQualityAuditor
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, AuditStatus, SeverityLevel, IssueType, QualityRepairParams, BasicViolation, \
     RepairHistory
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
@@ -126,7 +127,10 @@ class QualityAuditorAgent:
 
         try:
             # 1. 执行基本规则审查
-            rule_report = self.rule_auditor.audit(instructions, contract=contract)
+            # rule_auditor 由工厂按 AgentMode.RULE 创建，实际类型恒为 RuleQualityAuditor
+            rule_report = cast(RuleQualityAuditor, self.rule_auditor).audit(
+                instructions, contract=contract
+            )
             info(f"基本规则审查完成，发现{len(rule_report.violations)}个问题")
 
             # 2. 执行LLM深度审查（如果启用），传递历史上下文

@@ -169,8 +169,11 @@ def backfill_usage(
     Returns:
         原地回填后的资产计划文档
     """
-    if not isinstance(plan, AssetPlanDocument):
-        plan = AssetPlanDocument.model_validate(plan)
+    document = (
+        plan
+        if isinstance(plan, AssetPlanDocument)
+        else AssetPlanDocument.model_validate(plan)
+    )
 
     rows = _fragment_rows(fragments or [], shots)
     scene_locations = _scene_locations(contract, parsed_script)
@@ -180,7 +183,7 @@ def backfill_usage(
     prop_scenes = _prop_scene_map(parsed_script)
     referenced = _references_by_asset(route_plan)
 
-    for spec in plan.assets:
+    for spec in document.assets:
         if spec.asset_type == AssetType.CHARACTER_SHEET:
             used = [
                 row["id"] for row in rows if row["main_character"] == spec.owner_name
@@ -211,10 +214,10 @@ def backfill_usage(
     debug(
         "资产使用范围回填完成: "
         + ", ".join(
-            f"{spec.asset_id}={len(spec.usage.fragments)}" for spec in plan.assets
+            f"{spec.asset_id}={len(spec.usage.fragments)}" for spec in document.assets
         )
     )
-    return plan
+    return document
 
 
 class AssetGeneratorAgent:
