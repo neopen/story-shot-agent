@@ -167,6 +167,68 @@ def test_process_with_contract_sets_english_style_anchor(monkeypatch):
         contract.style_anchor["description"]
         == "tense atmosphere, high contrast lighting"
     )
+    # T-206：来源与候选一并写入契约，并可随 to_dict 落盘
+    assert contract.style_anchor_provenance["genre_source"] == "continuity_notes"
+    assert contract.style_anchor_provenance["genre_keyword"] == "悬疑"
+    assert contract.style_anchor_provenance["confidence"] == "medium"
+    assert contract.style_anchor_provenance["mood_source"] == "audio_atmosphere"
+    assert (
+        contract.to_dict()["style_anchor_provenance"]
+        == contract.style_anchor_provenance
+    )
+
+
+def test_generate_prompts_node_persists_style_provenance():
+    """T-206：契约 provenance 写入 instructions.metadata（AC-024/027）"""
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(fragment_id="frag_001", prompt="a woman waits", duration=3.0)
+        ]
+    )
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    provenance = {
+        "genre_source": "audio_atmosphere",
+        "genre_keyword": "浪漫",
+        "confidence": "low",
+    }
+    contract.set_style_anchor_provenance(provenance)
+
+    nodes = object.__new__(WorkflowNodes)
+    nodes._update_task_progress = lambda *args, **kwargs: None
+    nodes._complete_stage = lambda *args, **kwargs: None
+    nodes._recall_patterns_by_anchors = lambda state: []
+    nodes.workflow_memory = SimpleNamespace(
+        get_memory_dict=lambda *args, **kwargs: {},
+        get_memory_list=lambda *args, **kwargs: [],
+        after_stage_completion=lambda *args, **kwargs: None,
+    )
+    nodes.prompt_converter = SimpleNamespace(
+        apply_historical_context=lambda *args, **kwargs: None,
+        apply_repair_params=lambda *args, **kwargs: None,
+        process_with_style_consistency=lambda *args, **kwargs: instructions,
+        detect_issues=lambda *args, **kwargs: [],
+        clear_repair_params=lambda *args, **kwargs: None,
+        clear_historical_context=lambda *args, **kwargs: None,
+    )
+    nodes.storage = SimpleNamespace(save_obj_result=lambda *args, **kwargs: None)
+
+    state = WorkflowState.from_raw_script("剧本内容")
+    state.domain.contract = contract
+    state.domain.fragment_sequence = FragmentSequence(
+        fragments=[
+            VideoFragment(
+                id="frag_001",
+                shot_id="shot_001",
+                duration=3.0,
+                description="小明起身",
+                continuity_notes={},
+            )
+        ]
+    )
+
+    nodes.generate_prompts_node(state)
+
+    assert instructions.metadata["style_anchor_provenance"] == provenance
 
 
 def test_process_with_style_consistency_injects_english_prefix():

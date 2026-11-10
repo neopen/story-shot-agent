@@ -859,6 +859,15 @@ class WorkflowNodes:
                 "hits": len(recalled_patterns),
             }
 
+            # 风格溯源随指令落盘（FR-029）：与契约同源，供 AC-024/027 审计
+            provenance = (
+                state.domain.contract.style_anchor_provenance
+                if state.domain.contract
+                else {}
+            )
+            if provenance:
+                instructions.metadata["style_anchor_provenance"] = dict(provenance)
+
             # 统计提示词信息
             prompt_lengths = [len(f.prompt) for f in instructions.fragments]
             debug(

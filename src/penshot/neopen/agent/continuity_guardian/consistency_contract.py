@@ -151,6 +151,8 @@ class GlobalConsistencyContract:
 
     # 风格锚点
     style_anchor: Dict[str, Any] = field(default_factory=dict)
+    # 风格溯源（FR-029）：来源字段、候选、冲突丢弃项
+    style_anchor_provenance: Dict[str, Any] = field(default_factory=dict)
 
     # 资产锚点（角色三视图/道具静帧/场景锚点）
     assets: Dict[str, AssetContract] = field(default_factory=dict)
@@ -185,6 +187,11 @@ class GlobalConsistencyContract:
         """设置风格锚点"""
         self.style_anchor[style_type] = value
         self._record_change("style_anchor", {style_type: value})
+
+    def set_style_anchor_provenance(self, provenance: Mapping[str, Any]):
+        """写入风格溯源（FR-029），重复解析时以最新证据覆盖"""
+        self.style_anchor_provenance = dict(provenance or {})
+        self._record_change("style_anchor_provenance", self.style_anchor_provenance)
 
     def _record_change(self, change_type: str, data: Dict):
         """记录变更历史"""
@@ -240,6 +247,7 @@ class GlobalConsistencyContract:
                 for num, s in self.scenes.items()
             },
             "style_anchor": self.style_anchor,
+            "style_anchor_provenance": self.style_anchor_provenance,
             "assets": {asset_id: a.to_dict() for asset_id, a in self.assets.items()},
             "version": self.version,
         }

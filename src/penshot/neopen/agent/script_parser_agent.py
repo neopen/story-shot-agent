@@ -22,7 +22,7 @@ from .continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
     SceneContract,
 )
-from .continuity_guardian.style_anchors import infer_style_anchor
+from .continuity_guardian.style_anchors import infer_style_anchor_with_provenance
 from .quality_auditor.quality_auditor_models import (
     BasicViolation,
     SeverityLevel,
@@ -143,9 +143,12 @@ def build_contract_from_parsed(
     if title:
         contract.set_style_anchor("title", title)
 
-    # 推断英文 genre / 短英文风格描述，保证 prompt 风格前缀真正生效
-    for key, value in infer_style_anchor(parsed_script).items():
+    # 推断六维风格锚点，并把来源/候选溯源一并写入契约（FR-029）
+    anchor, provenance = infer_style_anchor_with_provenance(parsed_script)
+    for key, value in anchor.items():
         contract.set_style_anchor(key, value)
+    if provenance:
+        contract.set_style_anchor_provenance(provenance)
 
     return contract
 
