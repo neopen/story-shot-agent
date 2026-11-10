@@ -15,7 +15,7 @@ import json
 import os
 import shutil
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 
 from llama_index.core import VectorStoreIndex, Document, load_index_from_storage
 from llama_index.core.indices.base import BaseIndex
@@ -37,6 +37,11 @@ from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
 from penshot.neopen.knowledge.metadata_policy import (
     MetadataPolicy,
     PROMPT_TEMPLATE_METADATA_POLICY,
+)
+from penshot.neopen.prompts.recall_status import (
+    RecallFacts,
+    derive_status,
+    summarize_scores,
 )
 
 # llama-index 当前持久化格式的有效文件判据（FR-046）：
@@ -832,81 +837,216 @@ class PromptTemplateManager:
         except Exception as e:
             warning(f"保存到记忆层失败: {e}")
 
+    def get_recall_diagnostics(
+        self, script_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        获取召回诊断快照（FR-040）
+
+        只读接口：必要时加载缓存与索引，但不触发重建、不写入任何文件内容，
+        供 ``anchor_recall.kb`` 与检索诊断共用同一份事实。
+
+        Args:
+            script_id: 剧本ID（不指定则使用当前剧本）
+
+        Returns:
+            诊断字段字典：template_count / active_template_count / index_docs /
+            legacy_templates / global_template_count / global_scripts /
+            has_index / storage_dir
+        """
+        target_script_id = script_id or self._current_script_id or ""
+        if target_script_id and target_script_id not in self._cache_loaded:
+            self._load_cache_for_script(target_script_id)
+            self._load_index_for_script(target_script_id)
+
+        cache = self._caches.get(target_script_id, [])
+        legacy_count = sum(1 for item in cache if is_legacy_template(item))
+        index = self._indices.get(target_script_id)
+
+        return {
+            "template_count": len(cache),
+            "active_template_count": len(cache) - legacy_count,
+            "index_docs": self._count_index_docs(index),
+            "legacy_templates": legacy_count,
+            "global_template_count": 0,
+            "global_scripts": {},
+            "has_index": index is not None,
+            # 纯路径拼接，避免诊断接口为不存在的剧本创建目录
+            "storage_dir": (
+                os.path.join(
+                    self.base_storage_dir, "prompt_templates", target_script_id
+                )
+                if target_script_id
+                else ""
+            ),
+        }
+
+    def search_similar_detailed(
+        self,
+        query_text: str,
+        script_id: Optional[str] = None,
+        top_k: Optional[int] = None,
+        min_score: Optional[float] = None,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        搜索相似提示词模板并返回结构化诊断（FR-049）
+
+        调用方据第二个返回值区分“无模板 / 索引不可用 / 索引加载失败 /
+        分数不达标 / 检索异常”，不再用空列表静默表示所有失败原因；
+        状态判定统一交给 ``derive_status`` 纯函数（FR-041）。
+
+        Args:
+            query_text: 查询文本
+            script_id: 剧本ID（不指定则使用当前剧本）
+            top_k: 返回数量
+            min_score: 最低相似度分数（显式传 0.0 时按 0.0 处理）
+
+        Returns:
+            ``(相似模板列表, 诊断字典)``；诊断含 script_id / status / attempted /
+            retrieved / hits / min_score / max_score / top_k / threshold /
+            error / kb / last_repair
+        """
+        target_script_id = script_id or self._current_script_id or ""
+        effective_top_k = top_k or self.top_k
+        threshold = self.min_similarity_score if min_score is None else float(min_score)
+
+        results: List[Dict[str, Any]] = []
+        scores: List[float] = []
+        attempted = 0
+        errors: List[str] = []
+
+        if not target_script_id:
+            errors.append("未指定剧本ID且未设置当前剧本，无法检索")
+            debug(errors[0])
+        else:
+            if target_script_id not in self._cache_loaded:
+                self._load_cache_for_script(target_script_id)
+                self._load_index_for_script(target_script_id)
+            cache = self._caches.get(target_script_id, [])
+            has_active = any(not is_legacy_template(item) for item in cache)
+
+            current_index: Optional[BaseIndex] = None
+            if has_active:
+                # 检索前保证索引与活跃缓存一致（FR-047/048）
+                self._ensure_index_ready(target_script_id)
+                current_index = self._indices.get(target_script_id)
+
+            if current_index is not None:
+                attempted = 1
+                # 索引可能早于 legacy 标记，按缓存哈希二次排除（FR-045）
+                legacy_hashes = {
+                    item.get("hash")
+                    for item in cache
+                    if is_legacy_template(item) and item.get("hash")
+                }
+                try:
+                    retriever = current_index.as_retriever(
+                        similarity_top_k=effective_top_k, retriever_mode="similarity"
+                    )
+                    for node in retriever.retrieve(query_text):
+                        score = float(getattr(node, "score", 0.0) or 0.0)
+                        # 记录阈值过滤前的全部分数，供“全部低于阈值”判定
+                        scores.append(score)
+
+                        if score < threshold:
+                            continue
+
+                        metadata = node.node.metadata or {}
+                        if metadata.get("type") != PROMPT_TEMPLATE_METADATA_TYPE:
+                            continue
+                        if is_legacy_template({"metadata": metadata}):
+                            continue
+                        if metadata.get("hash") in legacy_hashes:
+                            continue
+
+                        results.append(
+                            {
+                                "prompt": node.node.text,
+                                "score": score,
+                                "metadata": metadata,
+                                "node_id": node.node.node_id,
+                                "script_id": metadata.get(
+                                    "script_id", target_script_id
+                                ),
+                                "source_scope": "script",
+                                "source_script_id": target_script_id,
+                            }
+                        )
+
+                    results = results[:effective_top_k]
+                except Exception as e:
+                    errors.append(str(e))
+                    results = []
+                    error(f"搜索相似提示词失败: {e}")
+
+        kb = self.get_recall_diagnostics(target_script_id)
+        state = self._index_state(target_script_id) if target_script_id else {}
+        retrieval_error = "; ".join(errors)
+        facts = RecallFacts(
+            template_count=kb["template_count"],
+            active_template_count=kb["active_template_count"],
+            legacy_templates=kb["legacy_templates"],
+            has_index=kb["has_index"],
+            index_docs=kb["index_docs"],
+            index_load_failed=bool(state.get("index_load_failed")),
+            cache_index_mismatch=kb["index_docs"] != kb["active_template_count"],
+            embeddings_available=self.embedding_model is not None,
+            retrieval_error=retrieval_error if not results else "",
+            global_scripts=kb["global_scripts"],
+        )
+        status = derive_status(facts, scores, len(results), 0, False)
+        summary = summarize_scores(scores, effective_top_k)
+
+        diagnostics = {
+            "script_id": target_script_id,
+            "status": status,
+            "attempted": attempted,
+            "retrieved": summary["count"],
+            "hits": len(results),
+            "min_score": summary["min_score"],
+            "max_score": summary["max_score"],
+            "top_k": effective_top_k,
+            "threshold": threshold,
+            "error": retrieval_error,
+            "kb": kb,
+            "last_repair": state.get("last_repair"),
+        }
+
+        debug(
+            f"搜索相似提示词: '{query_text[:50]}...', 状态={status}, "
+            f"检索={summary['count']}, 命中={len(results)}, "
+            f"最高分={summary['max_score']}"
+        )
+        return results, diagnostics
+
     def search_similar(
-            self,
-            query_text: str,
-            script_id: Optional[str] = None,
-            top_k: Optional[int] = None,
-            min_score: Optional[float] = None,
-            include_global: bool = True
+        self,
+        query_text: str,
+        script_id: Optional[str] = None,
+        top_k: Optional[int] = None,
+        min_score: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
-        搜索相似提示词模板
+        搜索相似提示词模板（兼容包装，只返回结果列表）
+
+        需要区分失败原因时请改用 ``search_similar_detailed``（FR-049）。
 
         Args:
             query_text: 查询文本
             script_id: 剧本ID（不指定则使用当前剧本）
             top_k: 返回数量
             min_score: 最低相似度分数
-            include_global: 是否包含全局模板（其他剧本）
 
         Returns:
             相似模板列表
         """
-        target_script_id = script_id or self._current_script_id
-
-        if not target_script_id:
-            debug("未指定剧本ID且未设置当前剧本，无法搜索")
-            return []
-
-        # 检索前保证索引与活跃缓存一致（FR-047/048）
-        self._ensure_index_ready(target_script_id)
-
-        current_index = self._indices.get(target_script_id)
-        if not current_index:
-            debug(f"剧本 {target_script_id} 的索引未初始化")
-            return []
-
-        cache = self._caches.get(target_script_id, [])
-        if len(cache) == 0:
-            debug(f"剧本 {target_script_id} 的模板库为空")
-            return []
-
-        try:
-            top_k = top_k or self.top_k
-            min_score = min_score or self.min_similarity_score
-
-            retriever = current_index.as_retriever(
-                similarity_top_k=top_k,
-                retriever_mode="similarity"
-            )
-
-            nodes = retriever.retrieve(query_text)
-
-            results = []
-            for node in nodes:
-                score = getattr(node, 'score', 0)
-
-                if score < min_score:
-                    continue
-
-                if node.node.metadata.get("type") != PROMPT_TEMPLATE_METADATA_TYPE:
-                    continue
-
-                results.append({
-                    "prompt": node.node.text,
-                    "score": score,
-                    "metadata": node.node.metadata,
-                    "node_id": node.node.node_id,
-                    "script_id": node.node.metadata.get("script_id", target_script_id)
-                })
-
-            debug(f"搜索相似提示词: '{query_text[:50]}...', 找到 {len(results)} 个结果")
-            return results[:top_k]
-
-        except Exception as e:
-            error(f"搜索相似提示词失败: {e}")
-            return []
+        results, _ = self.search_similar_detailed(
+            query_text,
+            script_id=script_id,
+            top_k=top_k,
+            min_score=min_score,
+        )
+        return results
 
     def get_best_match(
             self,
