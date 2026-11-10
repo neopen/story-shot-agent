@@ -218,8 +218,8 @@ def test_route_model_node_does_not_block_on_failure():
     assert state.execution.current_node == PipelineNode.ROUTE_MODEL
 
 
-def test_contract_schema_version_is_0_4_3():
-    assert CONTRACT_SCHEMA_VERSION == "0.4.3"
+def test_contract_schema_version_is_0_4_4():
+    assert CONTRACT_SCHEMA_VERSION == "0.4.4"
 
 
 if __name__ == "__main__":
