@@ -12,6 +12,7 @@ See LICENSE File For Details.
 
 from penshot.neopen.agent.asset_generator.asset_generator_agent import (
     AssetGeneratorAgent,
+    backfill_usage,
 )
 from penshot.neopen.agent.asset_generator.asset_models import (
     ASSET_SCHEMA_VERSION,
@@ -53,6 +54,7 @@ __all__ = [
     "AssetType",
     "AssetUsage",
     "ImageClientExecutionAdapter",
+    "backfill_usage",
     "build_character_sheet_specs",
     "build_prop_specs",
     "build_scene_specs",
