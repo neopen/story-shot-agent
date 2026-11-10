@@ -19,7 +19,10 @@ from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
 )
-from penshot.neopen.agent.continuity_guardian.style_anchors import build_style_prefix
+from penshot.neopen.agent.continuity_guardian.style_anchors import (
+    build_style_prefix,
+    build_style_text,
+)
 from penshot.neopen.agent.prompt_converter.prompt_converter_factory import (
     PromptConverterFactory,
 )
@@ -196,12 +199,16 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         # 应用风格锚点
         style_anchor = contract.style_anchor
         if style_anchor:
-            # 为每个片段添加统一的英文风格一致性前缀
-            style_prefix = build_style_prefix(style_anchor)
+            provenance = getattr(contract, "style_anchor_provenance", None)
+            # 一次渲染同时产出前缀与 fragment.style（FR-025），避免两处各自声明风格/打光
+            style_text = build_style_text(style_anchor, provenance)
+            style_prefix = f"[Style: {style_text}]" if style_text else ""
 
             for fragment in instructions.fragments:
                 if style_prefix and style_prefix not in fragment.prompt:
                     fragment.prompt = f"{style_prefix} {fragment.prompt}"
+                if style_text:
+                    fragment.style = style_text
 
         # 注入角色外观锚点（同一角色在跨片段使用契约中的统一外观）
         self._apply_character_anchors(instructions, fragment_sequence, contract)
@@ -723,15 +730,21 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
 
         # ========== 4. 修复风格不一致 ==========
         if style_issues:
-            # 统一使用默认风格
-            default_style = self.config.default_style
+            # 与风格前缀同源（FR-025）：保留既有风格来源，不再用默认风格覆盖一套
+            style_counts: Dict[str, int] = {}
             for prompt in instructions.fragments:
-                if prompt.style and prompt.style != default_style:
-                    old_style = prompt.style
-                    prompt.style = default_style
-                    repair_actions.append(
-                        f"统一风格: {prompt.fragment_id} {old_style} -> {default_style}"
-                    )
+                if prompt.style:
+                    style_counts[prompt.style] = style_counts.get(prompt.style, 0) + 1
+
+            if len(style_counts) > 1:
+                target_style = max(style_counts, key=lambda value: style_counts[value])
+                for prompt in instructions.fragments:
+                    if prompt.style and prompt.style != target_style:
+                        old_style = prompt.style
+                        prompt.style = target_style
+                        repair_actions.append(
+                            f"统一风格: {prompt.fragment_id} {old_style} -> {target_style}"
+                        )
 
         # ========== 5. 修复负面提示词 ==========
         if negative_issues:

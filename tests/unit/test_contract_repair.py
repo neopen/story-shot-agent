@@ -112,10 +112,10 @@ class TestContractAnchorDescriptions:
         assert describe_character_anchors(_full_contract(), "") == ""
 
     def test_style_anchor_uses_english_prefix(self):
-        """风格锚点复用英文风格前缀"""
+        """风格锚点复用英文六维前缀"""
         text = describe_style_anchors(_full_contract())
         assert "[Style:" in text
-        assert "tense atmosphere" in text
+        assert "high contrast lighting" in text
 
     def test_scene_anchor_includes_location_and_time(self):
         """场景锚点包含地点与时间"""
@@ -286,7 +286,7 @@ class TestRepairerContractDriven:
 
         suggestion = params.suggestions["frag_002"][0]
         assert "[Style:" in suggestion
-        assert "tense atmosphere" in suggestion
+        assert "high contrast lighting" in suggestion
 
     def test_scene_issue_uses_scene_anchor(self):
         """场景问题注入契约场景锚点"""

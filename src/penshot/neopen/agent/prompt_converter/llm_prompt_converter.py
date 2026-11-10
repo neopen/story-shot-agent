@@ -189,14 +189,28 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
                 info(f"修复截断提示词: {prompt.fragment_id}")
         return instructions
 
-    def _fix_style_consistency(self, instructions: AIVideoInstructions) -> AIVideoInstructions:
-        """修复风格一致性"""
-        default_style = self.config.default_style
+    def _fix_style_consistency(
+        self, instructions: AIVideoInstructions
+    ) -> AIVideoInstructions:
+        """修复风格一致性
+
+        以多数片段的既有风格为统一目标，避免用默认风格覆盖来源风格；
+        契约风格由调用方在同一渲染结果上注入（FR-025）。
+        """
+        style_counts: Dict[str, int] = {}
         for prompt in instructions.fragments:
-            if prompt.style and prompt.style != default_style:
+            if prompt.style:
+                style_counts[prompt.style] = style_counts.get(prompt.style, 0) + 1
+
+        if len(style_counts) <= 1:
+            return instructions
+
+        target_style = max(style_counts, key=lambda value: style_counts[value])
+        for prompt in instructions.fragments:
+            if prompt.style and prompt.style != target_style:
                 old_style = prompt.style
-                prompt.style = default_style
-                info(f"统一风格: {prompt.fragment_id} {old_style} -> {default_style}")
+                prompt.style = target_style
+                info(f"统一风格: {prompt.fragment_id} {old_style} -> {target_style}")
         return instructions
 
     def _fix_negative_prompts(self, instructions: AIVideoInstructions) -> AIVideoInstructions:

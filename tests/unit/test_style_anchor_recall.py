@@ -23,6 +23,10 @@ from penshot.neopen.agent.continuity_guardian.style_anchors import (
     build_style_prefix,
     infer_style_anchor,
 )
+from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
+    AIVideoInstructions,
+    AIVideoPrompt,
+)
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import (
     ShotInfo,
     ShotSequence,
@@ -57,12 +61,16 @@ def _parsed_script(**overrides):
 
 
 def test_infer_style_anchor_from_explicit_metadata():
-    """显式英文 genre 优先，并采用显式英文风格描述"""
+    """显式英文 genre 优先，六维取题材风格，显式英文描述保留"""
     parsed = _parsed_script(
         metadata={"genre": "thriller", "style_description": "high contrast lighting"}
     )
     assert infer_style_anchor(parsed) == {
         "genre": "thriller",
+        "lighting": "high contrast lighting",
+        "palette": "desaturated palette",
+        "mood": "tense",
+        "framing": "shadowed framing",
         "description": "high contrast lighting",
     }
 
@@ -120,18 +128,21 @@ def test_infer_style_anchor_empty_signals():
 
 
 def test_build_style_prefix_skips_chinese():
-    """中文风格描述被跳过，只保留英文 genre 描述"""
+    """中文风格描述被跳过，维度值按固定顺序输出"""
     prefix = build_style_prefix(
         {"genre": "drama", "description": "雨夜街道，霓虹灯闪烁"}
     )
-    assert prefix == "[Style: naturalistic lighting, emotional depth]"
+    assert prefix == "[Style: drama, naturalistic lighting, muted colors, emotional]"
     assert "雨夜" not in prefix
 
 
 def test_build_style_prefix_dedupes():
-    """genre 与 atmosphere 映射出相同描述时去重"""
+    """题材与氛围映射到同一维度时不重复输出"""
     prefix = build_style_prefix({"genre": "thriller", "atmosphere": "tense"})
-    assert prefix == "[Style: tense atmosphere, high contrast lighting]"
+    assert prefix == (
+        "[Style: thriller, high contrast lighting, desaturated palette, "
+        "tense, shadowed framing]"
+    )
 
 
 def test_process_with_contract_sets_english_style_anchor(monkeypatch):
@@ -179,6 +190,99 @@ def test_process_with_style_consistency_injects_english_prefix():
     assert instructions.fragments[0].prompt.startswith("[Style:")
     assert instructions.fragments[0].prompt.endswith("a woman waits")
     assert instructions.fragments[0].prompt.count("[Style:") == 1
+
+
+def test_fragment_style_shares_render_with_prefix():
+    """T-207：fragment.style 与 [Style: ...] 前缀同源（FR-025/AC-022）"""
+    from penshot.neopen.agent.prompt_converter_agent import PromptConverterAgent
+
+    agent = object.__new__(PromptConverterAgent)
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.set_style_anchor("genre", "romance")
+    contract.set_style_anchor("atmosphere", "romantic")
+
+    fragment_sequence = SimpleNamespace(
+        fragments=[SimpleNamespace(id="frag_001", continuity_notes={})]
+    )
+    instructions = SimpleNamespace(
+        fragments=[
+            SimpleNamespace(
+                fragment_id="frag_001",
+                prompt="a woman waits",
+                style="high contrast lighting, suspense",
+            )
+        ]
+    )
+    agent.prompt_process = lambda fs, ps: instructions
+
+    agent.process_with_style_consistency(fragment_sequence, None, contract)
+
+    fragment = instructions.fragments[0]
+    assert (
+        fragment.style
+        == "romance, soft warm lighting, warm palette, romantic, intimate framing"
+    )
+    assert fragment.prompt.startswith(f"[Style: {fragment.style}] ")
+    assert "high contrast lighting" not in fragment.prompt
+    assert fragment.prompt.count("[Style:") == 1
+
+
+def test_repair_prompts_keeps_uniform_contract_style():
+    """T-207：修复风格不一致时保留同源风格，不用默认风格覆盖"""
+    from penshot.neopen.agent.prompt_converter_agent import PromptConverterAgent
+    from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
+        BasicViolation,
+        RuleType,
+    )
+
+    agent = object.__new__(PromptConverterAgent)
+    contract_style = "romance, soft warm lighting, warm palette, romantic"
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(
+                fragment_id=f"frag_00{index}",
+                prompt="a woman waits",
+                duration=3.0,
+                style=contract_style,
+            )
+            for index in range(1, 4)
+        ]
+    )
+    issues = [BasicViolation.create_violation(rule_type=RuleType.STYLE_INCONSISTENT)]
+
+    agent.repair_prompts(instructions, issues, SimpleNamespace(fragments=[]))
+
+    assert {fragment.style for fragment in instructions.fragments} == {contract_style}
+
+
+def test_llm_fix_style_consistency_uses_dominant_style():
+    """T-207：转换器修复风格时统一到多数片段风格，不另取默认风格"""
+    from penshot.neopen.agent.prompt_converter.llm_prompt_converter import (
+        LLMPromptConverter,
+    )
+
+    converter = object.__new__(LLMPromptConverter)
+    dominant = "romance, soft warm lighting, warm palette"
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(
+                fragment_id="frag_001", prompt="a", duration=3.0, style=dominant
+            ),
+            AIVideoPrompt(
+                fragment_id="frag_002", prompt="b", duration=3.0, style=dominant
+            ),
+            AIVideoPrompt(
+                fragment_id="frag_003",
+                prompt="c",
+                duration=3.0,
+                style="high contrast lighting",
+            ),
+        ]
+    )
+
+    converter._fix_style_consistency(instructions)
+
+    assert {fragment.style for fragment in instructions.fragments} == {dominant}
 
 
 # ---------------------------------------------------------------------------
