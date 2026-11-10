@@ -71,7 +71,10 @@ from penshot.neopen.agent.model_adapter import (
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
-from penshot.neopen.agent.asset_generator import AssetGeneratorAgent
+from penshot.neopen.agent.asset_generator import (
+    AssetGeneratorAgent,
+    backfill_usage,
+)
 from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
 
 
@@ -393,9 +396,7 @@ class WorkflowNodes:
             )
 
             if report.generated > 0:
-                self._update_task_status(
-                    state.input.task_id, TaskStatus.PROCESSING
-                )
+                self._update_task_status(state.input.task_id, TaskStatus.PROCESSING)
             debug(
                 f"资产锚点处理完成: 模式={report.mode}, 已生成={report.generated}, "
                 f"待生成={report.pending}, 失败={report.failed}, 跳过={report.skipped}"
@@ -956,12 +957,18 @@ class WorkflowNodes:
             target_model = instructions.metadata.get("video_model")
             adapted_packages = adapt_instructions(instructions, target_model)
 
+            fragments = getattr(state.domain.fragment_sequence, "fragments", None)
+            shots = getattr(state.domain.shot_sequence, "shots", None)
+
             # 图生视频优先（M0.4.2）：先挂载资产引用，再由规则路由覆盖模型与生成模式
             two_stage_count = apply_image_to_video_routing(
                 adapted_packages,
                 instructions,
                 state.domain.contract,
                 state.domain.asset_manifest,
+                fragments=fragments,
+                shots=shots,
+                parsed_script=state.domain.parsed_script,
             )
 
             plan = build_route_plan(
@@ -969,7 +976,13 @@ class WorkflowNodes:
             )
             plan.adapted_packages = adapted_packages
             instructions.route_plan = plan.model_dump(mode="json")
-            instructions.asset_plan = state.domain.asset_plan
+
+            # FR-014/AC-017：路由后回填 usage，并用与 ASSETS 节点一致的序列化路径
+            # 重写 asset_plan.json，再同步 instructions.asset_plan 落盘
+            asset_plan = self._backfill_asset_plan(
+                state, plan, fragments=fragments, shots=shots
+            )
+            instructions.asset_plan = asset_plan
             instructions.asset_manifest = state.domain.asset_manifest
 
             self.storage.save_obj_result(
@@ -994,6 +1007,39 @@ class WorkflowNodes:
             state.execution.current_stage = AgentStage.CONVERTER
 
         return state
+
+    def _backfill_asset_plan(
+        self,
+        state: WorkflowState,
+        route_plan: Any,
+        fragments: Optional[List[Any]] = None,
+        shots: Optional[List[Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """路由后回填资产使用范围并重写 asset_plan.json（FR-014/AC-017）
+
+        两份资产计划共用同一份回填结果：``asset_plan.json`` 与
+        ``prompt_converter_result.json.asset_plan`` 都来自
+        ``state.domain.asset_plan``，保证 ``usage`` 完全一致。
+        """
+        if not state.domain.asset_plan:
+            return state.domain.asset_plan
+
+        plan = backfill_usage(
+            state.domain.asset_plan,
+            fragments=fragments,
+            shots=shots,
+            contract=state.domain.contract,
+            route_plan=route_plan,
+            parsed_script=state.domain.parsed_script,
+        )
+        state.domain.asset_plan = plan.to_dict()
+        self.storage.save_obj_result(
+            state.input.script_id,
+            state.input.task_id,
+            plan,
+            "asset_plan.json",
+        )
+        return state.domain.asset_plan
 
     def _recall_patterns_by_anchors(self, state: WorkflowState) -> List[str]:
         """按角色/场景锚点召回历史成功提示词（向量检索）
@@ -2278,9 +2324,7 @@ class WorkflowNodes:
         Returns:
             修复参数
         """
-        return self.generator.generate_repair_params(
-            issues, stage, contract=contract
-        )
+        return self.generator.generate_repair_params(issues, stage, contract=contract)
 
     def _record_continuity_round(
         self, state: WorkflowState, record: Dict[str, Any]
