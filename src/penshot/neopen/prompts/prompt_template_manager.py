@@ -20,6 +20,7 @@ from typing import List, Dict, Any, Optional, Set, Tuple
 from llama_index.core import VectorStoreIndex, Document, load_index_from_storage
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import MetadataMode
 from llama_index.core.storage import StorageContext
 
 from penshot.logger import debug, info, error, warning
@@ -131,6 +132,11 @@ class PromptTemplateManager:
         self._index_states: Dict[str, Dict[str, Any]] = {}
         # 同一任务（同一管理器实例）内每个剧本最多重建一次
         self._index_rebuilt: Set[str] = set()
+
+        # 跨剧本只读召回来源（FR-044）：script_id -> 统计与已持久化索引
+        # 与 _indices/_caches 分开存放，确保不写回、不参与重建
+        self._global_sources: Dict[str, Dict[str, Any]] = {}
+        self._global_scanned: Set[str] = set()
 
         # 节点解析器
         self.node_parser = SentenceSplitter(
@@ -837,8 +843,169 @@ class PromptTemplateManager:
         except Exception as e:
             warning(f"保存到记忆层失败: {e}")
 
+    @staticmethod
+    def _read_global_cache(script_dir: str) -> Tuple[int, int, Set[str]]:
+        """只读统计其他剧本缓存：模板总数、legacy 数与 legacy 哈希集合"""
+        cache_path = os.path.join(script_dir, "templates_cache.json")
+        if not os.path.exists(cache_path):
+            return 0, 0, set()
+
+        try:
+            with open(cache_path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except Exception as e:
+            warning(f"跨剧本缓存读取失败，按空模板处理: {cache_path}, {e}")
+            return 0, 0, set()
+
+        entries = [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+        legacy_entries = [item for item in entries if is_legacy_template(item)]
+        legacy_hashes = {
+            str(item["hash"]) for item in legacy_entries if item.get("hash")
+        }
+        return len(entries), len(legacy_entries), legacy_hashes
+
+    def _scan_global_sources(self, exclude_script_id: str) -> Dict[str, Dict[str, Any]]:
+        """
+        只读扫描其他剧本的模板统计（FR-044）
+
+        纯路径拼接遍历 ``base/prompt_templates/*``，不创建目录、不加载索引、
+        不写入任何数据；每个管理器实例只扫描一次，索引在首次检索时懒加载。
+
+        Args:
+            exclude_script_id: 当前剧本ID（不作为跨剧本来源）
+
+        Returns:
+            script_id -> 来源信息（目录、模板统计、legacy 哈希、索引槽）
+        """
+        if exclude_script_id not in self._global_scanned:
+            root = os.path.join(self.base_storage_dir, "prompt_templates")
+            names = sorted(os.listdir(root)) if os.path.isdir(root) else []
+            for name in names:
+                script_dir = os.path.join(root, name)
+                if name == exclude_script_id or not os.path.isdir(script_dir):
+                    continue
+                if name in self._global_sources:
+                    continue
+                total, legacy, legacy_hashes = self._read_global_cache(script_dir)
+                self._global_sources[name] = {
+                    "dir": script_dir,
+                    "template_count": total,
+                    "legacy_templates": legacy,
+                    "active_template_count": total - legacy,
+                    "legacy_hashes": legacy_hashes,
+                    "index": None,
+                    "index_loaded": False,
+                    "index_load_failed": False,
+                }
+            self._global_scanned.add(exclude_script_id)
+
+        return {
+            script_id: source
+            for script_id, source in self._global_sources.items()
+            if script_id != exclude_script_id
+        }
+
+    def _load_global_index(self, source: Dict[str, Any]) -> Optional[BaseIndex]:
+        """只读加载其他剧本已持久化的索引；缺失或失败即跳过，绝不重建或写回"""
+        if source["index_loaded"]:
+            cached: Optional[BaseIndex] = source["index"]
+            return cached
+
+        source["index_loaded"] = True
+        index_dir = os.path.join(source["dir"], "index_store")
+        if not any(
+            os.path.exists(os.path.join(index_dir, name)) for name in _INDEX_FILENAMES
+        ):
+            debug(f"跨剧本索引缺失，跳过: {index_dir}")
+            return None
+
+        try:
+            storage_context = StorageContext.from_defaults(persist_dir=index_dir)
+            index = load_index_from_storage(
+                storage_context=storage_context,
+                index_id=None,
+                embed_model=self.embedding_model,
+            )
+        except Exception as e:
+            source["index_load_failed"] = True
+            warning(f"跨剧本索引加载失败，跳过: {index_dir}, {e}")
+            return None
+
+        source["index"] = index
+        return index
+
+    def _retrieve_global(
+        self,
+        query_text: str,
+        sources: Dict[str, Dict[str, Any]],
+        top_k: int,
+        threshold: float,
+    ) -> Tuple[List[Dict[str, Any]], List[float], List[str], int]:
+        """
+        跨剧本只读检索，按分数补足剩余名额（FR-044）
+
+        Args:
+            query_text: 查询文本
+            sources: `_scan_global_sources` 给出的候选来源
+            top_k: 剩余名额
+            threshold: 最低相似度分数
+
+        Returns:
+            ``(命中列表, 全部分数, 异常信息列表, 实际执行的检索次数)``
+        """
+        candidates: List[Dict[str, Any]] = []
+        scores: List[float] = []
+        errors: List[str] = []
+        attempted = 0
+
+        for script_id, source in sources.items():
+            # 缓存全为 legacy 的剧本不参与召回（AC-043C）
+            if source["template_count"] > 0 and source["active_template_count"] == 0:
+                continue
+            index = self._load_global_index(source)
+            if index is None:
+                continue
+
+            try:
+                retriever = index.as_retriever(
+                    similarity_top_k=top_k, retriever_mode="similarity"
+                )
+                attempted += 1
+                for node in retriever.retrieve(query_text):
+                    score = float(getattr(node, "score", 0.0) or 0.0)
+                    scores.append(score)
+                    if score < threshold:
+                        continue
+                    metadata = node.node.metadata or {}
+                    if metadata.get("type") != PROMPT_TEMPLATE_METADATA_TYPE:
+                        continue
+                    if is_legacy_template({"metadata": metadata}):
+                        continue
+                    if str(metadata.get("hash")) in source["legacy_hashes"]:
+                        continue
+                    candidates.append(
+                        {
+                            "prompt": node.node.get_content(
+                                metadata_mode=MetadataMode.NONE
+                            ),
+                            "score": score,
+                            "metadata": metadata,
+                            "node_id": node.node.node_id,
+                            "script_id": script_id,
+                            "source_scope": "global",
+                            "source_script_id": script_id,
+                        }
+                    )
+            except Exception as e:
+                errors.append(f"{script_id}: {e}")
+                warning(f"跨剧本检索失败，跳过 {script_id}: {e}")
+
+        # 同剧本结果已优先占用名额，这里只按分数挑选补足部分
+        candidates.sort(key=lambda item: item["score"], reverse=True)
+        return candidates[:top_k], scores, errors, attempted
+
     def get_recall_diagnostics(
-        self, script_id: Optional[str] = None
+        self, script_id: Optional[str] = None, include_global: bool = True
     ) -> Dict[str, Any]:
         """
         获取召回诊断快照（FR-040）
@@ -848,6 +1015,7 @@ class PromptTemplateManager:
 
         Args:
             script_id: 剧本ID（不指定则使用当前剧本）
+            include_global: 是否统计跨剧本来源（与检索开关保持一致）
 
         Returns:
             诊断字段字典：template_count / active_template_count / index_docs /
@@ -862,14 +1030,26 @@ class PromptTemplateManager:
         cache = self._caches.get(target_script_id, [])
         legacy_count = sum(1 for item in cache if is_legacy_template(item))
         index = self._indices.get(target_script_id)
+        sources = (
+            self._scan_global_sources(target_script_id)
+            if include_global and target_script_id
+            else {}
+        )
 
         return {
             "template_count": len(cache),
             "active_template_count": len(cache) - legacy_count,
             "index_docs": self._count_index_docs(index),
-            "legacy_templates": legacy_count,
-            "global_template_count": 0,
-            "global_scripts": {},
+            # 汇总本次召回排除的 legacy（当前剧本 + 其他剧本），
+            # 而 template_count/active_template_count 仍只描述当前剧本
+            "legacy_templates": legacy_count
+            + sum(source["legacy_templates"] for source in sources.values()),
+            "global_template_count": sum(
+                source["active_template_count"] for source in sources.values()
+            ),
+            "global_scripts": {
+                script: source["dir"] for script, source in sources.items()
+            },
             "has_index": index is not None,
             # 纯路径拼接，避免诊断接口为不存在的剧本创建目录
             "storage_dir": (
@@ -887,6 +1067,7 @@ class PromptTemplateManager:
         script_id: Optional[str] = None,
         top_k: Optional[int] = None,
         min_score: Optional[float] = None,
+        include_global: bool = True,
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         搜索相似提示词模板并返回结构化诊断（FR-049）
@@ -900,11 +1081,12 @@ class PromptTemplateManager:
             script_id: 剧本ID（不指定则使用当前剧本）
             top_k: 返回数量
             min_score: 最低相似度分数（显式传 0.0 时按 0.0 处理）
+            include_global: 是否包含全局模板（其他剧本）
 
         Returns:
             ``(相似模板列表, 诊断字典)``；诊断含 script_id / status / attempted /
-            retrieved / hits / min_score / max_score / top_k / threshold /
-            error / kb / last_repair
+            retrieved / hits / local_hits / global_hits / min_score / max_score /
+            top_k / threshold / include_global / error / kb / last_repair
         """
         target_script_id = script_id or self._current_script_id or ""
         effective_top_k = top_k or self.top_k
@@ -930,6 +1112,9 @@ class PromptTemplateManager:
                 # 检索前保证索引与活跃缓存一致（FR-047/048）
                 self._ensure_index_ready(target_script_id)
                 current_index = self._indices.get(target_script_id)
+            else:
+                # 无可召回模板：不检索、不重建，也不留下索引槽位（FR-043/044）
+                current_index = self._indices.pop(target_script_id, None)
 
             if current_index is not None:
                 attempted = 1
@@ -979,8 +1164,31 @@ class PromptTemplateManager:
                     results = []
                     error(f"搜索相似提示词失败: {e}")
 
-        kb = self.get_recall_diagnostics(target_script_id)
+            # 同剧本名额未用满时回退到其他剧本的活跃模板（FR-044）
+            if (
+                include_global
+                and self.embedding_model is not None
+                and len(results) < effective_top_k
+            ):
+                global_results, global_scores, global_errors, global_attempted = (
+                    self._retrieve_global(
+                        query_text,
+                        self._scan_global_sources(target_script_id),
+                        effective_top_k - len(results),
+                        threshold,
+                    )
+                )
+                results.extend(global_results)
+                scores.extend(global_scores)
+                errors.extend(global_errors)
+                attempted += global_attempted
+
+        kb = self.get_recall_diagnostics(
+            target_script_id, include_global=include_global
+        )
         state = self._index_state(target_script_id) if target_script_id else {}
+        local_hits = sum(1 for item in results if item.get("source_scope") == "script")
+        global_hits = len(results) - local_hits
         retrieval_error = "; ".join(errors)
         facts = RecallFacts(
             template_count=kb["template_count"],
@@ -991,10 +1199,11 @@ class PromptTemplateManager:
             index_load_failed=bool(state.get("index_load_failed")),
             cache_index_mismatch=kb["index_docs"] != kb["active_template_count"],
             embeddings_available=self.embedding_model is not None,
+            # 个别来源失败不掩盖已取得的可用命中，异常仍完整记录在 error 中
             retrieval_error=retrieval_error if not results else "",
             global_scripts=kb["global_scripts"],
         )
-        status = derive_status(facts, scores, len(results), 0, False)
+        status = derive_status(facts, scores, local_hits, global_hits, include_global)
         summary = summarize_scores(scores, effective_top_k)
 
         diagnostics = {
@@ -1003,10 +1212,13 @@ class PromptTemplateManager:
             "attempted": attempted,
             "retrieved": summary["count"],
             "hits": len(results),
+            "local_hits": local_hits,
+            "global_hits": global_hits,
             "min_score": summary["min_score"],
             "max_score": summary["max_score"],
             "top_k": effective_top_k,
             "threshold": threshold,
+            "include_global": include_global,
             "error": retrieval_error,
             "kb": kb,
             "last_repair": state.get("last_repair"),
@@ -1014,8 +1226,8 @@ class PromptTemplateManager:
 
         debug(
             f"搜索相似提示词: '{query_text[:50]}...', 状态={status}, "
-            f"检索={summary['count']}, 命中={len(results)}, "
-            f"最高分={summary['max_score']}"
+            f"检索={summary['count']}, 命中={len(results)}"
+            f"(全局 {global_hits}), 最高分={summary['max_score']}"
         )
         return results, diagnostics
 
@@ -1025,6 +1237,7 @@ class PromptTemplateManager:
         script_id: Optional[str] = None,
         top_k: Optional[int] = None,
         min_score: Optional[float] = None,
+        include_global: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         搜索相似提示词模板（兼容包装，只返回结果列表）
@@ -1036,6 +1249,7 @@ class PromptTemplateManager:
             script_id: 剧本ID（不指定则使用当前剧本）
             top_k: 返回数量
             min_score: 最低相似度分数
+            include_global: 是否包含全局模板（其他剧本）
 
         Returns:
             相似模板列表
@@ -1045,6 +1259,7 @@ class PromptTemplateManager:
             script_id=script_id,
             top_k=top_k,
             min_score=min_score,
+            include_global=include_global,
         )
         return results
 

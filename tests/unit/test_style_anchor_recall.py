@@ -196,7 +196,7 @@ def test_generate_prompts_node_persists_style_provenance():
     nodes = object.__new__(WorkflowNodes)
     nodes._update_task_progress = lambda *args, **kwargs: None
     nodes._complete_stage = lambda *args, **kwargs: None
-    nodes._recall_patterns_by_anchors = lambda state: []
+    nodes._recall_patterns_by_anchors = lambda state: ([], {})
     nodes.workflow_memory = SimpleNamespace(
         get_memory_dict=lambda *args, **kwargs: {},
         get_memory_list=lambda *args, **kwargs: [],
@@ -229,6 +229,71 @@ def test_generate_prompts_node_persists_style_provenance():
     nodes.generate_prompts_node(state)
 
     assert instructions.metadata["style_anchor_provenance"] == provenance
+    # 该用例把召回整体打桩为空，节点只如实落盘，不凭空补出查询数（FR-042）
+    assert instructions.metadata["anchor_recall"] == {}
+
+
+def test_generate_prompts_node_persists_recall_statistics():
+    """T-506：节点把真实召回统计写入 instructions.metadata（FR-040/042）"""
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(fragment_id="frag_001", prompt="a woman waits", duration=3.0)
+        ]
+    )
+    nodes = object.__new__(WorkflowNodes)
+    nodes._update_task_progress = lambda *args, **kwargs: None
+    nodes._complete_stage = lambda *args, **kwargs: None
+    nodes.knowledge_manager = _FakeKnowledgeManager()
+    nodes.workflow_memory = SimpleNamespace(
+        get_memory_dict=lambda *args, **kwargs: {},
+        get_memory_list=lambda *args, **kwargs: [],
+        after_stage_completion=lambda *args, **kwargs: None,
+    )
+    nodes.prompt_converter = SimpleNamespace(
+        apply_historical_context=lambda *args, **kwargs: None,
+        apply_repair_params=lambda *args, **kwargs: None,
+        process_with_style_consistency=lambda *args, **kwargs: instructions,
+        detect_issues=lambda *args, **kwargs: [],
+        clear_repair_params=lambda *args, **kwargs: None,
+        clear_historical_context=lambda *args, **kwargs: None,
+    )
+    nodes.storage = SimpleNamespace(save_obj_result=lambda *args, **kwargs: None)
+
+    state = WorkflowState.from_raw_script("剧本内容")
+    state.domain.contract = _contract_with_anchor()
+    state.domain.shot_sequence = _shot_sequence()
+    state.domain.fragment_sequence = FragmentSequence(
+        fragments=[
+            VideoFragment(
+                id="frag_001",
+                shot_id="shot_001",
+                duration=3.0,
+                description="小明起身",
+                continuity_notes={"main_character": "小明"},
+            ),
+            VideoFragment(
+                id="frag_002",
+                shot_id="shot_404",
+                duration=3.0,
+                description="空镜头：窗帘被风吹起",
+                continuity_notes={},
+            ),
+        ]
+    )
+
+    nodes.generate_prompts_node(state)
+
+    anchor_recall = instructions.metadata["anchor_recall"]
+    assert anchor_recall["fragments"] == 2
+    assert anchor_recall["queries"] == 1
+    assert anchor_recall["queries_skipped"] == 1
+    assert anchor_recall["attempted"] == 1
+    assert anchor_recall["hits"] == 1
+    assert anchor_recall["injected"] == 1
+    assert anchor_recall["status"] == "hit"
+    assert anchor_recall["kb"]["template_count"] == 3
+    assert anchor_recall["top_k"] == 2
+    assert anchor_recall["max_score"] == 0.9
 
 
 def test_process_with_style_consistency_injects_english_prefix():
@@ -442,15 +507,101 @@ def test_build_issue_anchor_query_includes_problem_and_anchors():
 
 
 class _FakeKnowledgeManager:
-    """记录锚点查询并返回固定提示词的知识库桩"""
+    """记录锚点查询并返回结构化诊断的知识库桩"""
 
     def __init__(self, prompt_text="A young woman in a black coat sits on a sofa."):
         self.prompt_text = prompt_text
         self.queries = []
+        self.kb = {
+            "template_count": 3,
+            "active_template_count": 3,
+            "index_docs": 3,
+            "legacy_templates": 0,
+            "global_template_count": 0,
+            "global_scripts": {},
+            "has_index": True,
+            "storage_dir": "memory://prompt_templates/s1",
+        }
 
-    def search_similar(self, query, script_id=None, top_k=None):
+    def get_recall_diagnostics(self, script_id=None, include_global=True):
+        return dict(self.kb)
+
+    def search_similar_detailed(
+        self, query, script_id=None, top_k=None, include_global=True
+    ):
         self.queries.append(query)
-        return [{"prompt": self.prompt_text, "score": 0.9}]
+        return (
+            [
+                {
+                    "prompt": self.prompt_text,
+                    "score": 0.9,
+                    "source_scope": "script",
+                    "source_script_id": script_id,
+                }
+            ],
+            {
+                "status": "hit",
+                "attempted": 1,
+                "retrieved": 1,
+                "hits": 1,
+                "local_hits": 1,
+                "global_hits": 0,
+                "min_score": 0.9,
+                "max_score": 0.9,
+                "top_k": top_k,
+                "error": "",
+                "kb": dict(self.kb),
+            },
+        )
+
+
+def test_build_fragment_anchor_query_requires_anchor():
+    """AC-043：无主角色且无场景锚点时不构造查询（描述不再单独兜底）"""
+    fragment = VideoFragment(
+        id="frag_009",
+        shot_id="shot_404",
+        duration=3.0,
+        description="空镜头：窗帘被风吹起",
+        continuity_notes={},
+    )
+    assert (
+        build_fragment_anchor_query(fragment, _shot_sequence(), _contract_with_anchor())
+        == ""
+    )
+
+
+def test_build_fragment_anchor_query_keeps_scene_only_anchor():
+    """只有场景锚点（无主角色）仍构造查询"""
+    fragment = VideoFragment(
+        id="frag_009",
+        shot_id="shot_001",
+        duration=3.0,
+        description="空镜头：窗帘被风吹起",
+        continuity_notes={},
+    )
+    query = build_fragment_anchor_query(
+        fragment, _shot_sequence(), _contract_with_anchor()
+    )
+    assert query.startswith("场景: 公寓客厅（night）")
+    assert "角色:" not in query
+    assert "片段: 空镜头：窗帘被风吹起" in query
+
+
+def test_build_issue_anchor_query_keeps_problem_without_anchor():
+    """无锚点的问题查询仍保留问题描述，不因收紧而丢失召回入口"""
+    issue = SimpleNamespace(
+        id="issue_2",
+        description="道具在片段间消失",
+        fragment_id="frag_404",
+        shot_id=None,
+        scene_id=None,
+    )
+    assert (
+        build_issue_anchor_query(
+            issue, _fragment_sequence(), _shot_sequence(), _contract_with_anchor()
+        )
+        == "问题: 道具在片段间消失"
+    )
 
 
 def test_workflow_recall_patterns_by_anchors():
@@ -474,11 +625,120 @@ def test_workflow_recall_patterns_by_anchors():
         ]
     )
 
-    patterns = nodes._recall_patterns_by_anchors(state)
+    patterns, anchor_recall = nodes._recall_patterns_by_anchors(state)
 
     assert patterns == [nodes.knowledge_manager.prompt_text]
     assert len(nodes.knowledge_manager.queries) == 2
     assert all("角色: 小明" in query for query in nodes.knowledge_manager.queries)
+    assert anchor_recall["fragments"] == 2
+    assert anchor_recall["queries"] == 2
+    assert anchor_recall["queries_skipped"] == 0
+    assert anchor_recall["attempted"] == 2
+    assert anchor_recall["hits"] == 1
+    assert anchor_recall["injected"] == 1
+    assert anchor_recall["status"] == "hit"
+    assert anchor_recall["max_score"] == 0.9
+
+
+def test_workflow_recall_counts_skipped_fragments():
+    """AC-043：无锚点片段计入 queries_skipped，不冒充查询数"""
+    nodes = object.__new__(WorkflowNodes)
+    nodes.knowledge_manager = _FakeKnowledgeManager()
+
+    state = WorkflowState.from_raw_script("测试剧本内容")
+    state.domain.contract = _contract_with_anchor()
+    state.domain.shot_sequence = _shot_sequence()
+    state.domain.fragment_sequence = FragmentSequence(
+        fragments=[
+            _fragment_sequence().fragments[0],
+            VideoFragment(
+                id="frag_002",
+                shot_id="shot_404",
+                duration=3.0,
+                description="空镜头：窗帘被风吹起",
+                continuity_notes={},
+            ),
+        ]
+    )
+
+    patterns, anchor_recall = nodes._recall_patterns_by_anchors(state)
+
+    assert len(patterns) == 1
+    assert len(nodes.knowledge_manager.queries) == 1
+    assert anchor_recall["fragments"] == 2
+    assert anchor_recall["queries"] == 1
+    assert anchor_recall["queries_skipped"] == 1
+    assert anchor_recall["attempted"] == 1
+
+
+def test_workflow_recall_empty_kb_status_is_first_run():
+    """AC-040：空知识库下节点统计给出 first_run_no_history 与真实 kb"""
+    nodes = object.__new__(WorkflowNodes)
+    manager = _FakeKnowledgeManager()
+    manager.kb.update(
+        {
+            "template_count": 0,
+            "active_template_count": 0,
+            "index_docs": 0,
+            "has_index": False,
+        }
+    )
+
+    def _empty_search(query, script_id=None, top_k=None, include_global=True):
+        manager.queries.append(query)
+        return [], {
+            "status": "first_run_no_history",
+            "attempted": 0,
+            "retrieved": 0,
+            "hits": 0,
+            "min_score": 0.0,
+            "max_score": 0.0,
+            "error": "",
+            "kb": dict(manager.kb),
+        }
+
+    manager.search_similar_detailed = _empty_search
+    nodes.knowledge_manager = manager
+
+    state = WorkflowState.from_raw_script("测试剧本内容")
+    state.domain.contract = _contract_with_anchor()
+    state.domain.shot_sequence = _shot_sequence()
+    state.domain.fragment_sequence = _fragment_sequence()
+
+    patterns, anchor_recall = nodes._recall_patterns_by_anchors(state)
+
+    assert patterns == []
+    assert anchor_recall["status"] == "first_run_no_history"
+    assert anchor_recall["queries"] == 1
+    assert anchor_recall["attempted"] == 0
+    assert anchor_recall["hits"] == 0
+    assert anchor_recall["kb"]["template_count"] == 0
+    assert anchor_recall["kb"]["has_index"] is False
+
+
+def test_workflow_recall_records_retrieval_exception():
+    """检索抛异常时不阻断流程，统计如实记录 retrieval_error"""
+    nodes = object.__new__(WorkflowNodes)
+    manager = _FakeKnowledgeManager()
+
+    def _boom(query, script_id=None, top_k=None, include_global=True):
+        raise RuntimeError("向量检索不可用")
+
+    manager.search_similar_detailed = _boom
+    nodes.knowledge_manager = manager
+
+    state = WorkflowState.from_raw_script("测试剧本内容")
+    state.domain.contract = _contract_with_anchor()
+    state.domain.shot_sequence = _shot_sequence()
+    state.domain.fragment_sequence = _fragment_sequence()
+
+    patterns, anchor_recall = nodes._recall_patterns_by_anchors(state)
+
+    assert patterns == []
+    assert anchor_recall["status"] == "retrieval_error"
+    assert anchor_recall["queries"] == 1
+    assert anchor_recall["attempted"] == 1
+    assert anchor_recall["error"] == "向量检索不可用"
 
 
 def test_workflow_recall_patterns_without_contract():
@@ -490,5 +750,13 @@ def test_workflow_recall_patterns_without_contract():
     state.domain.contract = None
     state.domain.fragment_sequence = _fragment_sequence()
 
-    assert nodes._recall_patterns_by_anchors(state) == []
+    patterns, anchor_recall = nodes._recall_patterns_by_anchors(state)
+
+    assert patterns == []
     assert nodes.knowledge_manager.queries == []
+    assert anchor_recall["queries"] == 0
+    assert anchor_recall["queries_skipped"] == 1
+    assert anchor_recall["attempted"] == 0
+    # 未执行任何检索时不得伪造 first_run_no_history（FR-043），也不伪造 kb 快照
+    assert anchor_recall["status"] == ""
+    assert anchor_recall["kb"] == {}

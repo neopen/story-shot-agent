@@ -54,22 +54,26 @@ def _write_cache(manager, script_id, count, legacy_count=0):
         json.dump(entries, fh, ensure_ascii=False)
 
 
-def _persist_index(manager, script_id, texts):
-    """直接持久化一个索引，模拟历史运行留下的 index_store"""
-    documents = [
-        Document(
-            text=text,
-            metadata={
-                "type": PROMPT_TEMPLATE_METADATA_TYPE,
-                "script_id": script_id,
-            },
-        )
-        for text in texts
-    ]
+def _persist_index(manager, script_id, texts, legacy_count=0):
+    """持久化索引，模拟历史运行留下的 index_store
+
+    文档 hash 与 ``_write_cache`` 同口径，前 ``legacy_count`` 条带 legacy 标记。
+    """
+    documents = []
+    for position, text in enumerate(texts):
+        metadata = {
+            "type": PROMPT_TEMPLATE_METADATA_TYPE,
+            "script_id": script_id,
+            "hash": manager._generate_template_hash(text),
+        }
+        if position < legacy_count:
+            metadata["schema_version"] = "legacy"
+        documents.append(Document(text=text, metadata=metadata))
     index = VectorStoreIndex.from_documents(
         documents, embed_model=manager.embedding_model
     )
     index.storage_context.persist(persist_dir=manager._get_index_dir(script_id))
+    return index
 
 
 def test_ac046_loads_index_persisted_with_current_filenames(manager):
@@ -522,3 +526,264 @@ def test_t505_get_recall_diagnostics_never_rebuilds(manager, monkeypatch):
     assert not os.path.exists(
         os.path.join(manager._get_index_dir("script_a"), "default__vector_store.json")
     )
+
+
+# ==================== T-504：跨剧本只读召回 ====================
+
+
+def _seed_global(manager, script_id, count=3, legacy_count=0, with_index=True):
+    """预置另一剧本的缓存与已持久化索引（不经过当前剧本的任何写路径）"""
+    _write_cache(manager, script_id, count, legacy_count=legacy_count)
+    entries = _read_cache(manager, script_id)
+    if with_index:
+        _persist_index_with_hashes(manager, script_id, entries)
+    return [entry["prompt"] for entry in entries]
+
+
+def _snapshot_tree(root):
+    """目录文件清单 + 内容摘要 + 修改时间，用于证明只读"""
+    snapshot = {}
+    for current, _dirs, files in os.walk(root):
+        for name in files:
+            path = os.path.join(current, name)
+            with open(path, "rb") as fh:
+                snapshot[os.path.relpath(path, root)] = (
+                    fh.read(),
+                    os.path.getmtime(path),
+                )
+    return snapshot
+
+
+def test_ac043a_first_run_global_hit_without_writeback(manager):
+    """AC-043A：当前剧本空、他剧本 3 条活跃模板 → first_run_global_hit 且不写回"""
+    prompts = _seed_global(manager, "script_b")
+    before = _snapshot_tree(manager.base_storage_dir)
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", top_k=2
+    )
+
+    assert diagnostics["status"] == "first_run_global_hit"
+    assert diagnostics["hits"] == 2
+    assert diagnostics["global_hits"] == 2
+    assert diagnostics["local_hits"] == 0
+    assert diagnostics["attempted"] == 1
+    assert diagnostics["top_k"] == 2
+    assert diagnostics["kb"]["template_count"] == 0
+    assert diagnostics["kb"]["has_index"] is False
+    assert diagnostics["kb"]["global_template_count"] == 3
+    assert results
+    assert all(item["source_scope"] == "global" for item in results)
+    assert all(item["source_script_id"] == "script_b" for item in results)
+    assert all(item["prompt"] in prompts for item in results)
+
+    # 当前剧本不得被写入缓存或索引；他剧本文件保持原样
+    assert _snapshot_tree(manager.base_storage_dir) == before
+    assert not os.path.exists(
+        os.path.join(
+            manager.base_storage_dir,
+            "prompt_templates",
+            "script_a",
+            "templates_cache.json",
+        )
+    )
+    assert manager._caches.get("script_a") in (None, [])
+    assert "script_b" not in manager._caches
+    assert "script_b" not in manager._indices
+
+
+def test_empty_script_leaves_no_index_slot(manager):
+    """FR-043/044：空剧本召回不登记索引槽位，也不创建索引目录"""
+    _seed_global(manager, "script_b")
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_empty", min_score=0.0
+    )
+
+    assert diagnostics["status"] == "first_run_global_hit"
+    assert results
+    assert "script_empty" not in manager._indices
+    assert not manager._caches.get("script_empty")
+    assert not os.path.exists(
+        os.path.join(manager._get_index_dir("script_empty"), "docstore.json")
+    )
+    # 其他剧本只读：不进入可写缓存/索引表
+    assert "script_b" not in manager._indices
+    assert "script_b" not in manager._caches
+
+
+def test_ac043b_script_hits_take_quota_before_global(manager):
+    """AC-043B：同剧本命中优先占名额，全局只补足剩余名额"""
+    _write_cache(manager, "script_a", 3)
+    _seed_global(manager, "script_b")
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", top_k=3
+    )
+
+    assert diagnostics["status"] == "hit"
+    assert diagnostics["local_hits"] == 3
+    assert diagnostics["global_hits"] == 0
+    assert diagnostics["attempted"] == 1
+    assert [item["source_scope"] for item in results] == ["script"] * 3
+
+
+def test_global_fills_remaining_quota_after_partial_local_hits(manager):
+    """同剧本只命中 1 条时，全局按分数补足到 top_k，且排在其后"""
+    _write_cache(manager, "script_a", 1)
+    _seed_global(manager, "script_b")
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", top_k=3
+    )
+
+    assert diagnostics["local_hits"] == 1
+    assert diagnostics["global_hits"] == 2
+    assert diagnostics["hits"] == 3
+    assert diagnostics["attempted"] == 2
+    assert [item["source_scope"] for item in results] == ["script", "global", "global"]
+    assert results[0]["source_script_id"] == "script_a"
+    assert all(item["source_script_id"] == "script_b" for item in results[1:])
+
+
+def test_include_global_false_disables_cross_script_recall(manager):
+    """关闭跨剧本时不得读取他剧本，状态回到 first_run_no_history"""
+    _seed_global(manager, "script_b")
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", include_global=False
+    )
+
+    assert results == []
+    assert diagnostics["status"] == "first_run_no_history"
+    assert diagnostics["attempted"] == 0
+    assert diagnostics["global_hits"] == 0
+    assert manager._global_sources == {}
+
+
+def test_ac043c_all_legacy_global_is_excluded(manager):
+    """AC-043C：他剧本全为 legacy 时不参与召回，legacy 数量如实上报"""
+    _seed_global(manager, "script_b", count=3, legacy_count=3)
+
+    results, diagnostics = manager.search_similar_detailed("雨夜", script_id="script_a")
+
+    assert results == []
+    assert diagnostics["status"] == "first_run_no_history"
+    assert diagnostics["attempted"] == 0
+    assert diagnostics["kb"]["legacy_templates"] == 3
+    assert diagnostics["kb"]["global_template_count"] == 0
+    assert diagnostics["kb"]["template_count"] == 0
+
+
+def test_global_legacy_hashes_exclude_stale_index_nodes(manager):
+    """索引早于 legacy 标记时按缓存哈希二次排除；全 legacy 来源直接跳过"""
+    _write_cache(manager, "script_b", 3, legacy_count=3)
+    entries = _read_cache(manager, "script_b")
+    clean_entries = [{**entry, "metadata": {}} for entry in entries]
+    _persist_index_with_hashes(manager, "script_b", clean_entries)
+
+    # 全 legacy 来源不参与召回，连检索都不执行（AC-043C）
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", top_k=3
+    )
+    assert results == []
+    assert diagnostics["attempted"] == 0
+    assert diagnostics["retrieved"] == 0
+    assert diagnostics["kb"]["legacy_templates"] == 3
+
+    # 混入 1 条活跃模板后来源可召回，但索引里的 legacy 节点仍被哈希排除
+    active = {
+        "prompt": "活跃模板：雨夜便利店门口的固定机位。",
+        "hash": manager._generate_template_hash("活跃模板：雨夜便利店门口的固定机位。"),
+        "metadata": {},
+        "added_at": "2026-11-05T10:00:00",
+    }
+    with open(manager._get_cache_path("script_b"), "w", encoding="utf-8") as fh:
+        json.dump(entries + [active], fh, ensure_ascii=False)
+    _persist_index_with_hashes(manager, "script_b", clean_entries + [active])
+    manager._global_sources.clear()
+    manager._global_scanned.clear()
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", top_k=4
+    )
+
+    assert diagnostics["attempted"] == 1
+    assert diagnostics["retrieved"] == 4
+    assert diagnostics["hits"] == 1
+    assert diagnostics["kb"]["legacy_templates"] == 3
+    assert [item["prompt"] for item in results] == [active["prompt"]]
+
+
+def test_global_source_without_index_is_skipped(manager):
+    """他剧本只有缓存没有索引时跳过，不为它重建索引"""
+    _seed_global(manager, "script_b", with_index=False)
+
+    results, diagnostics = manager.search_similar_detailed("雨夜", script_id="script_a")
+
+    assert results == []
+    assert diagnostics["status"] == "first_run_no_history"
+    assert diagnostics["attempted"] == 0
+    assert diagnostics["kb"]["global_template_count"] == 3
+    assert not os.path.exists(
+        os.path.join(manager._get_index_dir("script_b"), "docstore.json")
+    )
+
+
+def test_broken_global_index_is_skipped_without_failing_recall(manager):
+    """他剧本索引损坏时跳过并告警，不影响当前剧本命中"""
+    _write_cache(manager, "script_a", 3)
+    _seed_global(manager, "script_b")
+    index_dir = manager._get_index_dir("script_b")
+    with open(os.path.join(index_dir, "docstore.json"), "w", encoding="utf-8") as fh:
+        fh.write("{ not json")
+
+    results, diagnostics = manager.search_similar_detailed("雨夜", script_id="script_a")
+
+    assert diagnostics["status"] == "hit"
+    assert diagnostics["local_hits"] == 3
+    assert diagnostics["global_hits"] == 0
+    assert diagnostics["error"] == ""
+    assert results
+    assert all(item["source_scope"] == "script" for item in results)
+
+
+def test_global_retrieval_error_does_not_mask_usable_hits(manager):
+    """个别来源检索异常时仍返回可用命中，异常完整记录在 error 中"""
+    _write_cache(manager, "script_a", 1)
+    _seed_global(manager, "script_b")
+    sources = manager._scan_global_sources("script_a")
+    sources["script_b"]["index"] = _BrokenIndex(3)
+    sources["script_b"]["index_loaded"] = True
+
+    results, diagnostics = manager.search_similar_detailed(
+        "雨夜", script_id="script_a", top_k=3
+    )
+
+    assert diagnostics["status"] == "hit"
+    assert diagnostics["local_hits"] == 1
+    assert "script_b" in diagnostics["error"]
+    assert "检索器不可用" in diagnostics["error"]
+    assert [item["source_scope"] for item in results] == ["script"]
+
+
+def test_global_scan_is_cached_per_manager_instance(manager, monkeypatch):
+    """目录扫描每实例只做一次，避免逐查询重复遍历（NFR-004）"""
+    _seed_global(manager, "script_b")
+    calls = []
+    original = manager._read_global_cache
+
+    def _counting(script_dir):
+        calls.append(script_dir)
+        return original(script_dir)
+
+    monkeypatch.setattr(manager, "_read_global_cache", _counting)
+
+    # 首次扫描已被前面的断言用掉，这里重置扫描标记后验证多次查询只扫描一次
+    manager._global_scanned.clear()
+    manager._global_sources.clear()
+    manager.search_similar_detailed("雨夜", script_id="script_a")
+    manager.search_similar_detailed("咖啡店", script_id="script_a")
+    manager.get_recall_diagnostics("script_a")
+
+    assert len(calls) == 1

@@ -98,7 +98,7 @@ def build_fragment_anchor_query(
         contract: 全局一致性契约
 
     Returns:
-        锚点查询文本；无契约或无可用锚点时返回空串
+        锚点查询文本；无契约或无角色/场景锚点时返回空串
     """
     if fragment is None or contract is None:
         return ""
@@ -114,6 +114,10 @@ def build_fragment_anchor_query(
         parts.extend(
             _scene_parts(_scene_num_from_id(getattr(shot, "scene_id", None)), contract)
         )
+
+    # 仅有片段描述时不构成锚点，交由调用方计入 queries_skipped（AC-043）
+    if not parts:
+        return ""
 
     description = (getattr(fragment, "description", "") or "").strip()
     if description:

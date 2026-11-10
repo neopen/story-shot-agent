@@ -13,7 +13,7 @@ See LICENSE File For Details.
 import time
 import traceback
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from penshot.config.config import settings
 from penshot.logger import error, debug, info, warning
@@ -62,6 +62,7 @@ from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
+from penshot.neopen.prompts.recall_status import build_anchor_recall
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
 from penshot.neopen.tools.result_storage_tool import create_result_storage
 from penshot.utils.log_utils import print_log_exception
@@ -776,7 +777,7 @@ class WorkflowNodes:
             )
 
             # 2.1 按角色/场景锚点召回历史成功提示词（向量检索）
-            recalled_patterns = self._recall_patterns_by_anchors(state)
+            recalled_patterns, anchor_recall = self._recall_patterns_by_anchors(state)
             # 锚点命中的提示词与本片段最相关，优先作为历史成功模式参考
             merged_patterns = list(recalled_patterns)
             for pattern in successful_prompts or []:
@@ -851,14 +852,7 @@ class WorkflowNodes:
             debug(f"片段指令转换完成，指令片段数: {len(instructions.fragments)}")
 
             # 记录锚点召回统计（供审计与"检索提升连续性"可量化验收）
-            instructions.metadata["anchor_recall"] = {
-                "queries": (
-                    len(state.domain.fragment_sequence.fragments)
-                    if state.domain.fragment_sequence
-                    else 0
-                ),
-                "hits": len(recalled_patterns),
-            }
+            instructions.metadata["anchor_recall"] = anchor_recall
 
             # 风格溯源随指令落盘（FR-029）：与契约同源，供 AC-024/027 审计
             provenance = (
@@ -1041,7 +1035,9 @@ class WorkflowNodes:
         )
         return state.domain.asset_plan
 
-    def _recall_patterns_by_anchors(self, state: WorkflowState) -> List[str]:
+    def _recall_patterns_by_anchors(
+        self, state: WorkflowState
+    ) -> Tuple[List[str], Dict[str, Any]]:
         """按角色/场景锚点召回历史成功提示词（向量检索）
 
         用一致性契约中的角色外观与场景地点/时间构建查询（而非整段 prompt 文本），
@@ -1052,44 +1048,88 @@ class WorkflowNodes:
             state: 工作流状态
 
         Returns:
-            召回的去重提示词列表（最多 6 条）
+            ``(注入的去重提示词列表, anchor_recall 统计)``；统计中的查询数、
+            跳过数与检索次数均来自实际执行结果（FR-040/042/043）
         """
+        config = settings.prompt_templates
+        manager = self.knowledge_manager
+        fragments = (
+            state.domain.fragment_sequence.fragments
+            if state.domain.fragment_sequence
+            else []
+        )
         contract = state.domain.contract
-        fragment_sequence = state.domain.fragment_sequence
-        if not contract or not fragment_sequence or not self.knowledge_manager:
-            return []
+        if not contract or not fragments or manager is None:
+            return [], build_anchor_recall(
+                fragments=len(fragments),
+                queries=0,
+                queries_skipped=len(fragments),
+                hits=0,
+                injected=0,
+                diagnostics=[],
+                top_k=config.top_k,
+            )
 
         patterns: List[str] = []
-        hit_count = 0
-        for fragment in fragment_sequence.fragments:
+        diagnostics: List[Dict[str, Any]] = []
+        queries = 0
+        queries_skipped = 0
+        for fragment in fragments:
             query = build_fragment_anchor_query(
                 fragment, state.domain.shot_sequence, contract
             )
             if not query:
+                queries_skipped += 1
                 continue
+            queries += 1
             try:
-                results = self.knowledge_manager.search_similar(
+                results, diagnostic = manager.search_similar_detailed(
                     query,
                     script_id=state.input.script_id,
-                    top_k=settings.prompt_templates.top_k,
+                    top_k=config.top_k,
+                    include_global=config.include_global,
                 )
             except Exception as e:
                 warning(f"锚点召回失败（fragment={fragment.id}）: {e}")
+                diagnostics.append(
+                    {"status": "retrieval_error", "error": str(e), "attempted": 1}
+                )
                 continue
 
+            diagnostics.append(diagnostic)
             for result in results or []:
-                prompt_text = ""
-                if isinstance(result, dict):
-                    prompt_text = str(result.get("prompt") or "")
+                if not isinstance(result, dict):
+                    continue
+                prompt_text = str(result.get("prompt") or "")
                 if prompt_text and prompt_text not in patterns:
                     patterns.append(prompt_text)
-                    hit_count += 1
 
-        debug(
-            f"锚点召回: 查询片段数={len(fragment_sequence.fragments)}, 命中={hit_count}"
-        )
         # 控制注入规模，避免历史提示词挤占转换上下文
-        return patterns[: settings.prompt_templates.max_injected_patterns]
+        injected = patterns[: config.max_injected_patterns]
+        # 所有片段都无锚点时仍给出真实知识库快照，便于区分“空库”与“无锚点”
+        kb = (
+            manager.get_recall_diagnostics(
+                state.input.script_id, include_global=config.include_global
+            )
+            if not diagnostics
+            else {}
+        )
+        anchor_recall = build_anchor_recall(
+            fragments=len(fragments),
+            queries=queries,
+            queries_skipped=queries_skipped,
+            hits=len(patterns),
+            injected=len(injected),
+            diagnostics=diagnostics,
+            top_k=config.top_k,
+            kb=kb,
+        )
+        debug(
+            f"锚点召回: 片段数={len(fragments)}, 查询={queries}, "
+            f"跳过={queries_skipped}, 命中={len(patterns)}, "
+            f"注入={len(injected)}, 状态={anchor_recall['status']}"
+        )
+        return injected, anchor_recall
 
     # ======================== 质量审查节点 ========================
 
