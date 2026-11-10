@@ -374,7 +374,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
             model=self.config.video_model,
             style=result.get("style_hint"),
             audio=audio,
-            camera=build_camera_control(fragment.description, fragment.shot_type),
+            camera=build_camera_control(combined_prompt, fragment.shot_type),
         )
 
 

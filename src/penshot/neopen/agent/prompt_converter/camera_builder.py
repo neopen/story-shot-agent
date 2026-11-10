@@ -150,26 +150,36 @@ def _normalize_source(shot_type: Optional[str]) -> str:
     return raw.replace("-", "_").replace(" ", "_")
 
 
-def _normalize_shot_type(shot_type: Optional[str], description: str) -> str:
-    """按「提示词文本 > 来源景别 > 默认值」归一化景别（FR-031~033）
-
-    来源景别为已知扩展值时原样输出；完全未知时保留原始值并告警，
-    不静默降级为默认景别。
-    """
-    detected = _detect_from_text(description)
-    if detected:
-        return detected
-
-    source = str(shot_type or "").strip()
-    if not source:
-        return DEFAULT_SHOT_TYPE
-
+def _resolve_source(source: str) -> str:
+    """解析来源景别：已知别名归一化，未知值保留原文并告警（FR-032/033）"""
     normalized = _EXACT_ALIASES.get(_normalize_source(source))
     if normalized:
         return normalized
 
     warning(f"未知景别来源，保留原始值: {source}")
     return source
+
+
+def _normalize_shot_type(
+    shot_type: Optional[str], description: str
+) -> Tuple[str, str, str]:
+    """按「提示词文本 > 来源景别 > 默认值」归一化景别（FR-031~034）
+
+    返回 ``(shot_type, source_shot_type, shot_type_raw)``；
+    来源景别为已知扩展值时原样输出，完全未知时保留原始值并告警，
+    不静默降级为默认景别。
+    """
+    source_raw = str(shot_type or "").strip()
+    source_normalized = _resolve_source(source_raw) if source_raw else ""
+
+    detected = _detect_from_text(description)
+    if detected:
+        return detected, source_normalized, source_raw
+
+    if source_normalized:
+        return source_normalized, source_normalized, source_raw
+
+    return DEFAULT_SHOT_TYPE, source_normalized, source_raw
 
 
 def _detect_motion(description: str) -> tuple[CameraMotion, float]:
@@ -186,13 +196,17 @@ def build_camera_control(
     description: str, shot_type: Optional[str] = None
 ) -> CameraControl:
     """构建片段的结构化相机控制参数"""
-    normalized_shot_type = _normalize_shot_type(shot_type, description)
+    normalized, source_normalized, source_raw = _normalize_shot_type(
+        shot_type, description
+    )
     motion, intensity = _detect_motion(description)
     return CameraControl(
-        shot_type=normalized_shot_type,
+        shot_type=normalized,
+        source_shot_type=source_normalized,
+        shot_type_raw=source_raw,
         motion=motion,
         intensity=intensity,
-        rack_focus=normalized_shot_type == ShotType.CLOSE_UP.value,
+        rack_focus=normalized == ShotType.CLOSE_UP.value,
         fps=24,
         shutter_angle=180.0,
     )

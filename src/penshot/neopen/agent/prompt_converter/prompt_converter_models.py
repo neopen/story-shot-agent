@@ -266,7 +266,13 @@ class CameraMotion(str, Enum):
 class CameraControl(BaseModel):
     """结构化相机控制参数，供支持运镜的目标模型直接消费"""
 
-    shot_type: str = Field(default="medium", description="景别")
+    shot_type: str = Field(
+        default="medium_shot", description="景别（ShotType 字符串值）"
+    )
+    source_shot_type: str = Field(
+        default="", description="来源镜头景别（归一化，用于溯源）"
+    )
+    shot_type_raw: str = Field(default="", description="来源镜头景别原始值")
     motion: CameraMotion = Field(
         default=CameraMotion.STATIC, description="运镜方式"
     )

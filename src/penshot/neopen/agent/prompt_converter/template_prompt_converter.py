@@ -111,7 +111,7 @@ class TemplatePromptConverter(BasePromptConverter):
             model=self.config.video_model,
             style=style_hint,
             requires_special_attention=fragment.requires_special_attention,
-            camera=build_camera_control(fragment.description, fragment.shot_type),
+            camera=build_camera_control(full_prompt, fragment.shot_type),
         )
 
     def _infer_shot_type(self, description: str) -> ShotType:
