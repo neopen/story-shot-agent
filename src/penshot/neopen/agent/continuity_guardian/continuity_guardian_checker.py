@@ -15,11 +15,25 @@ from typing import Dict, Any, List, Set, Optional
 
 from penshot.logger import info
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
+from penshot.neopen.constants.appearance import MAIN_GARMENT_KEYWORDS
+from .appearance_anchors import contains_keyword
 from .consistency_contract import GlobalConsistencyContract
 from .continuity_guardian_models import (
     ContinuityIssue, ContinuityIssueType, ContinuitySeverity,
     CharacterState, StateSnapshot, StateTimeline, ContinuityCheckResult
 )
+
+# 只用“主体服装名词集合”比较换装：片段措辞（身穿/佩戴/修饰语增减）与
+# 单件细节（鞋袜、配饰）差异都不算外观变化，避免反复误报。
+
+
+def _main_garment_signature(text: str) -> Set[str]:
+    """提取片段中出现的主体服装词，未描述服装时返回空集"""
+    return {
+        keyword
+        for keyword in MAIN_GARMENT_KEYWORDS
+        if contains_keyword(text, (keyword,))
+    }
 
 
 class ContinuityGuardianChecker:
@@ -43,6 +57,8 @@ class ContinuityGuardianChecker:
         self._seen_issues.clear()
         self._processed_shots.clear()
         self._processed_fragments.clear()
+        # 外观基线只在本轮片段序列内有效，跨轮保留会让首片段与上轮末片段误比较
+        self._last_appearance.clear()
 
         result = ContinuityCheckResult()
 
@@ -168,39 +184,33 @@ class ContinuityGuardianChecker:
     def _check_character_appearance_continuity(self, character: str, prompt: str,
                                                index: int, fragment_id: str,
                                                result: ContinuityCheckResult):
-        """检查角色外观连续性"""
-        # 检测关键外观特征是否一致
-        appearance_keywords = {
-            "服装": ["穿", "戴", "着", "衣服", "裙子", "裤子", "衬衫"],
-            "发型": ["长发", "短发", "马尾", "卷发", "直发"],
-            "配饰": ["眼镜", "帽子", "围巾", "项链", "耳环"]
-        }
+        """检查角色服装连续性
 
-        current_features = {}
-        for category, keywords in appearance_keywords.items():
-            for kw in keywords:
-                if kw in prompt:
-                    current_features[category] = kw
-                    break
+        比较片段间命中的主体服装词：只有片段明确描述了服装、且与上次已知服装
+        完全不相交时才算换装；片段未描述服装时沿用上次已知集合，避免
+        “这一句没提衣服”被当成换装，也避免“身穿/佩戴”等措辞差异触发误报。
+        """
+        garments = _main_garment_signature(prompt)
+        previous = self._last_appearance.get(character)
+        if garments and previous and not previous & garments:
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE,
+                description=(
+                    f"角色'{character}'的服装发生变化: "
+                    f"{'、'.join(sorted(previous))} -> {'、'.join(sorted(garments))}"
+                ),
+                severity=ContinuitySeverity.WARNING,
+                fragment_id=fragment_id,
+                position=index,
+                suggestion="保持角色外观一致性",
+                source_stage=PipelineNode.CONVERT_PROMPT.value,
+                auto_fixable=True
+            )
+            if issue:
+                result.add_issue(issue)
 
-        if character in self._last_appearance:
-            last = self._last_appearance[character]
-            for category, feature in current_features.items():
-                if category in last and last[category] != feature:
-                    issue = self._create_issue(
-                        issue_type=ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE,
-                        description=f"角色'{character}'的{category}发生变化: {last.get(category)} -> {feature}",
-                        severity=ContinuitySeverity.WARNING,
-                        fragment_id=fragment_id,
-                        position=index,
-                        suggestion="保持角色外观一致性",
-                        source_stage=PipelineNode.CONVERT_PROMPT.value,
-                        auto_fixable=True
-                    )
-                    if issue:
-                        result.add_issue(issue)
-
-        self._last_appearance[character] = current_features
+        if garments:
+            self._last_appearance[character] = garments
 
     def check_scene_continuity(self, context: Dict[str, Any],
                                result: ContinuityCheckResult) -> None:

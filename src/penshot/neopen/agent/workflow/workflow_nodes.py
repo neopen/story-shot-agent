@@ -2296,7 +2296,9 @@ class WorkflowNodes:
             f"严重={summary['critical']}, "
             f"主要={summary['major']}, "
             f"中度={summary['moderate']}, "
-            f"轻微={summary['minor']}"
+            f"轻微={summary['minor']}, "
+            f"警告={summary['warning']}, "
+            f"错误={summary['error']}"
         )
 
         for issue in result.issues:

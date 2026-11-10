@@ -348,3 +348,14 @@ ACCESSORY_KEYWORDS = ACCESSORY_KEYWORDS_ZH | ACCESSORY_KEYWORDS_EN
 # 服装域与配饰域重叠的“围巾/手套/帽子/scarf/glove/hat”统一归服装，
 # 避免同一服饰被判成两个语义域
 ACCESSORY_ONLY_KEYWORDS = ACCESSORY_KEYWORDS - GARMENT_NOUNS
+
+# 鞋袜类常被单独提及（如“湿漉的鞋”），不参与“整体服装是否更换”的判定
+FOOTWEAR_KEYWORDS_ZH = frozenset({"鞋", "靴", "袜"})
+
+FOOTWEAR_KEYWORDS_EN = frozenset({"shoe", "sneaker", "boot", "sandal", "sock"})
+
+FOOTWEAR_KEYWORDS = FOOTWEAR_KEYWORDS_ZH | FOOTWEAR_KEYWORDS_EN
+
+# 跨片段比较着装用的“主体服装”词：上装/下装/连衣裙等，
+# 已排除鞋袜与同时属于配饰的围巾/手套/帽子
+MAIN_GARMENT_KEYWORDS = GARMENT_NOUNS - ACCESSORY_KEYWORDS - FOOTWEAR_KEYWORDS
