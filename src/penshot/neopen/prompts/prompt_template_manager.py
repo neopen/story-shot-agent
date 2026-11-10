@@ -39,6 +39,24 @@ from penshot.neopen.knowledge.metadata_policy import (
     PROMPT_TEMPLATE_METADATA_POLICY,
 )
 
+# llama-index 当前持久化格式的有效文件判据（FR-046）：
+# 任一存在即尝试加载，不再以旧文件名 vector_store.json 缺失判定“无索引”
+_INDEX_FILENAMES = (
+    "default__vector_store.json",
+    "docstore.json",
+    "index_store.json",
+)
+
+
+def is_legacy_template(entry: Dict[str, Any]) -> bool:
+    """判定缓存条目是否为 legacy 模板（兼容顶层与 metadata 两种标记写法）"""
+    if entry.get("legacy") is True:
+        return True
+    metadata = entry.get("metadata") or {}
+    if metadata.get("legacy") is True:
+        return True
+    return metadata.get("schema_version") == "legacy"
+
 
 class PromptTemplateManager:
     """
@@ -103,6 +121,11 @@ class PromptTemplateManager:
         self._indices: Dict[str, Optional[BaseIndex]] = {}
         self._caches: Dict[str, List[Dict[str, Any]]] = {}
         self._cache_loaded: Set[str] = set()
+
+        # 索引加载状态与修复记录（FR-046/048，供召回诊断消费）
+        self._index_states: Dict[str, Dict[str, Any]] = {}
+        # 同一任务（同一管理器实例）内每个剧本最多重建一次
+        self._index_rebuilt: Set[str] = set()
 
         # 节点解析器
         self.node_parser = SentenceSplitter(
@@ -233,48 +256,68 @@ class PromptTemplateManager:
         except Exception as e:
             warning(f"保存缓存失败: {cache_path}, {e}")
 
+    def _index_state(self, script_id: str) -> Dict[str, Any]:
+        """获取（必要时初始化）剧本索引状态快照"""
+        state = self._index_states.get(script_id)
+        if state is None:
+            state = {
+                "has_index": False,
+                "index_load_failed": False,
+                "index_docs": 0,
+                "storage_dir": self._get_index_dir(script_id),
+            }
+            self._index_states[script_id] = state
+        return state
+
+    @staticmethod
+    def _count_index_docs(index: Optional[BaseIndex]) -> int:
+        """统计索引文档数（docstore 中的文档条数）"""
+        if index is None:
+            return 0
+        try:
+            return len(index.docstore.docs)
+        except Exception as e:
+            warning(f"统计索引文档数失败: {e}")
+            return 0
+
     def _load_index_for_script(self, script_id: str) -> None:
         """
-        加载指定剧本的索引
+        加载指定剧本的索引（FR-046）
 
-        注意：load_index_from_storage 的正确签名是：
-        def load_index_from_storage(
-            storage_context: StorageContext,
-            index_id: Optional[str] = None,
-            **kwargs: Any,
-        ) -> BaseIndex
+        有效判据为 ``default__vector_store.json`` / ``docstore.json`` /
+        ``index_store.json`` 任一存在；加载结果记录到 ``_index_states``，
+        供召回诊断区分“无索引”与“索引加载失败”。
 
         Args:
             script_id: 剧本ID
         """
         index_dir = self._get_index_dir(script_id)
+        state = self._index_state(script_id)
+        state.update({"has_index": False, "index_load_failed": False, "index_docs": 0})
+        self._indices[script_id] = None
 
-        if os.path.exists(index_dir):
-            try:
-                # 检查目录是否包含有效的索引文件
-                vector_store_path = os.path.join(index_dir, "vector_store.json")
-                if not os.path.exists(vector_store_path):
-                    debug(f"索引目录缺少 vector_store.json，将创建新索引: {index_dir}")
-                    self._indices[script_id] = None
-                    return
+        if not any(
+            os.path.exists(os.path.join(index_dir, name)) for name in _INDEX_FILENAMES
+        ):
+            debug(f"索引目录无有效索引文件，将按需重建: {index_dir}")
+            return
 
-                # 创建存储上下文
-                storage_context = StorageContext.from_defaults(persist_dir=index_dir)
+        try:
+            storage_context = StorageContext.from_defaults(persist_dir=index_dir)
+            index = load_index_from_storage(
+                storage_context=storage_context,
+                index_id=None,
+                embed_model=self.embedding_model,
+            )
+        except Exception as e:
+            warning(f"加载索引失败: {index_dir}, {e}")
+            state["index_load_failed"] = True
+            return
 
-                # 使用正确的签名加载索引
-                # load_index_from_storage 接受 storage_context 作为第一个参数
-                # index_id 参数用于指定特定的索引ID（如有多个索引）
-                self._indices[script_id] = load_index_from_storage(
-                    storage_context=storage_context,
-                    index_id=None  # 使用默认索引ID
-                )
-                info(f"已加载剧本 {script_id} 的索引")
-            except Exception as e:
-                warning(f"加载索引失败: {index_dir}, {e}")
-                self._indices[script_id] = None
-        else:
-            self._indices[script_id] = None
-            debug(f"索引目录不存在，将创建新索引: {index_dir}")
+        self._indices[script_id] = index
+        state["has_index"] = True
+        state["index_docs"] = self._count_index_docs(index)
+        info(f"已加载剧本 {script_id} 的索引，文档数: {state['index_docs']}")
 
     def _save_index_for_script(self, script_id: str) -> None:
         """
@@ -296,42 +339,58 @@ class PromptTemplateManager:
         except Exception as e:
             warning(f"保存索引失败: {index_dir}, {e}")
 
-    def _create_index_for_script(self, script_id: str, documents: List[Document]) -> bool:
+    def _create_index_for_script(
+        self, script_id: str, documents: List[Document], persist: bool = True
+    ) -> bool:
         """
         为剧本创建新索引
 
         Args:
             script_id: 剧本ID
             documents: 文档列表
+            persist: 是否落盘（只读重建场景可关闭）
 
         Returns:
             是否创建成功
         """
+        state = self._index_state(script_id)
         if not documents:
             self._indices[script_id] = None
+            state.update({"has_index": False, "index_docs": 0})
             return False
 
         try:
             # 创建索引时需要指定 embed_model
-            self._indices[script_id] = VectorStoreIndex.from_documents(
+            index = VectorStoreIndex.from_documents(
                 documents,
                 embed_model=self.embedding_model,
-                transformations=[self.node_parser]
+                transformations=[self.node_parser],
             )
-            self._save_index_for_script(script_id)
+            self._indices[script_id] = index
+            if persist:
+                self._save_index_for_script(script_id)
+            state.update(
+                {
+                    "has_index": True,
+                    "index_load_failed": False,
+                    "index_docs": self._count_index_docs(index),
+                }
+            )
             info(f"为剧本 {script_id} 创建索引，共 {len(documents)} 个模板")
             return True
         except Exception as e:
             error(f"创建索引失败: {script_id}, {e}")
             self._indices[script_id] = None
+            state.update({"has_index": False, "index_docs": 0})
             return False
 
-    def _rebuild_index_for_script(self, script_id: str) -> bool:
+    def _rebuild_index_for_script(self, script_id: str, persist: bool = True) -> bool:
         """
-        从缓存重建剧本的索引
+        从活跃缓存重建剧本的索引（legacy 模板不参与重建）
 
         Args:
             script_id: 剧本ID
+            persist: 是否落盘
 
         Returns:
             是否重建成功
@@ -340,11 +399,14 @@ class PromptTemplateManager:
         if not cache:
             debug(f"剧本 {script_id} 无缓存数据，跳过索引重建")
             self._indices[script_id] = None
+            self._index_state(script_id).update({"has_index": False, "index_docs": 0})
             return False
 
         try:
             documents = []
             for item in cache:
+                if is_legacy_template(item):
+                    continue
                 prompt_text = item.get("prompt", "")
                 if not prompt_text:
                     continue
@@ -361,15 +423,75 @@ class PromptTemplateManager:
                 documents.append(doc)
 
             if documents:
-                return self._create_index_for_script(script_id, documents)
+                return self._create_index_for_script(
+                    script_id, documents, persist=persist
+                )
             else:
                 self._indices[script_id] = None
+                self._index_state(script_id).update(
+                    {"has_index": False, "index_docs": 0}
+                )
                 return False
 
         except Exception as e:
             error(f"重建索引失败: {script_id}, {e}")
             self._indices[script_id] = None
+            self._index_state(script_id).update({"has_index": False, "index_docs": 0})
             return False
+
+    def _ensure_index_ready(self, script_id: str) -> bool:
+        """
+        检索/写入前保证索引与活跃缓存一致（FR-047/048）
+
+        索引缺失或文档数与活跃模板数不一致时，从缓存全量重建一次；
+        同一任务（同一管理器实例）内不重复重建，并记录修复前后数量。
+
+        Args:
+            script_id: 剧本ID
+
+        Returns:
+            索引是否可用
+        """
+        if script_id not in self._cache_loaded:
+            self._load_cache_for_script(script_id)
+            self._load_index_for_script(script_id)
+
+        cache = self._caches.get(script_id, [])
+        active_count = sum(1 for item in cache if not is_legacy_template(item))
+        index = self._indices.get(script_id)
+        index_docs = self._count_index_docs(index)
+
+        if index is not None and index_docs == active_count:
+            return True
+        if index is None and active_count == 0:
+            return False
+        if script_id in self._index_rebuilt:
+            return index is not None
+
+        reason = "index_missing" if index is None else "cache_index_mismatch"
+        before = {
+            "template_count": len(cache),
+            "active_template_count": active_count,
+            "index_docs": index_docs,
+        }
+        rebuilt = self._rebuild_index_for_script(script_id, persist=True)
+        self._index_rebuilt.add(script_id)
+        after = {
+            "template_count": len(self._caches.get(script_id, [])),
+            "active_template_count": active_count,
+            "index_docs": self._count_index_docs(self._indices.get(script_id)),
+        }
+        self._index_state(script_id)["last_repair"] = {
+            "reason": reason,
+            "before": before,
+            "after": after,
+            "rebuilt": rebuilt,
+        }
+        info(
+            f"剧本 {script_id} 索引修复({reason}): "
+            f"文档数 {index_docs} -> {after['index_docs']}"
+        )
+        return rebuilt
 
     def _get_current_index(self) -> Optional[BaseIndex]:
         """
@@ -606,15 +728,16 @@ class PromptTemplateManager:
                 metadata=doc_metadata
             )
 
-            # 确保该剧本的索引和缓存已加载
-            if target_script_id not in self._cache_loaded:
-                self._load_cache_for_script(target_script_id)
-                self._load_index_for_script(target_script_id)
+            # 写入前保证索引与活跃缓存一致，避免单文档索引覆盖既有 index_store（FR-047）
+            self._ensure_index_ready(target_script_id)
 
             # 添加到索引
             current_index = self._indices.get(target_script_id)
             if not current_index:
-                # 创建新索引
+                if self._caches.get(target_script_id):
+                    error("索引重建失败，拒绝以单文档索引覆盖既有模板库")
+                    return False
+                # 首次入库：创建新索引
                 success = self._create_index_for_script(target_script_id, [doc])
                 if not success:
                     error("创建索引失败，无法添加模板")
@@ -624,6 +747,9 @@ class PromptTemplateManager:
                 nodes = self.node_parser.get_nodes_from_documents([doc])
                 current_index.insert_nodes(nodes)
                 self._save_index_for_script(target_script_id)
+                state = self._index_state(target_script_id)
+                state["has_index"] = True
+                state["index_docs"] = self._count_index_docs(current_index)
 
             # 添加到缓存
             if target_script_id not in self._caches:
@@ -733,10 +859,8 @@ class PromptTemplateManager:
             debug("未指定剧本ID且未设置当前剧本，无法搜索")
             return []
 
-        # 确保缓存已加载
-        if target_script_id not in self._cache_loaded:
-            self._load_cache_for_script(target_script_id)
-            self._load_index_for_script(target_script_id)
+        # 检索前保证索引与活跃缓存一致（FR-047/048）
+        self._ensure_index_ready(target_script_id)
 
         current_index = self._indices.get(target_script_id)
         if not current_index:
