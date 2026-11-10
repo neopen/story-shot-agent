@@ -232,6 +232,15 @@ LIGHTING_FAMILY_MARKERS: Tuple[str, ...] = (
     "natural",
 )
 
+# 旧描述短语所属维度（FR-021）：已由锚点声明的维度不再接收旧短语
+_PHRASE_DIMENSION_MARKERS: Dict[str, frozenset] = {
+    "lighting": frozenset({"lighting", "light"}),
+    "palette": frozenset({"palette", "color", "colors", "colour", "colours", "tones"}),
+    "mood": frozenset({"mood", "tone", "atmosphere"}),
+    "framing": frozenset({"framing", "composition", "angle", "angles"}),
+    "grade": frozenset({"grade", "grading"}),
+}
+
 _CJK_PATTERN = re.compile(r"[\u4e00-\u9fff]")
 _MAX_DESCRIPTION_LENGTH = 50
 
@@ -694,14 +703,26 @@ def _duplicates_dimension(phrase: str, dimensions: Dict[str, str]) -> bool:
     return False
 
 
+def _phrase_dimension(phrase: str) -> str:
+    """判断旧描述短语属于哪个风格维度；无法判定时返回空串"""
+    tokens = set(re.split(r"[^a-z]+", str(phrase or "").lower()))
+    for dimension in ("lighting", "palette", "mood", "framing", "grade"):
+        if tokens & _PHRASE_DIMENSION_MARKERS[dimension]:
+            return dimension
+    return ""
+
+
 def _record_discarded(
-    provenance: Optional[Dict[str, Any]], value: str, source: str
+    provenance: Optional[Dict[str, Any]],
+    value: str,
+    source: str,
+    dimension: str = "lighting",
 ) -> None:
-    """记录被丢弃的冲突打光短语（FR-024）"""
+    """记录被丢弃的冲突短语（FR-024/FR-029）"""
     if provenance is None:
         return
     discarded = provenance.setdefault("discarded", [])
-    item = {"dimension": "lighting", "value": value, "source": source}
+    item = {"dimension": dimension, "value": value, "source": source}
     if item not in discarded:
         discarded.append(item)
 
@@ -750,6 +771,10 @@ def build_style_text(
 
     for phrase, source in _legacy_phrases(style_anchor):
         if phrase in parts:
+            continue
+        dimension = _phrase_dimension(phrase)
+        if dimension and dimensions.get(dimension):
+            _record_discarded(provenance, phrase, source, dimension)
             continue
         marker = _lighting_family(phrase)
         if marker and lighting_family:

@@ -22,6 +22,7 @@ from penshot.neopen.agent.continuity_guardian.consistency_contract import (
 from penshot.neopen.agent.continuity_guardian.style_anchors import (
     build_style_prefix,
     infer_style_anchor,
+    infer_style_anchor_with_provenance,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoInstructions,
@@ -143,6 +144,57 @@ def test_build_style_prefix_dedupes():
         "[Style: thriller, high contrast lighting, desaturated palette, "
         "tense, shadowed framing]"
     )
+
+
+def test_build_style_prefix_drops_legacy_phrases_conflicting_with_dimensions():
+    """FR-021/FR-029：旧描述与已决议维度冲突时丢弃并写入 provenance"""
+    anchor = {
+        "genre": "youth",
+        "lighting": "natural lighting",
+        "palette": "fresh pastel palette",
+        "mood": "hopeful",
+        "framing": "coming-of-age framing",
+        "grade": "soft pastel grade",
+        "description": "muted colors, melancholic tone",
+    }
+    provenance = {"discarded": []}
+
+    prefix = build_style_prefix(anchor, provenance)
+
+    assert prefix == (
+        "[Style: youth, natural lighting, fresh pastel palette, hopeful, "
+        "coming-of-age framing, soft pastel grade]"
+    )
+    assert provenance["discarded"] == [
+        {"dimension": "palette", "value": "muted colors", "source": "description"},
+        {"dimension": "mood", "value": "melancholic tone", "source": "description"},
+    ]
+
+
+def test_youth_scene_with_melancholic_arc_keeps_single_mood():
+    """题材优先于音频氛围：忧伤开篇的青春剧本仍只渲染 hopeful，冲突记入 discarded"""
+    parsed = _parsed_script(
+        title="痕迹",
+        atmosphere=(
+            "整体氛围从静谧、略带忧伤逐渐过渡到温暖、怀旧，"
+            "最后以温馨、充满希望的基调结束"
+        ),
+        scenes=[SimpleNamespace(location="教室", description="放学后的空教室")],
+    )
+
+    anchor, provenance = infer_style_anchor_with_provenance(parsed)
+    prefix = build_style_prefix(anchor, provenance)
+
+    assert anchor["genre"] == "youth"
+    assert anchor["mood"] == "hopeful"
+    assert "hopeful" in prefix
+    assert "melancholic tone" not in prefix
+    assert "muted colors" not in prefix
+    assert {item["dimension"] for item in provenance["discarded"]} == {
+        "palette",
+        "mood",
+    }
+    assert "melancholic" in provenance["mood_candidates"]
 
 
 def test_process_with_contract_sets_english_style_anchor(monkeypatch):
