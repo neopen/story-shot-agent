@@ -20,7 +20,10 @@ from penshot.neopen.agent.asset_generator import (
     build_prop_specs,
     build_scene_specs,
 )
-from penshot.neopen.agent.asset_generator import character_sheet_generator
+from penshot.neopen.agent.asset_generator import (
+    character_sheet_generator,
+    prop_scene_asset_generator,
+)
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
 )
@@ -79,7 +82,9 @@ def _parsed_script() -> SimpleNamespace:
                 )
             ],
             key_locations=[
-                SimpleNamespace(name="霓虹街道", visual_cues=["neon signs", "wet asphalt"])
+                SimpleNamespace(
+                    name="霓虹街道", visual_cues=["neon signs", "wet asphalt"]
+                )
             ],
             character_outfits=[
                 SimpleNamespace(
@@ -132,7 +137,9 @@ def test_build_specs_cover_character_prop_scene():
 
 def test_disabled_client_keeps_pending_assets():
     """文生图未启用时仅把 pending 资产与提示词挂到契约"""
-    agent = AssetGeneratorAgent(image_client=_FakeImageClient(_config("", enabled=False)))
+    agent = AssetGeneratorAgent(
+        image_client=_FakeImageClient(_config("", enabled=False))
+    )
     report = agent.generate_assets(_parsed_script(), _contract())
 
     assert report.enabled is False
@@ -379,3 +386,93 @@ def test_character_sheet_prompt_truncates_at_clause_boundary(monkeypatch):
     assert "素色浅灰棉质外套，肩头微湿，袖口有补丁" in prompt
     assert "内搭" not in prompt
     assert "旧胸针" not in prompt
+
+
+def _styled_script() -> SimpleNamespace:
+    """构造道具/场景提示词样本（含可重复的视觉线索）"""
+    return SimpleNamespace(
+        characters=[],
+        scenes=[
+            SimpleNamespace(
+                id="scene_001",
+                location="咖啡店外",
+                time_of_day="dusk",
+                weather="rain",
+                description="雨棚下亮着暖黄灯",
+            )
+        ],
+        global_metadata=SimpleNamespace(
+            key_props=[
+                SimpleNamespace(
+                    name="《飞鸟集》",
+                    description="蓝色封面的诗集",
+                    color="蓝色",
+                    importance="high",
+                )
+            ],
+            key_locations=[
+                SimpleNamespace(
+                    name="咖啡店外", visual_cues=["rainy street", "warm awning light"]
+                )
+            ],
+        ),
+    )
+
+
+def _style_contract(genre: str = "romance") -> GlobalConsistencyContract:
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.set_style_anchor("genre", genre)
+    return contract
+
+
+def test_prop_and_scene_prompts_use_dimension_style_not_bare_genre():
+    """AC-053/FR-054：资产提示词取维度风格，不拼裸 genre 标签"""
+    parsed = _styled_script()
+    contract = _style_contract("romance")
+
+    prop_prompt = build_prop_specs(parsed, contract)[0].image_prompt
+    scene_prompt = build_scene_specs(parsed, contract)[0].image_prompt
+
+    for prompt in (prop_prompt, scene_prompt):
+        tokens = [part.strip().lower() for part in prompt.split(",")]
+        assert "romance" not in tokens
+        assert "soft warm lighting" in tokens
+        assert "warm palette" in tokens
+
+    # 颜色已包含在描述中，不再重复拼接（FR-052）
+    assert "color: 蓝色" not in prop_prompt
+    assert prop_prompt.count("蓝色") == 1
+
+
+def test_scene_prompt_dedupes_cue_already_in_description():
+    """FR-052：同一语义内容只拼接一次"""
+    parsed = _styled_script()
+    parsed.scenes[0].description = "neon signs lit over wet asphalt"
+    parsed.global_metadata.key_locations[0].visual_cues = [
+        "neon signs",
+        "wet asphalt",
+    ]
+    contract = _style_contract("romance")
+
+    prompt = build_scene_specs(parsed, contract)[0].image_prompt
+
+    assert prompt.count("neon signs") == 1
+    assert prompt.count("wet asphalt") == 1
+
+
+def test_scene_prompt_truncates_at_clause_boundary(monkeypatch):
+    """FR-055：超限时只裁掉整段子句，不产生半截词"""
+    parsed = _styled_script()
+    parsed.scenes[0].description = (
+        "雨棚下亮着暖黄灯，地面积水映出灯光，行人撑伞匆匆走过，"
+        "咖啡店招牌微微发光，长椅空着"
+    )
+    contract = _style_contract("romance")
+    monkeypatch.setattr(prop_scene_asset_generator, "SCENE_MAX_PROMPT_LENGTH", 130)
+
+    prompt = build_scene_specs(parsed, contract)[0].image_prompt
+
+    assert len(prompt) <= 130
+    assert "雨棚下亮着暖黄灯，地面积水映出灯光，行人撑伞匆匆走过" in prompt
+    assert "咖啡店招牌" not in prompt
+    assert "长椅空着" not in prompt
