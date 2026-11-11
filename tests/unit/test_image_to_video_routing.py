@@ -201,6 +201,55 @@ def test_scene_first_frame_manifest_binding_fills_asset_ref():
     assert by_role["first_frame"].as_first_frame is True
 
 
+def test_scene_coverage_triggers_image_to_video_without_character() -> None:
+    """场景资产已覆盖片段时，无主角色也走图生视频并以场景首帧引用"""
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.register_scene(
+        SceneContract(scene_num=2, location="走廊/班级记忆墙", time_of_day="傍晚")
+    )
+    contract.register_asset(
+        AssetContract(
+            asset_id="scene_002",
+            asset_type="scene",
+            owner_name="走廊/班级记忆墙",
+            image_prompt="establishing shot still of 走廊/班级记忆墙",
+            status="pending",
+        )
+    )
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(
+                fragment_id="f3",
+                prompt="Wide shot of the hallway at dusk",
+                duration=3.9,
+            )
+        ]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="f3", target_model="runway_gen4", prompt="adapted", duration=3.9
+        )
+    ]
+    fragments = [SimpleNamespace(id="f3", shot_id="shot_014", description="镜头拉远")]
+    shots = [SimpleNamespace(id="shot_014", scene_id="scene_002", main_character="")]
+
+    triggered = apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    assert triggered == 1
+    package = packages[0]
+    assert package.mode == RouteMode.IMAGE_TO_VIDEO
+    assert package.asset_ref == ""
+    by_role = {reference.role: reference for reference in package.references}
+    assert by_role["first_frame"].asset_id == "scene_002"
+    assert by_role["first_frame"].as_first_frame is True
+    assert package.image_prompt
+    assert package.first_frame_instruction.startswith(
+        "Generate first frame with prompt:"
+    )
+
+
 def test_character_sheet_manifest_binding_never_becomes_asset_ref():
     """FR-016：即使清单回填了角色三视图，也只能出现在 references 中"""
     contract = GlobalConsistencyContract(script_id="s1", task_id="t1")

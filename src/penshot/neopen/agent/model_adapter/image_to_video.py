@@ -13,6 +13,7 @@ See LICENSE File For Details.
 from typing import Any, Dict, List, Optional
 
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
+    SCENE_ASSET_TYPE,
     build_first_frame_prompt,
     build_package_references,
 )
@@ -78,6 +79,22 @@ def _find_character_asset(contract: Any, character_name: str) -> Optional[Any]:
         if (
             getattr(asset, "asset_type", "") == "character_sheet"
             and getattr(asset, "owner_name", "") == character_name
+        ):
+            return asset
+    return None
+
+
+def _find_scene_asset(contract: Any, scene: Any) -> Optional[Any]:
+    """按场景地点查找契约中的场景资产；不要求已生成（pending 由下游执行）"""
+    if contract is None or scene is None:
+        return None
+    location = str(getattr(scene, "location", "") or "").strip()
+    if not location:
+        return None
+    for asset in getattr(contract, "assets", {}).values():
+        if (
+            getattr(asset, "asset_type", "") == SCENE_ASSET_TYPE
+            and str(getattr(asset, "owner_name", "") or "").strip() == location
         ):
             return asset
     return None
@@ -229,18 +246,21 @@ def apply_image_to_video_routing(
         if prompt is None:
             continue
 
+        fragment = fragment_index.get(package.fragment_id)
+        scene = _resolve_scene(contract, fragment, shot_index)
+
         critical = has_critical_text(prompt.prompt)
         anchors = _character_has_anchors(prompt, contract)
-        if not critical and not anchors:
+        # 场景资产已覆盖该片段时同样具备可用的首帧视觉锚点，不应退化为纯文生视频
+        has_scene_frame = _find_scene_asset(contract, scene) is not None
+        if not critical and not anchors and not has_scene_frame:
             continue
 
-        # 高一致性片段缺少角色三视图时无法兑现身份约束，回退文生视频
-        if anchors and not critical:
+        # 高一致性片段既缺角色三视图又无场景首帧时无法兑现身份约束，回退文生视频
+        if anchors and not critical and not has_scene_frame:
             if _find_character_asset(contract, prompt.main_character or "") is None:
                 continue
 
-        fragment = fragment_index.get(package.fragment_id)
-        scene = _resolve_scene(contract, fragment, shot_index)
         allowed_props = None
         if prop_scene_map:
             scene_id = _fragment_scene_id(fragment, shot_index)
