@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: config_models.py
 @Description: 
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/31 12:46
 """
 import random
@@ -15,6 +16,11 @@ from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from penshot.config.security.env_resolver import resolve_api_key_value, trusted_env_expansion
 from penshot.neopen.agent.base_models import VideoStyle
+from penshot.neopen.constants.rag import (
+    PROMPT_TEMPLATE_MIN_SIMILARITY,
+    PROMPT_TEMPLATE_RECALL_MAX_INJECTED,
+    PROMPT_TEMPLATE_RECALL_TOP_K,
+)
 
 
 class LLMBaseConfig(BaseModel):
@@ -109,6 +115,23 @@ class EmbeddingConfig(BaseModel):
     """嵌入模型主配置"""
     default: EmbeddingBaseConfig = Field(default_factory=EmbeddingBaseConfig)
     fallback: Optional[EmbeddingBaseConfig] = Field(default_factory=EmbeddingBaseConfig)
+
+
+class PromptTemplatesConfig(BaseModel):
+    """提示词模板召回配置（0.4.4）
+
+    默认值与 constants/rag.py 的常量保持一致，由单测锁定防止漂移；
+    环境变量覆盖路径：PENSHOT_PROMPT_TEMPLATES__MIN_SIMILARITY_SCORE。
+    """
+
+    min_similarity_score: float = Field(
+        default=PROMPT_TEMPLATE_MIN_SIMILARITY, ge=0.0, le=1.0
+    )
+    top_k: int = Field(default=PROMPT_TEMPLATE_RECALL_TOP_K, ge=1)
+    include_global: bool = Field(default=True)
+    max_injected_patterns: int = Field(
+        default=PROMPT_TEMPLATE_RECALL_MAX_INJECTED, ge=1
+    )
 
 
 class RetrieverConfig(BaseModel):

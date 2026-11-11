@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: config.py
 @Description: 配置管理模块 - 严格遵循 env > yaml > default 优先级
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/01
 """
@@ -17,21 +17,9 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from penshot.config.config_loader import ConfigLoader
-from penshot.config.config_models import (
-    APIConfig,
-    AppConfig,
-    EmbeddingBaseConfig,
-    EmbeddingConfig,
-    ImageBaseConfig,
-    ImageConfig,
-    LLMBaseConfig,
-    LLMConfig,
-    PathsConfig,
-    RetrieverConfig,
-    RoutingConfig,
-    StoryboardConfig,
-)
-from penshot.config.security import trusted_env_expansion
+from penshot.config.config_models import (AppConfig, APIConfig, LLMConfig, EmbeddingConfig, ImageConfig,
+                                          PathsConfig, StoryboardConfig, LLMBaseConfig, EmbeddingBaseConfig, RetrieverConfig,
+                                          ImageBaseConfig, RoutingConfig, PromptTemplatesConfig)
 from penshot.logger import info, warning
 from penshot.utils.dotenv_loader import DotEnvLoader
 from penshot.utils.path_utils import PathResolver
@@ -65,6 +53,10 @@ class Settings(BaseSettings):
     image: ImageConfig = Field(default_factory=ImageConfig)
     # 检索器配置
     retriever: RetrieverConfig = Field(default_factory=RetrieverConfig)
+    # 提示词模板召回配置（0.4.4）
+    prompt_templates: PromptTemplatesConfig = Field(
+        default_factory=PromptTemplatesConfig
+    )
 
     # 业务配置
     storyboard: StoryboardConfig = Field(default_factory=StoryboardConfig)

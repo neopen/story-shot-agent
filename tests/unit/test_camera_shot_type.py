@@ -1,0 +1,201 @@
+"""景别一致性单元测试（0.4.4 T-401~T-404）。
+
+覆盖 ShotType 全值别名、长词优先匹配、探测顺序（最终 prompt > 来源景别 >
+默认值）、扩展景别保留、未知景别告警、来源景别溯源字段，以及两个转换器
+均以最终提示词文本构建 camera。
+"""
+
+import pytest
+
+from penshot.neopen.agent.prompt_converter import camera_builder
+from penshot.neopen.agent.prompt_converter.camera_builder import build_camera_control
+from penshot.neopen.agent.prompt_converter.template_prompt_converter import (
+    TemplatePromptConverter,
+)
+from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotType
+from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
+from penshot.neopen.shot_config import ShotConfig
+
+
+@pytest.mark.parametrize(
+    "alias,expected",
+    [
+        ("全景", "wide_shot"),
+        ("远景", "long_shot"),
+        ("中景", "medium_shot"),
+        ("近景", "close_up"),
+        ("特写", "close_up"),
+        ("极特写", "extreme_close_up"),
+        ("过肩", "over_shoulder"),
+        ("主观", "pov"),
+        ("双人", "two_shot"),
+        ("跟拍", "following_shot"),
+        ("wide shot", "wide_shot"),
+        ("long shot", "long_shot"),
+        ("medium shot", "medium_shot"),
+        ("close-up", "close_up"),
+        ("extreme close-up", "extreme_close_up"),
+        ("over-the-shoulder", "over_shoulder"),
+        ("point of view", "pov"),
+        ("two shot", "two_shot"),
+    ],
+)
+def test_shot_type_aliases_cover_chinese_and_english(alias, expected):
+    """FR-030：中文与英文别名都能归一化到 ShotType 值"""
+    camera = build_camera_control(f"{alias} of the scene")
+
+    assert camera.shot_type == expected
+
+
+@pytest.mark.parametrize("value", [shot_type.value for shot_type in ShotType])
+def test_every_enum_value_is_recognized(value):
+    """FR-030：别名表覆盖 ShotType 枚举全部值"""
+    camera = build_camera_control("", value)
+
+    assert camera.shot_type == value
+
+
+def test_longest_alias_wins_for_extreme_close_up():
+    """T-401：长词优先，extreme close-up 不被 close-up 截胡"""
+    camera = build_camera_control("extreme close-up on the pocket watch")
+
+    assert camera.shot_type == "extreme_close_up"
+
+
+def test_prompt_text_wins_over_source_shot_type():
+    """FR-031：探测顺序以最终提示词文本为准"""
+    camera = build_camera_control("wide shot of the empty street", "close_up")
+
+    assert camera.shot_type == "wide_shot"
+
+
+def test_source_shot_type_used_when_prompt_has_no_marker():
+    """FR-031：提示词无景别词时回退来源镜头景别"""
+    camera = build_camera_control("slow pan across the room", "over_shoulder")
+
+    assert camera.shot_type == "over_shoulder"
+
+
+def test_missing_signal_falls_back_to_medium():
+    """FR-031：文本与来源都缺失时才使用默认景别"""
+    camera = build_camera_control("slow pan across the room", None)
+
+    assert camera.shot_type == "medium_shot"
+
+
+def test_extended_shot_type_is_not_downgraded():
+    """FR-032/AC-030/AC-031：扩展景别原样保留"""
+    for value in (
+        "over_shoulder",
+        "extreme_close_up",
+        "pov",
+        "two_shot",
+        "following_shot",
+    ):
+        assert build_camera_control("", value).shot_type == value
+
+
+def test_unknown_shot_type_is_kept_with_warning(monkeypatch):
+    """FR-033/AC-033：未知景别保留原值并告警，不静默降级"""
+    warnings = []
+    monkeypatch.setattr(camera_builder, "warning", warnings.append)
+
+    camera = build_camera_control("slow pan", "dutch_angle")
+
+    assert camera.shot_type == "dutch_angle"
+    assert warnings
+    assert "dutch_angle" in warnings[0]
+
+
+def test_source_shot_type_tracks_normalized_and_raw_values():
+    """FR-034/AC-030：来源景别同时保留归一化值与原始值"""
+    camera = build_camera_control("slow pan across the room", "过肩")
+
+    assert camera.shot_type == "over_shoulder"
+    assert camera.source_shot_type == "over_shoulder"
+    assert camera.shot_type_raw == "过肩"
+
+
+def test_source_fields_stay_recorded_when_prompt_overrides():
+    """FR-034：提示词优先时仍保留来源景别用于溯源"""
+    camera = build_camera_control("wide shot of the empty street", "close_up")
+
+    assert camera.shot_type == "wide_shot"
+    assert camera.source_shot_type == "close_up"
+    assert camera.shot_type_raw == "close_up"
+
+
+def test_source_fields_empty_without_source_shot_type():
+    """FR-034：无来源景别时溯源字段为空"""
+    camera = build_camera_control("slow pan across the room", None)
+
+    assert camera.shot_type == "medium_shot"
+    assert camera.source_shot_type == ""
+    assert camera.shot_type_raw == ""
+
+
+def test_template_converter_builds_camera_from_final_prompt():
+    """FR-031/AC-032：模板转换器以最终提示词文本探测景别"""
+    converter = TemplatePromptConverter(ShotConfig())
+    fragment = VideoFragment(
+        id="frag_001",
+        shot_id="shot_001",
+        duration=3.0,
+        description="slow pan across the empty street",
+        shot_type="over_shoulder",
+    )
+
+    prompt = converter.convert_fragment(fragment)
+
+    assert "Medium shot" in prompt.prompt
+    assert prompt.camera.shot_type == "medium_shot"
+    assert prompt.camera.source_shot_type == "over_shoulder"
+    assert prompt.camera.shot_type_raw == "over_shoulder"
+
+
+def test_llm_converter_builds_camera_from_final_prompt(monkeypatch):
+    """FR-031/AC-032：LLM 转换器以最终提示词文本探测景别"""
+    from penshot.neopen.agent.prompt_converter.llm_prompt_converter import (
+        LLMPromptConverter,
+    )
+
+    converter = object.__new__(LLMPromptConverter)
+    converter.config = ShotConfig()
+    converter.system_prompt = "system"
+    converter.user_prompt_template = (
+        "{fragment_id}{description}{duration}{character}{location}"
+        "{original_language}{dm_model}{video_style}{max_length}{min_length}"
+        "{global_context}{scene_info}{element_info}{full_script_context}"
+        "{audio_context}{characters_json}{repair_hint}{history_hint}"
+    )
+    converter.global_metadata = None
+    converter.current_repair_params = None
+    converter.last_audio_id = None
+    converter._detect_original_language = lambda fragment: "en"
+    converter._get_scene_info_for_fragment = lambda fragment: ""
+    converter._get_element_info_for_fragment = lambda fragment: ""
+    converter._format_global_context = lambda metadata: ""
+    converter._get_full_script_context = lambda fragment: ""
+    converter._get_audio_context_for_fragment = lambda fragment: {}
+    converter._get_character_info_json = lambda: "[]"
+    converter._build_history_hint = lambda context: ""
+    converter._call_llm_parse_with_retry = lambda system, user: {
+        "prompt": "An over-the-shoulder shot follows her gaze.",
+        "original_prompt": "过肩镜头跟随她的视线。",
+    }
+    converter._build_audio_prompt_from_llm_result = lambda result, fragment: None
+
+    fragment = VideoFragment(
+        id="frag_008",
+        shot_id="shot_008",
+        duration=3.0,
+        description="slow pan across the room",
+        shot_type="close_up",
+    )
+
+    prompt = converter._convert_fragment_with_llm(fragment, None)
+
+    assert "over-the-shoulder" in prompt.prompt
+    assert prompt.camera.shot_type == "over_shoulder"
+    assert prompt.camera.source_shot_type == "close_up"
+    assert prompt.camera.shot_type_raw == "close_up"

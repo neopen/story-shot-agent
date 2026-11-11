@@ -20,9 +20,14 @@ from penshot.neopen.agent.asset_generator import (
     build_prop_specs,
     build_scene_specs,
 )
+from penshot.neopen.agent.asset_generator import (
+    character_sheet_generator,
+    prop_scene_asset_generator,
+)
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
 )
+from penshot.neopen.agent.script_parser_agent import build_contract_from_parsed
 from penshot.neopen.client.image_generation import (
     BaseImageGenerationClient,
     ImageGenerationRequest,
@@ -77,7 +82,9 @@ def _parsed_script() -> SimpleNamespace:
                 )
             ],
             key_locations=[
-                SimpleNamespace(name="霓虹街道", visual_cues=["neon signs", "wet asphalt"])
+                SimpleNamespace(
+                    name="霓虹街道", visual_cues=["neon signs", "wet asphalt"]
+                )
             ],
             character_outfits=[
                 SimpleNamespace(
@@ -112,7 +119,11 @@ def test_build_specs_cover_character_prop_scene():
     assert char_specs[0].asset_type == AssetType.CHARACTER_SHEET
     assert char_specs[0].owner_name == "林然"
     assert char_specs[0].views == ["front", "side", "back"]
-    assert "neo-noir" in char_specs[0].image_prompt
+    # FR-053：三视图不拼接剧情风格/氛围打光
+    assert "neo-noir" not in char_specs[0].image_prompt
+    assert "front view, side view and back view" in char_specs[0].image_prompt
+    assert "neutral grey background" in char_specs[0].image_prompt
+    assert "soft even studio lighting" in char_specs[0].image_prompt
 
     assert len(prop_specs) == 1
     assert prop_specs[0].asset_type == AssetType.PROP
@@ -126,7 +137,9 @@ def test_build_specs_cover_character_prop_scene():
 
 def test_disabled_client_keeps_pending_assets():
     """文生图未启用时仅把 pending 资产与提示词挂到契约"""
-    agent = AssetGeneratorAgent(image_client=_FakeImageClient(_config("", enabled=False)))
+    agent = AssetGeneratorAgent(
+        image_client=_FakeImageClient(_config("", enabled=False))
+    )
     report = agent.generate_assets(_parsed_script(), _contract())
 
     assert report.enabled is False
@@ -263,3 +276,278 @@ def test_manifest_asset_id_map_supports_downstream_renaming(tmp_path):
     assert report.manifest_applied == 1
     assert "char_001" in contract.assets
     assert contract.assets["char_001"].asset_ref.endswith("renamed.png")
+
+
+def _anchor_script() -> SimpleNamespace:
+    """构造与 0.4.4 缺陷样本一致的三视图输入（含结构化服装）"""
+    return SimpleNamespace(
+        characters=[
+            SimpleNamespace(
+                name="林小雨",
+                description=(
+                    "20岁学生，神情焦急后转为惊喜，穿着素色外套（肩头微湿），"
+                    "手持手帕和湿漉漉的诗集《飞鸟集》。"
+                ),
+                key_traits=["学生", "抱书", "带哭腔"],
+            ),
+            SimpleNamespace(
+                name="陈阳",
+                description=(
+                    "22岁兼职外卖员，穿着黄色雨衣，骑着电动车，"
+                    "动作匆忙但细心，从雨衣里掏出干毛巾。"
+                ),
+                key_traits=["外卖员", "黄色雨衣", "迟到"],
+            ),
+        ],
+        scenes=[
+            SimpleNamespace(
+                id="scene_001",
+                location="咖啡店外",
+                time_of_day="day",
+                elements=[
+                    SimpleNamespace(character="林小雨"),
+                    SimpleNamespace(character="陈阳"),
+                ],
+            )
+        ],
+        global_metadata=SimpleNamespace(
+            character_outfits=[
+                SimpleNamespace(
+                    character="林小雨",
+                    description="素色外套，肩头因雨水微湿，搭配学生气质的简约装扮。",
+                    color="素色/浅灰",
+                    style="休闲学生风",
+                    material="棉质/混纺",
+                ),
+                SimpleNamespace(
+                    character="陈阳",
+                    description="亮黄色连帽雨衣，内搭深色T恤，下身深色长裤，脚穿防滑鞋。",
+                    color="黄色",
+                    style="功能性工装",
+                    material="PVC/防水尼龙",
+                ),
+            ],
+            key_props=[],
+            key_locations=[],
+            continuity_notes="",
+            audio_atmosphere="neutral",
+        ),
+        title="雨夜来电",
+    )
+
+
+def test_character_sheet_prompt_excludes_performance_and_duplicates():
+    """AC-050/AC-051/AC-052：只有外观锚点，服装只出现一次，固定中性棚拍"""
+    parsed = _anchor_script()
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    specs = build_character_sheet_specs(parsed, contract)
+    prompt = next(s for s in specs if s.owner_name == "林小雨").image_prompt
+
+    for banned in ("带哭腔", "神情", "手持", "骑着电动车", "湿漉"):
+        assert banned not in prompt
+    assert prompt.count("素色浅灰棉质外套") == 1
+    assert prompt.count("肩头微湿") == 1
+    assert "front view, side view and back view" in prompt
+    assert "neutral grey background" in prompt
+    assert "soft even studio lighting" in prompt
+
+
+def test_character_sheet_prompt_keeps_outfit_accessories():
+    """char_002 缺陷回归：结构化服装里的“佩戴眼镜”必须进入三视图提示词"""
+    parsed = SimpleNamespace(
+        characters=[SimpleNamespace(name="语文老师", description="", key_traits=[])],
+        scenes=[SimpleNamespace(id="scene_001", location="教室", elements=[])],
+        global_metadata=SimpleNamespace(
+            character_outfits=[
+                SimpleNamespace(
+                    character="语文老师",
+                    description="得体的浅色连衣裙或套装，佩戴眼镜，气质温婉。",
+                    color="浅色",
+                    style="知性教师风",
+                    material="棉质",
+                )
+            ],
+            key_props=[],
+            key_locations=[],
+            continuity_notes="",
+            audio_atmosphere="neutral",
+        ),
+        title="走廊",
+    )
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    prompt = build_character_sheet_specs(parsed, contract)[0].image_prompt
+
+    assert "佩戴眼镜" in prompt
+    assert "连衣裙" in prompt
+    assert "气质温婉" not in prompt
+
+
+def test_character_sheet_prompt_supports_english_script():
+    """英文剧本：结构化服装与配饰进入三视图提示词，情绪/动作子句不混入"""
+    parsed = SimpleNamespace(
+        characters=[
+            SimpleNamespace(
+                name="Ethan",
+                description=(
+                    "25-year-old male, short black hair, wearing a yellow raincoat, "
+                    "holding a wet notebook, smiling nervously."
+                ),
+                key_traits=[],
+            )
+        ],
+        scenes=[SimpleNamespace(id="scene_001", location="Corridor", elements=[])],
+        global_metadata=SimpleNamespace(
+            character_outfits=[
+                SimpleNamespace(
+                    character="Ethan",
+                    description=(
+                        "A yellow hooded raincoat with dark trousers, wearing glasses, "
+                        "a kind expression."
+                    ),
+                    color="yellow",
+                    style="functional workwear",
+                    material="PVC",
+                )
+            ],
+            key_props=[],
+            key_locations=[],
+            continuity_notes="",
+            audio_atmosphere="neutral",
+        ),
+        title="The Memory Wall",
+    )
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    prompt = build_character_sheet_specs(parsed, contract)[0].image_prompt
+
+    assert "yellow hooded raincoat with dark trousers" in prompt
+    assert "glasses" in prompt
+    for banned in ("holding", "smiling", "kind expression"):
+        assert banned not in prompt
+
+
+def test_character_sheet_prompt_dedupes_across_anchor_fields():
+    """同一描述出现在多个白名单字段时只拼接一次"""
+    parsed = _anchor_script()
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+    anchors = contract.characters["林小雨"].appearance_anchors
+    anchors.clear()
+    anchors.update({"hair": "黑色短发", "clothing": "黑色短发"})
+
+    prompt = build_character_sheet_specs(parsed, contract)[0].image_prompt
+
+    assert prompt.count("黑色短发") == 1
+
+
+def test_character_sheet_prompt_truncates_at_clause_boundary(monkeypatch):
+    """FR-055：超限时只裁掉整段子句，不产生半截词"""
+    parsed = _anchor_script()
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+    anchors = contract.characters["林小雨"].appearance_anchors
+    anchors.clear()
+    anchors["clothing"] = (
+        "素色浅灰棉质外套，肩头微湿，袖口有补丁，"
+        "内搭深色T恤，下身深色长裤，脚穿防滑鞋，配饰是一枚旧胸针"
+    )
+    monkeypatch.setattr(
+        character_sheet_generator, "CHARACTER_SHEET_MAX_PROMPT_LENGTH", 230
+    )
+
+    prompt = build_character_sheet_specs(parsed, contract)[0].image_prompt
+
+    assert len(prompt) <= 230
+    assert "素色浅灰棉质外套，肩头微湿，袖口有补丁" in prompt
+    assert "内搭" not in prompt
+    assert "旧胸针" not in prompt
+
+
+def _styled_script() -> SimpleNamespace:
+    """构造道具/场景提示词样本（含可重复的视觉线索）"""
+    return SimpleNamespace(
+        characters=[],
+        scenes=[
+            SimpleNamespace(
+                id="scene_001",
+                location="咖啡店外",
+                time_of_day="dusk",
+                weather="rain",
+                description="雨棚下亮着暖黄灯",
+            )
+        ],
+        global_metadata=SimpleNamespace(
+            key_props=[
+                SimpleNamespace(
+                    name="《飞鸟集》",
+                    description="蓝色封面的诗集",
+                    color="蓝色",
+                    importance="high",
+                )
+            ],
+            key_locations=[
+                SimpleNamespace(
+                    name="咖啡店外", visual_cues=["rainy street", "warm awning light"]
+                )
+            ],
+        ),
+    )
+
+
+def _style_contract(genre: str = "romance") -> GlobalConsistencyContract:
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.set_style_anchor("genre", genre)
+    return contract
+
+
+def test_prop_and_scene_prompts_use_dimension_style_not_bare_genre():
+    """AC-053/FR-054：资产提示词取维度风格，不拼裸 genre 标签"""
+    parsed = _styled_script()
+    contract = _style_contract("romance")
+
+    prop_prompt = build_prop_specs(parsed, contract)[0].image_prompt
+    scene_prompt = build_scene_specs(parsed, contract)[0].image_prompt
+
+    for prompt in (prop_prompt, scene_prompt):
+        tokens = [part.strip().lower() for part in prompt.split(",")]
+        assert "romance" not in tokens
+        assert "soft warm lighting" in tokens
+        assert "warm palette" in tokens
+
+    # 颜色已包含在描述中，不再重复拼接（FR-052）
+    assert "color: 蓝色" not in prop_prompt
+    assert prop_prompt.count("蓝色") == 1
+
+
+def test_scene_prompt_dedupes_cue_already_in_description():
+    """FR-052：同一语义内容只拼接一次"""
+    parsed = _styled_script()
+    parsed.scenes[0].description = "neon signs lit over wet asphalt"
+    parsed.global_metadata.key_locations[0].visual_cues = [
+        "neon signs",
+        "wet asphalt",
+    ]
+    contract = _style_contract("romance")
+
+    prompt = build_scene_specs(parsed, contract)[0].image_prompt
+
+    assert prompt.count("neon signs") == 1
+    assert prompt.count("wet asphalt") == 1
+
+
+def test_scene_prompt_truncates_at_clause_boundary(monkeypatch):
+    """FR-055：超限时只裁掉整段子句，不产生半截词"""
+    parsed = _styled_script()
+    parsed.scenes[0].description = (
+        "雨棚下亮着暖黄灯，地面积水映出灯光，行人撑伞匆匆走过，"
+        "咖啡店招牌微微发光，长椅空着"
+    )
+    contract = _style_contract("romance")
+    monkeypatch.setattr(prop_scene_asset_generator, "SCENE_MAX_PROMPT_LENGTH", 130)
+
+    prompt = build_scene_specs(parsed, contract)[0].image_prompt
+
+    assert len(prompt) <= 130
+    assert "雨棚下亮着暖黄灯，地面积水映出灯光，行人撑伞匆匆走过" in prompt
+    assert "咖啡店招牌" not in prompt
+    assert "长椅空着" not in prompt

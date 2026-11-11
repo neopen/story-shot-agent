@@ -13,12 +13,16 @@ from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import 
     ContinuityCheckResult,
     ContinuityIssueType,
 )
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
+    QualityRepairParams,
+)
 from penshot.neopen.agent.shot_segmenter.llm_shot_segmenter import LLMShotSegmenter
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import (
     ShotInfo,
     ShotSequence,
     ShotType,
 )
+from penshot.neopen.agent.shot_segmenter_agent import ShotSegmenterAgent
 from penshot.neopen.agent.workflow.workflow_decision import PipelineDecision
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode, PipelineState
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
@@ -155,6 +159,64 @@ class TestTransitionShotInsertion:
         result = segmenter._insert_transition_shots(sequence)
 
         assert len(result.shots) == 2
+
+
+class TestLocalSceneJumpRepair:
+    """场景跳转变更分镜后由本地确定性修复，不重跑 LLM"""
+
+    class _NoLLMSegmenter:
+        def split(self, *args, **kwargs):
+            raise AssertionError("场景跳转修复不应重跑 LLM 分镜生成")
+
+    def _agent(self, sequence: ShotSequence) -> ShotSegmenterAgent:
+        agent = ShotSegmenterAgent.__new__(ShotSegmenterAgent)
+        agent.current_repair_params = None
+        agent.current_historical_context = None
+        agent.last_shot_sequence = sequence
+        agent.segment_history = []
+        agent.segmenter = self._NoLLMSegmenter()
+        agent.enhancer = None
+        agent.llm_confidence = 0.7
+        agent.always_enhance = True
+        agent._increase_shot_count = False
+        agent._prefer_shorter_shots = False
+        return agent
+
+    def _sequence(self) -> ShotSequence:
+        return ShotSequence(
+            shots=[
+                _shot("shot_001", "scene_001", ShotType.MEDIUM_SHOT),
+                _shot("shot_002", "scene_002", ShotType.MEDIUM_SHOT),
+                _shot("shot_003", "scene_002", ShotType.CLOSE_UP),
+            ]
+        )
+
+    def test_process_reuses_existing_shots_without_llm(self):
+        """仅场景跳转时插入过渡镜头并记录修复历史"""
+        agent = self._agent(self._sequence())
+        agent.current_repair_params = QualityRepairParams(
+            fix_needed=True, issue_types=["scene_jump"]
+        )
+
+        result = agent.process(None)
+
+        assert len(result.shots) == 4
+        assert result.shots[1].is_transition is True
+        assert result.metadata["repair_history"][0]["repair_params"]["issue_types"] == [
+            "scene_jump"
+        ]
+        # 修复后同一个边界不再被上报，保证单轮收敛
+        assert not _scene_jump_issues(result.shots)
+
+    def test_mixed_issues_still_regenerate(self):
+        """混合问题仍走 LLM 重新生成，本地修复只处理纯结构性问题"""
+        agent = self._agent(self._sequence())
+        agent.current_repair_params = QualityRepairParams(
+            fix_needed=True, issue_types=["scene_jump", "shot_insufficient"]
+        )
+
+        assert agent._repair_scene_jumps_locally() is None
+        assert len(agent.last_shot_sequence.shots) == 3
 
 
 class TestSegmentLoopBudget:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
@@ -24,7 +24,7 @@ See LICENSE File For Details.
 
     The entrypoint uses os.execv to replace the current process when starting the app so that signals
     from Docker are delivered to the Python/uvicorn process correctly.
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/30 15:39
 """

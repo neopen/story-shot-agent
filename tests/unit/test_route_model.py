@@ -79,6 +79,15 @@ def test_camera_builder_uses_shot_type_and_motion():
     assert camera.intensity > 0
 
 
+def test_camera_builder_records_source_shot_type_for_traceability():
+    """FR-034：camera 保留来源景别的归一化值与原始值"""
+    camera = build_camera_control("slow pan across the room", "过肩")
+
+    assert camera.shot_type == "over_shoulder"
+    assert camera.source_shot_type == "over_shoulder"
+    assert camera.shot_type_raw == "过肩"
+
+
 def test_adapter_passes_structured_camera_when_supported():
     prompt = _prompt("close-up of a woman, rainy street")
     prompt.camera = build_camera_control("close-up", "close_up")
@@ -209,8 +218,8 @@ def test_route_model_node_does_not_block_on_failure():
     assert state.execution.current_node == PipelineNode.ROUTE_MODEL
 
 
-def test_contract_schema_version_is_0_4_3():
-    assert CONTRACT_SCHEMA_VERSION == "0.4.3"
+def test_contract_schema_version_is_0_4_4():
+    assert CONTRACT_SCHEMA_VERSION == "0.4.4"
 
 
 if __name__ == "__main__":

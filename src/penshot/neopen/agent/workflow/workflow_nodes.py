@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: workflow_nodes.py
 @Description: LangGraph工作流节点实现，包含所有工作流执行功能
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
@@ -13,7 +13,7 @@ See LICENSE File For Details.
 import time
 import traceback
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from penshot.config.config import settings
 from penshot.logger import error, debug, info, warning
@@ -61,7 +61,9 @@ from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
+from penshot.neopen.prompts.ingestion_policy import decide_ingestion
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
+from penshot.neopen.prompts.recall_status import build_anchor_recall
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
 from penshot.neopen.tools.result_storage_tool import create_result_storage
 from penshot.utils.log_utils import print_log_exception
@@ -71,7 +73,10 @@ from penshot.neopen.agent.model_adapter import (
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
-from penshot.neopen.agent.asset_generator import AssetGeneratorAgent
+from penshot.neopen.agent.asset_generator import (
+    AssetGeneratorAgent,
+    backfill_usage,
+)
 from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
 
 
@@ -137,14 +142,15 @@ class WorkflowNodes:
             ),
         )
 
-        # 初始化提示词模板管理器
+        # 初始化提示词模板管理器（召回参数统一取自配置，0.4.4 实测校准）
+        prompt_template_config = settings.prompt_templates
         self.knowledge_manager = PromptTemplateManager(
             embedding_model=self.embeddings,
             script_id=self.script_id,
             storage_dir=settings.get_data_paths().get("data_embedding"),
             memory_manager=self._memory,
-            min_similarity_score=0.7,
-            top_k=3,
+            min_similarity_score=prompt_template_config.min_similarity_score,
+            top_k=prompt_template_config.top_k,
         )
 
         # 初始化工作流记忆管理器（统一记忆访问入口）：内部封装了三层记忆存储（短期、中期、长期）
@@ -392,9 +398,7 @@ class WorkflowNodes:
             )
 
             if report.generated > 0:
-                self._update_task_status(
-                    state.input.task_id, TaskStatus.PROCESSING
-                )
+                self._update_task_status(state.input.task_id, TaskStatus.PROCESSING)
             debug(
                 f"资产锚点处理完成: 模式={report.mode}, 已生成={report.generated}, "
                 f"待生成={report.pending}, 失败={report.failed}, 跳过={report.skipped}"
@@ -774,7 +778,7 @@ class WorkflowNodes:
             )
 
             # 2.1 按角色/场景锚点召回历史成功提示词（向量检索）
-            recalled_patterns = self._recall_patterns_by_anchors(state)
+            recalled_patterns, anchor_recall = self._recall_patterns_by_anchors(state)
             # 锚点命中的提示词与本片段最相关，优先作为历史成功模式参考
             merged_patterns = list(recalled_patterns)
             for pattern in successful_prompts or []:
@@ -849,14 +853,16 @@ class WorkflowNodes:
             debug(f"片段指令转换完成，指令片段数: {len(instructions.fragments)}")
 
             # 记录锚点召回统计（供审计与"检索提升连续性"可量化验收）
-            instructions.metadata["anchor_recall"] = {
-                "queries": (
-                    len(state.domain.fragment_sequence.fragments)
-                    if state.domain.fragment_sequence
-                    else 0
-                ),
-                "hits": len(recalled_patterns),
-            }
+            instructions.metadata["anchor_recall"] = anchor_recall
+
+            # 风格溯源随指令落盘（FR-029）：与契约同源，供 AC-024/027 审计
+            provenance = (
+                state.domain.contract.style_anchor_provenance
+                if state.domain.contract
+                else {}
+            )
+            if provenance:
+                instructions.metadata["style_anchor_provenance"] = dict(provenance)
 
             # 统计提示词信息
             prompt_lengths = [len(f.prompt) for f in instructions.fragments]
@@ -946,12 +952,18 @@ class WorkflowNodes:
             target_model = instructions.metadata.get("video_model")
             adapted_packages = adapt_instructions(instructions, target_model)
 
+            fragments = getattr(state.domain.fragment_sequence, "fragments", None)
+            shots = getattr(state.domain.shot_sequence, "shots", None)
+
             # 图生视频优先（M0.4.2）：先挂载资产引用，再由规则路由覆盖模型与生成模式
             two_stage_count = apply_image_to_video_routing(
                 adapted_packages,
                 instructions,
                 state.domain.contract,
                 state.domain.asset_manifest,
+                fragments=fragments,
+                shots=shots,
+                parsed_script=state.domain.parsed_script,
             )
 
             plan = build_route_plan(
@@ -959,7 +971,13 @@ class WorkflowNodes:
             )
             plan.adapted_packages = adapted_packages
             instructions.route_plan = plan.model_dump(mode="json")
-            instructions.asset_plan = state.domain.asset_plan
+
+            # FR-014/AC-017：路由后回填 usage，并用与 ASSETS 节点一致的序列化路径
+            # 重写 asset_plan.json，再同步 instructions.asset_plan 落盘
+            asset_plan = self._backfill_asset_plan(
+                state, plan, fragments=fragments, shots=shots
+            )
+            instructions.asset_plan = asset_plan
             instructions.asset_manifest = state.domain.asset_manifest
 
             self.storage.save_obj_result(
@@ -985,7 +1003,42 @@ class WorkflowNodes:
 
         return state
 
-    def _recall_patterns_by_anchors(self, state: WorkflowState) -> List[str]:
+    def _backfill_asset_plan(
+        self,
+        state: WorkflowState,
+        route_plan: Any,
+        fragments: Optional[List[Any]] = None,
+        shots: Optional[List[Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """路由后回填资产使用范围并重写 asset_plan.json（FR-014/AC-017）
+
+        两份资产计划共用同一份回填结果：``asset_plan.json`` 与
+        ``prompt_converter_result.json.asset_plan`` 都来自
+        ``state.domain.asset_plan``，保证 ``usage`` 完全一致。
+        """
+        if not state.domain.asset_plan:
+            return state.domain.asset_plan
+
+        plan = backfill_usage(
+            state.domain.asset_plan,
+            fragments=fragments,
+            shots=shots,
+            contract=state.domain.contract,
+            route_plan=route_plan,
+            parsed_script=state.domain.parsed_script,
+        )
+        state.domain.asset_plan = plan.to_dict()
+        self.storage.save_obj_result(
+            state.input.script_id,
+            state.input.task_id,
+            plan,
+            "asset_plan.json",
+        )
+        return state.domain.asset_plan
+
+    def _recall_patterns_by_anchors(
+        self, state: WorkflowState
+    ) -> Tuple[List[str], Dict[str, Any]]:
         """按角色/场景锚点召回历史成功提示词（向量检索）
 
         用一致性契约中的角色外观与场景地点/时间构建查询（而非整段 prompt 文本），
@@ -996,42 +1049,88 @@ class WorkflowNodes:
             state: 工作流状态
 
         Returns:
-            召回的去重提示词列表（最多 6 条）
+            ``(注入的去重提示词列表, anchor_recall 统计)``；统计中的查询数、
+            跳过数与检索次数均来自实际执行结果（FR-040/042/043）
         """
+        config = settings.prompt_templates
+        manager = self.knowledge_manager
+        fragments = (
+            state.domain.fragment_sequence.fragments
+            if state.domain.fragment_sequence
+            else []
+        )
         contract = state.domain.contract
-        fragment_sequence = state.domain.fragment_sequence
-        if not contract or not fragment_sequence or not self.knowledge_manager:
-            return []
+        if not contract or not fragments or manager is None:
+            return [], build_anchor_recall(
+                fragments=len(fragments),
+                queries=0,
+                queries_skipped=len(fragments),
+                hits=0,
+                injected=0,
+                diagnostics=[],
+                top_k=config.top_k,
+            )
 
         patterns: List[str] = []
-        hit_count = 0
-        for fragment in fragment_sequence.fragments:
+        diagnostics: List[Dict[str, Any]] = []
+        queries = 0
+        queries_skipped = 0
+        for fragment in fragments:
             query = build_fragment_anchor_query(
                 fragment, state.domain.shot_sequence, contract
             )
             if not query:
+                queries_skipped += 1
                 continue
+            queries += 1
             try:
-                results = self.knowledge_manager.search_similar(
-                    query, script_id=state.input.script_id, top_k=2
+                results, diagnostic = manager.search_similar_detailed(
+                    query,
+                    script_id=state.input.script_id,
+                    top_k=config.top_k,
+                    include_global=config.include_global,
                 )
             except Exception as e:
                 warning(f"锚点召回失败（fragment={fragment.id}）: {e}")
+                diagnostics.append(
+                    {"status": "retrieval_error", "error": str(e), "attempted": 1}
+                )
                 continue
 
+            diagnostics.append(diagnostic)
             for result in results or []:
-                prompt_text = ""
-                if isinstance(result, dict):
-                    prompt_text = str(result.get("prompt") or "")
+                if not isinstance(result, dict):
+                    continue
+                prompt_text = str(result.get("prompt") or "")
                 if prompt_text and prompt_text not in patterns:
                     patterns.append(prompt_text)
-                    hit_count += 1
 
-        debug(
-            f"锚点召回: 查询片段数={len(fragment_sequence.fragments)}, 命中={hit_count}"
-        )
         # 控制注入规模，避免历史提示词挤占转换上下文
-        return patterns[:6]
+        injected = patterns[: config.max_injected_patterns]
+        # 所有片段都无锚点时仍给出真实知识库快照，便于区分“空库”与“无锚点”
+        kb = (
+            manager.get_recall_diagnostics(
+                state.input.script_id, include_global=config.include_global
+            )
+            if not diagnostics
+            else {}
+        )
+        anchor_recall = build_anchor_recall(
+            fragments=len(fragments),
+            queries=queries,
+            queries_skipped=queries_skipped,
+            hits=len(patterns),
+            injected=len(injected),
+            diagnostics=diagnostics,
+            top_k=config.top_k,
+            kb=kb,
+        )
+        debug(
+            f"锚点召回: 片段数={len(fragments)}, 查询={queries}, "
+            f"跳过={queries_skipped}, 命中={len(patterns)}, "
+            f"注入={len(injected)}, 状态={anchor_recall['status']}"
+        )
+        return injected, anchor_recall
 
     # ======================== 质量审查节点 ========================
 
@@ -1126,7 +1225,10 @@ class WorkflowNodes:
         try:
             # 执行质量审查
             result = self.quality_auditor.qa_process(
-                state.domain.instructions, all_stage_issues, historical_context
+                state.domain.instructions,
+                all_stage_issues,
+                historical_context,
+                contract=state.domain.contract,
             )
 
             debug("质量审查完成:")
@@ -1177,25 +1279,45 @@ class WorkflowNodes:
                 f"审计结果汇总: 状态={result.status.value}, 分数={result.score}%, 问题统计={result.stats}"
             )
 
-            # 审查通过后，保存成功的提示词
-            if result.status == AuditStatus.PASSED and state.domain.instructions:
-                for fragment in state.domain.instructions.fragments:
-                    self.knowledge_manager.save_successful_prompt(
-                        fragment_id=fragment.fragment_id,
-                        prompt_text=fragment.prompt,
-                        quality_score=result.score,
-                        script_id=state.input.script_id,
-                        additional_metadata={
-                            "scene": getattr(fragment, "scene", ""),
-                            "style": getattr(fragment, "style", ""),
-                            "duration": getattr(fragment, "duration", 0),
-                            "task_id": state.input.task_id,
-                            "script_id": state.input.script_id,
-                        },
-                    )
-                info(
-                    f"质量审查通过，已保存 {len(state.domain.instructions.fragments)} 个成功提示词"
+            # 入库策略与 WorkflowMemory 共用；按整批审计结果判定一次（FR-045）
+            if state.domain.instructions:
+                decision = decide_ingestion(
+                    audit_status=result.status.value,
+                    quality_score=result.score,
+                    active_template_count=self.knowledge_manager.count_active_templates(
+                        state.input.script_id
+                    ),
+                    severities=[v.severity for v in result.violations],
                 )
+                if decision.allowed:
+                    for fragment in state.domain.instructions.fragments:
+                        self.knowledge_manager.save_successful_prompt(
+                            fragment_id=fragment.fragment_id,
+                            prompt_text=fragment.prompt,
+                            quality_score=result.score,
+                            script_id=state.input.script_id,
+                            additional_metadata={
+                                "scene": getattr(fragment, "scene", ""),
+                                "style": getattr(fragment, "style", ""),
+                                "duration": getattr(fragment, "duration", 0),
+                                "task_id": state.input.task_id,
+                                "script_id": state.input.script_id,
+                            },
+                            source=decision.source,
+                            audit_status=decision.audit_status,
+                        )
+                    info(
+                        f"审计入库: source={decision.source}, "
+                        f"audit_status={decision.audit_status}, "
+                        f"片段数={len(state.domain.instructions.fragments)}"
+                    )
+                else:
+                    info(
+                        f"审计结果不满足入库策略，跳过入库: "
+                        f"reason={decision.reason}, "
+                        f"audit_status={decision.audit_status}, "
+                        f"score={result.score}"
+                    )
 
             # 记录错误来源
             if result.status in [AuditStatus.FAILED, AuditStatus.CRITICAL_ISSUES]:
@@ -2174,7 +2296,9 @@ class WorkflowNodes:
             f"严重={summary['critical']}, "
             f"主要={summary['major']}, "
             f"中度={summary['moderate']}, "
-            f"轻微={summary['minor']}"
+            f"轻微={summary['minor']}, "
+            f"警告={summary['warning']}, "
+            f"错误={summary['error']}"
         )
 
         for issue in result.issues:
@@ -2266,9 +2390,7 @@ class WorkflowNodes:
         Returns:
             修复参数
         """
-        return self.generator.generate_repair_params(
-            issues, stage, contract=contract
-        )
+        return self.generator.generate_repair_params(issues, stage, contract=contract)
 
     def _record_continuity_round(
         self, state: WorkflowState, record: Dict[str, Any]

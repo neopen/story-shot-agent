@@ -1,4 +1,4 @@
-version: "1.2"
+version: "1.3"
 
 shot_segmenter_system:
   name: "shot_segmenter_system"
@@ -80,6 +80,8 @@ shot_segmenter_user:
 
       12. If splitting is required (>7s), ensure each resulting shot has independent visual focus or emotional progression.
 
+      13. Element ID alignment: element_ids MUST be copied verbatim from the bracketed real IDs in the element list. Element IDs are globally unique across scenes and do not restart per scene (a later scene may start at elem_005); never renumber from elem_001.
+
     Return a JSON array where each item is:
     {{
       "id": "shot_001",
@@ -88,7 +90,7 @@ shot_segmenter_user:
       "shot_type": "wide_shot/medium_shot/close_up",
       "main_character": "main character name (if any)",
       "confidence": confidence_score (0.0-1.0),
-      "element_ids": ["elem_001","elem_002"]
+      "element_ids": ["real element IDs from the element list, e.g. elem_001, elem_005"]
     }}
 
     Return a valid JSON array only; do not include additional explanatory text or symbols.

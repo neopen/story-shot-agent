@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: embedding_adapter.py
 @Description: 嵌入模型适配工具，统一 LangChain 与 llama_index 两种嵌入接口
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 """
 from typing import Any, List, Optional

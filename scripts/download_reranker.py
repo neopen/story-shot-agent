@@ -1,12 +1,13 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: download_reranker.py
 @Description: 自动下载 BAAI/bge-reranker-large 模型
             需要安装 pip install sentence-transformers  或 pip install modelscope
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/5/20 22:30
 """
 

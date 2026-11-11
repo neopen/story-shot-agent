@@ -7,6 +7,35 @@
 
 ---
 
+
+## [0.4.4](https://github.com/neopen/story-shot-agent/compare/v0.4.3...v0.4.4) (2026-11-11)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 0.4.4 连续性闭环与首帧语义加固 ([#92](https://github.com/neopen/story-shot-agent/issues/92)) ([db11924](https://github.com/neopen/story-shot-agent/commit/db1192476be63859878bb21a1a2da75b54f302ca))
+
+## [0.4.4](https://github.com/neopen/story-shot-agent/compare/v0.4.2...v0.4.4) (2026-11-10)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 角色外观锚点：自由文本只保留外观子句，字段白名单首值优先，长度只在子句边界截断，避免情绪/动作词与半截词污染锚点。
+* 风格维度：按题材/氛围补齐六维风格前缀，互斥打光只保留一个家族，题材别名归一化并输出溯源。
+* 资产引用：角色三视图与道具静帧不再作为首帧，`asset_ref` 只代表片段首帧；回填 `usage.fragments` 并与路由引用保持一致。
+* 景别一致性：`camera.shot_type` 以最终提示词为准，保留来源景别与原始值溯源，两个转换器口径统一。
+* 提示词模板召回：修复索引加载以旧文件名判空导致零命中、单文档索引覆盖既有索引的问题；新增结构化检索诊断与只读召回快照，支持跨剧本只读召回。
+* 模板入库：质量审查与记忆层共用统一入库策略，模板写入 `source` / `audit_status`，legacy 模板默认排除在召回之外。
+* 质量门禁：新增外观锚点污染、景别与提示词不一致、互斥打光并存、资产使用范围缺失四条规则，违规在 `quality_auditor_result.json` 中带可定位的 `fragment_id` / `asset_id`。
+
+### ⚠️ 升级与迁移
+
+* `CONTRACT_SCHEMA_VERSION` 提升至 `0.4.4`，`pyproject.toml` 与 `penshot.__version__` 同步；新增字段均为可选，旧 `asset_manifest` 与 SDK 调用方式保持可用。
+* 0.4.3 已入库的缺陷模板需一次性迁移：`python scripts/migrate_prompt_templates_044.py` 默认 dry-run（只输出统计，不写文件），确认后加 `--apply` 写入；`--script-id` 可限定单剧本。
+* 迁移会先备份各剧本的 `templates_cache.json` 与 `index_store/` 到带时间戳的备份目录；缺陷模板只做隔离标记，不删除底层数据；迁移完成后从活跃缓存全量重建索引。
+* 召回阈值默认 `min_similarity_score = 0.80`、`top_k = 2`、`max_injected_patterns = 6`，跨剧本召回默认开启；可通过 `PENSHOT_PROMPT_TEMPLATES__*` 覆盖。
+
+
 ## [0.4.3](https://github.com/neopen/story-shot-agent/compare/v0.4.2...v0.4.3) (2026-11-09)
 
 
@@ -19,6 +48,7 @@
 ### 🐛 Bug Fixes (问题修复)
 
 * **continuity:** 修复 time_gap 反复重试与连续性节点崩溃 ([dcbd097](https://github.com/neopen/story-shot-agent/commit/dcbd097764030822aa0edc1f6ccf926abc87f8fc))
+
 
 ## [0.4.2](https://github.com/neopen/story-shot-agent/compare/v0.4.1...v0.4.2) (2026-11-06)
 

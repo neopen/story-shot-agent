@@ -1,12 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_task_manager_smoke.py
 @Description: TaskManager 冒烟测试（适配 TaskManager 重构后的协调层新 API）
     覆盖：创建/读取/进度/回调/结果/完成/失败/指标/快照/删除
-@Author: NeoPen
+@Author: neopen
 """
 
 import pytest

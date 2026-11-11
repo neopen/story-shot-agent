@@ -1,17 +1,17 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: asset_generator_agent.py
 @Description: 资产锚点生成智能体（工作流包装：产出声明式资产计划，可选消费/产出回填清单）
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/05
 """
 
 import os
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from penshot.logger import debug, info, warning
 from penshot.neopen.agent.asset_generator.asset_models import (
@@ -21,6 +21,7 @@ from penshot.neopen.agent.asset_generator.asset_models import (
     AssetPromptEdit,
     AssetSpec,
     AssetStatus,
+    AssetType,
 )
 from penshot.neopen.agent.asset_generator.character_sheet_generator import (
     build_character_sheet_specs,
@@ -40,6 +41,183 @@ from penshot.neopen.client.image_generation import (
     BaseImageGenerationClient,
     get_default_image_client,
 )
+
+
+def _field(source: Any, name: str, default: Any = None) -> Any:
+    """读取 dataclass / Pydantic / 字典字段"""
+    if source is None:
+        return default
+    value = getattr(source, name, None)
+    if value is None and isinstance(source, Mapping):
+        value = source.get(name)
+    return default if value is None else value
+
+
+def _fragment_rows(fragments: Sequence[Any], shots: Any) -> List[Dict[str, str]]:
+    """把片段序列归一为「片段 -> 镜头 -> 场景」扁平行"""
+    if isinstance(shots, Mapping):
+        shot_index = {str(key): value for key, value in shots.items()}
+    else:
+        shot_index = {
+            str(_field(shot, "id", "")): shot
+            for shot in shots or []
+            if _field(shot, "id", "")
+        }
+
+    rows: List[Dict[str, str]] = []
+    for fragment in fragments or []:
+        fragment_id = str(
+            _field(fragment, "id", "") or _field(fragment, "fragment_id", "") or ""
+        )
+        if not fragment_id:
+            continue
+        shot = shot_index.get(str(_field(fragment, "shot_id", "") or ""))
+        notes = _field(fragment, "continuity_notes", {}) or {}
+        main_character = _field(shot, "main_character", None) or _field(
+            fragment, "main_character", None
+        )
+        if not main_character and isinstance(notes, Mapping):
+            main_character = notes.get("main_character")
+        rows.append(
+            {
+                "id": fragment_id,
+                "scene_id": str(_field(shot, "scene_id", "") or ""),
+                "location": str(_field(shot, "location", "") or ""),
+                "main_character": str(main_character or "").strip(),
+            }
+        )
+    return rows
+
+
+def _scene_locations(contract: Any, parsed_script: Any) -> Dict[str, str]:
+    """构建场景ID -> 地点映射；契约优先，解析结果补齐"""
+    locations: Dict[str, str] = {}
+    for scene in getattr(parsed_script, "scenes", None) or []:
+        scene_id = str(_field(scene, "id", "") or "")
+        location = str(_field(scene, "location", "") or "").strip()
+        if scene_id and location:
+            locations[scene_id] = location
+
+    scenes = getattr(contract, "scenes", None) or {}
+    if isinstance(scenes, Mapping):
+        for scene_num, scene in scenes.items():
+            location = str(getattr(scene, "location", "") or "").strip()
+            if not location:
+                continue
+            if str(scene_num).isdigit():
+                locations[f"scene_{int(scene_num):03d}"] = location
+            else:
+                locations[str(scene_num)] = location
+    return locations
+
+
+def _prop_scene_map(parsed_script: Any) -> Dict[str, set[str]]:
+    """道具名 -> 出现场景ID集合（来自 global_metadata.key_props.appears_in）"""
+    metadata = getattr(parsed_script, "global_metadata", None)
+    result: Dict[str, set[str]] = {}
+    for prop in getattr(metadata, "key_props", None) or []:
+        name = str(_field(prop, "name", "") or "").strip()
+        scenes = {
+            str(scene_id)
+            for scene_id in (_field(prop, "appears_in", None) or [])
+            if scene_id
+        }
+        if name and scenes:
+            result[name] = scenes
+    return result
+
+
+def _references_by_asset(route_plan: Any) -> Dict[str, List[str]]:
+    """汇总路由计划中每个片段引用的资产（用于 FR-013 覆盖校验）"""
+    packages = _field(route_plan, "adapted_packages", None)
+    if packages is None and isinstance(route_plan, Mapping):
+        packages = route_plan.get("adapted_packages")
+    result: Dict[str, List[str]] = {}
+    for package in packages or []:
+        fragment_id = str(_field(package, "fragment_id", "") or "")
+        for reference in _field(package, "references", None) or []:
+            asset_id = str(_field(reference, "asset_id", "") or "")
+            if fragment_id and asset_id:
+                result.setdefault(asset_id, []).append(fragment_id)
+    return result
+
+
+def backfill_usage(
+    plan: Any,
+    fragments: Optional[Sequence[Any]] = None,
+    shots: Any = None,
+    contract: Optional[GlobalConsistencyContract] = None,
+    route_plan: Any = None,
+    parsed_script: Any = None,
+) -> AssetPlanDocument:
+    """回填资产计划的使用范围（FR-012/013、AC-012..016）
+
+    - 角色三视图：所有以该角色为主角的片段；
+    - 场景锚点：所有位于该场景地点下的片段；
+    - 道具静帧：所有位于该道具 ``appears_in`` 场景下的片段；
+    - ``route_plan`` 中显式引用的片段强制并入使用范围（引用集合必须是
+      使用范围的子集）。
+
+    Args:
+        plan: 资产计划文档；字典输入会先校验为 ``AssetPlanDocument``
+        fragments: 片段序列（``VideoFragment`` 或含 ``fragment_id`` 的提示词）
+        shots: 镜头序列或 ``{shot_id: shot}`` 映射
+        contract: 全局一致性契约；提供场景地点
+        route_plan: 路由计划；提供每片段的资产引用
+        parsed_script: 剧本解析结果；提供场景地点与道具 ``appears_in``
+
+    Returns:
+        原地回填后的资产计划文档
+    """
+    document = (
+        plan
+        if isinstance(plan, AssetPlanDocument)
+        else AssetPlanDocument.model_validate(plan)
+    )
+
+    rows = _fragment_rows(fragments or [], shots)
+    scene_locations = _scene_locations(contract, parsed_script)
+    for row in rows:
+        row["location"] = scene_locations.get(row["scene_id"], "")
+    fragment_order = {row["id"]: index for index, row in enumerate(rows)}
+    prop_scenes = _prop_scene_map(parsed_script)
+    referenced = _references_by_asset(route_plan)
+
+    for spec in document.assets:
+        if spec.asset_type == AssetType.CHARACTER_SHEET:
+            used = [
+                row["id"] for row in rows if row["main_character"] == spec.owner_name
+            ]
+        elif spec.asset_type == AssetType.SCENE:
+            used = [
+                row["id"]
+                for row in rows
+                if row["location"] and row["location"] == spec.owner_name
+            ]
+        elif spec.asset_type == AssetType.PROP:
+            scene_ids = prop_scenes.get(spec.owner_name, set())
+            used = [row["id"] for row in rows if row["scene_id"] in scene_ids]
+        else:
+            used = []
+
+        for fragment_id in referenced.get(spec.asset_id, []):
+            if fragment_id in fragment_order and fragment_id not in used:
+                used.append(fragment_id)
+
+        spec.usage.fragments = sorted(
+            dict.fromkeys(used),
+            key=lambda fragment_id: fragment_order.get(
+                fragment_id, len(fragment_order)
+            ),
+        )
+
+    debug(
+        "资产使用范围回填完成: "
+        + ", ".join(
+            f"{spec.asset_id}={len(spec.usage.fragments)}" for spec in document.assets
+        )
+    )
+    return document
 
 
 class AssetGeneratorAgent:
@@ -176,7 +354,9 @@ class AssetGeneratorAgent:
                 }
             )
 
-            asset = getattr(contract, "assets", {}).get(edit.asset_id) if contract else None
+            asset = (
+                getattr(contract, "assets", {}).get(edit.asset_id) if contract else None
+            )
             if asset is not None:
                 asset.image_prompt = spec.image_prompt
                 if spec.status == AssetStatus.PENDING:
@@ -210,7 +390,9 @@ class AssetGeneratorAgent:
             for key, value in manifest.asset_id_map.items()
             if key not in asset_ids and value not in drop_ids
         }
-        return manifest.model_copy(update={"bindings": bindings, "asset_id_map": id_map})
+        return manifest.model_copy(
+            update={"bindings": bindings, "asset_id_map": id_map}
+        )
 
     def generate_assets(
         self,

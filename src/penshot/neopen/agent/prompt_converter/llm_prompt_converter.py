@@ -1,18 +1,18 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: llm_prompt_converter.py
 @Description: 基于LLM的提示词转换器 - 音频参数由LLM直接从CharacterInfo解析
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 23:36
 """
 import json
 from typing import Optional, Dict, Any
 
-from penshot.logger import info, error
+from penshot.logger import info, error, warning
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
 from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.prompt_converter.base_prompt_converter import BasePromptConverter
@@ -189,14 +189,28 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
                 info(f"修复截断提示词: {prompt.fragment_id}")
         return instructions
 
-    def _fix_style_consistency(self, instructions: AIVideoInstructions) -> AIVideoInstructions:
-        """修复风格一致性"""
-        default_style = self.config.default_style
+    def _fix_style_consistency(
+        self, instructions: AIVideoInstructions
+    ) -> AIVideoInstructions:
+        """修复风格一致性
+
+        以多数片段的既有风格为统一目标，避免用默认风格覆盖来源风格；
+        契约风格由调用方在同一渲染结果上注入（FR-025）。
+        """
+        style_counts: Dict[str, int] = {}
         for prompt in instructions.fragments:
-            if prompt.style and prompt.style != default_style:
+            if prompt.style:
+                style_counts[prompt.style] = style_counts.get(prompt.style, 0) + 1
+
+        if len(style_counts) <= 1:
+            return instructions
+
+        target_style = max(style_counts, key=lambda value: style_counts[value])
+        for prompt in instructions.fragments:
+            if prompt.style and prompt.style != target_style:
                 old_style = prompt.style
-                prompt.style = default_style
-                info(f"统一风格: {prompt.fragment_id} {old_style} -> {default_style}")
+                prompt.style = target_style
+                info(f"统一风格: {prompt.fragment_id} {old_style} -> {target_style}")
         return instructions
 
     def _fix_negative_prompts(self, instructions: AIVideoInstructions) -> AIVideoInstructions:
@@ -360,7 +374,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
             model=self.config.video_model,
             style=result.get("style_hint"),
             audio=audio,
-            camera=build_camera_control(fragment.description, fragment.shot_type),
+            camera=build_camera_control(combined_prompt, fragment.shot_type),
         )
 
 
@@ -572,6 +586,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         if elements_text:
             return "本片段包含的原始元素：\n" + "\n".join(elements_text)
 
+        warning(f"片段 {fragment.id} 的 element_ids 无法对应任何剧本元素: {element_ids}")
         return "本片段无对应原始元素"
 
     def _get_full_script_context(self, fragment: VideoFragment) -> str:

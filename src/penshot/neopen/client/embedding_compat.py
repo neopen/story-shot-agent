@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: embedding_compat.py
 @Description: 嵌入模型参数兼容性辅助：处理服务端不支持 dimensions 参数的情况
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 """
 from typing import Any, Callable, List

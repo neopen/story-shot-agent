@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_task_processor_queue.py
 @Description: 异步任务处理器队列行为测试（优先级、容量、取消、恢复）
-@Author: NeoPen
+@Author: neopen
 """
 from datetime import datetime, timezone
 

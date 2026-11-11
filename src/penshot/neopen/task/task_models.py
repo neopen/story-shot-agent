@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: task_models.py
 @Description: API-friendly request/response models for task processing
-@Author: NeoPen (adapted)
+@Author: neopen (adapted)
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/03/17
 """

@@ -1,18 +1,25 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: consistency_contract.py
 @Description: 全局一致性契约 - 贯穿剧本解析、分镜、分割、提示词生成
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/4/28 0:18
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Any, Set
+from typing import Any, Dict, List, Mapping, Optional, Set
+
+from .appearance_anchors import (
+    APPEARANCE_FIELDS,
+    extract_appearance_anchors,
+    merge_appearance_anchors,
+)
 
 
 class ContractStatus(Enum):
@@ -47,23 +54,23 @@ class CharacterContract:
         # 提取外观特征
         self._extract_appearance_features(description)
 
-    def _extract_appearance_features(self, description: str):
-        """从描述中提取外观特征"""
-        features = {}
-        # 服装特征
-        clothes_keywords = ["穿", "着", "戴", "衣服", "裙子", "西装", "衬衫"]
-        for kw in clothes_keywords:
-            if kw in description:
-                # 提取服装描述
-                idx = description.find(kw)
-                if idx > 0:
-                    start = max(0, idx - 10)
-                    end = min(len(description), idx + 20)
-                    features["clothing"] = description[start:end]
-                    break
+    def _extract_appearance_features(
+        self, description: str, outfit: Optional[Mapping[str, Any]] = None
+    ) -> None:
+        """从描述（及可选结构化服装）提取外观特征
 
-        if features:
-            self.appearance_anchors.update(features)
+        提取规则统一委托 `appearance_anchors` 共享模块；同一字段首值优先，
+        保证锚点在所有片段中完全一致（FR-005）。
+        """
+        features = extract_appearance_anchors(description=description, outfit=outfit)
+        if not features:
+            return
+
+        merged = merge_appearance_anchors(self.appearance_anchors, features)
+        self.appearance_anchors.clear()
+        self.appearance_anchors.update(
+            {key: value for key, value in merged.items() if key in APPEARANCE_FIELDS}
+        )
 
     def get_gap_scenes(self) -> int:
         """获取最大缺席场景数"""
@@ -145,6 +152,8 @@ class GlobalConsistencyContract:
 
     # 风格锚点
     style_anchor: Dict[str, Any] = field(default_factory=dict)
+    # 风格溯源（FR-029）：来源字段、候选、冲突丢弃项
+    style_anchor_provenance: Dict[str, Any] = field(default_factory=dict)
 
     # 资产锚点（角色三视图/道具静帧/场景锚点）
     assets: Dict[str, AssetContract] = field(default_factory=dict)
@@ -179,6 +188,11 @@ class GlobalConsistencyContract:
         """设置风格锚点"""
         self.style_anchor[style_type] = value
         self._record_change("style_anchor", {style_type: value})
+
+    def set_style_anchor_provenance(self, provenance: Mapping[str, Any]):
+        """写入风格溯源（FR-029），重复解析时以最新证据覆盖"""
+        self.style_anchor_provenance = dict(provenance or {})
+        self._record_change("style_anchor_provenance", self.style_anchor_provenance)
 
     def _record_change(self, change_type: str, data: Dict):
         """记录变更历史"""
@@ -234,6 +248,7 @@ class GlobalConsistencyContract:
                 for num, s in self.scenes.items()
             },
             "style_anchor": self.style_anchor,
+            "style_anchor_provenance": self.style_anchor_provenance,
             "assets": {asset_id: a.to_dict() for asset_id, a in self.assets.items()},
             "version": self.version,
         }
