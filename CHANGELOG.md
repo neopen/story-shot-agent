@@ -8,6 +8,13 @@
 ---
 
 
+## [0.4.4](https://github.com/neopen/story-shot-agent/compare/v0.4.3...v0.4.4) (2026-11-11)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 0.4.4 连续性闭环与首帧语义加固 ([#92](https://github.com/neopen/story-shot-agent/issues/92)) ([db11924](https://github.com/neopen/story-shot-agent/commit/db1192476be63859878bb21a1a2da75b54f302ca))
+
 ## [0.4.4](https://github.com/neopen/story-shot-agent/compare/v0.4.2...v0.4.4) (2026-11-10)
 
 
