@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: quality_auditor_models.py
 @Description: 质量审核模型
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/19 22:58
 """
@@ -52,6 +52,10 @@ class BasicViolation(BaseModel):
         default=None,
         description="涉及的片段ID"
     )
+    asset_id: Optional[str] = Field(
+        default=None,
+        description="涉及的资产ID（FR-064：资产相关违规需可定位）"
+    )
     suggestion: Optional[str] = Field(
         default=None,
         description="改进建议"
@@ -66,6 +70,7 @@ class BasicViolation(BaseModel):
             issue_desc=data.get("issue_desc", ""),
             severity=SeverityLevel(data.get("severity", "warning")),
             fragment_id=data.get("fragment_id"),
+            asset_id=data.get("asset_id"),
             suggestion=data.get("suggestion"),
             source_node=PipelineNode(data.get("source_node")) if data.get("source_node") else None
         )
@@ -75,6 +80,7 @@ class BasicViolation(BaseModel):
                issue_value: Optional[Any] = None, standard_value: Optional[Any] = None,
                severity: SeverityLevel = SeverityLevel.WARNING,
                fragment_id: Optional[str] = None,
+               asset_id: Optional[str] = None,
                suggestion: Optional[str] = None,
                source_node: PipelineNode = PipelineNode.AUDIT_QUALITY) -> 'BasicViolation':
         """添加违规记录"""
@@ -87,6 +93,7 @@ class BasicViolation(BaseModel):
             source_node=source_node,
             severity=severity,
             fragment_id=fragment_id,
+            asset_id=asset_id,
             suggestion=suggestion
         )
 
@@ -94,12 +101,14 @@ class BasicViolation(BaseModel):
     def create_violation(cls, rule_type: RuleType,
                          issue_value: Optional[Any] = None, standard_value: Optional[Any] = None,
                          severity: SeverityLevel = SeverityLevel.WARNING,
-                         fragment_id: Optional[str] = None, suggestion: Optional[str] = None,
+                         fragment_id: Optional[str] = None, asset_id: Optional[str] = None,
+                         suggestion: Optional[str] = None,
                          source_node: PipelineNode = PipelineNode.AUDIT_QUALITY) -> 'BasicViolation':
         """添加违规记录"""
         return cls.create(issue_code=rule_type.code, issue_type=rule_type.issue_type, issue_desc=rule_type.description,
                           issue_value=issue_value, standard_value=standard_value,
-                          severity=severity, fragment_id=fragment_id, suggestion=suggestion, source_node=source_node)
+                          severity=severity, fragment_id=fragment_id, asset_id=asset_id,
+                          suggestion=suggestion, source_node=source_node)
 
 
 class QualityRepairParams(BaseModel):

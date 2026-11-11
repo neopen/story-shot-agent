@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_embedding_compat.py
 @Description: 嵌入模型 dimensions 参数降级逻辑测试
-@Author: NeoPen
+@Author: neopen
 """
 import pytest
 from langchain_core.embeddings import Embeddings

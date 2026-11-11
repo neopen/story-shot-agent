@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: template_prompt_converter.py
 @Description: 
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/26 23:41
 """
@@ -111,7 +111,7 @@ class TemplatePromptConverter(BasePromptConverter):
             model=self.config.video_model,
             style=style_hint,
             requires_special_attention=fragment.requires_special_attention,
-            camera=build_camera_control(fragment.description, fragment.shot_type),
+            camera=build_camera_control(full_prompt, fragment.shot_type),
         )
 
     def _infer_shot_type(self, description: str) -> ShotType:

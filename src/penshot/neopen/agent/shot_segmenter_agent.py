@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: shot_generator_agent.py
 @Description: 分镜生成智能体
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2025/10 - 2025/11
 """
@@ -16,12 +16,13 @@ from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode, ElementType
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import IssueType
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, RuleType
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, RuleType, QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_enhancer import DurationEnhancer
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_factory import estimator_factory
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_factory import ShotSegmenterFactory
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence, ShotInfo, ShotType
+from penshot.neopen.agent.shot_segmenter.transition_shots import insert_transition_shots
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
@@ -70,6 +71,11 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         self._need_extra_validation: bool = False
 
     def process(self, structured_script: ParsedScript) -> Optional[ShotSequence]:
+        # 结构性问题（场景跳转）直接复用现有分镜修复，避免重跑 LLM 生成
+        repaired = self._repair_scene_jumps_locally()
+        if repaired is not None:
+            return repaired
+
         # 使用当前修复参数影响生成策略
         # if self._increase_shot_count:
         #     # 调整分镜生成器的配置
@@ -94,6 +100,38 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                 debug("启用短镜头优先模式")
 
         return self.shot_process(structured_script)
+
+    def _repair_scene_jumps_locally(self) -> Optional[ShotSequence]:
+        """仅场景跳转问题时复用现有分镜插入过渡镜头
+
+        场景跳转由场景边界与相邻景别决定，重跑 LLM 生成并不能稳定消除，
+        只会反复消耗分镜生成调用；在已有分镜上确定性插入过渡镜头即可收敛。
+        """
+        params = self.current_repair_params
+        if not params or not params.fix_needed:
+            return None
+        if set(params.issue_types or []) != {"scene_jump"}:
+            return None
+        if self.last_shot_sequence is None or len(self.last_shot_sequence.shots) < 2:
+            return None
+
+        info("仅场景跳转问题，复用现有分镜插入过渡镜头，跳过 LLM 重新生成")
+        shot_sequence = insert_transition_shots(self.last_shot_sequence)
+        self._record_shot_repair(shot_sequence, params)
+        self.last_shot_sequence = shot_sequence
+        return shot_sequence
+
+    def _record_shot_repair(self, shot_sequence: ShotSequence, params: QualityRepairParams) -> None:
+        """记录分镜修复参数，供产物回溯"""
+        if "repair_history" not in shot_sequence.metadata:
+            shot_sequence.metadata["repair_history"] = []
+        shot_sequence.metadata["repair_history"].append({
+            "timestamp": time.time(),
+            "repair_params": {
+                "issue_types": params.issue_types,
+                "suggestions": params.suggestions
+            }
+        })
 
     def repair_result(self, shot_sequence: ShotSequence, issues: List[BasicViolation],
                       structured_script: ParsedScript) -> ShotSequence:
@@ -222,15 +260,7 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
             # 4. 记录修复历史
             repair_params = self.current_repair_params
             if repair_params and repair_params.fix_needed:
-                if "repair_history" not in shot_sequence.metadata:
-                    shot_sequence.metadata["repair_history"] = []
-                shot_sequence.metadata["repair_history"].append({
-                    "timestamp": time.time(),
-                    "repair_params": {
-                        "issue_types": repair_params.issue_types,
-                        "suggestions": repair_params.suggestions
-                    }
-                })
+                self._record_shot_repair(shot_sequence, repair_params)
 
             self.last_shot_sequence = shot_sequence
             return shot_sequence

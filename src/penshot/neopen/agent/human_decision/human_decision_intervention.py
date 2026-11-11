@@ -1,12 +1,13 @@
 # human_decision_intervention.py - 优化后的版本（保留控制台交互）
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: human_decision_intervention.py
 @Description: 人工干预工作流节点 - 控制台版本
-@Author: NeoPen
+@Author: neopen
+@GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/2/5 17:28
 """
 import threading

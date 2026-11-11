@@ -1,21 +1,22 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: quality_auditor_agent.py
 @Description: 质量审查器 - 合并基本规则和LLM审查结果
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/25 21:59
 """
 import time
-from typing import Optional, Dict, List, Any, Set
+from typing import Optional, Dict, List, Any, Set, cast
 
 from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
 from penshot.neopen.agent.quality_auditor.quality_auditor_factory import QualityAuditorFactory
+from penshot.neopen.agent.quality_auditor.rule_quality_auditor import RuleQualityAuditor
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, AuditStatus, SeverityLevel, IssueType, QualityRepairParams, BasicViolation, \
     RepairHistory
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
@@ -91,7 +92,8 @@ class QualityAuditorAgent:
 
     def qa_process(self, instructions: AIVideoInstructions,
                    stage_issues: Optional[Dict[PipelineNode, List[BasicViolation]]] = None,
-                   historical_context: Optional[Dict[str, Any]] = None) -> Optional[QualityAuditReport]:
+                   historical_context: Optional[Dict[str, Any]] = None,
+                   contract: Optional[Any] = None) -> Optional[QualityAuditReport]:
         """
         执行质量审查 - 合并基本规则、LLM结果和各阶段问题
 
@@ -99,6 +101,7 @@ class QualityAuditorAgent:
             instructions: AI视频指令
             stage_issues: 各阶段检测到的问题（来自各个智能体的detect_issues方法）
             historical_context: 历史上下文（可选，用于优化审查）
+            contract: 全局一致性契约（可选，供外观锚点污染检查使用）
 
         Returns:
             质量审查报告
@@ -124,7 +127,10 @@ class QualityAuditorAgent:
 
         try:
             # 1. 执行基本规则审查
-            rule_report = self.rule_auditor.audit(instructions)
+            # rule_auditor 由工厂按 AgentMode.RULE 创建，实际类型恒为 RuleQualityAuditor
+            rule_report = cast(RuleQualityAuditor, self.rule_auditor).audit(
+                instructions, contract=contract
+            )
             info(f"基本规则审查完成，发现{len(rule_report.violations)}个问题")
 
             # 2. 执行LLM深度审查（如果启用），传递历史上下文

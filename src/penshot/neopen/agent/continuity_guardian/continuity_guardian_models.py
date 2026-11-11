@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: continuity_guardian_models.py
 @Description: 连续性管理模型
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/18 14:26
 """
@@ -444,6 +444,9 @@ class ContinuityCheckResult(BaseModel):
             "major": self.major_count,
             "moderate": self.moderate_count,
             "minor": self.minor_count,
+            "warning": len(self.issues_by_severity.get(ContinuitySeverity.WARNING.value, [])),
+            "error": len(self.issues_by_severity.get(ContinuitySeverity.ERROR.value, [])),
+            "info": len(self.issues_by_severity.get(ContinuitySeverity.INFO.value, [])),
             "issues_by_type": {k: len(v) for k, v in self.issues_by_type.items()},
             "check_timestamp": self.check_timestamp
         }

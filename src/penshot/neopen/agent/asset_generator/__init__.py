@@ -1,17 +1,18 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: __init__.py
 @Description: 资产锚点生成层公共 API（M0.4.2）
-@Author: NeoPen
+@Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/05
 """
 
 from penshot.neopen.agent.asset_generator.asset_generator_agent import (
     AssetGeneratorAgent,
+    backfill_usage,
 )
 from penshot.neopen.agent.asset_generator.asset_models import (
     ASSET_SCHEMA_VERSION,
@@ -53,6 +54,7 @@ __all__ = [
     "AssetType",
     "AssetUsage",
     "ImageClientExecutionAdapter",
+    "backfill_usage",
     "build_character_sheet_specs",
     "build_prop_specs",
     "build_scene_specs",

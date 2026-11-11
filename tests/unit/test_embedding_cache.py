@@ -1,11 +1,11 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_embedding_cache.py
 @Description: 嵌入模型工厂缓存单元测试（确保同一配置只初始化一次）
-@Author: NeoPen
+@Author: neopen
 """
 import pytest
 
