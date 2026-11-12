@@ -14,6 +14,7 @@ from penshot.neopen.agent.asset_generator import (
     AssetGeneratorAgent,
     AssetManifest,
     AssetPlanDocument,
+    AssetSpec,
     AssetStatus,
     AssetType,
     build_character_sheet_specs,
@@ -135,6 +136,109 @@ def test_build_specs_cover_character_prop_scene():
     assert "neon signs" in scene_specs[0].image_prompt
 
 
+def test_character_sheet_resolves_ambiguous_clothing():
+    """结构化服装自身含“A 或 B”时确定性消解，并标记人工复核"""
+    parsed = _parsed_script()
+    parsed.characters = [SimpleNamespace(name="林然", description="温和的女性教师")]
+    parsed.global_metadata.character_outfits = [
+        SimpleNamespace(
+            character="林然",
+            description="得体的浅色连衣裙或套装",
+            color="米色/浅蓝",
+            style="职业休闲",
+            material="丝绸/棉麻",
+        )
+    ]
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    spec = build_character_sheet_specs(parsed, contract)[0]
+
+    assert "或" not in spec.image_prompt
+    assert "连衣裙" in spec.image_prompt
+    assert spec.metadata["requires_special_attention"] is True
+    assert spec.metadata["outfit_resolution"] in {
+        "first_alternative",
+        "garment_match",
+    }
+    assert set(spec.metadata["outfit_alternatives"]) == {
+        "得体的浅色连衣裙",
+        "套装",
+    }
+
+
+def test_character_sheet_resolves_free_text_ambiguity():
+    """无结构化服装时，自由文本里的“或”同样被消解并标记"""
+    parsed = _parsed_script()
+    parsed.characters = [
+        SimpleNamespace(name="林然", description="她身穿浅色连衣裙或套装，佩戴眼镜")
+    ]
+    parsed.global_metadata.character_outfits = []
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    spec = build_character_sheet_specs(parsed, contract)[0]
+
+    assert "或" not in spec.image_prompt
+    assert "连衣裙" in spec.image_prompt
+    assert spec.metadata["requires_special_attention"] is True
+
+
+def test_character_sheet_prefers_style_matched_alternative():
+    """style 字段能唯一指向备选时，按 style 消解"""
+    parsed = _parsed_script()
+    parsed.global_metadata.character_outfits = [
+        SimpleNamespace(
+            character="林然",
+            description="运动背心或短袖T恤，搭配运动短裤",
+            color="灰色/黑色",
+            style="运动背心",
+            material="速干面料",
+        )
+    ]
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    spec = build_character_sheet_specs(parsed, contract)[0]
+
+    assert spec.metadata["outfit_resolution"] == "style_match"
+    assert "运动背心" in spec.image_prompt
+    assert "短袖T恤" not in spec.image_prompt
+
+
+def test_character_sheet_keeps_unambiguous_clothing():
+    """无歧义且含服装名词时不产生审阅标记"""
+    parsed = _parsed_script()
+    parsed.global_metadata.character_outfits = [
+        SimpleNamespace(
+            character="林然",
+            description="黑色羊毛西装",
+            color="黑色",
+            style="正装",
+            material="羊毛",
+        )
+    ]
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    spec = build_character_sheet_specs(parsed, contract)[0]
+
+    assert "requires_special_attention" not in spec.metadata
+    assert "黑色羊毛西装" in spec.image_prompt
+
+
+def test_default_agent_never_resolves_image_client(monkeypatch):
+    """默认工作流只声明资产，不得惰性解析任何文生图客户端"""
+    import penshot.neopen.agent.asset_generator.asset_generator_agent as module
+
+    def _boom():
+        raise AssertionError("默认路径不得解析文生图客户端")
+
+    monkeypatch.setattr(module, "get_default_image_client", _boom)
+
+    report = AssetGeneratorAgent().generate_assets(_parsed_script(), _contract())
+
+    assert report.mode == "plan"
+    assert report.enabled is False
+    assert report.pending == 3
+
+
 def test_disabled_client_keeps_pending_assets():
     """文生图未启用时仅把 pending 资产与提示词挂到契约"""
     agent = AssetGeneratorAgent(
@@ -208,6 +312,23 @@ def test_plan_assets_always_produces_declarative_plan():
     assert char.usage.characters == ["林然"]
     assert char.consistency.identity_lock is True
     assert char.consistency.preferred_view == "front"
+
+
+def test_plan_style_anchor_discards_conflicting_description_phrases():
+    """资产计划的 style_anchor 必须与片段同源，不残留已丢弃的氛围短语"""
+    contract = _contract()
+    contract.set_style_anchor("palette", "fresh pastel palette")
+    contract.set_style_anchor("mood", "hopeful")
+    contract.set_style_anchor("description", "muted colors, melancholic tone")
+
+    plan = AssetGeneratorAgent().plan_assets(_parsed_script(), contract)
+
+    description = plan.style_anchor["description"]
+    assert "muted colors" not in description
+    assert "melancholic tone" not in description
+    assert description == "neo-noir, fresh pastel palette, hopeful"
+    # 只读契约，不得因生成计划而改写原始锚点
+    assert contract.style_anchor["description"] == "muted colors, melancholic tone"
 
 
 class _CountingImageClient(_FakeImageClient):
@@ -551,3 +672,222 @@ def test_scene_prompt_truncates_at_clause_boundary(monkeypatch):
     assert "雨棚下亮着暖黄灯，地面积水映出灯光，行人撑伞匆匆走过" in prompt
     assert "咖啡店招牌" not in prompt
     assert "长椅空着" not in prompt
+
+
+# ======================== 0.4.5 任务 2：服装完整性 ========================
+
+
+def _outfit_script(clothing: str) -> SimpleNamespace:
+    """构造只有单一服装描述的最小解析结果"""
+    return SimpleNamespace(
+        characters=[SimpleNamespace(name="张晨", description="高中生")],
+        scenes=[],
+        global_metadata=SimpleNamespace(
+            character_outfits=[SimpleNamespace(character="张晨", description=clothing)],
+            key_props=[],
+            key_locations=[],
+        ),
+    )
+
+
+def test_incomplete_outfit_is_flagged_with_missing_fields():
+    """只有服装类型、缺颜色与材质时标记人工复核并写明缺口"""
+    parsed = _outfit_script("高中校服")
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    spec = build_character_sheet_specs(parsed, contract)[0]
+
+    assert spec.metadata["requires_special_attention"] is True
+    assert spec.metadata["outfit_missing_fields"] == ["颜色", "材质"]
+    assert "缺少颜色和材质" in spec.metadata["attention_reason"]
+    assert spec.metadata["outfit_text"] == "高中校服"
+
+
+def test_complete_outfit_has_no_missing_flag():
+    """类型+颜色+材质齐全时不产生信息不足标记"""
+    parsed = _outfit_script("蓝白相间棉质高中校服")
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    spec = build_character_sheet_specs(parsed, contract)[0]
+
+    assert "requires_special_attention" not in spec.metadata
+    assert "outfit_missing_fields" not in spec.metadata
+
+
+def test_backfill_character_outfits_from_fragment_prompts():
+    """路由阶段用片段提示词补全颜色/材质，保留复核标记与缺失说明"""
+    plan = AssetPlanDocument(
+        assets=[
+            AssetSpec(
+                asset_id="char_001",
+                asset_type=AssetType.CHARACTER_SHEET,
+                owner_name="张晨",
+                image_prompt=(
+                    "character reference sheet of 张晨, front view, full body, "
+                    "高中校服, highly detailed character design"
+                ),
+                metadata={
+                    "role": "identity_anchor",
+                    "outfit_text": "高中校服",
+                    "requires_special_attention": True,
+                    "attention_reason": "服装描述缺少颜色和材质",
+                },
+            )
+        ]
+    )
+
+    changed = character_sheet_generator.backfill_character_outfits(
+        plan,
+        {
+            "张晨": [
+                (
+                    "frag_011",
+                    "Zhang Chen wearing slightly disheveled blue and white cotton "
+                    "school uniform, sweat drops on forehead",
+                )
+            ]
+        },
+    )
+
+    spec = plan.assets[0]
+    assert changed == ["char_001"]
+    assert "blue and white cotton school uniform" in spec.image_prompt
+    assert "高中校服" not in spec.image_prompt
+    assert spec.metadata["outfit_backfill_source"] == "frag_011"
+    assert spec.metadata["requires_special_attention"] is True
+    assert "缺少颜色和材质" in spec.metadata["attention_reason"]
+    assert "已从片段提示词" in spec.metadata["attention_reason"]
+
+
+def test_backfill_skips_complete_or_generated_assets():
+    """已完整、已生成或人工编辑过的资产不回填"""
+    complete = AssetSpec(
+        asset_id="char_001",
+        asset_type=AssetType.CHARACTER_SHEET,
+        owner_name="甲",
+        image_prompt="character reference sheet of 甲, 黑色羊毛西装",
+        metadata={"outfit_text": "黑色羊毛西装"},
+    )
+    generated = AssetSpec(
+        asset_id="char_002",
+        asset_type=AssetType.CHARACTER_SHEET,
+        owner_name="乙",
+        image_prompt="character reference sheet of 乙, 高中校服",
+        asset_ref="/downstream/char_002.png",
+        status=AssetStatus.GENERATED,
+        metadata={"outfit_text": "高中校服"},
+    )
+    edited = AssetSpec(
+        asset_id="char_003",
+        asset_type=AssetType.CHARACTER_SHEET,
+        owner_name="丙",
+        image_prompt="character reference sheet of 丙, 高中校服",
+        metadata={"outfit_text": "高中校服", "human_edited": True},
+    )
+    plan = AssetPlanDocument(assets=[complete, generated, edited])
+
+    changed = character_sheet_generator.backfill_character_outfits(
+        plan, {"甲": [("f1", "wearing blue cotton coat")]}
+    )
+
+    assert changed == []
+    assert generated.status == AssetStatus.GENERATED
+    assert edited.metadata["outfit_text"] == "高中校服"
+
+
+def test_manifest_missing_file_uri_keeps_pending(tmp_path):
+    """显式 file:// 指向的文件不存在时保持 pending，并记录明确错误"""
+    contract = _contract()
+    agent = AssetGeneratorAgent()
+    manifest = AssetManifest(
+        task_id="t1",
+        bindings=[
+            AssetBinding(
+                asset_id="char_001",
+                asset_ref=(tmp_path / "missing.png").as_uri(),
+                source="external",
+            )
+        ],
+    )
+
+    report = agent.generate_assets(_parsed_script(), contract, manifest=manifest)
+
+    assert report.manifest_applied == 0
+    assert any(
+        "char_001" in message and "不存在" in message for message in report.errors
+    )
+    assert contract.assets["char_001"].status == AssetStatus.PENDING.value
+
+
+def test_manifest_checksum_mismatch_keeps_pending(tmp_path):
+    """校验和不匹配时拒绝回填，避免挂上错误图片"""
+    image = tmp_path / "char_001.png"
+    image.write_bytes(b"real-image")
+    contract = _contract()
+    agent = AssetGeneratorAgent()
+    manifest = AssetManifest(
+        task_id="t1",
+        bindings=[
+            AssetBinding(
+                asset_id="char_001",
+                asset_ref=image.as_uri(),
+                checksum="sha256:" + "0" * 64,
+            )
+        ],
+    )
+
+    report = agent.generate_assets(_parsed_script(), contract, manifest=manifest)
+
+    assert report.manifest_applied == 0
+    assert any("校验和不匹配" in message for message in report.errors)
+    assert contract.assets["char_001"].status == AssetStatus.PENDING.value
+
+
+def test_manifest_accepts_v3_assets_alias(tmp_path):
+    """兼容 v3 清单的 assets 字段、script_id 与 generated_at"""
+    image = tmp_path / "char_001.png"
+    image.write_bytes(b"real-image")
+    contract = _contract()
+    agent = AssetGeneratorAgent()
+    manifest = AssetManifest.model_validate(
+        {
+            "task_id": "t1",
+            "script_id": "s1",
+            "generated_at": "2026-11-12T15:00:00Z",
+            "assets": [
+                {
+                    "asset_id": "char_001",
+                    "asset_ref": image.as_uri(),
+                    "generated_at": "2026-11-12T15:00:00Z",
+                    "source": "external",
+                }
+            ],
+        }
+    )
+
+    assert manifest.script_id == "s1"
+    assert manifest.generated_at == "2026-11-12T15:00:00Z"
+    report = agent.generate_assets(_parsed_script(), contract, manifest=manifest)
+
+    assert report.manifest_applied == 1
+    assert report.errors == []
+    spec = next(item for item in report.assets if item.asset_id == "char_001")
+    assert spec.metadata["generated_at"] == "2026-11-12T15:00:00Z"
+
+
+def test_manifest_unknown_asset_id_is_reported():
+    """清单里出现计划外的 asset_id 时给出明确错误"""
+    contract = _contract()
+    agent = AssetGeneratorAgent()
+    manifest = AssetManifest(
+        task_id="t1",
+        bindings=[AssetBinding(asset_id="char_999", asset_ref="/cdn/char_999.png")],
+    )
+
+    report = agent.generate_assets(_parsed_script(), contract, manifest=manifest)
+
+    assert report.manifest_applied == 0
+    assert any(
+        "char_999" in message and "不在资产计划中" in message
+        for message in report.errors
+    )

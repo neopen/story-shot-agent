@@ -16,6 +16,7 @@
 
 ```
 examples/
+├── backfill_assets.py  # 资产回填：把已有图片/URL 写成 asset_manifest（离线）
 ├── data/               # 样例数据（scripts/ 剧本、results/ 阶段产物 JSON）
 ├── sdk/                # Python 库（PenshotFunction）直调
 ├── rest/               # REST API 客户端（httpx，需先启动 REST 服务）
@@ -26,6 +27,18 @@ examples/
 ```
 
 ## 各子目录
+
+### 顶层脚本
+
+| 脚本 | 场景 | 运行前提 |
+| --- | --- | --- |
+| `backfill_assets.py` | 把已有图片路径/URL 写进 `asset_manifest`（自动 sha256、可选 `--apply` 写回计划副本） | 纯标准库 + 已安装的 penshot，**无需 LLM/生图** |
+
+```bash
+python examples/backfill_assets.py data/asset_plan.json \
+    --set char_001=assets/char_001.png \
+    --set scene_001=https://cdn.example.com/scene_001.png
+```
 
 ### sdk/ — SDK 直调（`PenshotFunction`）
 

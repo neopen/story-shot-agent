@@ -75,6 +75,7 @@ from penshot.neopen.agent.model_adapter import (
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
 from penshot.neopen.agent.asset_generator import (
     AssetGeneratorAgent,
+    backfill_outfits,
     backfill_usage,
 )
 from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
@@ -1026,7 +1027,17 @@ class WorkflowNodes:
             contract=state.domain.contract,
             route_plan=route_plan,
             parsed_script=state.domain.parsed_script,
+            instructions=state.domain.instructions,
         )
+        # 0.4.5 任务 2：ASSETS 阶段只能标记服装信息不足，这里用最终提示词补全
+        outfit_backfilled = backfill_outfits(
+            plan,
+            fragments=fragments,
+            shots=shots,
+            instructions=state.domain.instructions,
+        )
+        if outfit_backfilled:
+            debug(f"角色服装已从片段提示词回填: {', '.join(outfit_backfilled)}")
         state.domain.asset_plan = plan.to_dict()
         self.storage.save_obj_result(
             state.input.script_id,

@@ -312,12 +312,24 @@ def _usage_plan() -> AssetPlanDocument:
     )
 
 
+# 片段描述中的道具提及：道具 usage 必须“场景命中 + 文本提及”双条件
+USAGE_MENTIONS = {
+    2: "《飞鸟集》摊开在膝上",
+    3: "她披着黄色雨衣，手里捏着借阅卡",
+    4: "电影票根从口袋滑落",
+    5: "借阅卡被递回柜台",
+    6: "他合上《飞鸟集》",
+    9: "《飞鸟集》被放回书架",
+    10: "黄色雨衣滴着水，电影票根攥在手心",
+}
+
+
 def _usage_inputs():
     fragments = [
         SimpleNamespace(
             id=f"frag_{index:03d}",
             shot_id=f"shot_{index:03d}",
-            description="",
+            description=USAGE_MENTIONS.get(index, "两人对视，沉默片刻"),
             continuity_notes={},
         )
         for index in range(1, 12)
@@ -355,7 +367,7 @@ def _usage_inputs():
 
 
 def test_backfill_usage_matches_ac012_to_ac015():
-    """AC-012..015：角色按主角、场景按地点、道具按 appears_in 场景回填"""
+    """AC-012..015：角色按主角、场景按地点、道具按场景 + 文本提及回填"""
     plan = backfill_usage(
         _usage_plan(),
         contract=_usage_contract(),
@@ -379,14 +391,17 @@ def test_backfill_usage_matches_ac012_to_ac015():
     ]
     assert usage["scene_001"] == [f"frag_{index:03d}" for index in range(1, 9)]
     assert usage["scene_002"] == ["frag_009", "frag_010", "frag_011"]
-    assert usage["prop_001"] == [f"frag_{index:03d}" for index in range(1, 12)]
-    assert usage["prop_002"] == [f"frag_{index:03d}" for index in range(5, 9)]
-    assert usage["prop_003"] == ["frag_009", "frag_010", "frag_011"]
-    assert usage["prop_004"] == [f"frag_{index:03d}" for index in range(3, 12)]
+    assert usage["prop_001"] == ["frag_002", "frag_006", "frag_009"]
+    assert usage["prop_002"] == ["frag_005"]
+    assert usage["prop_003"] == ["frag_010"]
+    assert usage["prop_004"] == ["frag_003", "frag_010"]
+    # 同场景但片段未提及的道具不得进入使用范围（0.4.5 任务 4）
+    assert "frag_008" not in usage["prop_002"]
+    assert "frag_004" not in usage["prop_004"]
 
 
 def test_backfill_usage_covers_route_plan_references():
-    """AC-016：route_plan 引用的片段必须落在对应资产使用范围内"""
+    """AC-016：route_plan 合法引用必须落在对应资产使用范围内"""
     route_plan = SimpleNamespace(
         adapted_packages=[
             SimpleNamespace(
@@ -396,8 +411,8 @@ def test_backfill_usage_covers_route_plan_references():
                 ],
             ),
             SimpleNamespace(
-                fragment_id="frag_005",
-                references=[PromptReference(asset_id="prop_003", role="prop")],
+                fragment_id="frag_002",
+                references=[PromptReference(asset_id="prop_001", role="prop")],
             ),
         ]
     )
@@ -410,12 +425,86 @@ def test_backfill_usage_covers_route_plan_references():
     )
     usage = {spec.asset_id: spec.usage.fragments for spec in plan.assets}
 
+    # 角色口径不变：路由引用可补入非主角色片段
     assert "frag_001" in usage["char_002"]
-    assert "frag_005" in usage["prop_003"]
+    assert "frag_002" in usage["prop_001"]
 
     for package in route_plan.adapted_packages:
         for reference in package.references:
             assert package.fragment_id in usage[reference.asset_id]
+
+
+def test_backfill_usage_drops_stale_prop_references():
+    """道具引用未通过文本提及判定时不得并入，避免 refs 撑大 usage"""
+    route_plan = SimpleNamespace(
+        adapted_packages=[
+            SimpleNamespace(
+                fragment_id="frag_005",
+                references=[PromptReference(asset_id="prop_003", role="prop")],
+            )
+        ]
+    )
+
+    plan = backfill_usage(
+        _usage_plan(),
+        contract=_usage_contract(),
+        route_plan=route_plan,
+        **_usage_inputs(),
+    )
+    prop_003 = next(spec for spec in plan.assets if spec.asset_id == "prop_003")
+
+    assert prop_003.usage.fragments == ["frag_010"]
+
+
+def test_backfill_usage_reads_prompt_text_for_props():
+    """提示词正文里的道具提及同样计入（描述为空时）"""
+    inputs = _usage_inputs()
+    for fragment in inputs["fragments"]:
+        fragment.description = ""
+    instructions = SimpleNamespace(
+        fragments=[
+            SimpleNamespace(
+                fragment_id="frag_010",
+                prompt="she clutches the 电影票根 tightly",
+            )
+        ]
+    )
+
+    plan = backfill_usage(
+        _usage_plan(),
+        contract=_usage_contract(),
+        instructions=instructions,
+        **inputs,
+    )
+    prop_003 = next(spec for spec in plan.assets if spec.asset_id == "prop_003")
+
+    assert prop_003.usage.fragments == ["frag_010"]
+
+
+def test_backfill_usage_does_not_match_english_synonyms():
+    """英文同义词不等于道具名：movie ticket 不代表“电影票根”"""
+    inputs = _usage_inputs()
+    for fragment in inputs["fragments"]:
+        fragment.description = ""
+    instructions = SimpleNamespace(
+        fragments=[
+            SimpleNamespace(
+                fragment_id="frag_010",
+                prompt="a movie ticket slips from his pocket",
+            )
+        ]
+    )
+
+    plan = backfill_usage(
+        _usage_plan(),
+        contract=_usage_contract(),
+        instructions=instructions,
+        **inputs,
+    )
+    usage = {spec.asset_id: spec.usage.fragments for spec in plan.assets}
+
+    assert usage["prop_003"] == []
+    assert usage["prop_001"] == []
 
 
 def test_backfill_usage_accepts_dict_plan():

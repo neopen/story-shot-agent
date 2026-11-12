@@ -136,6 +136,9 @@ GARMENT_NOUNS_ZH = frozenset(
         "毛衣",
         "背心",
         "西装",
+        "套装",
+        "校服",
+        "连衣裙",
         "制服",
         "长裤",
         "短裤",
@@ -203,6 +206,146 @@ GARMENT_NOUNS_EN = frozenset(
 )
 
 GARMENT_NOUNS = GARMENT_NOUNS_ZH | GARMENT_NOUNS_EN
+
+# 颜色词：用于判断服装描述是否包含颜色要素（0.4.5 服装完整性）
+# 中文按子串匹配，因此只用“蓝/白/米色”等不会与他词混淆的最小词；英文按单词边界。
+COLOR_KEYWORDS_ZH = frozenset(
+    {
+        "红",
+        "橙",
+        "黄",
+        "绿",
+        "青",
+        "蓝",
+        "紫",
+        "黑",
+        "白",
+        "灰",
+        "棕",
+        "褐",
+        "粉",
+        "米色",
+        "米白",
+        "藏青",
+        "卡其",
+        "银色",
+        "金色",
+        "彩色",
+        "素色",
+        "深色",
+        "浅色",
+        "暗色",
+        "亮色",
+    }
+)
+
+COLOR_KEYWORDS_EN = frozenset(
+    {
+        "red",
+        "orange",
+        "yellow",
+        "green",
+        "cyan",
+        "blue",
+        "purple",
+        "violet",
+        "black",
+        "white",
+        "gray",
+        "grey",
+        "brown",
+        "beige",
+        "pink",
+        "navy",
+        "khaki",
+        "gold",
+        "golden",
+        "silver",
+        "crimson",
+        "scarlet",
+        "teal",
+        "maroon",
+        "ivory",
+        "cream",
+        "tan",
+        "indigo",
+        "turquoise",
+        "lavender",
+        "magenta",
+        "burgundy",
+    }
+)
+
+COLOR_KEYWORDS = COLOR_KEYWORDS_ZH | COLOR_KEYWORDS_EN
+
+# 材质词：用于判断服装描述是否包含材质要素（0.4.5 服装完整性）
+MATERIAL_KEYWORDS_ZH = frozenset(
+    {
+        "棉",
+        "棉质",
+        "棉布",
+        "麻",
+        "亚麻",
+        "真丝",
+        "丝绸",
+        "丝质",
+        "缎面",
+        "羊毛",
+        "羊绒",
+        "毛呢",
+        "毛料",
+        "皮革",
+        "真皮",
+        "帆布",
+        "针织",
+        "涤纶",
+        "聚酯",
+        "尼龙",
+        "氨纶",
+        "雪纺",
+        "薄纱",
+        "纱质",
+        "混纺",
+        "灯芯绒",
+        "腈纶",
+        "莫代尔",
+        "摇粒绒",
+    }
+)
+
+MATERIAL_KEYWORDS_EN = frozenset(
+    {
+        "cotton",
+        "linen",
+        "silk",
+        "satin",
+        "wool",
+        "cashmere",
+        "polyester",
+        "nylon",
+        "denim",
+        "leather",
+        "canvas",
+        "knit",
+        "knitted",
+        "velvet",
+        "chiffon",
+        "fleece",
+        "tweed",
+        "corduroy",
+        "spandex",
+        "rayon",
+        "mesh",
+        "lace",
+        "suede",
+        "flannel",
+        "mohair",
+        "acrylic",
+        "modal",
+    }
+)
+
+MATERIAL_KEYWORDS = MATERIAL_KEYWORDS_ZH | MATERIAL_KEYWORDS_EN
 
 # 外观状态词：湿/干/破损/褪色等，用于保留“肩头微湿”这类状态子句
 STATE_KEYWORDS_ZH = frozenset({"湿", "干", "破", "脏", "褶皱", "褪色", "颜色", "色"})
