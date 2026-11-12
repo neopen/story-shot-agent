@@ -338,6 +338,7 @@ class RuleType(str, Enum):
     SHOT_REPETITIVE = Rule("shot_repetitive", "镜头类型重复连续", IssueType.CONTINUITY)
     SHOT_TYPE_MISMATCH = Rule("shot_type_mismatch", "镜头类型与内容不匹配", IssueType.STYLE)
     SHOT_TYPE_PROMPT_MISMATCH = Rule("shot_type_prompt_mismatch", "景别与提示词表述不一致", IssueType.STYLE)
+    CAMERA_MOTION_PROMPT_MISMATCH = Rule("camera_motion_prompt_mismatch", "运镜与提示词表述不一致", IssueType.STYLE)
 
     # 角色相关
     SHOT_MAIN_CHARACTER_MISSING = Rule("shot_main_character_missing", "镜头缺少主要角色标识", IssueType.CHARACTER)

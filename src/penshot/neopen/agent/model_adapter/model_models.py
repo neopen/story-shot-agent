@@ -169,6 +169,10 @@ class AdaptedPromptPackage(BaseModel):
     prompt_overrides: List[PromptOverride] = Field(
         default_factory=list, description="下游二次修改记录"
     )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="构建期发现但不阻断的声明式告警（如场景锚定不一致）",
+    )
     model_params: Dict[str, Any] = Field(
         default_factory=dict, description="模型专属生成参数"
     )

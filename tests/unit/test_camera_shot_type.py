@@ -8,7 +8,12 @@
 import pytest
 
 from penshot.neopen.agent.prompt_converter import camera_builder
-from penshot.neopen.agent.prompt_converter.camera_builder import build_camera_control
+from penshot.neopen.agent.prompt_converter.camera_builder import (
+    build_camera_control,
+    check_motion_consistency,
+    detect_motion_from_text,
+)
+from penshot.neopen.agent.prompt_converter.prompt_converter_models import CameraMotion
 from penshot.neopen.agent.prompt_converter.template_prompt_converter import (
     TemplatePromptConverter,
 )
@@ -199,3 +204,133 @@ def test_llm_converter_builds_camera_from_final_prompt(monkeypatch):
     assert prompt.camera.shot_type == "over_shoulder"
     assert prompt.camera.source_shot_type == "close_up"
     assert prompt.camera.shot_type_raw == "close_up"
+
+
+# ======================== 0.4.5 任务 5：运镜一致性 ========================
+
+
+def test_motion_detects_push_in_as_dolly():
+    """slow push-in 归为 dolly 而非 static"""
+    camera = build_camera_control("wide shot, slow push-in toward the note", None)
+
+    assert camera.motion.value == "dolly"
+
+
+def test_motion_detects_pull_back_as_dolly():
+    """slow pull-back 归为 dolly（旧词表缺失，退化为 zoom 或 static）"""
+    camera = build_camera_control("wide shot, slow pull-back camera movement", None)
+
+    assert camera.motion.value == "dolly"
+
+
+def test_motion_detects_tracking_as_dolly():
+    """tracking shot 归为 dolly"""
+    camera = build_camera_control("tracking shot through the corridor", None)
+
+    assert camera.motion.value == "dolly"
+
+
+def test_motion_prefers_specific_phrase_over_short_keyword():
+    """多词短语优先：pull-back 不被中文“拉远”（zoom 族）截胡"""
+    camera = build_camera_control("wide shot, slow pull-back，缓慢拉远镜头", None)
+
+    assert camera.motion.value == "dolly"
+
+
+def test_motion_keeps_chinese_zoom_mapping():
+    """既有中文映射不变：单说“拉远”仍是 zoom"""
+    camera = build_camera_control("全景镜头，缓慢拉远", None)
+
+    assert camera.motion.value == "zoom"
+
+
+def test_motion_static_for_pure_stillness():
+    """纯静态描述仍为 static"""
+    camera = build_camera_control("close-up of a still frame on the table", None)
+
+    assert camera.motion.value == "static"
+
+
+def test_motion_conflict_logs_warning(monkeypatch):
+    """命中多个运动族时保留最具体者并告警"""
+    messages = []
+    monkeypatch.setattr(camera_builder, "warning", messages.append)
+
+    build_camera_control("slow pull-back，缓慢拉远镜头", None)
+
+    assert any("运镜关键词冲突" in message for message in messages)
+
+
+def test_static_with_camera_verb_logs_warning(monkeypatch):
+    """static 与明确运镜动词冲突时不得静默"""
+    messages = []
+    monkeypatch.setattr(camera_builder, "warning", messages.append)
+
+    camera = build_camera_control("the camera moves slowly along the wall", None)
+
+    assert camera.motion.value == "static"
+    assert any("static" in message and "运动表述" in message for message in messages)
+
+
+def test_motion_consistency_accepts_push_in_with_dolly():
+    """frag_015：提示词 slow push-in、motion=dolly 属同一族，不告警"""
+    result = check_motion_consistency(
+        "wide shot, slow push-in towards a yellow sticky note",
+        CameraMotion.DOLLY,
+    )
+
+    assert result is None
+
+
+def test_motion_consistency_warns_push_in_against_static():
+    """反向缺失：提示词写推镜、motion 却是 static，必须告警"""
+    result = check_motion_consistency(
+        "wide shot, slow push-in towards a yellow sticky note",
+        CameraMotion.STATIC,
+    )
+
+    assert result is not None
+    level, message = result
+    assert level == "warning"
+    assert "static" in message and "push-in" in message
+
+
+def test_motion_consistency_skips_static_without_motion():
+    """frag_010：提示词没有运镜动词、motion=static 属合理，不误报"""
+    result = check_motion_consistency(
+        "close-up of Li Ming's face, static camera, 35mm lens",
+        CameraMotion.STATIC,
+    )
+
+    assert result is None
+
+
+def test_motion_consistency_warns_motion_against_static_prompt():
+    """frag_006：提示词明确写 static camera，motion=handheld 时告警"""
+    result = check_motion_consistency(
+        "wide shot, Li Ming standing still, 35mm lens, static camera",
+        CameraMotion.HANDHELD,
+    )
+
+    assert result is not None
+    level, message = result
+    assert level == "warning"
+    assert "handheld" in message and "静止镜头" in message
+
+
+def test_motion_consistency_info_when_prompt_omits_motion():
+    """提示词完全没写运镜时不升级为违规，只返回 info"""
+    result = check_motion_consistency(
+        "medium two-shot, two students talking in a classroom",
+        CameraMotion.HANDHELD,
+    )
+
+    assert result is not None
+    assert result[0] == "info"
+
+
+def test_holding_object_is_not_detected_as_handheld_motion():
+    """“手持白色同学录”是拿道具，不是手持运镜"""
+    detected, _ = detect_motion_from_text("远景镜头，李明手持白色毕业同学录，固定机位")
+
+    assert detected is None

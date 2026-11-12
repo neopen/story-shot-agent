@@ -23,6 +23,7 @@ from penshot.neopen.agent.continuity_guardian.style_anchors import (
 )
 from penshot.neopen.constants.appearance import EXCLUDE_KEYWORDS
 from penshot.neopen.agent.prompt_converter.camera_builder import (
+    check_motion_consistency,
     detect_shot_type_from_text,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
@@ -77,6 +78,7 @@ class RuleQualityAuditor(BaseQualityAuditor):
         # G 质量门禁（FR-060..FR-064）
         self._check_appearance_anchor_pollution(contract, report)
         self._check_shot_type_prompt_consistency(instructions, report)
+        self._check_camera_motion_prompt_consistency(instructions, report)
         self._check_style_lighting_conflict(instructions, report)
         self._check_asset_usage(instructions, report)
 
@@ -314,6 +316,49 @@ class RuleQualityAuditor(BaseQualityAuditor):
             self._add_check(report, check_name, "passed", "景别与提示词表述一致")
         else:
             self._add_check(report, check_name, "failed", f"发现{mismatch_count}个景别不一致片段")
+
+    def _check_camera_motion_prompt_consistency(self, instructions: AIVideoInstructions, report: QualityAuditReport) -> None:
+        """反向校验 camera.motion 与最终提示词运镜表述（0.4.5 任务 5）
+
+        推镜/拉镜/变焦同属 dolly 族，不告警；提示词写死 static 而 motion 是运动族
+        才记为 WARNING。提示词未写运镜而 motion 非 static 仅记录 info 级日志，
+        避免把“镜头语言完全省略”也升级成违规。
+        """
+        check_name = "运镜与提示词一致性检查"
+        mismatch_count = 0
+
+        for fragment in instructions.fragments:
+            camera = getattr(fragment, "camera", None)
+            if camera is None:
+                continue
+            motion = getattr(camera, "motion", None)
+            result = check_motion_consistency(fragment.prompt, motion)
+            if result is None:
+                continue
+            level, message = result
+            if level != "warning":
+                info(f"{fragment.fragment_id}: {message}")
+                continue
+
+            mismatch_count += 1
+            self._add_violation(
+                report=report,
+                rule_type=RuleType.CAMERA_MOTION_PROMPT_MISMATCH,
+                source_node=PipelineNode.CONVERT_PROMPT,
+                issue_value={
+                    "camera_motion": str(getattr(motion, "value", motion) or ""),
+                    "detail": message,
+                },
+                standard_value="运镜表述与 camera.motion 一致",
+                severity=SeverityLevel.WARNING,
+                fragment_id=fragment.fragment_id,
+                suggestion=message
+            )
+
+        if mismatch_count == 0:
+            self._add_check(report, check_name, "passed", "运镜与提示词表述一致")
+        else:
+            self._add_check(report, check_name, "failed", f"发现{mismatch_count}个运镜不一致片段")
 
     def _check_style_lighting_conflict(self, instructions: AIVideoInstructions, report: QualityAuditReport) -> None:
         """检查风格前缀中的互斥打光并存（FR-062/FR-064）

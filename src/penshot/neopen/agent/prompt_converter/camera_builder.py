@@ -5,7 +5,8 @@
 别名表覆盖 ``ShotType`` 全部值并按长词优先匹配（FR-030）。
 """
 
-from typing import Dict, List, Optional, Tuple
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from penshot.logger import warning
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
@@ -125,12 +126,67 @@ _TEXT_ALIASES: List[Tuple[str, str]] = sorted(
 _MOTION_KEYWORDS = {
     CameraMotion.PAN: ("pan", "摇镜", "横向移动"),
     CameraMotion.TILT: ("tilt", "俯仰", "上下移动"),
-    CameraMotion.DOLLY: ("dolly", "推镜", "拉镜", "跟拍"),
+    CameraMotion.DOLLY: (
+        "dolly in",
+        "dolly out",
+        "push in",
+        "push-in",
+        "pull back",
+        "pull-back",
+        "tracking shot",
+        "tracking",
+        "dolly",
+        "推镜",
+        "拉镜",
+        "跟拍",
+    ),
     CameraMotion.ZOOM: ("zoom", "变焦", "推近", "拉远"),
-    CameraMotion.HANDHELD: ("handheld", "手持", "晃动"),
+    # “手持”单独出现多指“手里拿着道具”，仅保留明确的运镜表述
+    CameraMotion.HANDHELD: ("handheld", "手持镜头", "手持拍摄", "手持晃动", "晃动"),
     CameraMotion.CRANE: ("crane", "升降", "摇臂"),
     CameraMotion.ORBIT: ("orbit", "环绕", "绕拍"),
 }
+
+# 方向语义相容的运动族：推镜/拉镜/变焦同属 dolly 族，互相不告警
+_MOTION_FAMILIES: Dict[CameraMotion, str] = {
+    CameraMotion.PAN: "pan",
+    CameraMotion.TILT: "tilt",
+    CameraMotion.DOLLY: "dolly",
+    CameraMotion.ZOOM: "dolly",
+    CameraMotion.HANDHELD: "handheld",
+    CameraMotion.CRANE: "crane",
+    CameraMotion.ORBIT: "orbit",
+}
+
+# 提示词明确写死静态时，camera.motion 不应是任何运动族
+_STATIC_PROMPT_MARKERS: Tuple[str, ...] = (
+    "static camera",
+    "fixed camera",
+    "locked-off",
+    "locked off",
+    "固定机位",
+    "固定镜头",
+    "静止镜头",
+    "镜头固定",
+)
+
+# 判定 static 但文本含明确运镜动词时的自检词（不含已入表词汇）
+_STATIC_CONFLICT_MARKERS: Tuple[str, ...] = (
+    "camera move",
+    "camera follow",
+    "camera push",
+    "camera pull",
+    "camera track",
+    "镜头移动",
+    "镜头跟随",
+    "运镜",
+)
+
+
+def _keyword_specificity(keyword: str) -> Tuple[int, int]:
+    """关键词具体度：多词短语优先于单词，同词数时取更长者"""
+    tokens = [part for part in re.split(r"[\s_-]+", keyword.strip()) if part]
+    return len(tokens), len(keyword)
 
 
 def detect_shot_type_from_text(text: Optional[str]) -> str:
@@ -185,14 +241,128 @@ def _normalize_shot_type(
     return DEFAULT_SHOT_TYPE, source_normalized, source_raw
 
 
+def _warn_static_motion_mismatch(lowered: str) -> None:
+    """static 与文本中的明确运镜表述冲突时告警（不静默丢弃）"""
+    hits = [marker for marker in _STATIC_CONFLICT_MARKERS if marker in lowered]
+    if hits:
+        warning(
+            "运镜判定为 static，但文本含明确运动表述: " + ", ".join(sorted(set(hits)))
+        )
+
+
 def _detect_motion(description: str) -> tuple[CameraMotion, float]:
-    """从描述推断运镜方式与强度"""
+    """从描述推断运镜方式与强度
+
+    同一文本命中多个运动族时，按“多词短语 > 单词、长词 > 短词”取最具体者，
+    并对冲突词告警，避免 ``slow pull-back`` 被 ``拉远`` 之类的短词截胡。
+    """
     lowered = (description or "").lower()
-    for motion, keywords in _MOTION_KEYWORDS.items():
-        if any(keyword in lowered for keyword in keywords):
-            intensity = 0.6 if motion == CameraMotion.HANDHELD else 0.4
-            return motion, intensity
-    return CameraMotion.STATIC, 0.2
+    candidates: List[Tuple[CameraMotion, str]] = [
+        (motion, keyword)
+        for motion, keywords in _MOTION_KEYWORDS.items()
+        for keyword in keywords
+        if keyword in lowered
+    ]
+    if not candidates:
+        _warn_static_motion_mismatch(lowered)
+        return CameraMotion.STATIC, 0.2
+
+    motion, keyword = candidates[0]
+    for candidate_motion, candidate_keyword in candidates[1:]:
+        if _keyword_specificity(candidate_keyword) > _keyword_specificity(keyword):
+            motion, keyword = candidate_motion, candidate_keyword
+
+    conflicting = sorted({item.value for item, _ in candidates if item != motion})
+    if conflicting:
+        warning(
+            f"运镜关键词冲突: 按具体短语取 {motion.value}"
+            f"（命中 {keyword}），同时出现 {', '.join(conflicting)}"
+        )
+
+    intensity = 0.6 if motion == CameraMotion.HANDHELD else 0.4
+    return motion, intensity
+
+
+def detect_motion_from_text(text: str) -> Tuple[Optional[CameraMotion], str]:
+    """从文本探测最具体的运镜方式，返回 ``(运镜, 命中关键词)``
+
+    与 ``_detect_motion`` 共用词表与具体度排序，但不再默认 static：
+    未命中时返回 ``(None, "")``，便于区分“没写运镜”和“明确写静态”。
+    """
+    lowered = (text or "").lower()
+    candidates: List[Tuple[CameraMotion, str]] = [
+        (motion, keyword)
+        for motion, keywords in _MOTION_KEYWORDS.items()
+        for keyword in keywords
+        if keyword in lowered
+    ]
+    if not candidates:
+        return None, ""
+    motion, keyword = candidates[0]
+    for candidate_motion, candidate_keyword in candidates[1:]:
+        if _keyword_specificity(candidate_keyword) > _keyword_specificity(keyword):
+            motion, keyword = candidate_motion, candidate_keyword
+    return motion, keyword
+
+
+def _normalize_motion(motion: Any) -> Optional[CameraMotion]:
+    """把 CameraMotion / 字符串归一为枚举；未知值返回 None"""
+    if isinstance(motion, CameraMotion):
+        return motion
+    text = str(motion or "").strip().lower()
+    if not text:
+        return None
+    try:
+        return CameraMotion(text)
+    except ValueError:
+        return None
+
+
+def check_motion_consistency(text: str, motion: Any) -> Optional[Tuple[str, str]]:
+    """反向校验 camera.motion 与最终提示词运镜表述（0.4.5 任务 5）
+
+    - 提示词没写运镜、motion=static：一致，不告警；
+    - 提示词写死 static/fixed camera，但 motion 是运动族：warning；
+    - 提示词命中运镜、motion 是相容族（push-in ≈ dolly ≈ zoom）：不告警；
+    - 提示词命中运镜、motion 是不同族：warning；
+    - 提示词没写运镜、motion 是运动族：info（仅提示，不记违规）。
+
+    Returns:
+        ``(level, message)``，level 为 ``warning`` / ``info``；无需提示返回 None
+    """
+    declared = _normalize_motion(motion)
+    if declared is None:
+        return None
+
+    detected, keyword = detect_motion_from_text(text)
+    lowered = (text or "").lower()
+    if detected is None:
+        if declared == CameraMotion.STATIC:
+            return None
+        static_hits = [marker for marker in _STATIC_PROMPT_MARKERS if marker in lowered]
+        if static_hits:
+            return (
+                "warning",
+                f"camera.motion={declared.value} 但提示词明确写为静止镜头"
+                f"（{'/'.join(static_hits)}）",
+            )
+        return (
+            "info",
+            f"camera.motion={declared.value} 但提示词未出现运镜表述",
+        )
+
+    if declared == CameraMotion.STATIC:
+        return (
+            "warning",
+            f"camera.motion=static 但提示词含运镜表述「{keyword}」",
+        )
+    if _MOTION_FAMILIES.get(declared) == _MOTION_FAMILIES.get(detected):
+        return None
+    return (
+        "warning",
+        f"camera.motion={declared.value} 与提示词运镜「{keyword}」"
+        f"（{detected.value}）不一致",
+    )
 
 
 def build_camera_control(

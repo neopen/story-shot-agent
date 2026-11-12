@@ -12,10 +12,12 @@ See LICENSE File For Details.
 
 from typing import Any, Dict, List, Optional
 
+from penshot.logger import warning
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     SCENE_ASSET_TYPE,
     build_first_frame_prompt,
     build_package_references,
+    check_scene_anchor_consistency,
 )
 from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
@@ -287,6 +289,19 @@ def apply_image_to_video_routing(
             ),
             None,
         )
+        # 0.4.5 任务 7：片段文本描述的场景与首帧场景资产不一致时告警
+        if scene_reference is not None:
+            scene_warning = check_scene_anchor_consistency(
+                prompt,
+                contract,
+                scene=scene,
+                fragment=fragment,
+                first_frame_asset_id=scene_reference.asset_id,
+            )
+            if scene_warning:
+                package.warnings.append(scene_warning)
+                warning(f"场景锚定不一致: {scene_warning}")
+
         scene_asset_ref = (
             _manifest_ref(manifest, scene_reference.asset_id)
             if scene_reference is not None

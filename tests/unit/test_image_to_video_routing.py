@@ -316,7 +316,7 @@ def test_missing_character_reference_falls_back_to_text_to_video():
 
 
 def test_prop_references_follow_scene_appears_in():
-    """T-303：道具引用按 appears_in 场景约束，与 usage 同口径（FR-013）"""
+    """T-303/0.4.5：道具引用需“场景命中 + 文本提及”，与 usage 同口径（FR-013）"""
     contract = _contract()
     contract.register_scene(
         SceneContract(scene_num=1, location="街角咖啡店", time_of_day="day")
@@ -330,7 +330,7 @@ def test_prop_references_follow_scene_appears_in():
         )
     )
     fragments = [
-        SimpleNamespace(id="f1", shot_id="shot_001", description="票根露出了一角")
+        SimpleNamespace(id="f1", shot_id="shot_001", description="电影票根露出了一角")
     ]
     shots = [
         SimpleNamespace(id="shot_001", scene_id="scene_001", main_character="林然")
@@ -357,6 +357,45 @@ def test_prop_references_follow_scene_appears_in():
     prop_ref = _run(["scene_001"])["prop_001"]
     assert prop_ref.role == "prop"
     assert prop_ref.as_first_frame is False
+
+
+def test_prop_references_require_text_mention():
+    """同场景但片段未提及的道具不挂引用（0.4.5 任务 4 根因）"""
+    contract = _contract()
+    contract.register_scene(
+        SceneContract(scene_num=1, location="街角咖啡店", time_of_day="day")
+    )
+    contract.register_asset(
+        AssetContract(
+            asset_id="prop_001",
+            asset_type="prop",
+            owner_name="电影票根",
+            image_prompt="product still of 电影票根",
+        )
+    )
+    fragments = [
+        SimpleNamespace(id="f1", shot_id="shot_001", description="她低头看着桌面")
+    ]
+    shots = [
+        SimpleNamespace(id="shot_001", scene_id="scene_001", main_character="林然")
+    ]
+    parsed_script = SimpleNamespace(
+        global_metadata=SimpleNamespace(
+            key_props=[SimpleNamespace(name="电影票根", appears_in=["scene_001"])]
+        )
+    )
+    packages = _packages()[:1]
+
+    apply_image_to_video_routing(
+        packages,
+        _instructions(),
+        contract,
+        fragments=fragments,
+        shots=shots,
+        parsed_script=parsed_script,
+    )
+
+    assert "prop_001" not in {ref.asset_id for ref in packages[0].references}
 
 
 def test_prompt_overrides_keep_asset_identity_and_provenance():
@@ -400,3 +439,169 @@ def test_route_plan_and_instructions_carry_schema_version():
     """路由计划与指令集都带 schema_version，供下游判断兼容性"""
     assert RoutePlan().schema_version == PROMPT_SCHEMA_VERSION
     assert AIVideoInstructions().schema_version == PROMPT_SCHEMA_VERSION
+
+
+# ======================== 0.4.5 任务 7：场景锚定一致性 ========================
+
+
+def _scene_contract() -> GlobalConsistencyContract:
+    """教室 + 走廊两个场景，镜头映射到走廊但提示词描述教室"""
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.register_character("张晨", 1, "他穿着蓝白相间棉质校服")
+    contract.register_scene(
+        SceneContract(
+            scene_num=1,
+            location="教室",
+            time_of_day="afternoon",
+            characters_in_scene=["张晨"],
+        )
+    )
+    contract.register_scene(
+        SceneContract(
+            scene_num=2,
+            location="走廊/班级记忆墙",
+            time_of_day="dusk",
+            characters_in_scene=["张晨"],
+        )
+    )
+    for asset_id, owner_name in (
+        ("scene_001", "教室"),
+        ("scene_002", "走廊/班级记忆墙"),
+    ):
+        contract.register_asset(
+            AssetContract(
+                asset_id=asset_id,
+                asset_type="scene",
+                owner_name=owner_name,
+                asset_ref=f"/tmp/assets/{asset_id}.png",
+                image_prompt=f"establishing shot of {owner_name}",
+                status="generated",
+            )
+        )
+    return contract
+
+
+def _scene_prompt(fragment_id: str, prompt: str) -> AIVideoPrompt:
+    return AIVideoPrompt(
+        fragment_id=fragment_id,
+        prompt=prompt,
+        duration=3.0,
+        main_character="张晨",
+    )
+
+
+def test_scene_anchor_mismatch_is_reported():
+    """片段写教室但镜头映射到走廊首帧时给出 warning 与替换建议"""
+    contract = _scene_contract()
+    instructions = AIVideoInstructions(
+        fragments=[
+            _scene_prompt(
+                "frag_001",
+                "medium two-shot, Zhang Chen in a high school classroom, "
+                "wearing blue and white cotton uniform",
+            )
+        ]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_001",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_001", shot_id="shot_001", description="")]
+    shots = [SimpleNamespace(id="shot_001", scene_id="scene_002")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    assert packages[0].warnings
+    message = packages[0].warnings[0]
+    assert "教室" in message
+    assert "scene_001" in message
+    assert "走廊" in message
+
+
+def test_scene_anchor_skips_prompt_without_location():
+    """提示词没有明确场景描述时不误报"""
+    contract = _scene_contract()
+    instructions = AIVideoInstructions(
+        fragments=[_scene_prompt("frag_002", "A man runs through the rain")]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_002",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_002", shot_id="shot_002", description="")]
+    shots = [SimpleNamespace(id="shot_002", scene_id="scene_002")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    assert packages[0].warnings == []
+
+
+def test_scene_anchor_accepts_matching_location():
+    """提示词与首帧场景一致时不告警（英文别名词表生效）"""
+    contract = _scene_contract()
+    instructions = AIVideoInstructions(
+        fragments=[
+            _scene_prompt(
+                "frag_003",
+                "Zhang Chen leans on the corridor wall next to the memory wall",
+            )
+        ]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_003",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_003", shot_id="shot_003", description="")]
+    shots = [SimpleNamespace(id="shot_003", scene_id="scene_002")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    assert packages[0].warnings == []
+
+
+def test_scene_anchor_ignores_location_in_dialogue():
+    """台词里提到另一场景不算画面锚定错误，避免误报"""
+    contract = _scene_contract()
+    instructions = AIVideoInstructions(
+        fragments=[
+            _scene_prompt(
+                "frag_004",
+                "extreme close-up of a teacher, speaking softly: "
+                "'go take a look in the hallway.'",
+            )
+        ]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_004",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_004", shot_id="shot_004", description="")]
+    shots = [SimpleNamespace(id="shot_004", scene_id="scene_001")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    assert packages[0].warnings == []

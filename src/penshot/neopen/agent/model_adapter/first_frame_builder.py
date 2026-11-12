@@ -44,6 +44,127 @@ CHARACTER_SHEET_TYPE = "character_sheet"
 SCENE_ASSET_TYPE = "scene"
 PROP_ASSET_TYPE = "prop"
 
+# 场景地点双语词表：剧本地点是中文、最终提示词常为英文，直接子串匹配会漏检
+_SCENE_LOCATION_GLOSSARY: Dict[str, tuple[str, ...]] = {
+    "教室": ("classroom", "class room"),
+    "走廊": ("corridor", "hallway", "hall"),
+    "记忆墙": ("memory wall",),
+    "班级记忆墙": ("memory wall",),
+    "操场": ("playground", "sports field"),
+    "篮球场": ("basketball court",),
+    "图书馆": ("library",),
+    "食堂": ("cafeteria", "canteen"),
+    "宿舍": ("dormitory", "dorm room"),
+    "天台": ("rooftop",),
+    "校门": ("school gate",),
+    "街道": ("street",),
+    "公交站": ("bus stop",),
+    "公园": ("park",),
+    "河边": ("riverside", "riverbank"),
+    "客厅": ("living room",),
+    "卧室": ("bedroom",),
+    "厨房": ("kitchen",),
+    "办公室": ("office",),
+    "医院": ("hospital",),
+    "咖啡馆": ("cafe", "coffee shop"),
+    "餐厅": ("restaurant",),
+    "商店": ("store", "shop"),
+    "家": ("home",),
+}
+
+
+def _scene_location_terms(location: str) -> List[str]:
+    """把场景地点展开为可直接在文本中检索的词（中文原词 + 英文别名）"""
+    terms: List[str] = []
+    for token in re.split(r"[/、·,，]", str(location or "")):
+        token = token.strip()
+        if not token:
+            continue
+        terms.append(token)
+        for key, aliases in _SCENE_LOCATION_GLOSSARY.items():
+            if key == token or (len(key) > 1 and key in token):
+                terms.extend(aliases)
+    return list(dict.fromkeys(terms))
+
+
+def _term_in_text(text: str, term: str) -> bool:
+    """英文词按整词匹配，中文按子串匹配（与外观词表口径一致）"""
+    if not term:
+        return False
+    if term.isascii():
+        pattern = rf"(?<![A-Za-z]){re.escape(term)}(?![A-Za-z])"
+        return re.search(pattern, text) is not None
+    return term in text
+
+
+# 英文单引号对白里常有 don't 之类的撇号：首尾引号必须不贴字母，
+# 中间的撇号只有夹在两个字母之间才视为词内撇号而非配对边界
+_QUOTED_RE = re.compile(
+    r"\"[^\"]*\""
+    r"|(?<![A-Za-z])'(?:[^']|(?<=[A-Za-z])'(?=[A-Za-z]))*'(?![A-Za-z])"
+    r"|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』"
+)
+
+
+def _strip_quoted_content(text: str) -> str:
+    """剔除对白/引号内容：台词里提到“走廊”不代表画面场景在走廊"""
+    return _QUOTED_RE.sub(" ", str(text or ""))
+
+
+def _scene_asset_mentioned(asset: Any, text: str) -> bool:
+    """场景资产的地点是否在片段文本中被提及"""
+    location = _attr(asset, "owner_name") or _attr(asset, "location")
+    return any(_term_in_text(text, term) for term in _scene_location_terms(location))
+
+
+def check_scene_anchor_consistency(
+    prompt: AIVideoPrompt,
+    contract: Any,
+    scene: Any = None,
+    fragment: Any = None,
+    first_frame_asset_id: str = "",
+) -> str:
+    """校验片段描述的场景与首帧场景资产是否一致（0.4.5 任务 7）
+
+    片段文本明确提到另一个场景地点、且未提到当前首帧场景时给出告警；文本没有
+    场景描述或同时提到多个场景时跳过，避免误报。
+
+    Returns:
+        告警文本；无需告警时返回空串
+    """
+    asset_id = str(first_frame_asset_id or "").strip()
+    if contract is None or not asset_id:
+        return ""
+
+    scenes = _contract_assets(contract, SCENE_ASSET_TYPE)
+    current = next(
+        (item for item in scenes if _attr(item, "asset_id") == asset_id), None
+    )
+    if current is None:
+        return ""
+
+    text = _strip_quoted_content(
+        f"{_attr(fragment, 'description')} {_attr(prompt, 'prompt')}"
+    )
+    if _scene_asset_mentioned(current, text):
+        return ""
+
+    mentioned = [
+        item
+        for item in scenes
+        if _attr(item, "asset_id") != asset_id and _scene_asset_mentioned(item, text)
+    ]
+    if len(mentioned) != 1:
+        return ""
+
+    target = mentioned[0]
+    fragment_id = _attr(fragment, "id") or _attr(prompt, "fragment_id")
+    return (
+        f"{fragment_id} 描述「{_attr(target, 'owner_name')}」场景，"
+        f"但首帧资产为「{_attr(current, 'owner_name')}」，"
+        f"建议改用 {_attr(target, 'asset_id')}（{_attr(target, 'owner_name')}）"
+    )
+
 
 def _attr(source: Any, name: str, default: str = "") -> str:
     """读取 dataclass / 字典字段并归一为字符串"""
@@ -222,16 +343,17 @@ def build_package_references(
     - 场景锚点：``role="first_frame"``、``as_first_frame=True``；
     - 道具静帧：``role="prop"``、``as_first_frame=False``。
 
-    仅引用契约中已声明的资产；未声明资产不凭空造 ID。``prop_names`` 传入
-    时按场景约束过滤道具（与 ``usage.fragments`` 同一口径，避免引用落在
-    使用范围之外）；未传入时按片段文本匹配。
+    仅引用契约中已声明的资产；未声明资产不凭空造 ID。道具引用必须**同时**
+    满足“文本提及”与“场景约束”：``owner_name in text`` 且（传入
+    ``prop_names`` 时）``owner_name in prop_names``。只按场景整批放行会把
+    同场景内并未出现的道具也挂到片段上（FR-013/AC-016 的缺口）。
 
     Args:
         prompt: 片段提示词
         contract: 全局一致性契约
         scene: 可选已解析场景
         fragment: 可选来源片段
-        prop_names: 允许引用的道具名集合；``None`` 表示按文本匹配
+        prop_names: 场景内允许引用的道具名集合；``None`` 表示只按文本匹配
 
     Returns:
         声明式资产引用列表
@@ -275,19 +397,19 @@ def build_package_references(
         owner_name = _attr(asset, "owner_name")
         if not owner_name:
             continue
-        if allowed_props is not None:
-            matched = owner_name in allowed_props
-        else:
-            matched = owner_name in text
-        if matched:
-            references.append(
-                PromptReference(
-                    asset_id=_attr(asset, "asset_id"),
-                    role="prop",
-                    view="front",
-                    as_first_frame=False,
-                    required=False,
-                )
+        # 文本提及是必要条件的：场景约束只用于确认道具确实登记在该场景
+        if owner_name not in text:
+            continue
+        if allowed_props is not None and owner_name not in allowed_props:
+            continue
+        references.append(
+            PromptReference(
+                asset_id=_attr(asset, "asset_id"),
+                role="prop",
+                view="front",
+                as_first_frame=False,
+                required=False,
             )
+        )
 
     return references
