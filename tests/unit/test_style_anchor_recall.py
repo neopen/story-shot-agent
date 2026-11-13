@@ -124,8 +124,12 @@ def test_infer_style_anchor_ignores_incidental_action_word():
 
 
 def test_infer_style_anchor_empty_signals():
-    """无任何风格信号时不产生锚点"""
-    assert infer_style_anchor(_parsed_script()) == {}
+    """无任何风格信号时兜底三维，genre 保持为空（FR-088/FR-090）"""
+    assert infer_style_anchor(_parsed_script()) == {
+        "lighting": "natural lighting",
+        "palette": "muted colors",
+        "mood": "neutral",
+    }
 
 
 def test_build_style_prefix_skips_chinese():

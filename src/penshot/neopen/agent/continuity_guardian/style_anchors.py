@@ -24,6 +24,13 @@ STYLE_DIMENSIONS: Tuple[str, ...] = (
     "grade",
 )
 
+# 无任何证据时的三维兜底（FR-088）；genre 不兜底（FR-090）
+DEFAULT_STYLE_DIMENSIONS: Dict[str, str] = {
+    "lighting": "natural lighting",
+    "palette": "muted colors",
+    "mood": "neutral",
+}
+
 # 规范题材的六维取值；未声明的维度保持空值，渲染时跳过
 GENRE_DIMENSIONS: Dict[str, Dict[str, str]] = {
     "action": {
@@ -232,6 +239,35 @@ LIGHTING_FAMILY_MARKERS: Tuple[str, ...] = (
     "natural",
 )
 
+# 场景打光词 -> 氛围键（FR-091）；命中即视为有效氛围证据
+LIGHTING_KEYWORDS: Dict[str, str] = {
+    "冷白": "sad",
+    "昏暗": "dark",
+    "刺眼": "tense",
+    "暖黄": "happy",
+    "霓虹": "energetic",
+    "阳光": "fresh",
+}
+
+# provenance.source 固定枚举；声明顺序即来源优先级（FR-091）
+EVIDENCE_SOURCES: Tuple[str, ...] = (
+    "field_priority",
+    "audio_atmosphere",
+    "env_sound",
+    "lighting_keyword",
+    "keyword_scan",
+)
+
+# MoodEvidence.source（原始字段）-> provenance.source（来源细分，FR-091）
+_MOOD_SOURCE_LABELS: Dict[str, str] = {
+    "audio_atmosphere": "audio_atmosphere",
+    "env_sounds": "env_sound",
+    "lighting": "lighting_keyword",
+    "title": "keyword_scan",
+    "scene": "keyword_scan",
+    "continuity_notes": "keyword_scan",
+}
+
 # 旧描述短语所属维度（FR-021）：已由锚点声明的维度不再接收旧短语
 _PHRASE_DIMENSION_MARKERS: Dict[str, frozenset] = {
     "lighting": frozenset({"lighting", "light"}),
@@ -286,10 +322,11 @@ class GenreEvidence:
 
 @dataclass
 class MoodEvidence:
-    """氛围证据采集结果（FR-023）
+    """氛围证据采集结果（FR-023/FR-091）
 
-    ``resolved_by`` 记录决议依据：显式音频氛围或一阶关键词扫描，供
-    provenance 输出与冲突排查使用。
+    ``source`` 保留原始字段名（``audio_atmosphere`` / ``title`` /
+    ``scene`` / ``continuity_notes`` / ``env_sounds`` / ``lighting``）；
+    ``resolved_by`` 记录决议依据，FR-091 扩展证据命中时记 ``extracted``。
     """
 
     mood: str = ""
@@ -367,6 +404,66 @@ def _atmosphere_from_explicit(text: str) -> Tuple[str, str]:
     if exact in ATMOSPHERE_STYLE_MAP:
         return exact, value
     return _scan_atmosphere_keyword(value)
+
+
+def _scan_lighting_keyword(text: str) -> Tuple[str, str]:
+    """扫描场景文本中的打光词，返回映射后的氛围键与原始词（FR-091）"""
+    value = str(text or "")
+    for keyword, atmosphere in LIGHTING_KEYWORDS.items():
+        if keyword in value:
+            return atmosphere, keyword
+    return "", ""
+
+
+def _scene_lighting_text(scene: Any) -> str:
+    """拼接单个场景的地点与描述：打光词可能出现在任一部分"""
+    location = getattr(scene, "location", "") or ""
+    description = getattr(scene, "description", "") or ""
+    return f"{location} {description}"
+
+
+def collect_lighting_evidence(parsed_script: Any) -> MoodEvidence:
+    """采集场景文本中的打光词证据（FR-091）
+
+    首个命中的打光词决定候选；``source`` 固定为 ``lighting``，
+    ``resolved_by`` 记 ``extracted``，原始词供 provenance 追溯。
+
+    Args:
+        parsed_script: 剧本解析结果（可为 None）
+
+    Returns:
+        打光词氛围证据；无命中时各字段为空
+    """
+    evidence = MoodEvidence()
+    if parsed_script is None:
+        return evidence
+
+    for scene in getattr(parsed_script, "scenes", []) or []:
+        mood, keyword = _scan_lighting_keyword(_scene_lighting_text(scene))
+        if not mood:
+            continue
+        evidence.candidates.append(
+            {"field": "lighting", "mood": mood, "keyword": keyword}
+        )
+        if not evidence.mood:
+            evidence.mood = mood
+            evidence.source = "lighting"
+            evidence.keyword = keyword
+            evidence.resolved_by = "extracted"
+    return evidence
+
+
+def _append_env_sound_candidates(evidence: MoodEvidence, parsed_script: Any) -> None:
+    """扫描场景环境音描述，命中氛围词时追加候选（FR-091）"""
+    for scene in getattr(parsed_script, "scenes", []) or []:
+        audio_context = getattr(scene, "audio_context", None)
+        for sound in getattr(audio_context, "env_sounds", []) or []:
+            description = getattr(sound, "description", None)
+            mood, keyword = _scan_atmosphere_keyword(str(description or ""))
+            if mood:
+                evidence.candidates.append(
+                    {"field": "env_sounds", "mood": mood, "keyword": keyword}
+                )
 
 
 def _scene_text(parsed_script: Any, limit: int = 3) -> str:
@@ -473,11 +570,11 @@ def collect_genre_evidence(parsed_script: Any) -> GenreEvidence:
 
 
 def collect_mood_evidence(parsed_script: Any) -> MoodEvidence:
-    """按 FR-023 采集氛围证据
+    """按 FR-023/FR-091 采集氛围证据
 
-    mood 维度以显式 ``audio_atmosphere`` 为准，它 MUST 优先于场景文本的
-    一阶关键词扫描；其余字段只在显式氛围无信号时按 标题 > 场景 > 连续性
-    要点 回退。
+    mood 维度以显式 ``audio_atmosphere`` 为准，它 MUST 优先于场景环境音、
+    打光词与一阶关键词扫描；扩展证据按 环境音 > 打光词 > 标题/场景/连续性
+    要点 回退。全部未命中时由 FR-088 兜底。
 
     Args:
         parsed_script: 剧本解析结果（可为 None）
@@ -502,6 +599,9 @@ def collect_mood_evidence(parsed_script: Any) -> MoodEvidence:
             }
         )
 
+    _append_env_sound_candidates(evidence, parsed_script)
+    evidence.candidates.extend(collect_lighting_evidence(parsed_script).candidates)
+
     for field_name, text in (
         ("title", str(getattr(parsed_script, "title", "") or "")),
         ("scene", _scene_text(parsed_script)),
@@ -516,17 +616,15 @@ def collect_mood_evidence(parsed_script: Any) -> MoodEvidence:
                 {"field": field_name, "mood": mood, "keyword": keyword}
             )
 
-    if explicit_mood:
-        evidence.mood = explicit_mood
-        evidence.source = "audio_atmosphere"
-        evidence.keyword = explicit_keyword
-        evidence.resolved_by = "explicit_audio_atmosphere"
-    elif evidence.candidates:
-        first = evidence.candidates[0]
-        evidence.mood = str(first["mood"])
-        evidence.source = str(first["field"])
-        evidence.keyword = str(first["keyword"])
-        evidence.resolved_by = "keyword_scan"
+    if not evidence.candidates:
+        return evidence
+
+    first = evidence.candidates[0]
+    evidence.mood = str(first["mood"])
+    evidence.source = str(first["field"])
+    evidence.keyword = str(first["keyword"])
+    # FR-089：命中任一证据即记 extracted，细分来源只留在 source
+    evidence.resolved_by = "extracted"
     return evidence
 
 
@@ -544,10 +642,55 @@ def _resolve_style_dimensions(
     return dimensions
 
 
-def _build_provenance(
+def _provenance_source(
     genre_evidence: GenreEvidence, mood_evidence: MoodEvidence
+) -> Optional[str]:
+    """按固定优先级返回 ``provenance.source`` 细分（FR-091）
+
+    题材命中即记 ``field_priority``；否则按氛围证据来源映射，返回值
+    只会出现在 ``EVIDENCE_SOURCES`` 中（无证据时为 None）。
+    """
+    if genre_evidence.genre:
+        return "field_priority"
+    return _MOOD_SOURCE_LABELS.get(mood_evidence.source) or None
+
+
+def _apply_default_dimensions(dimensions: StyleDimensions) -> List[str]:
+    """按 FR-088 补齐缺失的 lighting/palette/mood，返回补齐项
+
+    默认值只填空缺，不覆盖既有维度；``genre`` 不参与兜底（FR-090）。
+    """
+    applied: List[str] = []
+    for name in STYLE_DIMENSIONS:
+        value = DEFAULT_STYLE_DIMENSIONS.get(name)
+        if not value or getattr(dimensions, name):
+            continue
+        setattr(dimensions, name, value)
+        applied.append(name)
+    return applied
+
+
+def _lighting_provenance(
+    genre_evidence: GenreEvidence,
+    mood_evidence: MoodEvidence,
+    defaults_applied: List[str],
+) -> Tuple[str, Optional[str]]:
+    """定位最终 lighting 维度的证据来源与原始词（FR-088/FR-091）"""
+    if "lighting" in defaults_applied:
+        return "default_fallback", None
+    if genre_evidence.genre:
+        return "field_priority", genre_evidence.keyword or None
+    source = _provenance_source(genre_evidence, mood_evidence) or "default_fallback"
+    return source, mood_evidence.keyword or None
+
+
+def _build_provenance(
+    genre_evidence: GenreEvidence,
+    mood_evidence: MoodEvidence,
+    defaults_applied: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """组装 FR-029 provenance；``discarded`` 由渲染层消解冲突时补充"""
+    """组装 FR-029/FR-088/FR-091 provenance；``discarded`` 由渲染层消解冲突时补充"""
+    applied = list(defaults_applied or [])
     genres = {str(item["genre"]) for item in genre_evidence.candidates}
     mood_candidates: List[str] = []
     for item in mood_evidence.candidates:
@@ -555,12 +698,15 @@ def _build_provenance(
         if mood and mood not in mood_candidates:
             mood_candidates.append(mood)
 
-    if genre_evidence.genre:
-        resolved_by = "field_priority"
-    elif mood_evidence.mood:
-        resolved_by = "mood_only"
-    else:
-        resolved_by = "no_signal"
+    # FR-089：任一证据命中即 extracted，全部未命中才记 default_fallback
+    resolved_by = (
+        "extracted"
+        if genre_evidence.genre or mood_evidence.mood
+        else "default_fallback"
+    )
+    lighting_source, lighting_keyword = _lighting_provenance(
+        genre_evidence, mood_evidence, applied
+    )
 
     return {
         "genre_source": genre_evidence.source or None,
@@ -569,8 +715,13 @@ def _build_provenance(
         "genre_rejected": list(genre_evidence.rejected),
         "genre_conflict": len(genres) > 1,
         "mood_source": mood_evidence.source or None,
+        "mood_keyword": mood_evidence.keyword or None,
         "mood_candidates": mood_candidates,
+        "source": _provenance_source(genre_evidence, mood_evidence),
+        "lighting_source": lighting_source,
+        "lighting_keyword": lighting_keyword,
         "resolved_by": resolved_by,
+        "defaults_applied": applied,
         "discarded": [],
         "confidence": genre_evidence.confidence or None,
     }
@@ -579,12 +730,13 @@ def _build_provenance(
 def infer_style_anchor_with_provenance(
     parsed_script: Any,
 ) -> Tuple[Dict[str, str], Dict[str, Any]]:
-    """推断六维风格锚点并输出 FR-029 provenance
+    """推断六维风格锚点并输出 FR-029/FR-088 provenance
 
     题材按 FR-028 字段优先级采集（非规范显式值只进 ``genre_rejected``），
     六维取值以题材维度为主、氛围维度补空缺；氛围证据按 FR-023 以显式
     ``audio_atmosphere`` 为准。无题材信号时 ``genre`` 为空，MUST NOT 用
-    默认题材补位（FR-029、AC-029）。
+    默认题材补位（FR-029、FR-090）；lighting/palette/mood 全无信号时
+    按 FR-088 兜底，并把补齐项写入 ``defaults_applied``。
 
     Args:
         parsed_script: 剧本解析结果（ParsedScript，可为 None）
@@ -599,6 +751,7 @@ def infer_style_anchor_with_provenance(
     genre_evidence = collect_genre_evidence(parsed_script)
     mood_evidence = collect_mood_evidence(parsed_script)
     dimensions = _resolve_style_dimensions(genre_evidence.genre, mood_evidence)
+    defaults_applied = _apply_default_dimensions(dimensions)
 
     metadata = getattr(parsed_script, "metadata", None)
     description = ""
@@ -613,7 +766,7 @@ def infer_style_anchor_with_provenance(
     }
     if description and len(description) < _MAX_DESCRIPTION_LENGTH:
         anchor["description"] = description
-    return anchor, _build_provenance(genre_evidence, mood_evidence)
+    return anchor, _build_provenance(genre_evidence, mood_evidence, defaults_applied)
 
 
 def infer_style_anchor(parsed_script: Any) -> Dict[str, str]:

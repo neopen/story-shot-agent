@@ -222,7 +222,7 @@ def test_incidental_mood_word_in_scene_does_not_decide_genre():
 
 
 def test_no_signal_produces_empty_evidence():
-    """无任何题材信号时不补默认题材"""
+    """无任何题材信号时不补默认题材，仅兜底三维（FR-088/FR-090）"""
     parsed = _parsed_script()
 
     evidence = collect_genre_evidence(parsed)
@@ -232,7 +232,11 @@ def test_no_signal_produces_empty_evidence():
     assert evidence.confidence == ""
     assert evidence.candidates == []
     assert evidence.rejected == []
-    assert infer_style_anchor(parsed) == {}
+    assert infer_style_anchor(parsed) == {
+        "lighting": "natural lighting",
+        "palette": "muted colors",
+        "mood": "neutral",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +256,7 @@ def test_explicit_atmosphere_mood_outranks_scene_scan():
     assert evidence.mood == "romantic"
     assert evidence.source == "audio_atmosphere"
     assert evidence.keyword == "浪漫"
-    assert evidence.resolved_by == "explicit_audio_atmosphere"
+    assert evidence.resolved_by == "extracted"
     assert {
         "field": "scene",
         "mood": "tense",
@@ -272,7 +276,7 @@ def test_mood_falls_back_to_scene_scan_without_explicit_atmosphere():
     assert evidence.mood == "tense"
     assert evidence.source == "scene"
     assert evidence.keyword == "紧张"
-    assert evidence.resolved_by == "keyword_scan"
+    assert evidence.resolved_by == "extracted"
 
 
 def test_mood_keywords_cover_spec_words():
@@ -344,11 +348,12 @@ def test_genre_dimensions_outrank_atmosphere_dimensions():
     assert anchor["lighting"] == "high contrast lighting"
     assert anchor["mood"] == "tense"
     assert anchor["framing"] == "shadowed framing"
-    assert provenance["resolved_by"] == "field_priority"
+    assert provenance["resolved_by"] == "extracted"
+    assert provenance["source"] == "field_priority"
 
 
-def test_no_genre_signal_keeps_mood_and_lighting_without_default():
-    """AC-029：无题材信号时 genre 为空，锚点仍由 mood/lighting 构成"""
+def test_no_genre_signal_keeps_evidence_dimensions():
+    """AC-029/FR-088：无题材信号时 genre 为空，缺失的 palette 由默认补齐"""
     parsed = _parsed_script(atmosphere="tense")
 
     anchor, provenance = infer_style_anchor_with_provenance(parsed)
@@ -356,9 +361,12 @@ def test_no_genre_signal_keeps_mood_and_lighting_without_default():
     assert "genre" not in anchor
     assert anchor["mood"] == "tense"
     assert anchor["lighting"] == "high contrast lighting"
+    assert anchor["palette"] == "muted colors"
     assert provenance["genre_source"] is None
     assert provenance["genre_candidates"] == []
-    assert provenance["resolved_by"] == "mood_only"
+    assert provenance["resolved_by"] == "extracted"
+    assert provenance["source"] == "audio_atmosphere"
+    assert provenance["defaults_applied"] == ["palette"]
 
 
 def test_atmosphere_dimensions_cover_all_mood_keys():
@@ -423,13 +431,13 @@ def test_prefix_resolves_lighting_conflict_and_records_discard():
 
 
 def test_prefix_without_genre_is_built_from_mood_and_lighting():
-    """AC-029：无题材信号时前缀仍由 mood/lighting 构成"""
+    """AC-029/FR-088：无题材信号时前缀由证据维度与默认 palette 构成"""
     parsed = _parsed_script(atmosphere="tense")
     anchor, _ = infer_style_anchor_with_provenance(parsed)
 
     assert "genre" not in anchor
     assert build_style_prefix(anchor) == (
-        "[Style: high contrast lighting, tense, shadowed framing]"
+        "[Style: high contrast lighting, muted colors, tense, shadowed framing]"
     )
 
 
