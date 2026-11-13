@@ -78,7 +78,11 @@ from penshot.neopen.agent.asset_generator import (
     backfill_outfits,
     backfill_usage,
 )
-from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
+from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence
+from penshot.neopen.agent.video_splitter.video_splitter_models import (
+    FragmentSequence,
+    VideoFragment,
+)
 
 
 class WorkflowNodes:
@@ -865,6 +869,13 @@ class WorkflowNodes:
             if provenance:
                 instructions.metadata["style_anchor_provenance"] = dict(provenance)
 
+            # 总时长报告（0.4.6 FR-078/079）：总时长以实际片段求和为准，
+            # 解析元素推算值与目标时长取自镜头序列统计
+            instructions.metadata["duration_report"] = self._build_duration_report(
+                state.domain.fragment_sequence,
+                state.domain.shot_sequence,
+            )
+
             # 统计提示词信息
             prompt_lengths = [len(f.prompt) for f in instructions.fragments]
             debug(
@@ -938,6 +949,52 @@ class WorkflowNodes:
             state.errors.error_source = PipelineNode.CONVERT_PROMPT
 
         return state
+
+    @staticmethod
+    def _build_duration_report(
+        fragment_sequence: Optional[FragmentSequence],
+        shot_sequence: Optional[ShotSequence],
+    ) -> Dict[str, Any]:
+        """构造总时长报告（FR-078/079）
+
+        总时长按实际片段求和；解析元素推算值、目标时长与时长来源取自
+        镜头序列统计。目标时长缺失时为 None，且不产生“总时长不足”告警。
+
+        Args:
+            fragment_sequence: 分割后的片段序列
+            shot_sequence: 镜头序列，携带 ``estimate_sequence`` 统计
+
+        Returns:
+            写入 ``metadata.duration_report`` 的字典
+        """
+        fragments = getattr(fragment_sequence, "fragments", None) or []
+        stats = getattr(shot_sequence, "stats", None) or {}
+
+        total_duration = round(sum(fragment.duration for fragment in fragments), 2)
+        target_duration = stats.get("target_duration")
+        duration_delta = (
+            None
+            if target_duration is None
+            else round(target_duration - total_duration, 2)
+        )
+
+        report = {
+            "total_duration": total_duration,
+            "shot_duration": stats.get("total_duration"),
+            "element_duration": stats.get("element_duration"),
+            "target_duration": target_duration,
+            "duration_delta": duration_delta,
+            "duration_source": stats.get("duration_source"),
+        }
+
+        if duration_delta is not None and duration_delta > 0:
+            warning(
+                f"总时长不足：目标 {target_duration}s，实际 {total_duration}s，"
+                f"差 {duration_delta}s"
+            )
+
+        debug(f"总时长报告: {report}")
+        return report
 
     def route_model_node(self, state: WorkflowState) -> WorkflowState:
         """目标模型路由节点（M0.4.3）
