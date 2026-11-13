@@ -26,6 +26,11 @@ FRAG_003_DESCRIPTION = (
 
 EIGHT_NODE_TEXT = "林晚低头，抬头，转身，迈步，攥紧纸条，叹气，凝视窗外，微笑。"
 
+VEHICLE_TEXT = (
+    "全景镜头：列车明亮的车灯从隧道深处亮起，缓缓驶入站台。"
+    "车门打开，车厢内空无一人，显得格外空旷。林晚站在原地，身影静止，没有移动的迹象。"
+)
+
 
 def _shot(description: str, element_ids=None) -> ShotInfo:
     return ShotInfo(
@@ -57,6 +62,21 @@ def test_count_action_nodes_ignores_pure_environment() -> None:
         count_action_nodes("深夜空旷的地铁站台笼罩在冷白色灯光中，远处隧道口漆黑一片。")
         == 0
     )
+
+
+def test_count_action_nodes_vehicle_scene() -> None:
+    """交通工具类动作：亮起、驶入、打开三个节点均被识别"""
+    assert count_action_nodes(VEHICLE_TEXT) == 3
+
+
+def test_count_action_nodes_ignores_broadcast_only() -> None:
+    """纯广播文本不产生动作节点，词表不收录“进站”等过宽词"""
+    assert count_action_nodes("站台广播响起：列车即将进站，请乘客注意安全。") == 0
+
+
+def test_compute_duration_vehicle_scene() -> None:
+    """样本车辆镜头按三个动作节点达到 3.3 秒"""
+    assert compute_duration_from_text(VEHICLE_TEXT) == 3.3
 
 
 def test_count_action_nodes_empty_text() -> None:

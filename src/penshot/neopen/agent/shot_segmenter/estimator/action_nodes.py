@@ -70,6 +70,8 @@ ACTION_NODE_PATTERNS: Tuple[str, ...] = tuple(
             "推开",
             "打开",
             "关上",
+            "驶入",
+            "亮起",
             "叹气",
             "叹了",
             "点头",
