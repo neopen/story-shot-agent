@@ -1093,6 +1093,7 @@ class WorkflowNodes:
             shots=shots,
             instructions=state.domain.instructions,
             parsed_script=state.domain.parsed_script,
+            manifest=state.domain.asset_manifest,
         )
         if outfit_backfilled:
             debug(f"角色服装已从片段提示词回填: {', '.join(outfit_backfilled)}")

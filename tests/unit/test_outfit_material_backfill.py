@@ -17,6 +17,7 @@ from penshot.neopen.agent.asset_generator.asset_generator_agent import backfill_
 from penshot.neopen.agent.asset_generator.asset_models import (
     AssetPlanDocument,
     AssetSpec,
+    AssetStatus,
     AssetType,
 )
 from penshot.neopen.agent.asset_generator.character_sheet_generator import (
@@ -59,9 +60,22 @@ def test_outfit_without_material_still_missing():
 
 
 def _outfit_plan(
-    outfit_text: str, reason: str = "服装描述缺少材质"
+    outfit_text: str,
+    reason: str = "服装描述缺少材质",
+    status: AssetStatus = AssetStatus.PENDING,
+    asset_ref: str = "",
+    human_edited: bool = False,
 ) -> AssetPlanDocument:
     """构造带缺失材质的角色三视图资产计划"""
+    metadata: dict = {
+        "role": "identity_anchor",
+        "outfit_text": outfit_text,
+        "outfit_missing_fields": ["材质"],
+        "requires_special_attention": True,
+        "attention_reason": reason,
+    }
+    if human_edited:
+        metadata["human_edited"] = True
     return AssetPlanDocument(
         assets=[
             AssetSpec(
@@ -72,13 +86,9 @@ def _outfit_plan(
                     "character reference sheet of 站台管理员, front view, full body, "
                     f"{outfit_text}, highly detailed character design"
                 ),
-                metadata={
-                    "role": "identity_anchor",
-                    "outfit_text": outfit_text,
-                    "outfit_missing_fields": ["材质"],
-                    "requires_special_attention": True,
-                    "attention_reason": reason,
-                },
+                status=status,
+                asset_ref=asset_ref,
+                metadata=metadata,
             )
         ]
     )
@@ -176,3 +186,101 @@ def test_wrapper_derives_script_materials_from_parsed_script():
     assert changed == ["char_002"]
     assert "制服布料" in spec.image_prompt
     assert spec.metadata["outfit_backfill_source"] == SCRIPT_MATERIAL_SOURCE
+
+
+def test_generated_status_is_not_backfilled():
+    """FR-096：已生成资产即使没有 asset_ref 也不回填"""
+    plan = _outfit_plan("深蓝色标准地铁制服", status=AssetStatus.GENERATED)
+
+    changed = backfill_character_outfits(plan, {}, {"站台管理员": "制服布料"})
+
+    assert changed == []
+    assert plan.assets[0].metadata["outfit_text"] == "深蓝色标准地铁制服"
+
+
+def test_manifest_revision_blocks_backfill():
+    """FR-096：清单 revision > 0 的资产不被覆盖"""
+    plan = _outfit_plan("深蓝色标准地铁制服")
+
+    changed = backfill_character_outfits(
+        plan,
+        {},
+        {"站台管理员": "制服布料"},
+        {"char_002": 1},
+    )
+
+    assert changed == []
+    assert "制服布料" not in plan.assets[0].image_prompt
+
+
+def test_zero_manifest_revision_allows_backfill():
+    """FR-096：revision 为 0 视为未编辑，允许回填"""
+    plan = _outfit_plan("深蓝色标准地铁制服")
+
+    changed = backfill_character_outfits(
+        plan,
+        {},
+        {"站台管理员": "制服布料"},
+        {"char_002": 0},
+    )
+
+    assert changed == ["char_002"]
+    assert "制服布料" in plan.assets[0].image_prompt
+
+
+def test_wrapper_manifest_revision_blocks_backfill():
+    """asset_generator_agent 包装层把清单 revision 传入回填保护"""
+    plan = _outfit_plan("深蓝色标准地铁制服")
+    manifest = {"bindings": [{"asset_id": "char_002", "revision": 1}]}
+
+    changed = backfill_outfits(
+        plan,
+        parsed_script=SimpleNamespace(
+            global_metadata=SimpleNamespace(
+                character_outfits=[
+                    SimpleNamespace(character="站台管理员", material="制服布料")
+                ]
+            )
+        ),
+        manifest=manifest,
+    )
+
+    assert changed == []
+
+
+def test_wrapper_manifest_alias_revision_blocks_backfill():
+    """FR-096：下游改名时按 asset_id_map 反查 revision"""
+    plan = _outfit_plan("深蓝色标准地铁制服")
+    manifest = {
+        "asset_id_map": {"char_002": "down_002"},
+        "bindings": [{"asset_id": "down_002", "revision": 2}],
+    }
+
+    changed = backfill_outfits(
+        plan,
+        parsed_script=SimpleNamespace(
+            global_metadata=SimpleNamespace(
+                character_outfits=[
+                    SimpleNamespace(character="站台管理员", material="制服布料")
+                ]
+            )
+        ),
+        manifest=manifest,
+    )
+
+    assert changed == []
+
+
+def test_wrapper_without_manifest_still_protects_edited_assets():
+    """FR-096：无清单时仍优先保护 asset_ref 与人工编辑资产"""
+    plan = _outfit_plan("深蓝色标准地铁制服", asset_ref="/downstream/char_002.png")
+    edited = _outfit_plan("深蓝色标准地铁制服", human_edited=True).assets[0]
+    plan.assets.append(edited)
+    edited.asset_id = "char_003"
+    edited.owner_name = "调度员"
+
+    changed = backfill_outfits(plan, manifest=None)
+
+    assert changed == []
+    assert plan.assets[0].metadata["outfit_text"] == "深蓝色标准地铁制服"
+    assert edited.metadata["outfit_text"] == "深蓝色标准地铁制服"

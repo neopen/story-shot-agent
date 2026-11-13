@@ -280,26 +280,53 @@ def _script_materials(parsed_script: Any) -> Dict[str, str]:
     return materials
 
 
+def _manifest_revisions(manifest: Any) -> Dict[str, int]:
+    """提取清单中的 asset_id -> revision；兼容改名映射与字典输入"""
+    if not manifest:
+        return {}
+    model = (
+        manifest
+        if isinstance(manifest, AssetManifest)
+        else AssetManifest.model_validate(manifest)
+    )
+    revisions: Dict[str, int] = {}
+    for binding in model.bindings:
+        revisions[binding.asset_id] = max(
+            revisions.get(binding.asset_id, 0), binding.revision
+        )
+    for canonical, actual in model.asset_id_map.items():
+        if actual in revisions:
+            revisions[canonical] = max(revisions.get(canonical, 0), revisions[actual])
+    return revisions
+
+
 def backfill_outfits(
     plan: Any,
     fragments: Optional[Sequence[Any]] = None,
     shots: Any = None,
     instructions: Any = None,
     parsed_script: Any = None,
+    manifest: Any = None,
 ) -> List[str]:
-    """路由阶段回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016）
+    """路由阶段回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016/T-017）
 
     ASSETS 节点早于提示词生成，只能标记服装信息不足；路由节点拿到最终提示词后
     按主角色归属回填，避免三视图停留在“高中校服”这类无颜色/材质的短标签。
     剧本 ``global_metadata.character_outfits.material`` 比片段文本更可信，优先使用。
+    清单 ``revision > 0`` 的资产不回填；无清单时按未编辑处理并记录降级日志（FR-096）。
     """
+    if manifest is None:
+        info("资产回填缺少 asset_manifest，无 revision 信息，按未编辑处理")
     rows = _fragment_rows(fragments or [], shots, _prompt_texts(instructions))
     texts: Dict[str, List[Tuple[str, str]]] = {}
     for row in rows:
         if row["main_character"] and row["text"]:
             texts.setdefault(row["main_character"], []).append((row["id"], row["text"]))
     return backfill_character_outfits(
-        plan, texts, script_materials=_script_materials(parsed_script)
+        plan,
+        texts,
+        script_materials=_script_materials(parsed_script),
+        asset_revisions=_manifest_revisions(manifest),
     )
 
 

@@ -17,6 +17,7 @@ from penshot.neopen.agent.asset_generator.asset_models import (
     AssetConsistency,
     AssetPlanDocument,
     AssetSpec,
+    AssetStatus,
     AssetType,
     AssetUsage,
 )
@@ -488,18 +489,23 @@ def backfill_character_outfits(
     plan: Any,
     texts_by_character: Mapping[str, Sequence[Tuple[str, str]]],
     script_materials: Optional[Mapping[str, str]] = None,
+    asset_revisions: Optional[Mapping[str, int]] = None,
 ) -> List[str]:
-    """回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016）
+    """回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016/T-017）
 
     ASSETS 节点早于提示词生成，此时只能依据剧本锚点标记“信息不足”；路由阶段
     按“剧本 ``character_outfits.material`` > 该角色片段提示词”的顺序补全三视图。
     回填后重算缺失字段：全部解决时清除 ``outfit_missing_fields`` 与
     ``requires_special_attention``；仍缺失时保留标记并写明“剧本与片段均未提供”。
 
+    已生成、已有 ``asset_ref``、被人工编辑或清单 ``revision > 0`` 的资产不回填，
+    避免覆盖下游产物（FR-096）。
+
     Args:
         plan: 资产计划文档（``AssetPlanDocument`` 或字典），原地修改
         texts_by_character: 角色名 -> [(片段ID, 片段文本)]，片段文本含描述与提示词
         script_materials: 角色名 -> 剧本结构化材质（来自 ``global_metadata``）
+        asset_revisions: asset_id -> 清单修订号；缺省或 0 视为未编辑
 
     Returns:
         实际回填的 asset_id 列表
@@ -509,11 +515,16 @@ def backfill_character_outfits(
         if isinstance(plan, AssetPlanDocument)
         else AssetPlanDocument.model_validate(plan)
     )
+    revisions = asset_revisions or {}
     changed: List[str] = []
     for spec in document.assets:
         if spec.asset_type != AssetType.CHARACTER_SHEET:
             continue
         if spec.asset_ref or spec.metadata.get("human_edited"):
+            continue
+        if spec.status == AssetStatus.GENERATED:
+            continue
+        if revisions.get(spec.asset_id, 0) > 0:
             continue
         current = str(spec.metadata.get("outfit_text") or "").strip() or (
             _outfit_from_prompt(spec.image_prompt)
