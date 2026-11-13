@@ -1,4 +1,4 @@
-version: "1.5"
+version: "1.6"
 
 prompt_converter_system:
   name: "prompt_converter_system"
@@ -27,6 +27,9 @@ prompt_converter_system:
       - Based on provided character info, audio context and fragment duration, generate complete audio parameters.
       - All parameters must conform to the target model's expected schema.
       - Ensure audio duration strictly matches the video duration.
+      - Dialogue language follows the script language: for Chinese scripts, dialogue lines and voice_description must be Chinese; English is only allowed in non-dialogue fields such as negative_prompt or audio_style.
+      - For English scripts, the dialogue description section must be English; any Chinese translation may only appear in the comment section after a blank line (\n\n).
+      - Always output dialogue_language ("zh" or "en") matching the dialogue language.
 
 
 prompt_converter_user:
@@ -65,6 +68,9 @@ prompt_converter_user:
     [Important instructions]
     - Video prompts must preserve all dialog lines and visual elements exactly.
     - Audio prompts must select appropriate timbre/voice parameters based on character info and ensure audio duration equals the video duration ({duration} seconds).
+    - For Chinese scripts (original_language `zh`), dialogue lines and voice_description must be Chinese; English is only allowed in non-dialogue fields such as negative_prompt or audio_style.
+    - For English scripts (original_language `en`), the dialogue description section of `audio.prompt` must be English. Any Chinese translation may only appear in the comment section after a blank line (`\n\n`), never in the dialogue description section.
+    - Always output `dialogue_language` ("zh" or "en") matching the dialogue language.
     - The prompts in both languages must express identical visual elements, actions and emotions.
     - Prompts must not include sensitive or inappropriate content.
     - Keep prompts specific and clear; avoid vague or abstract descriptions.
@@ -83,9 +89,10 @@ prompt_converter_user:
         "negative_prompt": "Audio negative prompt",
         "model_type": "XTTSv2/AudioLDM_3/Bark/ElevenLabs/Azure_TTS/OpenAI_TTS",
         "voice_type": "character_dialogue/narration/announcer/creative",
+        "dialogue_language": "zh or en, matching the dialogue language",
         "audio_style": "cinematic/realistic/anime/commercial",
         "voice_character": "character name (optional)",
-        "voice_description": "Voice timbre description (English)",
+        "voice_description": "Voice timbre description (Chinese for zh scripts, English for en scripts)",
         "speed": 1.0,
         "pitch_shift": 0,
         "emotion": "neutral/happy/sad/angry/tender",

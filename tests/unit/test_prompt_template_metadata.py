@@ -3,12 +3,28 @@
 验证提示词原文只写入文档正文，metadata 仅保留索引字段，避免超过向量库块大小。
 """
 
+from pathlib import Path
+
+import yaml
+
 import penshot.neopen.prompts.prompt_template_manager as manager_module
 from penshot.neopen.constants.rag import MAX_METADATA_LENGTH
 from penshot.neopen.knowledge.metadata_policy import (
     PROMPT_TEMPLATE_METADATA_POLICY,
 )
+from penshot.neopen.prompts.prompt_load_manager import PromptManager
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
+from penshot.neopen.shot_language import ShotLanguage
+
+_TEMPLATE_ROOT = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "penshot"
+    / "neopen"
+    / "prompts"
+    / "v1.x"
+)
+_CONVERTER_FILE = "prompt_converter_prompt.yaml"
 
 
 def test_prompt_template_metadata_policy():
@@ -83,3 +99,49 @@ def test_manager_doc_metadata_excludes_prompt(monkeypatch):
     assert metadata["fragment_id"] == "f1"
     assert metadata["quality_score"] == 90
     assert len(metadata["scene"]) <= MAX_METADATA_LENGTH
+
+
+def _load_converter_template(language: str) -> dict:
+    """读取指定语言的提示词转换模板"""
+    path = _TEMPLATE_ROOT / language / _CONVERTER_FILE
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def test_converter_templates_require_dialogue_language():
+    """FR-084/AC-074：中英文模板版本升到 1.6，且都要求输出 dialogue_language"""
+    for language in ("zh", "en"):
+        data = _load_converter_template(language)
+        system = data["prompt_converter_system"]["template"]
+        user = data["prompt_converter_user"]["template"]
+
+        assert data["version"] == "1.6"
+        assert "dialogue_language" in system
+        assert "dialogue_language" in user
+
+
+def test_zh_template_requires_chinese_dialogue_and_voice():
+    """FR-086：中文模板要求台词与 voice_description 使用中文"""
+    user = _load_converter_template("zh")["prompt_converter_user"]["template"]
+
+    assert "台词原文与 voice_description 必须为中文" in user
+    assert "英文只允许出现在 negative_prompt、audio_style 等非台词字段" in user
+
+
+def test_en_template_limits_chinese_to_comment_section():
+    """FR-087：英文模板写明中文对照只进 \\n\\n 之后的注释段"""
+    user = _load_converter_template("en")["prompt_converter_user"]["template"]
+
+    assert "may only appear in the comment section after a blank line" in user
+    assert "never in the dialogue description section" in user
+    assert "\\n\\n" in user
+
+
+def test_converter_templates_still_load_through_prompt_manager():
+    """模板结构保持兼容，旧读取链路仍可召回两份模板"""
+    for language in (ShotLanguage.ZH, ShotLanguage.EN):
+        manager = PromptManager(language=language)
+        system = manager.get_prompt("prompt_converter_system")
+        user = manager.get_prompt("prompt_converter_user")
+
+        assert "dialogue_language" in system
+        assert "dialogue_language" in user
