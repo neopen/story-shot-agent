@@ -1,5 +1,5 @@
 """
-M0.4.6 T-013 回归测试：氛围证据扩展与 provenance.source 枚举。
+0.4.5 T-013 回归测试：氛围证据扩展与 provenance.source 枚举。
 
 覆盖：
 - 场景 `audio_context.env_sounds[].description` 与场景文本打光词进入氛围证据；

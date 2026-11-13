@@ -1,6 +1,6 @@
 """
 @FileName: test_action_node_duration.py
-@Description: 动作节点识别与确定性时长公式（0.4.6 T-001/T-002）
+@Description: 动作节点识别与确定性时长公式（0.4.5 T-001/T-002）
 @Author: neopen
 @Time: 2026/11/13
 """

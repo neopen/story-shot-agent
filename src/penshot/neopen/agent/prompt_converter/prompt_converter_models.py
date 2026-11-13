@@ -47,7 +47,7 @@ class AIAudioPrompt(BaseModel):
         description="负面提示词。不想要的声音特性。不同模型有不同默认值",
     )
 
-    # 台词语言（FR-084）：0.4.6 兼容字段，0.5 迁移为 dialogue_cues.language
+    # 台词语言（FR-084）：0.4.5 兼容字段，0.5 迁移为 dialogue_cues.language
     dialogue_language: Literal["zh", "en"] = Field(
         default="zh",
         description="台词语言。默认由剧本语言推断，中文剧本为zh，英文剧本为en",

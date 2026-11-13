@@ -4,7 +4,7 @@ Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: action_nodes.py
-@Description: 动作节点识别与确定性时长计算（0.4.6 FR-075/077）
+@Description: 动作节点识别与确定性时长计算（0.4.5 FR-075/077）
 @Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/13

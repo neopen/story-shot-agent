@@ -177,7 +177,7 @@ class DurationEnhancer:
 
         增强会改变片段时长，因此继承上一阶段的时长报告字段并重算差值，
         避免 ``element_duration`` / ``target_duration`` / ``duration_source``
-        在增强后被丢弃（0.4.6 FR-078）。
+        在增强后被丢弃（0.4.5 FR-078）。
         """
         previous = sequence.stats or {}
         total_duration = round(sum(s.duration for s in sequence.shots), 2)

@@ -869,7 +869,7 @@ class WorkflowNodes:
             if provenance:
                 instructions.metadata["style_anchor_provenance"] = dict(provenance)
 
-            # 总时长报告（0.4.6 FR-078/079）：总时长以实际片段求和为准，
+            # 总时长报告（0.4.5 FR-078/079）：总时长以实际片段求和为准，
             # 解析元素推算值与目标时长取自镜头序列统计
             instructions.metadata["duration_report"] = self._build_duration_report(
                 state.domain.fragment_sequence,
@@ -1086,7 +1086,7 @@ class WorkflowNodes:
             parsed_script=state.domain.parsed_script,
             instructions=state.domain.instructions,
         )
-        # 0.4.6 T-016：剧本结构化材质优先，其次用最终提示词补全服装缺失要素
+        # 0.4.5 T-016：剧本结构化材质优先，其次用最终提示词补全服装缺失要素
         outfit_backfilled = backfill_outfits(
             plan,
             fragments=fragments,

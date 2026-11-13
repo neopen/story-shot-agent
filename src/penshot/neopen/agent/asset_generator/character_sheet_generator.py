@@ -491,7 +491,7 @@ def backfill_character_outfits(
     script_materials: Optional[Mapping[str, str]] = None,
     asset_revisions: Optional[Mapping[str, int]] = None,
 ) -> List[str]:
-    """回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016/T-017）
+    """回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.5 T-016/T-017）
 
     ASSETS 节点早于提示词生成，此时只能依据剧本锚点标记“信息不足”；路由阶段
     按“剧本 ``character_outfits.material`` > 该角色片段提示词”的顺序补全三视图。

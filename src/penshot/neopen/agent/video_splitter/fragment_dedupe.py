@@ -4,7 +4,7 @@ Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: fragment_dedupe.py
-@Description: 片段疑似重复检测与合并（0.4.6 FR-070~FR-074）
+@Description: 片段疑似重复检测与合并（0.4.5 FR-070~FR-074）
 @Author: neopen
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/13

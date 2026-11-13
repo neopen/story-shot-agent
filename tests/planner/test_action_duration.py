@@ -312,7 +312,7 @@ if __name__ == '__main__':
     print("\n=== 演示完成 ===")
 
 
-# ==================== 0.4.6 T-007：estimator 接入与总时长统计 ====================
+# ==================== 0.4.5 T-007：estimator 接入与总时长统计 ====================
 
 
 def _make_sequence(descriptions: List[str]) -> ShotSequence:
@@ -417,7 +417,7 @@ def test_invalid_target_duration_is_ignored(monkeypatch):
     assert any("非法目标时长" in message for message in messages)
 
 
-# ==================== 0.4.6 T-008：总时长报告落盘 ====================
+# ==================== 0.4.5 T-008：总时长报告落盘 ====================
 
 
 def _make_prompt_nodes(instructions: AIVideoInstructions) -> WorkflowNodes:

@@ -204,7 +204,7 @@ def test_normalize_returns_copy_without_mutating_input():
 
 
 def test_normalize_does_not_introduce_dialogue_cues():
-    """FR-084：0.4.6 不引入 dialogue_cues 结构"""
+    """FR-084：0.4.5 不引入 dialogue_cues 结构"""
     result = normalize_audio_language(_audio("喂"), "zh")
 
     assert "dialogue_cues" not in result.model_dump()

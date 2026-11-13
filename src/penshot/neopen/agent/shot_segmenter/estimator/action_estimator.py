@@ -22,7 +22,7 @@ from penshot.logger import debug
 class ActionDurationEstimator(BaseDurationEstimator):
     """动作时长估算器
 
-    0.4.6 起时长主口径为 :func:`action_nodes.compute_duration`（FR-075），
+    0.4.5 起时长主口径为 :func:`action_nodes.compute_duration`（FR-075），
     本估算器仅在镜头缺少描述时作为回退，不再承担权威时长来源。
     """
 
