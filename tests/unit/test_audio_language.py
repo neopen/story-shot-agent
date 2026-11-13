@@ -7,8 +7,13 @@
 from types import SimpleNamespace
 from typing import Optional
 
+from penshot.neopen.agent.prompt_converter.llm_prompt_converter import (
+    LLMPromptConverter,
+)
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIAudioPrompt,
+    AIVideoInstructions,
+    AIVideoPrompt,
 )
 from penshot.neopen.agent.prompt_converter.script_language import (
     detect_script_language,
@@ -203,3 +208,83 @@ def test_normalize_does_not_introduce_dialogue_cues():
     result = normalize_audio_language(_audio("喂"), "zh")
 
     assert "dialogue_cues" not in result.model_dump()
+
+
+def _converter(script_language: str = "zh") -> LLMPromptConverter:
+    """构造只带解析阶段字段的转换器，避免加载LLM与提示词模板"""
+    converter = LLMPromptConverter.__new__(LLMPromptConverter)
+    converter.script_language = script_language
+    converter.last_audio_id = None
+    return converter
+
+
+def _fragment() -> SimpleNamespace:
+    return SimpleNamespace(id="frag_001", duration=4.0)
+
+
+def test_audio_prompt_serializes_dialogue_language():
+    """FR-084：音频提示词默认 zh，且随指令集一起序列化"""
+    audio = _audio("喂")
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(
+                fragment_id="frag_001", prompt="a shot", duration=4.0, audio=audio
+            )
+        ]
+    )
+
+    dumped = instructions.to_dict()
+
+    assert audio.dialogue_language == "zh"
+    assert dumped["fragments"][0]["audio"]["dialogue_language"] == "zh"
+
+
+def test_parse_fills_missing_language_with_inferred_value():
+    """T-011：LLM未返回dialogue_language时按剧本推断值补齐并归一"""
+    converter = _converter("zh")
+    result = {
+        "audio": {
+            "prompt": "male voice: 'The last train is arriving.'\n\n男声：“末班车即将进站。”"
+        }
+    }
+
+    audio = converter._build_audio_prompt_from_llm_result(result, _fragment())
+
+    assert audio is not None
+    assert audio.dialogue_language == "zh"
+    assert "last train" not in audio.prompt
+
+
+def test_parse_uses_llm_declared_language_when_present():
+    """T-011：LLM声明合法语言时以其为准，中文对照只进注释段"""
+    converter = _converter("zh")
+    result = {
+        "audio": {
+            "prompt": "He says: 'I will wait.' 他说：“我会等。”",
+            "dialogue_language": "en",
+        }
+    }
+
+    audio = converter._build_audio_prompt_from_llm_result(result, _fragment())
+
+    assert audio is not None
+    assert audio.dialogue_language == "en"
+    head, _, comment = audio.prompt.partition("\n\n")
+    assert "他" not in head
+    assert "他说：“我会等。”" in comment
+
+
+def test_parse_ignores_invalid_language_and_falls_back():
+    """T-011：LLM返回非法语言取值时回落到剧本推断值"""
+    converter = _converter("en")
+    result = {
+        "audio": {
+            "prompt": "He says: 'Wait.'",
+            "dialogue_language": "cn",
+        }
+    }
+
+    audio = converter._build_audio_prompt_from_llm_result(result, _fragment())
+
+    assert audio is not None
+    assert audio.dialogue_language == "en"

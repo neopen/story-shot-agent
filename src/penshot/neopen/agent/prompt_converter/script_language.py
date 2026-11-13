@@ -11,7 +11,7 @@ See LICENSE File For Details.
 """
 
 import re
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Literal, Optional, Tuple
 
 from penshot.logger import warning
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
@@ -89,7 +89,7 @@ def _has_cjk(text: str) -> bool:
     return bool(_CJK_RE.search(str(text or "")))
 
 
-def _metadata_language(parsed_script: Any) -> str:
+def _metadata_language(parsed_script: Any) -> Literal["zh", "en", ""]:
     """读取解析元数据中的显式语言声明，无法识别时返回空串"""
     metadata = _attr(parsed_script, "metadata", None)
     declared = (
@@ -140,7 +140,7 @@ def _collect_script_text(parsed_script: Any) -> str:
     return "\n".join(part for part in parts if part)
 
 
-def detect_script_language(parsed_script: Any) -> str:
+def detect_script_language(parsed_script: Any) -> Literal["zh", "en"]:
     """推断剧本语言（FR-085）
 
     优先级：解析元数据显式语言 > 正文 CJK 字符占比阈值 > 默认 ``zh``。
