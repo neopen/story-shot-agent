@@ -163,6 +163,66 @@ def _outfit_from_prompt(image_prompt: str) -> str:
     return ""
 
 
+# 剧本材质回填的来源字段：写入 outfit_backfill_source 便于追溯
+SCRIPT_MATERIAL_SOURCE = "global_metadata.character_outfits.material"
+
+# attention_reason 中属于“缺失项/回填说明”的片段，重算时需要丢弃
+_REASON_MISSING_TOKENS = ("缺少", "仍缺", "均未提供", "已从")
+
+_UNRESOLVED_SOURCE_NOTE = "剧本与片段均未提供"
+
+
+def _script_material_candidate(current: str, material: str) -> Optional[str]:
+    """用剧本结构化材质补全缺失材质（优先于片段提示词）
+
+    ``global_metadata.character_outfits.material`` 是解析阶段的确定性结论，
+    比片段文本更可信；仅当当前描述确实缺少材质且合并后确有改善时返回。
+    """
+    value = str(material or "").strip()
+    if not value or not contains_keyword(value, MATERIAL_KEYWORDS):
+        return None
+    if "材质" not in _missing_outfit_fields(current):
+        return None
+    merged = f"{current}，{value}" if current else value
+    if len(_missing_outfit_fields(merged)) >= len(_missing_outfit_fields(current)):
+        return None
+    return merged
+
+
+def _missing_reason_parts(reason: str) -> List[str]:
+    """拆分 attention_reason，丢弃缺失项与回填说明，只保留其他复核原因"""
+    parts = [part.strip() for part in str(reason or "").split("；")]
+    return [
+        part
+        for part in parts
+        if part and not any(token in part for token in _REASON_MISSING_TOKENS)
+    ]
+
+
+def _apply_outfit_metadata(spec: AssetSpec, phrase: str) -> None:
+    """按回填结果重算缺失字段与人工复核标记（FR-094/FR-095）
+
+    已解决的缺失项移除；全部解决且无其他复核原因时清除标记；仍有缺失时
+    保留标记并写明“剧本与片段均未提供”的结论。
+    """
+    remaining = _missing_outfit_fields(phrase)
+    if remaining:
+        spec.metadata["outfit_missing_fields"] = remaining
+    else:
+        spec.metadata.pop("outfit_missing_fields", None)
+
+    kept = _missing_reason_parts(str(spec.metadata.get("attention_reason") or ""))
+    if remaining:
+        kept.append(_missing_reason(remaining))
+        kept.append(_UNRESOLVED_SOURCE_NOTE)
+    if kept:
+        spec.metadata["requires_special_attention"] = True
+        spec.metadata["attention_reason"] = "；".join(kept)
+    else:
+        spec.metadata.pop("requires_special_attention", None)
+        spec.metadata.pop("attention_reason", None)
+
+
 def _best_outfit_candidate(
     current: str, character_name: str, texts: Sequence[Tuple[str, str]]
 ) -> Optional[Tuple[str, str]]:
@@ -427,16 +487,19 @@ def build_character_sheet_specs(
 def backfill_character_outfits(
     plan: Any,
     texts_by_character: Mapping[str, Sequence[Tuple[str, str]]],
+    script_materials: Optional[Mapping[str, str]] = None,
 ) -> List[str]:
-    """用片段提示词回填角色服装缺失的颜色/材质（0.4.5 任务 2）
+    """回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016）
 
     ASSETS 节点早于提示词生成，此时只能依据剧本锚点标记“信息不足”；路由阶段
-    拿到最终提示词后，用同一角色的片段服装短语补全三视图提示词。补全后仍保留
-    ``requires_special_attention``：源锚点本身不完整，人工复核仍有必要。
+    按“剧本 ``character_outfits.material`` > 该角色片段提示词”的顺序补全三视图。
+    回填后重算缺失字段：全部解决时清除 ``outfit_missing_fields`` 与
+    ``requires_special_attention``；仍缺失时保留标记并写明“剧本与片段均未提供”。
 
     Args:
         plan: 资产计划文档（``AssetPlanDocument`` 或字典），原地修改
         texts_by_character: 角色名 -> [(片段ID, 片段文本)]，片段文本含描述与提示词
+        script_materials: 角色名 -> 剧本结构化材质（来自 ``global_metadata``）
 
     Returns:
         实际回填的 asset_id 列表
@@ -456,32 +519,33 @@ def backfill_character_outfits(
             _outfit_from_prompt(spec.image_prompt)
         )
         if not _missing_outfit_fields(current):
+            # 旧产物可能残留已失效的缺失标记（如材质词表扩展后），按当前文本重算
+            if spec.metadata.get("outfit_missing_fields"):
+                _apply_outfit_metadata(spec, current)
             continue
-        candidate = _best_outfit_candidate(
-            current, spec.owner_name, texts_by_character.get(spec.owner_name, [])
+
+        phrase = _script_material_candidate(
+            current, (script_materials or {}).get(spec.owner_name, "")
         )
-        if candidate is None:
+        source: Optional[str] = SCRIPT_MATERIAL_SOURCE if phrase else None
+        if phrase is None:
+            candidate = _best_outfit_candidate(
+                current, spec.owner_name, texts_by_character.get(spec.owner_name, [])
+            )
+            if candidate is not None:
+                source, phrase = candidate
+
+        if phrase is None or source is None:
+            # 无可用来源：只更新结论，写明剧本与片段均未提供
+            _apply_outfit_metadata(spec, current)
             continue
-        fragment_id, phrase = candidate
         if not current or current not in spec.image_prompt:
             # 提示词已截断或服装未拼入时不做替换，避免破坏提示词结构
             continue
 
         spec.image_prompt = spec.image_prompt.replace(current, phrase, 1)
         spec.metadata["outfit_text"] = phrase
-        spec.metadata["outfit_backfill_source"] = fragment_id
-        remaining = _missing_outfit_fields(phrase)
-        if remaining:
-            spec.metadata["outfit_missing_fields"] = remaining
-
-        reason = str(spec.metadata.get("attention_reason") or "").strip()
-        if not reason:
-            # 兼容 0.4.4 产物：旧计划未记录缺失原因，按当前锚点补齐
-            reason = _missing_reason(_missing_outfit_fields(current))
-        extra = f"已从片段提示词 {fragment_id} 回填"
-        if remaining:
-            extra += f"，仍缺{'、'.join(remaining)}"
-        spec.metadata["requires_special_attention"] = True
-        spec.metadata["attention_reason"] = f"{reason}；{extra}" if reason else extra
+        spec.metadata["outfit_backfill_source"] = source
+        _apply_outfit_metadata(spec, phrase)
         changed.append(spec.asset_id)
     return changed

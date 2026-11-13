@@ -1086,12 +1086,13 @@ class WorkflowNodes:
             parsed_script=state.domain.parsed_script,
             instructions=state.domain.instructions,
         )
-        # 0.4.5 任务 2：ASSETS 阶段只能标记服装信息不足，这里用最终提示词补全
+        # 0.4.6 T-016：剧本结构化材质优先，其次用最终提示词补全服装缺失要素
         outfit_backfilled = backfill_outfits(
             plan,
             fragments=fragments,
             shots=shots,
             instructions=state.domain.instructions,
+            parsed_script=state.domain.parsed_script,
         )
         if outfit_backfilled:
             debug(f"角色服装已从片段提示词回填: {', '.join(outfit_backfilled)}")

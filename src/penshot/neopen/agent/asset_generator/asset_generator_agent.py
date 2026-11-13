@@ -268,23 +268,39 @@ def backfill_usage(
     return document
 
 
+def _script_materials(parsed_script: Any) -> Dict[str, str]:
+    """提取剧本结构化服装材质：角色名 -> ``character_outfits.material``"""
+    metadata = _field(parsed_script, "global_metadata")
+    materials: Dict[str, str] = {}
+    for outfit in _field(metadata, "character_outfits", []) or []:
+        character = str(_field(outfit, "character", "") or "").strip()
+        material = str(_field(outfit, "material", "") or "").strip()
+        if character and material:
+            materials[character] = material
+    return materials
+
+
 def backfill_outfits(
     plan: Any,
     fragments: Optional[Sequence[Any]] = None,
     shots: Any = None,
     instructions: Any = None,
+    parsed_script: Any = None,
 ) -> List[str]:
-    """路由阶段用片段提示词回填角色服装缺失要素（0.4.5 任务 2）
+    """路由阶段回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.6 T-016）
 
     ASSETS 节点早于提示词生成，只能标记服装信息不足；路由节点拿到最终提示词后
     按主角色归属回填，避免三视图停留在“高中校服”这类无颜色/材质的短标签。
+    剧本 ``global_metadata.character_outfits.material`` 比片段文本更可信，优先使用。
     """
     rows = _fragment_rows(fragments or [], shots, _prompt_texts(instructions))
     texts: Dict[str, List[Tuple[str, str]]] = {}
     for row in rows:
         if row["main_character"] and row["text"]:
             texts.setdefault(row["main_character"], []).append((row["id"], row["text"]))
-    return backfill_character_outfits(plan, texts)
+    return backfill_character_outfits(
+        plan, texts, script_materials=_script_materials(parsed_script)
+    )
 
 
 def _resolve_plan_style_anchor(contract: Any) -> Dict[str, Any]:

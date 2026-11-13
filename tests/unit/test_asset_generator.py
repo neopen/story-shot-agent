@@ -715,7 +715,7 @@ def test_complete_outfit_has_no_missing_flag():
 
 
 def test_backfill_character_outfits_from_fragment_prompts():
-    """路由阶段用片段提示词补全颜色/材质，保留复核标记与缺失说明"""
+    """片段提示词补全全部缺失要素后清除缺失字段与复核标记（FR-095）"""
     plan = AssetPlanDocument(
         assets=[
             AssetSpec(
@@ -754,9 +754,9 @@ def test_backfill_character_outfits_from_fragment_prompts():
     assert "blue and white cotton school uniform" in spec.image_prompt
     assert "高中校服" not in spec.image_prompt
     assert spec.metadata["outfit_backfill_source"] == "frag_011"
-    assert spec.metadata["requires_special_attention"] is True
-    assert "缺少颜色和材质" in spec.metadata["attention_reason"]
-    assert "已从片段提示词" in spec.metadata["attention_reason"]
+    assert "outfit_missing_fields" not in spec.metadata
+    assert "requires_special_attention" not in spec.metadata
+    assert "attention_reason" not in spec.metadata
 
 
 def test_backfill_skips_complete_or_generated_assets():
