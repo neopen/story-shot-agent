@@ -36,6 +36,100 @@ SHOT_PHRASES: Dict[str, str] = {
 }
 
 _STYLE_PREFIX_PATTERN = re.compile(r"^\[Style:[^\]]*\]\s*")
+_ACTION_LABEL_RE = re.compile(r"action\s*[:：]\s*", re.IGNORECASE)
+
+# 中文镜头前缀：兼容“过肩镜头（或中景）：”“全景/环境音镜头：”“中景转全景：”等变体
+_SHOT_PREFIX_RE = re.compile(
+    r"^(?:大?全景|远景|中近景|中景|近景|极?特写|过肩|主观|双人)"
+    r"[^，,。！？!?；;：:\n]{0,10}[：:，,]\s*"
+)
+
+# 子句边界：中文逗号/句号与英文逗号/句号统一切分，便于按视觉内容取舍
+_CLAUSE_SEPARATORS = "，,。！？!?；;\n"
+# 只裁掉分隔标点，保留引号/问号，避免把“上不上？”的收尾引号一起裁掉
+_CLAUSE_TRIM_CHARS = " \t\r\n，,。；;：:"
+_QUOTE_PAIRS = {"“": "”", "‘": "’", "「": "」", "『": "』", '"': '"'}
+
+# 音频/画外事件关键词：命中即整句剔除，避免首帧只剩音效文本（FR-081）
+_AUDIO_ONLY_KEYWORDS = (
+    "广播",
+    "画外音",
+    "音效",
+    "环境音",
+    "播报",
+    "回荡",
+    "announcer",
+    "voice-over",
+    "voiceover",
+    "announcement",
+)
+
+# 视觉名词提示：清洗后整段不含角色、场景地点或这些词时视为“无视觉内容”
+_VISUAL_NOUNS = (
+    "人",
+    "身影",
+    "背影",
+    "侧脸",
+    "脸",
+    "眼",
+    "手",
+    "肩",
+    "头发",
+    "站台",
+    "隧道",
+    "列车",
+    "车",
+    "门",
+    "窗",
+    "墙",
+    "地面",
+    "灯",
+    "街",
+    "路",
+    "建筑",
+    "天空",
+    "雨",
+    "雪",
+    "树",
+    "草",
+    "花",
+    "桌",
+    "椅",
+    "床",
+    "沙发",
+    "书",
+    "纸",
+    "围巾",
+    "大衣",
+    "衣服",
+    "杯",
+    # 英文提示词回退路径同样需要视觉锚点
+    "person",
+    "man",
+    "woman",
+    "platform",
+    "tunnel",
+    "train",
+    "door",
+    "window",
+    "wall",
+    "floor",
+    "light",
+    "street",
+    "road",
+    "building",
+    "sky",
+    "rain",
+    "snow",
+    "tree",
+    "book",
+    "paper",
+    "scarf",
+    "coat",
+    "cup",
+)
+
+EMPTY_SCENE_PROMPT = "empty scene, no people"
 
 # 天气为晴时不再重复声明，避免首帧提示词堆叠无信息短语
 _NEUTRAL_WEATHER = ("", "clear", "clear weather", "sunny")
@@ -262,12 +356,78 @@ def _appearance_text(contract: Any, character_name: str) -> str:
     return ", ".join(parts)
 
 
-def _action_text(prompt: AIVideoPrompt, fragment: Any) -> str:
-    """片段动作：优先来源片段描述，回退提示词正文（剥离风格前缀）"""
+def _has_visual_anchor(text: str, character_name: str, scene: Any) -> bool:
+    """判断清洗后的文本是否仍包含可入画的视觉对象（FR-083）"""
+    if not text:
+        return False
+    if character_name and character_name in text:
+        return True
+    location = _attr(scene, "location")
+    if any(term in text for term in _scene_location_terms(location)):
+        return True
+    lowered = text.lower()
+    return any(noun in lowered for noun in _VISUAL_NOUNS)
+
+
+def _split_clauses(text: str) -> List[str]:
+    """按标点切分子句，但不切开引号内的台词（避免引号配对残缺）"""
+    clauses: List[str] = []
+    buffer: List[str] = []
+    closing = ""
+    for char in text:
+        if closing:
+            buffer.append(char)
+            if char == closing:
+                closing = ""
+            continue
+        if char in _QUOTE_PAIRS:
+            closing = _QUOTE_PAIRS[char]
+            buffer.append(char)
+            continue
+        if char in _CLAUSE_SEPARATORS:
+            clauses.append("".join(buffer))
+            buffer = []
+            continue
+        buffer.append(char)
+    clauses.append("".join(buffer))
+    return clauses
+
+
+def _clean_visual_text(text: str) -> str:
+    """清洗片段动作文本，只保留可入画的视觉内容（FR-080/081）
+
+    处理顺序：剔除 ``action:`` 标签 -> 按子句切分 -> 剥离中文镜头前缀 ->
+    丢弃音频/画外子句与含“镜头”的运镜描述。返回空串表示没有可用视觉内容，
+    由调用方按 FR-083 走空镜兜底。
+    """
+    cleaned = _ACTION_LABEL_RE.sub(" ", _STYLE_PREFIX_PATTERN.sub("", str(text or "")))
+    clauses: List[str] = []
+    for clause in _split_clauses(cleaned):
+        clause = _SHOT_PREFIX_RE.sub("", clause.strip())
+        clause = clause.strip(_CLAUSE_TRIM_CHARS)
+        if not clause:
+            continue
+        lowered = clause.lower()
+        if any(keyword in lowered for keyword in _AUDIO_ONLY_KEYWORDS):
+            continue
+        # “固定镜头”“镜头越过肩膀”等属于运镜描述，景别已由 shot_phrase 表达
+        if "镜头" in clause:
+            continue
+        clauses.append(clause)
+    return ", ".join(clauses)
+
+
+def _action_text(prompt: AIVideoPrompt, fragment: Any, scene: Any = None) -> str:
+    """片段动作：优先来源片段描述，回退提示词正文，并清洗为纯视觉描述"""
     description = _attr(fragment, "description")
-    if description:
-        return description
-    return _STYLE_PREFIX_PATTERN.sub("", _attr(prompt, "prompt")).strip()
+    raw = description or _STYLE_PREFIX_PATTERN.sub("", _attr(prompt, "prompt")).strip()
+    cleaned = _clean_visual_text(raw)
+    if not cleaned:
+        return ""
+    main_character = normalize_character_name(_attr(prompt, "main_character"))
+    if _has_visual_anchor(cleaned, main_character, scene):
+        return cleaned
+    return ""
 
 
 def build_first_frame_prompt(
@@ -279,8 +439,11 @@ def build_first_frame_prompt(
     """构建片段专属首帧静帧提示词（FR-011、AC-011）
 
     组成顺序：景别短语 -> 角色（白名单外观） -> 场景地点/时间/天气 ->
-    片段动作 -> 风格维度。与角色三视图提示词（固定 turnaround 棚拍表述）
-    结构不同，保证 ``image_prompt`` 不会等于三视图提示词。
+    片段动作（清洗后） -> 风格维度。与角色三视图提示词（固定 turnaround
+    棚拍表述）结构不同，保证 ``image_prompt`` 不会等于三视图提示词。
+
+    动作文本经 FR-080/081 清洗：剥离中文镜头术语与 ``action:`` 标签，剔除
+    纯音频/画外子句；清洗后无视觉内容时按 FR-083 追加空镜兜底描述。
 
     Args:
         prompt: 片段提示词；读取 ``main_character`` / ``camera`` / ``prompt``
@@ -289,7 +452,7 @@ def build_first_frame_prompt(
         fragment: 可选来源片段；提供 ``description`` 与 ``shot_type``
 
     Returns:
-        英文为主的首帧静帧提示词；无任何上下文时仍包含片段动作
+        英文为主的首帧静帧提示词；动作无视觉内容时包含空镜兜底描述
     """
     resolved_scene = _resolve_scene(contract, prompt, scene)
     # 旧产物可能已把“无角色”占位符写进 main_character，首帧拼接时同样视为无角色
@@ -315,9 +478,12 @@ def build_first_frame_prompt(
     if weather.lower() not in _NEUTRAL_WEATHER:
         parts.append(weather)
 
-    action = _action_text(prompt, fragment)
+    action = _action_text(prompt, fragment, resolved_scene)
     if action:
-        parts.append(f"action: {action}")
+        parts.append(action)
+    else:
+        # FR-083：纯音效/纯广播片段用空镜兜底，不能让首帧只剩声音描述
+        parts.append(EMPTY_SCENE_PROMPT)
 
     if contract is not None:
         style_text = build_style_text(

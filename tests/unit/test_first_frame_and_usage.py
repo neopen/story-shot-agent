@@ -141,7 +141,8 @@ def test_first_frame_prompt_strips_style_prefix_from_action():
     first_frame = build_first_frame_prompt(prompt, contract)
 
     assert first_frame.count("[Style:") == 0
-    assert "action: 林然蹲下擦拭雨水" in first_frame
+    assert "林然蹲下擦拭雨水" in first_frame
+    assert "action:" not in first_frame
 
 
 def test_first_frame_prompt_drops_placeholder_subject():

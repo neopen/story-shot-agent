@@ -26,6 +26,7 @@ from penshot.neopen.agent.model_adapter import (
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoInstructions,
     AIVideoPrompt,
+    CameraControl,
 )
 
 
@@ -222,6 +223,7 @@ def test_scene_coverage_triggers_image_to_video_without_character() -> None:
                 fragment_id="f3",
                 prompt="Wide shot of the hallway at dusk",
                 duration=3.9,
+                camera=CameraControl(shot_type="wide_shot"),
             )
         ]
     )
@@ -245,6 +247,10 @@ def test_scene_coverage_triggers_image_to_video_without_character() -> None:
     assert by_role["first_frame"].asset_id == "scene_002"
     assert by_role["first_frame"].as_first_frame is True
     assert package.image_prompt
+    assert "镜头" not in package.image_prompt
+    assert "action:" not in package.image_prompt
+    assert package.image_prompt.startswith("wide shot")
+    assert "empty scene, no people" in package.image_prompt
     assert package.first_frame_instruction.startswith(
         "Generate first frame with prompt:"
     )
