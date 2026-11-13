@@ -23,6 +23,7 @@ from penshot.neopen.agent.asset_generator.asset_models import (
     AssetSpec,
     AssetStatus,
     AssetType,
+    PropStateVariant,
 )
 from penshot.neopen.agent.asset_generator.asset_ref_validation import (
     split_ref_warnings,
@@ -44,6 +45,10 @@ from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
 )
 from penshot.neopen.agent.continuity_guardian.style_anchors import build_style_text
+from penshot.neopen.agent.prop_usage import (
+    advance_prop_state,
+    should_reference_prop,
+)
 from penshot.neopen.client.image_generation import (
     BaseImageGenerationClient,
     get_default_image_client,
@@ -95,12 +100,16 @@ def _fragment_rows(
             main_character = notes.get("main_character")
         description = str(_field(fragment, "description", "") or "")
         prompt_text = str(prompts.get(fragment_id, "") or "")
+        shot_type = str(
+            _field(fragment, "shot_type", "") or _field(shot, "shot_type", "") or ""
+        )
         rows.append(
             {
                 "id": fragment_id,
                 "scene_id": str(_field(shot, "scene_id", "") or ""),
                 "location": str(_field(shot, "location", "") or ""),
                 "main_character": str(main_character or "").strip(),
+                "shot_type": shot_type,
                 "text": f"{description} {prompt_text}".strip(),
             }
         )
@@ -173,6 +182,62 @@ def _references_by_asset(route_plan: Any) -> Dict[str, List[str]]:
     return result
 
 
+def _character_match_key(name: str, names: Sequence[str], texts: Sequence[str]) -> str:
+    """角色正文匹配键：整名逐字出现用整名，否则描述型长名退化到尾部名词
+
+    解析层常用“方位/特征 + 人物”描述角色（如“门口黑影”），正文里通常只出现
+    尾部名词，导致三视图 usage 为空、资产链断裂。尾部名词仅在整名从未逐字
+    出现、且不被其他角色共享时启用，避免把“门口”这类方位词误判成角色出场。
+
+    Args:
+        name: 角色名
+        names: 全部角色名（用于别名唯一性判断）
+        texts: 片段文本集合（描述 + 提示词）
+
+    Returns:
+        可用于正文匹配的键；都不可用时返回空串
+    """
+    name = str(name or "").strip()
+    if not name:
+        return ""
+    if any(name in text for text in texts):
+        return name
+    if len(name) < 4:
+        return ""
+    alias = name[-2:]
+    if not alias or alias == name:
+        return ""
+    if any(
+        alias in str(other or "") for other in names if str(other or "").strip() != name
+    ):
+        return ""
+    return alias
+
+
+def _prop_state_variants(
+    owner_name: str, rows: List[Dict[str, str]]
+) -> List[PropStateVariant]:
+    """按片段顺序推导道具状态分组；不足两种状态时不产出变体
+
+    只有被使用范围覆盖的片段参与推导，且状态只允许单向推进：frag_007 揉成团
+    之后，后续片段里残留的“皱巴巴”不再把状态回退成 crumpled。
+    """
+    grouped: Dict[str, List[str]] = {}
+    order: List[str] = []
+    current = ""
+    for row in rows:
+        current = advance_prop_state(current, row["text"], owner_name)
+        if not current:
+            continue
+        if current not in grouped:
+            grouped[current] = []
+            order.append(current)
+        grouped[current].append(row["id"])
+    if len(order) < 2:
+        return []
+    return [PropStateVariant(state=state, fragments=grouped[state]) for state in order]
+
+
 def backfill_usage(
     plan: Any,
     fragments: Optional[Sequence[Any]] = None,
@@ -184,10 +249,12 @@ def backfill_usage(
 ) -> AssetPlanDocument:
     """回填资产计划的使用范围（FR-012/013、AC-012..016）
 
-    - 角色三视图：所有以该角色为主角的片段；
+    - 角色三视图：所有以该角色为主角的片段；描述型角色名（正文无整词命中）
+      按尾部名词别名补关联，避免“门口黑影”这类资产 usage 为空；
     - 场景锚点：所有位于该场景地点下的片段；
     - 道具静帧：所有位于该道具 ``appears_in`` 场景下、**且片段文本提及该道具**
-      的片段；仅按场景整批回填会把同场景内未出现的道具算进使用范围；
+      的片段；仅按场景整批回填会把同场景内未出现的道具算进使用范围。围巾/饰品
+      等著装类道具只在特写聚焦于它时才计入，避免服装描述扩成整场引用；
     - ``route_plan`` 中显式引用的片段并入使用范围（引用集合必须是使用范围的
       子集）；道具引用还要通过同一文本提及判定，过时的引用被丢弃。
 
@@ -218,11 +285,26 @@ def backfill_usage(
     prop_scenes = _prop_scene_map(parsed_script)
     referenced = _references_by_asset(route_plan)
 
+    character_names: List[str] = [
+        spec.owner_name
+        for spec in document.assets
+        if spec.asset_type == AssetType.CHARACTER_SHEET
+    ]
+    for character in getattr(parsed_script, "characters", None) or []:
+        name = str(_field(character, "name", "") or "").strip()
+        if name and name not in character_names:
+            character_names.append(name)
+    row_texts = [row["text"] for row in rows]
+
     for spec in document.assets:
         scene_ids: set[str] = set()
         if spec.asset_type == AssetType.CHARACTER_SHEET:
+            key = _character_match_key(spec.owner_name, character_names, row_texts)
             used = [
-                row["id"] for row in rows if row["main_character"] == spec.owner_name
+                row["id"]
+                for row in rows
+                if row["main_character"] == spec.owner_name
+                or (key and key in row["text"])
             ]
         elif spec.asset_type == AssetType.SCENE:
             used = [
@@ -235,7 +317,10 @@ def backfill_usage(
             used = [
                 row["id"]
                 for row in rows
-                if row["scene_id"] in scene_ids and spec.owner_name in row["text"]
+                if row["scene_id"] in scene_ids
+                and should_reference_prop(
+                    row["text"], spec.owner_name, row["shot_type"]
+                )
             ]
         else:
             used = []
@@ -246,9 +331,11 @@ def backfill_usage(
                 continue
             if spec.asset_type == AssetType.PROP and (
                 ref_row["scene_id"] not in scene_ids
-                or spec.owner_name not in ref_row["text"]
+                or not should_reference_prop(
+                    ref_row["text"], spec.owner_name, ref_row["shot_type"]
+                )
             ):
-                # 过时引用：同场景但片段未提及该道具，不并入使用范围
+                # 过时引用：同场景但片段未真正需要该道具参考，不并入使用范围
                 continue
             used.append(fragment_id)
 
@@ -258,6 +345,11 @@ def backfill_usage(
                 fragment_id, len(fragment_order)
             ),
         )
+        if spec.asset_type == AssetType.PROP:
+            used_set = set(spec.usage.fragments)
+            spec.state_variants = _prop_state_variants(
+                spec.owner_name, [row for row in rows if row["id"] in used_set]
+            )
 
     debug(
         "资产使用范围回填完成: "

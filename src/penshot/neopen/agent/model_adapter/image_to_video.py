@@ -16,6 +16,7 @@ from penshot.logger import warning
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     SCENE_ASSET_TYPE,
     build_first_frame_prompt,
+    build_motion_prompt,
     build_package_references,
     check_scene_anchor_consistency,
 )
@@ -27,6 +28,7 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoInstructions,
     AIVideoPrompt,
 )
+from penshot.neopen.agent.prop_usage import advance_prop_state, mentions_prop
 
 # 文字/屏幕内容特征：这些片段的文字渲染最容易出错，优先走文生图 -> 图生视频
 CRITICAL_TEXT_MARKERS = (
@@ -187,6 +189,54 @@ def _props_by_scene(parsed_script: Any) -> Dict[str, set[str]]:
     return mapping
 
 
+def _prop_names(parsed_script: Any) -> List[str]:
+    """从剧本元数据读取全局道具名（保持声明顺序）"""
+    metadata = getattr(parsed_script, "global_metadata", None)
+    names: List[str] = []
+    for prop in getattr(metadata, "key_props", None) or []:
+        name = str(getattr(prop, "name", "") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _prop_state_maps(
+    prompts: Dict[str, AIVideoPrompt],
+    fragments: Optional[List[Any]],
+    parsed_script: Any,
+) -> Dict[str, Dict[str, str]]:
+    """按片段顺序推导每个道具的状态，返回 道具名 -> {片段ID: 状态}
+
+    与 ``backfill_usage`` 共用 ``advance_prop_state`` 的单向状态机：
+    frag_007 揉成团后，后续片段即使文本仍写“皱巴巴”也保持 balled。
+    """
+    names = _prop_names(parsed_script)
+    if not names:
+        return {}
+
+    ordered: List[tuple[str, str]] = []
+    for fragment in fragments or []:
+        fragment_id = str(getattr(fragment, "id", "") or "")
+        prompt = prompts.get(fragment_id)
+        if not fragment_id or prompt is None:
+            continue
+        description = str(getattr(fragment, "description", "") or "")
+        ordered.append((fragment_id, f"{description} {prompt.prompt}".strip()))
+
+    result: Dict[str, Dict[str, str]] = {}
+    for name in names:
+        current = ""
+        states: Dict[str, str] = {}
+        for fragment_id, text in ordered:
+            if not mentions_prop(text, name):
+                continue
+            current = advance_prop_state(current, text, name)
+            if current:
+                states[fragment_id] = current
+        result[name] = states
+    return result
+
+
 def should_use_image_to_video(prompt: AIVideoPrompt, contract: Any = None) -> bool:
     """是否应优先使用「文生图 -> 图生视频」两段式生成"""
     if has_critical_text(prompt.prompt):
@@ -241,6 +291,7 @@ def apply_image_to_video_routing(
         if getattr(shot, "id", "")
     }
     prop_scene_map = _props_by_scene(parsed_script)
+    prop_state_maps = _prop_state_maps(prompts, fragments, parsed_script)
 
     triggered = 0
     for package in packages:
@@ -270,16 +321,24 @@ def apply_image_to_video_routing(
                 allowed_props = sorted(prop_scene_map.get(scene_id, set()))
 
         package.mode = RouteMode.IMAGE_TO_VIDEO
+        prop_states = {
+            name: states[package.fragment_id]
+            for name, states in prop_state_maps.items()
+            if package.fragment_id in states
+        }
         package.references = build_package_references(
             prompt,
             contract,
             scene=scene,
             fragment=fragment,
             prop_names=allowed_props,
+            prop_states=prop_states,
         )
         package.image_prompt = build_first_frame_prompt(
             prompt, contract, scene=scene, fragment=fragment
         )
+        package.motion_prompt = build_motion_prompt(prompt, fragment)
+        motion_text = package.motion_prompt or prompt.prompt
 
         scene_reference = next(
             (
@@ -311,14 +370,14 @@ def apply_image_to_video_routing(
             package.asset_ref = scene_asset_ref
             package.first_frame_instruction = (
                 f"Use reference image {scene_asset_ref} as the first frame; "
-                f"animate: {prompt.prompt}"
+                f"animate: {motion_text}"
             )
         else:
             # 场景首帧尚未回填时保留声明式首帧提示词，由下游生成后再作首帧
             package.asset_ref = ""
             package.first_frame_instruction = (
                 f"Generate first frame with prompt: {package.image_prompt}; "
-                f"then use it as the first frame and animate: {prompt.prompt}"
+                f"then use it as the first frame and animate: {motion_text}"
             )
         triggered += 1
 

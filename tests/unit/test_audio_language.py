@@ -18,6 +18,7 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 from penshot.neopen.agent.prompt_converter.script_language import (
     detect_script_language,
     normalize_audio_language,
+    normalize_video_prompt_language,
 )
 
 
@@ -208,6 +209,51 @@ def test_normalize_does_not_introduce_dialogue_cues():
     result = normalize_audio_language(_audio("喂"), "zh")
 
     assert "dialogue_cues" not in result.model_dump()
+
+
+# ===================== 视频提示词台词语言归一（FR-086 延伸） =====================
+
+
+def test_zh_video_prompt_drops_english_dialogue_and_keeps_chinese_tail():
+    """frag_008 缺陷回归：英文描述段不得残留英文台词，中文对照段保留"""
+    prompt = (
+        "extreme close-up, side profile, lips slightly moving, "
+        "whispering 'Hello your delivery is here', voice trembling\n\n"
+        "特写镜头：陈默嘴唇微动，用极低的音量说道：“您好您的外卖到了”。"
+    )
+
+    result = normalize_video_prompt_language(prompt, "zh")
+    head, _, tail = result.partition("\n\n")
+
+    assert "Hello your delivery is here" not in head
+    assert "whispering" not in head
+    assert "lips slightly moving" in head
+    assert "您好您的外卖到了" in tail
+
+
+def test_zh_video_prompt_strips_quote_without_translation_segment():
+    """没有中文对照段时按子句剔除英文台词，保留镜头描述"""
+    prompt = "close-up, lips moving, whispering 'Hello there'"
+
+    result = normalize_video_prompt_language(prompt, "zh")
+
+    assert result == "close-up, lips moving"
+
+
+def test_en_video_prompt_keeps_english_dialogue_untouched():
+    """英文剧本的视频提示词不做台词清洗"""
+    prompt = "close-up, whispering 'Hello there'\n\n特写：说道：“你好”。"
+
+    assert normalize_video_prompt_language(prompt, "en") == prompt
+
+
+def test_zh_video_prompt_without_english_dialogue_is_unchanged():
+    """本来不含英文台词的视频提示词原样返回"""
+    prompt = (
+        "medium shot, a man places a box on the cabinet\n\n中景：男人把餐盒放在鞋柜上。"
+    )
+
+    assert normalize_video_prompt_language(prompt, "zh") == prompt
 
 
 def _converter(script_language: str = "zh") -> LLMPromptConverter:

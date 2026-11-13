@@ -48,6 +48,15 @@ class AssetUsage(BaseModel):
     fragments: List[str] = Field(default_factory=list, description="使用该资产的片段ID")
 
 
+class PropStateVariant(BaseModel):
+    """道具状态变体：同一道具在不同片段中的形态（如 crumpled -> balled）"""
+
+    state: str = Field(..., description="状态名，如 crumpled / balled")
+    fragments: List[str] = Field(
+        default_factory=list, description="处于该状态的片段ID（按片段顺序）"
+    )
+
+
 class AssetConsistency(BaseModel):
     """资产的连续性约束，供下游执行器锁定角色身份"""
 
@@ -73,6 +82,10 @@ class AssetSpec(BaseModel):
     )
     consistency: AssetConsistency = Field(
         default_factory=AssetConsistency, description="连续性约束"
+    )
+    state_variants: List[PropStateVariant] = Field(
+        default_factory=list,
+        description="道具状态变体（仅道具资产，随片段顺序推导）",
     )
     status: AssetStatus = Field(default=AssetStatus.PENDING, description="生成状态")
     asset_ref: str = Field(default="", description="落盘后的本地引用")

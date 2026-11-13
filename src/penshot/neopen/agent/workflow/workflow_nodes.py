@@ -73,6 +73,7 @@ from penshot.neopen.agent.model_adapter import (
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
+from penshot.neopen.agent.model_adapter.quality_gate import apply_quality_gate
 from penshot.neopen.agent.asset_generator import (
     AssetGeneratorAgent,
     backfill_outfits,
@@ -1028,13 +1029,27 @@ class WorkflowNodes:
                 adapted_packages, instructions, state.domain.contract
             )
             plan.adapted_packages = adapted_packages
-            instructions.route_plan = plan.model_dump(mode="json")
 
             # FR-014/AC-017：路由后回填 usage，并用与 ASSETS 节点一致的序列化路径
             # 重写 asset_plan.json，再同步 instructions.asset_plan 落盘
             asset_plan = self._backfill_asset_plan(
                 state, plan, fragments=fragments, shots=shots
             )
+
+            # P0-4 Gate 1：结构/逻辑问题回写 warnings，避免生成层自评全绿
+            plan.warnings = apply_quality_gate(
+                adapted_packages,
+                instructions,
+                asset_plan=asset_plan,
+                fragments=fragments,
+            )
+            package_warnings = {
+                package.fragment_id: package.warnings for package in adapted_packages
+            }
+            for decision in plan.decisions:
+                decision.warnings = list(package_warnings.get(decision.fragment_id, []))
+
+            instructions.route_plan = plan.model_dump(mode="json")
             instructions.asset_plan = asset_plan
             instructions.asset_manifest = state.domain.asset_manifest
 

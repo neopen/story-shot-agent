@@ -28,6 +28,7 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 from penshot.neopen.agent.prompt_converter.script_language import (
     detect_script_language,
     normalize_audio_language,
+    normalize_video_prompt_language,
 )
 from penshot.neopen.agent.prompt_converter.template_prompt_converter import TemplatePromptConverter
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
@@ -372,6 +373,10 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         # 获取生成的视频提示词
         english_prompt = result.get("prompt", "")
         original_prompt = result.get("original_prompt", "")
+        # 中文剧本的英文描述段不得残留英文台词（FR-086 延伸），中文对照段保留
+        english_prompt = normalize_video_prompt_language(
+            english_prompt, self.script_language
+        )
         combined_prompt = f"{english_prompt}\n\n{original_prompt}"
 
         # 解析LLM返回的音频提示词

@@ -254,6 +254,32 @@ def _normalize_en_prompt(prompt: str) -> str:
     return f"{cleaned_head}\n\n{comment}"
 
 
+def normalize_video_prompt_language(prompt: str, language: str) -> str:
+    """按剧本语言归一视频提示词（FR-086 对视频提示词的延伸）
+
+    中文剧本的视频提示词由英文描述段与中文对照段拼成，LLM 常把中文台词改写
+    成英文引号句，导致画面提示词语言与台词语言（zh）不一致。这里只清洗
+    ``\\n\\n`` 之前的英文描述段：剔除英文台词引号句及其说话人前缀，动作与
+    镜头描述保留；中文对照段原样不动。英文剧本不做改写。
+
+    Args:
+        prompt: 视频提示词；已含中文对照时按 ``\\n\\n`` 拆分
+        language: ``detect_script_language`` 的推断结果
+
+    Returns:
+        清洗后的提示词；非中文剧本或本来不含英文台词时原样返回
+    """
+    normalized = str(language or "").strip().lower()
+    if normalized.startswith("en"):
+        return prompt
+
+    head, tail = _split_translation(prompt)
+    cleaned = _strip_english_dialogue(head)
+    if not tail:
+        return cleaned
+    return f"{cleaned}\n\n{tail}" if cleaned else tail
+
+
 def normalize_audio_language(audio: AIAudioPrompt, language: str) -> AIAudioPrompt:
     """按剧本语言归一音频提示词（FR-086/FR-087）
 

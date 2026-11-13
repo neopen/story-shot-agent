@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     EMPTY_SCENE_PROMPT,
     build_first_frame_prompt,
+    build_motion_prompt,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoPrompt,
@@ -88,14 +89,16 @@ def test_drops_audio_only_sentences_and_uses_empty_scene():
 
 
 def test_keeps_visual_clauses_from_mixed_audio_fragment():
-    """音频事件与视觉动作混排时只剔除音频子句"""
+    """音频事件与视觉动作混排时只剔除音频子句，动作部分留给 motion_prompt"""
     description = "站台广播响起，林晚抬头看向漆黑的隧道口，神情犹豫。"
-
     first_frame = _first_frame(description)
 
     assert "广播" not in first_frame
-    assert "林晚抬头看向漆黑的隧道口" in first_frame
+    assert "抬头" not in first_frame
     assert EMPTY_SCENE_PROMPT not in first_frame
+
+    motion = build_motion_prompt(_prompt(), SimpleNamespace(description=description))
+    assert "林晚抬头看向漆黑的隧道口" in motion
 
 
 def test_keeps_usable_empty_station_description():
@@ -115,18 +118,24 @@ def test_keeps_usable_empty_station_description():
 
 
 def test_strips_compound_prefix_and_keeps_quoted_dialogue_intact():
-    """复合镜头前缀可剥离，引号内台词不被逗号切碎"""
+    """复合镜头前缀可剥离；台词不再进入静态首帧，由 motion_prompt 承载"""
     description = (
         "中景转全景：林晚最终迈步走上列车。"
         "管理员语气平淡地问道：“姑娘，末班车了，上不上？”"
     )
-
+    fragment = SimpleNamespace(
+        id="frag_001", shot_type="medium_shot", description=description
+    )
     first_frame = _first_frame(description, shot_type="medium_shot")
 
     assert first_frame.startswith("medium shot")
     assert "镜头" not in first_frame
-    assert "林晚最终迈步走上列车" in first_frame
-    assert "上不上？”" in first_frame
+    assert "迈步" not in first_frame
+    assert "上不上？" not in first_frame
+
+    motion = build_motion_prompt(_prompt(), fragment)
+    assert "林晚最终迈步走上列车" in motion
+    assert "上不上？”" in motion
 
 
 def test_camera_move_only_description_falls_back_to_empty_scene():

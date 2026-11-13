@@ -12,6 +12,10 @@ from penshot.neopen.agent.model_adapter.capability_registry import (
     all_capabilities,
     get_capability,
 )
+from penshot.neopen.agent.model_adapter.first_frame_builder import (
+    build_first_frame_prompt,
+    build_motion_prompt,
+)
 from penshot.neopen.agent.model_adapter.model_adapter_factory import get_adapter
 from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
@@ -91,10 +95,14 @@ def _apply_route_mode(
         package.references = []
         package.asset_ref = ""
         package.image_prompt = ""
+        package.motion_prompt = ""
         package.first_frame_instruction = ""
         return
     if not package.first_frame_instruction:
-        package.image_prompt = f"First frame still: {prompt.prompt}"
+        # P0-2：未走片段级首帧构建的图生视频包，也要用静态截面作为首帧，
+        # 动作序列改由 motion_prompt 承载，避免首帧混入时间序列。
+        package.image_prompt = build_first_frame_prompt(prompt)
+        package.motion_prompt = build_motion_prompt(prompt)
         package.first_frame_instruction = package.image_prompt
 
 
@@ -158,9 +166,12 @@ def build_route_plan(
             rebuilt.asset_ref = package.asset_ref
             rebuilt.references = package.references
             rebuilt.image_prompt = package.image_prompt or rebuilt.image_prompt
+            rebuilt.motion_prompt = package.motion_prompt
             rebuilt.first_frame_instruction = (
                 package.first_frame_instruction or rebuilt.first_frame_instruction
             )
+            # 构建期告警必须随适配重建保留，否则 Gate 1 之外的既有告警会被静默丢弃
+            rebuilt.warnings = list(package.warnings)
         _apply_route_mode(rebuilt, prompt, mode)
         packages[index] = rebuilt
 

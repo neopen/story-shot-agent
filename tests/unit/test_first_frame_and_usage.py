@@ -518,3 +518,100 @@ def test_backfill_usage_accepts_dict_plan():
 
     char_001 = next(spec for spec in plan.assets if spec.asset_id == "char_001")
     assert char_001.usage.fragments[0] == "frag_001"
+
+
+# ==================== 描述型角色名 usage 关联（char_003 资产链断裂回归） ====================
+
+
+def _character_plan(*names: str) -> AssetPlanDocument:
+    return AssetPlanDocument(
+        task_id="t1",
+        script_id="s1",
+        assets=[
+            AssetSpec(
+                asset_id=f"char_{index:03d}",
+                asset_type=AssetType.CHARACTER_SHEET,
+                owner_name=name,
+                image_prompt=f"character reference sheet of {name}",
+                usage=AssetUsage(characters=[name]),
+            )
+            for index, name in enumerate(names, start=1)
+        ],
+    )
+
+
+def _mention_fragment(fragment_id: str, description: str) -> SimpleNamespace:
+    index = fragment_id.rsplit("_", 1)[-1]
+    return SimpleNamespace(
+        id=fragment_id,
+        shot_id=f"shot_{index}",
+        description=description,
+        continuity_notes={},
+    )
+
+
+def _mention_shots(fragment_ids, main_character: Optional[str] = "陈默"):
+    return [
+        SimpleNamespace(
+            id=f"shot_{fragment_id.rsplit('_', 1)[-1]}",
+            scene_id="scene_002",
+            main_character=main_character,
+        )
+        for fragment_id in fragment_ids
+    ]
+
+
+def _character_script(*names: str) -> SimpleNamespace:
+    return SimpleNamespace(characters=[SimpleNamespace(name=name) for name in names])
+
+
+def test_backfill_usage_links_descriptive_character_by_tail_noun():
+    """frag_013 缺陷回归：描述型角色按尾部名词关联到出场片段"""
+    fragments = [
+        _mention_fragment("frag_005", "陈默目光扫向黑暗的门内，推门进入"),
+        _mention_fragment("frag_012", "陈默转身就要往门口跑"),
+        _mention_fragment(
+            "frag_013", "发现门口站了一个戴着白色医用口罩的黑影，全身黑色衣物"
+        ),
+    ]
+
+    plan = backfill_usage(
+        _character_plan("陈默", "门口黑影"),
+        fragments=fragments,
+        shots=_mention_shots([fragment.id for fragment in fragments]),
+        parsed_script=_character_script("陈默", "门口黑影"),
+    )
+
+    shadow = next(spec for spec in plan.assets if spec.asset_id == "char_002")
+    assert shadow.usage.fragments == ["frag_013"]
+
+
+def test_backfill_usage_skips_shared_tail_noun():
+    """尾部名词被多个角色共享时不启用别名，避免互相串用"""
+    fragments = [_mention_fragment("frag_013", "一个黑影缓缓把门关上")]
+
+    plan = backfill_usage(
+        _character_plan("门口黑影", "窗边黑影"),
+        fragments=fragments,
+        shots=_mention_shots(["frag_013"]),
+        parsed_script=_character_script("门口黑影", "窗边黑影"),
+    )
+
+    usage = {spec.asset_id: spec.usage.fragments for spec in plan.assets}
+    assert usage["char_001"] == []
+    assert usage["char_002"] == []
+
+
+def test_backfill_usage_matches_verbatim_character_name():
+    """整名逐字出现时按整名关联，不依赖 main_character 字段"""
+    fragments = [_mention_fragment("frag_013", "门口黑影缓缓把门关上")]
+
+    plan = backfill_usage(
+        _character_plan("门口黑影"),
+        fragments=fragments,
+        shots=_mention_shots(["frag_013"], main_character=None),
+        parsed_script=_character_script("门口黑影"),
+    )
+
+    char_001 = next(spec for spec in plan.assets if spec.asset_id == "char_001")
+    assert char_001.usage.fragments == ["frag_013"]

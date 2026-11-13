@@ -174,6 +174,7 @@ def test_llm_converter_builds_camera_from_final_prompt(monkeypatch):
         "{audio_context}{characters_json}{repair_hint}{history_hint}"
     )
     converter.global_metadata = None
+    converter.script_language = "en"
     converter.current_repair_params = None
     converter.last_audio_id = None
     converter._detect_original_language = lambda fragment: "en"
