@@ -10,11 +10,12 @@ See LICENSE File For Details.
 @Time: 2025/10 - 2025/11
 """
 import time
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict, cast
 
 from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode, ElementType
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
+from penshot.neopen.agent.character_names import normalize_character_name
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import IssueType
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, RuleType, QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
@@ -425,13 +426,44 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
 
         repair_actions = []
 
+        # 契约违规项（Validator 产物，字典结构）与规则审查问题（BasicViolation）分开处理
+        contract_violations: List[Dict[str, Any]] = [
+            cast(Dict[str, Any], i) for i in issues if isinstance(i, dict)
+        ]
+        basic_issues = [i for i in issues if not isinstance(i, dict)]
+
+        # 审计回路传来的契约违规以 BasicViolation 包装（issue_value 保留原始字典），
+        # 一并按契约违规处理，避免修复器再次空转
+        for issue in basic_issues:
+            if (issue.issue_code or "") == "unknown_character" and isinstance(
+                issue.issue_value, dict
+            ):
+                contract_violations.append(issue.issue_value)
+
         # 问题分类 - 使用 issue_type 进行主分类，更精确和类型安全
-        duration_issues = [i for i in issues if i.issue_type == IssueType.DURATION]
-        description_issues = [i for i in issues if i.issue_type == IssueType.PROMPT and
-                             ('description' in (i.issue_code or '') or 'desc' in (i.issue_code or ''))]
-        type_issues = [i for i in issues if i.issue_code in ['shot_type_uniform', 'shot_type_invalid', 'shot_type_mismatch']]
-        repetitive_issues = [i for i in issues if i.issue_code == 'shot_repetitive']
-        character_issues = [i for i in issues if i.issue_type == IssueType.CHARACTER]
+        duration_issues = [
+            i for i in basic_issues if i.issue_type == IssueType.DURATION
+        ]
+        description_issues = [
+            i
+            for i in basic_issues
+            if i.issue_type == IssueType.PROMPT
+            and (
+                "description" in (i.issue_code or "") or "desc" in (i.issue_code or "")
+            )
+        ]
+        type_issues = [
+            i
+            for i in basic_issues
+            if i.issue_code
+            in ["shot_type_uniform", "shot_type_invalid", "shot_type_mismatch"]
+        ]
+        repetitive_issues = [
+            i for i in basic_issues if i.issue_code == "shot_repetitive"
+        ]
+        character_issues = [
+            i for i in basic_issues if i.issue_type == IssueType.CHARACTER
+        ]
 
         # ========== 1. 修复时长问题 ==========
         if duration_issues:
@@ -545,7 +577,37 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                                     break
                             break
 
-        # ========== 6. 更新统计信息 ==========
+        # ========== 6. 修复契约外角色（unknown_character 违规项） ==========
+        if contract_violations:
+            parsed_names = {
+                normalize_character_name(c.name)
+                for c in (structured_script.characters or [])
+                if getattr(c, "name", None)
+            }
+            for violation in contract_violations:
+                # 契约违规项是字典（Validator 产物），BasicViolation 分类走上面的分支
+                contract_issue = cast(Dict[str, Any], violation)
+                if (contract_issue.get("type") or "") != "unknown_character":
+                    continue
+                shot_id = contract_issue.get("shot_id")
+                shot = self._find_shot(shot_sequence, shot_id) if shot_id else None
+                if not shot:
+                    continue
+                character = normalize_character_name(contract_issue.get("character"))
+                if not character:
+                    continue
+                if character in parsed_names:
+                    # 剧本真实角色由契约补登记解决，不在镜头层改动
+                    continue
+                if normalize_character_name(shot.main_character) != character:
+                    continue
+                # 生成幻觉角色：清除主角色标注，画面描述保留（不涉及角色外观锚点）
+                shot.main_character = ""
+                repair_actions.append(
+                    f"清除契约外角色主角色标注: {shot_id}「{character}」"
+                )
+
+        # ========== 7. 更新统计信息 ==========
         new_stats = {
             "shot_count": len(shot_sequence.shots),
             "total_duration": sum(s.duration for s in shot_sequence.shots),

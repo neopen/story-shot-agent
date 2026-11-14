@@ -1703,6 +1703,7 @@ class WorkflowNodes:
                             stage,
                             state.domain.contract,
                             state.domain.shot_sequence,
+                            state.domain.parsed_script,
                         )
                         repair_params = merge_repair_params(
                             repair_params, contract_params
