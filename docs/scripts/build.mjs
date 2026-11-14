@@ -258,6 +258,7 @@ const docsFooter = () => `<footer class="docs-footer">
     <span>© <span data-year>${today.slice(0, 4)}</span> PenShot · 文档基线 ${site.version} · MIT License</span>
     <div class="docs-footer__links">
       <a href="${site.url}">官网</a>
+      <a href="changelog.html">更新日志</a>
       <a href="${site.repo}" target="_blank" rel="noopener">GitHub</a>
       <a href="${site.pypi}" target="_blank" rel="noopener">PyPI</a>
       <a href="${site.issues}" target="_blank" rel="noopener">问题反馈</a>
@@ -509,6 +510,7 @@ ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
           </div>
           <div class="hub-resources">
             <a class="hub-resource" href="${site.repo}" target="_blank" rel="noopener">${icon('github', 16)}GitHub 源码</a>
+            <a class="hub-resource" href="changelog.html">${icon('clock', 16)}更新日志</a>
             <a class="hub-resource" href="${site.pypi}" target="_blank" rel="noopener">${icon('package', 16)}PyPI 安装包</a>
             <a class="hub-resource" href="${site.docker}" target="_blank" rel="noopener">${icon('docker', 16)}Docker 镜像</a>
             <a class="hub-resource" href="${site.issues}" target="_blank" rel="noopener">${icon('prompt', 16)}问题反馈</a>

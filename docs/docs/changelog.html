@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>更新日志 · PenShot 文档</title>
+  <meta name="description" content="PenShot 从 0.1 到 0.4.5 的发布记录、功能与修复内容、契约变更、数据迁移与升级注意事项。">
+  <meta name="keywords" content="PenShot 更新日志,CHANGELOG,版本发布,升级指南,语义化版本,0.4.5,0.4.4,契约版本">
+  <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+  <meta name="theme-color" content="#0b0d12">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/changelog.html">
+  <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="更新日志 · PenShot 文档">
+  <meta property="og:description" content="PenShot 从 0.1 到 0.4.5 的发布记录、功能与修复内容、契约变更、数据迁移与升级注意事项。">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/changelog.html">
+  <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:section" content="开始使用">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="更新日志 · PenShot 文档">
+  <meta name="twitter:description" content="PenShot 从 0.1 到 0.4.5 的发布记录、功能与修复内容、契约变更、数据迁移与升级注意事项。">
+  <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/docs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"更新日志","name":"更新日志","description":"PenShot 从 0.1 到 0.4.5 的发布记录、功能与修复内容、契约变更、数据迁移与升级注意事项。","url":"https://shot.helpenx.com/docs/changelog.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/changelog.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot 更新日志, CHANGELOG, 版本发布, 升级指南, 语义化版本, 0.4.5, 0.4.4, 契约版本","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+</head>
+<body class="docs-page" data-search-index="search-index.json">
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="../index.html" aria-label="PenShot 首页">
+      <img src="../assets/img/logo-mark.svg" alt="" width="30" height="30">
+      <span>PenShot<small>Storyboard Agent</small></span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="../index.html">首页</a>
+      <a href="../index.html#features">功能</a>
+      <a href="../index.html#workflow">工作流程</a>
+      <a href="../index.html#integrations">集成</a>
+      <a href="index.html" class="is-active">文档</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">博客</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+      <a class="header-github" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg><span>GitHub</span>
+      </a>
+      <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="打开导航">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" data-mobile-nav>
+  <a href="../index.html">首页</a>
+  <a href="../index.html#features">功能</a>
+  <a href="../index.html#workflow">工作流程</a>
+  <a href="../index.html#integrations">集成方式</a>
+  <a href="index.html">文档</a>
+  <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+  <div class="mobile-nav__cta">
+    <a class="btn btn--primary" href="quick-start.html">快速开始</a>
+    <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<main id="main">
+  <div class="docs-shell">
+  <aside class="docs-sidebar" data-docs-sidebar aria-label="文档导航">
+    <button class="sidebar-close" type="button" data-sidebar-close aria-label="关闭目录"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="sidebar-search">
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档</span><kbd>Ctrl K</kbd></button>
+    </div>
+    <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
+    <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="docker.html">Docker 部署</a></li><li><a href="changelog.html" class="is-active" aria-current="page">更新日志</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
+        <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
+        <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>检索与记忆</div>
+        <ul class="sidebar-links"><li><a href="memory.html">记忆系统</a></li><li><a href="rag-knowledge-base.html">知识库与检索</a></li></ul>
+      </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-extra">
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>GitHub 源码</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>PyPI 安装包</a>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
+    </div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+  </aside>
+  <div class="sidebar-overlay" data-sidebar-overlay></div>
+  <div class="docs-main">
+    <nav class="breadcrumbs" aria-label="面包屑">
+      <a href="../index.html">首页</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html">文档</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html#start">开始使用</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <span>更新日志</span>
+    </nav>
+    <div class="docs-mobile-bar">
+      <button type="button" data-sidebar-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>文档目录</button>
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+    </div>
+    <details class="toc-mobile">
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 22 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">版本速览</a></li><li class="toc-depth-2"><a href="#sec-2">v0.4.5 · 2026-11-14</a></li><li class="toc-depth-3"><a href="#sec-3">分镜生成</a></li><li class="toc-depth-3"><a href="#sec-4">资产与风格一致性</a></li><li class="toc-depth-3"><a href="#sec-5">质量门禁与 P0 修复</a></li><li class="toc-depth-3"><a href="#sec-6">升级与兼容</a></li><li class="toc-depth-2"><a href="#sec-7">v0.4.4 · 2026-11-11</a></li><li class="toc-depth-3"><a href="#sec-8">连续性与修复回路</a></li><li class="toc-depth-3"><a href="#sec-9">首帧与资产引用</a></li><li class="toc-depth-3"><a href="#sec-10">提示词、模板与质量规则</a></li><li class="toc-depth-3"><a href="#sec-11">升级与迁移</a></li><li class="toc-depth-2"><a href="#sec-12">v0.4.3 · 2026-11-09</a></li><li class="toc-depth-2"><a href="#sec-13">v0.4.2 · 2026-11-06</a></li><li class="toc-depth-2"><a href="#sec-14">v0.4.1 · 2026-11-05</a></li><li class="toc-depth-2"><a href="#sec-15">v0.4.0 · 2026-11-03</a></li><li class="toc-depth-2"><a href="#sec-16">0.3.x 系列</a></li><li class="toc-depth-2"><a href="#sec-17">0.2.x 系列</a></li><li class="toc-depth-2"><a href="#sec-18">0.1.x 系列</a></li><li class="toc-depth-2"><a href="#sec-19">升级与兼容</a></li><li class="toc-depth-3"><a href="#sec-20">契约与文档对应关系</a></li><li class="toc-depth-2"><a href="#sec-21">版本号与文档策略</a></li><li class="toc-depth-2"><a href="#sec-22">相关链接</a></li></ul>
+    </details>
+    <div class="docs-layout">
+      <article class="doc-body">
+        <header class="doc-header">
+          <span class="doc-header__cat">开始使用</span>
+          <h1>更新日志</h1>
+          <p class="doc-deck">按语义化版本记录发布内容、契约变更与升级注意事项。</p>
+          <div class="doc-meta-row">
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 11 分钟阅读</span>
+            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/changelog.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
+          </div>
+        </header>
+        <p>本页按语义化版本记录 PenShot 的正式发布，重点标注会改变输出结构、契约或默认行为的变更。提交级明细与发布说明见 <a href="https://github.com/neopen/story-shot-agent/releases" target="_blank" rel="noopener">GitHub Releases</a>。</p>
+
+<blockquote>站点文档正文以 v0.4.4 源码为基线整理。v0.4.5 已于 2026-11-14 发布，属于兼容性修复版本：新增字段均为可选，SDK、REST 与 MCP 的调用方式不变。</blockquote>
+
+<h2 id="sec-1">版本速览</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">版本</th><th style="text-align:left">日期</th><th style="text-align:left">类型</th><th style="text-align:left">重点</th><th style="text-align:left">兼容性</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>v0.4.5</code></td><td style="text-align:left">2026-11-14</td><td style="text-align:left">修复</td><td style="text-align:left">分镜缺陷收口、时长与去重、首帧清洗、资产与风格证据</td><td style="text-align:left">兼容，新增可选字段</td></tr>
+<tr><td style="text-align:left"><code>v0.4.4</code></td><td style="text-align:left">2026-11-11</td><td style="text-align:left">修复</td><td style="text-align:left">连续性闭环、首帧语义、资产引用、模板召回与质量规则</td><td style="text-align:left">契约升至 0.4.4，需迁移旧模板</td></tr>
+<tr><td style="text-align:left"><code>v0.4.3</code></td><td style="text-align:left">2026-11-09</td><td style="text-align:left">功能</td><td style="text-align:left">模型路由与结构化相机控制</td><td style="text-align:left">新增 <code>route_plan</code>，路由失败不阻断</td></tr>
+<tr><td style="text-align:left"><code>v0.4.2</code></td><td style="text-align:left">2026-11-06</td><td style="text-align:left">功能</td><td style="text-align:left">声明式资产计划、下游交接与人工资产编辑</td><td style="text-align:left">新增 <code>asset_plan</code> / <code>asset_manifest</code></td></tr>
+<tr><td style="text-align:left"><code>v0.4.1</code></td><td style="text-align:left">2026-11-05</td><td style="text-align:left">功能</td><td style="text-align:left">连续性前置约束与报告加固</td><td style="text-align:left">兼容</td></tr>
+<tr><td style="text-align:left"><code>v0.4.0</code></td><td style="text-align:left">2026-11-03</td><td style="text-align:left">功能</td><td style="text-align:left">目标模型适配层接入主链路</td><td style="text-align:left">兼容</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-2">v0.4.5 · 2026-11-14</h2>
+<p>分镜缺陷修复与资产链收口。无破坏性 API 变更，SDK 调用方式保持不变。</p>
+
+<h3 id="sec-3">分镜生成</h3>
+<ul>
+<li>片段时长改为按动作节点确定性推算，并输出片段总时长报告；只有与镜头计划实质偏离时才告警。</li>
+<li>新增同镜头重复片段的检测、合并与超长重切，重编号后片段引用保持一致。</li>
+<li>首帧提示词清洗中文镜头词、<code>action:</code>、广播与音效标记，保留英文景别；纯音频片段使用空镜兜底。</li>
+<li>新增剧本语言推断与音频提示词归一，输出 <code>dialogue_language</code>。</li>
+</ul>
+
+<h3 id="sec-4">资产与风格一致性</h3>
+<ul>
+<li>风格锚定证据扩展到环境音与打光；无信号时回退到 mood / lighting / palette，并写入 provenance。</li>
+<li>服装材质词表扩展，剧本中给出的材质优先回填；资产声明与回填形成闭环，缺失项可见、可补。</li>
+<li>服装关键字段缺失的资产要求降级为剪影或背影，不再阻断片段。</li>
+</ul>
+
+<h3 id="sec-5">质量门禁与 P0 修复</h3>
+<ul>
+<li>场景锚定不匹配时自动替换或阻断片段，路由重建时保留阻断状态。</li>
+<li>修复环节零动作必须报错并标记，检测分数与修复分数分列。</li>
+<li><code>below_threshold</code> 放行时写入 <code>quality_gate</code> 标记，便于下游区分“通过”与“降级放行”。</li>
+<li>质量审查采信契约校验结果；<code>critical_text</code> 只按可读文字判定；景别以镜头计划为准并保留 POV；楼道/走廊同义归一。</li>
+</ul>
+
+<h3 id="sec-6">升级与兼容</h3>
+<ul>
+<li>新增的 <code>degraded_assets</code>、<code>dialogue_language</code>、<code>quality_gate</code> 标记等字段均为可选，旧产物仍可解析。</li>
+<li>无需执行数据迁移；如需使用新的质量标记，升级后重新运行任务即可。</li>
+</ul>
+
+<h2 id="sec-7">v0.4.4 · 2026-11-11</h2>
+<p>连续性闭环与首帧语义加固，是本阶段行为变化最集中的版本。</p>
+
+<h3 id="sec-8">连续性与修复回路</h3>
+<ul>
+<li>跨场景切换改为确定性插入过渡镜头，修复 <code>scene_jump</code> 重试仍反复重跑分镜、问题无法消解的问题。</li>
+<li>外观连续性单轮比较改为主体服装集合，配饰与鞋履增删不再被误报为“外观变化”。</li>
+<li>角色外观锚点只保留自由文本中的外观子句，按字段白名单取首值，避免情绪、动作词与半截词污染锚点。</li>
+<li>风格维度按题材/氛围补齐六维前缀，互斥打光只保留一个家族，题材别名归一化并输出溯源。</li>
+</ul>
+
+<h3 id="sec-9">首帧与资产引用</h3>
+<ul>
+<li>角色三视图与道具静帧不再作为首帧，<code>asset_ref</code> 只代表片段首帧；回填 <code>usage.fragments</code> 并与路由引用保持一致。</li>
+<li>场景已登记场景资产时，图生视频路由不再退化为文生视频；无主角色的片段同样以场景首帧走两段式生成。</li>
+<li>修复旧产物首帧提示词拼出“of 无”的残句；非角色占位名归一为空。</li>
+</ul>
+
+<h3 id="sec-10">提示词、模板与质量规则</h3>
+<ul>
+<li>修复模板索引加载以旧文件名判空导致零命中、单文档索引覆盖既有索引的问题；新增结构化检索诊断与只读召回快照。</li>
+<li>模板入库统一质量审查与记忆层的策略，写入 <code>source</code> / <code>audit_status</code>，旧缺陷模板默认排除在召回之外。</li>
+<li>新增四条质量规则：外观锚点污染、景别与提示词不一致、互斥打光并存、资产使用范围缺失；违规记录带可定位的 <code>fragment_id</code> / <code>asset_id</code>。</li>
+<li>景别一致性以最终提示词为准，保留来源景别与原始值溯源。</li>
+</ul>
+
+<h3 id="sec-11">升级与迁移</h3>
+<ul>
+<li><code>CONTRACT_SCHEMA_VERSION</code> 提升至 <code>0.4.4</code>，与 <code>asset_plan</code>、<code>asset_manifest</code> 和路由契约保持一致；新增字段均为可选。</li>
+<li>0.4.3 已入库的缺陷模板需执行一次迁移：<code>python scripts/migrate_prompt_templates_044.py</code> 默认 dry-run，确认后加 <code>--apply</code> 写入；<code>--script-id</code> 可限定单剧本。</li>
+<li>迁移会先备份各剧本的 <code>templates_cache.json</code> 与 <code>index_store/</code>；缺陷模板只做隔离标记，不删除底层数据，完成后从活跃缓存全量重建索引。</li>
+<li>召回阈值默认 <code>min_similarity_score=0.80</code>、<code>top_k=2</code>、<code>max_injected_patterns=6</code>，可通过 <code>PENSHOT_PROMPT_TEMPLATES__*</code> 覆盖。</li>
+<li>下游若把 <code>asset_ref</code> 当作角色三视图或道具图使用，需要改为读取片段首帧引用，否则会拿到空值或场景首帧。</li>
+</ul>
+
+<h2 id="sec-12">v0.4.3 · 2026-11-09</h2>
+<p>新增模型路由与结构化相机控制，提示词生成与目标模型决策解耦。</p>
+
+<ul>
+<li>登记 <code>runway_gen4</code>、<code>kling_3</code>、<code>luma_dream</code>、<code>sora_2</code>、<code>pika_2</code> 五个模型的能力：时长上限、是否支持图生视频、镜头控制、一致性与风格倾向。</li>
+<li>按可读文字、镜头复杂度、角色一致性需求、风格倾向与时长生成路由决策，输出到 <code>instructions.route_plan</code>，并为每个片段生成模型专属提示词包。</li>
+<li>关键文字或高一致性片段可走“静态首帧 + 动作驱动”的两段式图生视频；首帧引用只来自资产清单，不回退契约旧引用。</li>
+<li>路由失败只记录告警，<code>route_plan</code> 置为 <code>null</code>，不阻断主流程；未通过质量门的片段进入 <code>blocked_fragments</code>。</li>
+<li>修复 <code>time_gap</code> 反复重试与连续性节点崩溃。</li>
+</ul>
+
+<h2 id="sec-13">v0.4.2 · 2026-11-06</h2>
+<p>引入声明式资产计划与下游交接，PenShot 默认不调用任何文生图接口。</p>
+
+<ul>
+<li><code>asset_plan</code> 以 <code>character_sheet</code>、<code>prop</code>、<code>scene</code> 三类资产描述“要生成什么”，包含提示词、负向词、尺寸、视角与状态。</li>
+<li>片段通过 <code>references</code> 复用资产，角色区分 <code>identity_reference</code> 与首帧引用；<code>usage.fragments</code> 标明每个资产被哪些片段使用，支持按需生成。</li>
+<li>下游完成资产生成后可回传 <code>asset_manifest</code>（<code>bindings</code>、<code>asset_id_map</code>），把真实资产引用接回 PenShot，并跳过重复生成。</li>
+<li>人工干预节点新增 <code>[7] EDIT_ASSET</code>：可修改资产提示词并回到资产节点重建，编辑记录累计在 <code>execution.asset_prompt_edits</code>。</li>
+<li>资产状态包含 <code>pending</code>、<code>generated</code>、<code>failed</code>、<code>skipped</code>；清单只覆盖已有资产，不新增或删除资产规格。</li>
+</ul>
+
+<h2 id="sec-14">v0.4.1 · 2026-11-05</h2>
+<p>连续性前置约束收尾与报告加固。</p>
+
+<ul>
+<li>连续性前置约束收尾：把约束提前到生成阶段，减少“生成完成后再返工”的无效循环。</li>
+<li>连续性修复回路与 <code>continuity_report.json</code>、<code>repair_history.json</code> 落盘，报告补充累计检测问题统计。</li>
+<li>修复连续性报告异步落盘无法等待的问题。</li>
+</ul>
+
+<h2 id="sec-15">v0.4.0 · 2026-11-03</h2>
+<p>新增目标模型适配层并接入主链路。</p>
+
+<ul>
+<li>提示词转换结果统一为 <code>AIVideoInstructions</code>，由适配层按目标模型重写风格前缀、负向词、镜头字段、分辨率与运动参数。</li>
+<li>模型适配与提示词生成分离，后续版本在此基础上增加按片段自动选型。</li>
+</ul>
+
+<h2 id="sec-16">0.3.x 系列</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">版本</th><th style="text-align:left">日期</th><th style="text-align:left">主要变更</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>0.3.12</code></td><td style="text-align:left">2026-11-01</td><td style="text-align:left">修复 Qwen 私有 MaaS 连接、嵌入兼容与 JSON 截断，对齐路径配置结构</td></tr>
+<tr><td style="text-align:left"><code>0.3.11</code></td><td style="text-align:left">2026-10-14</td><td style="text-align:left">修复 Qwen 模型依赖问题</td></tr>
+<tr><td style="text-align:left"><code>0.3.10</code></td><td style="text-align:left">2026-10-13</td><td style="text-align:left">重构 Docker 配置</td></tr>
+<tr><td style="text-align:left"><code>0.3.9</code></td><td style="text-align:left">2026-10-13</td><td style="text-align:left">LLM 客户端支持 OpenAI 兼容 Chat，调整默认配置</td></tr>
+<tr><td style="text-align:left"><code>0.3.8</code></td><td style="text-align:left">2026-09-19</td><td style="text-align:left">LLM 异常时自动启用本地规则解析；修复 Redis 连接与配置适配；新增 LLM 自动依赖检测；Chroma 改为异步初始化</td></tr>
+<tr><td style="text-align:left"><code>0.3.7</code></td><td style="text-align:left">2026-09-02</td><td style="text-align:left">Docker 发布从 GHCR 切换到 Docker Hub，整理 CI 与 lint 配置</td></tr>
+<tr><td style="text-align:left"><code>0.3.6</code></td><td style="text-align:left">2026-07-23</td><td style="text-align:left">客户端脚本、完整性修复、规范性优化与边界检查</td></tr>
+<tr><td style="text-align:left"><code>0.3.5</code></td><td style="text-align:left">2026-07-17</td><td style="text-align:left">重构提示词音频输出结构；统一质量审查与修复模型，修复各阶段审查问题</td></tr>
+<tr><td style="text-align:left"><code>0.3.4</code></td><td style="text-align:left">2026-05-21</td><td style="text-align:left">重排序默认启用；节点默认不自动决策，改为控制台人工交互；Redis 不可用时短期记忆本地持久化；修复知识库向量检索与重排序</td></tr>
+<tr><td style="text-align:left"><code>0.3.3</code></td><td style="text-align:left">2026-05-15</td><td style="text-align:left">工作流状态检查点支持持久化；完善记忆流转与人工干预；修复检索器引用与记忆计数</td></tr>
+<tr><td style="text-align:left"><code>0.3.2</code></td><td style="text-align:left">2026-05-05</td><td style="text-align:left">数据按剧本隔离；三层记忆职责拆分；新增损坏恢复、离线模式与静默降级；镜头类型去重与多样性</td></tr>
+<tr><td style="text-align:left"><code>0.3.1-beta</code></td><td style="text-align:left">2026-05-03</td><td style="text-align:left">新增跨块一致性验证器与全局一致性契约；任务与工作流职责拆分；检索器配置与知识库增强</td></tr>
+<tr><td style="text-align:left"><code>0.3.0</code></td><td style="text-align:left">2026-04-27</td><td style="text-align:left">引入 llamaIndex 与 RAG 知识库；剧本解析支持本地规则；性能与一致性优化</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-17">0.2.x 系列</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">版本</th><th style="text-align:left">日期</th><th style="text-align:left">主要变更</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>0.2.4</code></td><td style="text-align:left">2026-04-08</td><td style="text-align:left">修复各节点重试机制与“无限循环”；修复人工干预节点；配置标准化</td></tr>
+<tr><td style="text-align:left"><code>0.2.3</code></td><td style="text-align:left">2026-04-06</td><td style="text-align:left">升级 LangChain 与 LLM 依赖；新增剧本 ID 与按剧本分类记忆；支持自定义视频风格参数</td></tr>
+<tr><td style="text-align:left"><code>0.2.2</code></td><td style="text-align:left">2026-04-01</td><td style="text-align:left">统一客户端接口；引入嵌入模型与记忆分层架构；提供 HTTP 服务；细粒度任务池进度；修复 MCP Server</td></tr>
+<tr><td style="text-align:left"><code>0.2.1</code></td><td style="text-align:left">2026-03-29</td><td style="text-align:left">增强质量审查智能体；新增连续性守护节点；统一 JSON 输出模型；修复 Function Call 与任务池响应</td></tr>
+<tr><td style="text-align:left"><code>0.2.0</code></td><td style="text-align:left">2026-03-25</td><td style="text-align:left">任务池支持并发、等待、持久化与停止恢复；新增 Function Call、CLI 与 MCP Server；REST 支持批量与同步提交</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-18">0.1.x 系列</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">版本</th><th style="text-align:left">日期</th><th style="text-align:left">主要变更</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>0.1.3-beta</code></td><td style="text-align:left">2026-03-06</td><td style="text-align:left">新增与视频同步的音频提示词（台词、背景声、画外音）；修复片段衔接、切割与解析丢失；标准化 API 输出</td></tr>
+<tr><td style="text-align:left"><code>0.1.2-alpha</code></td><td style="text-align:left">2026-02-28</td><td style="text-align:left">优化视频分割；质量审查覆盖更多维度；提示词增加特写与细节描述</td></tr>
+<tr><td style="text-align:left"><code>0.1.1-alpha.1</code></td><td style="text-align:left">2026-02-12</td><td style="text-align:left">首个公开 alpha：基于 LangGraph 的多智能体链路，覆盖剧本解析、镜头分割、片段切割、提示词转换与质量审查</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-19">升级与兼容</h2>
+<p>升级前先固定版本号并保留一次可回放的旧产物；涉及契约变化时，按下表处理。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">升级路径</th><th style="text-align:left">需要处理</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">0.4.4 → 0.4.5</td><td style="text-align:left">无需改动；按需读取 <code>degraded_assets</code>、<code>dialogue_language</code> 与 <code>quality_gate</code> 标记</td></tr>
+<tr><td style="text-align:left">0.4.3 → 0.4.4</td><td style="text-align:left">执行模板迁移脚本（先 dry-run 再 <code>--apply</code>）；核对下游 <code>asset_ref</code> 语义；质量审查新增四条规则，需检查告警消费逻辑</td></tr>
+<tr><td style="text-align:left">0.4.2 → 0.4.3</td><td style="text-align:left">读取 <code>instructions.route_plan</code>；处理 <code>null</code> 与 <code>blocked_fragments</code>；如需图生视频，接入场景首帧引用</td></tr>
+<tr><td style="text-align:left">0.4.1 → 0.4.2</td><td style="text-align:left">资产节点默认只输出 <code>asset_plan</code>，不会生成图片；需要接入下游资产生成与 <code>asset_manifest</code> 回填</td></tr>
+<tr><td style="text-align:left">0.4.0 → 0.4.1</td><td style="text-align:left">无接口变更，建议重新运行一次任务以生成新的连续性报告</td></tr>
+<tr><td style="text-align:left">0.3.x → 0.4.x</td><td style="text-align:left">先升级到 0.4.4 并完成模板迁移，再按需启用资产计划与模型路由；旧 0.3.x 模板不会自动具备 0.4.4 的 <code>audit_status</code></td></tr>
+</tbody>
+</table>
+
+<h3 id="sec-20">契约与文档对应关系</h3>
+<table>
+<thead>
+<tr><th style="text-align:left">契约 / 字段</th><th style="text-align:left">起始版本</th><th style="text-align:left">说明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>AIVideoInstructions</code></td><td style="text-align:left">0.4.0</td><td style="text-align:left">统一提示词产物，模型适配层在其上重写</td></tr>
+<tr><td style="text-align:left"><code>asset_plan</code></td><td style="text-align:left">0.4.2</td><td style="text-align:left">声明式资产计划，见<a href="asset-handoff.html">资产计划与交接</a></td></tr>
+<tr><td style="text-align:left"><code>asset_manifest</code></td><td style="text-align:left">0.4.2</td><td style="text-align:left">下游资产引用回填，字段结构按 0.4.4 提供</td></tr>
+<tr><td style="text-align:left"><code>route_plan</code></td><td style="text-align:left">0.4.3</td><td style="text-align:left">位于 <code>instructions.route_plan</code>，见<a href="model-routing.html">模型路由</a></td></tr>
+<tr><td style="text-align:left">首帧两段式</td><td style="text-align:left">0.4.3</td><td style="text-align:left"><code>first_frame_instruction</code> 与场景首帧引用，见<a href="first-frame.html">首帧与图生视频</a></td></tr>
+<tr><td style="text-align:left">契约版本</td><td style="text-align:left">0.4.4</td><td style="text-align:left"><code>CONTRACT_SCHEMA_VERSION = 0.4.4</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-21">版本号与文档策略</h2>
+<ul>
+<li>0.x 阶段：次版本号用于向下兼容的功能新增，修订号用于兼容修复；尚未承诺 1.0 级别的 API 稳定性。</li>
+<li>破坏性变更、默认行为变化与数据迁移会同时出现在本页与对应 Release Notes 中，升级前应逐条核对。</li>
+<li>站点只维护一份最新文档，不按版本复制页面；正文标注的源码基线用于说明“这批描述对应哪次复核”。</li>
+<li>安装包以 <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a> 为准，容器镜像以 <a href="https://hub.docker.com/r/neotems/penshot" target="_blank" rel="noopener">Docker Hub</a> 为准。</li>
+</ul>
+
+<h2 id="sec-22">相关链接</h2>
+<ul>
+<li><a href="https://github.com/neopen/story-shot-agent/releases" target="_blank" rel="noopener">GitHub Releases</a>：每个版本的构建产物与发布说明。</li>
+<li><a href="https://github.com/neopen/story-shot-agent/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a>：仓库内的变更记录原文。</li>
+<li><a href="quick-start.html">快速开始</a>：安装与首次运行；<a href="integration.html">集成指南</a>：接口与返回结构。</li>
+</ul>
+
+        <nav class="doc-pager" aria-label="文档翻页">
+    <a class="pager-link" href="docker.html">
+      <span class="pager-link__label">← 上一篇 · 开始使用</span>
+      <strong>Docker 部署</strong>
+      <small>官方镜像与 Compose 启动 REST 服务，含 Redis、持久化与健康检查。</small>
+    </a>
+    <a class="pager-link pager-link--next" href="architecture.html">
+      <span class="pager-link__label">下一篇 → · 核心设计</span>
+      <strong>技术架构</strong>
+      <small>十二个注册节点、八态决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。</small>
+    </a>
+  </nav>
+      </article>
+      <aside class="doc-toc" aria-label="本页目录">
+        <div class="toc-inner">
+          <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">版本速览</a></li><li class="toc-depth-2"><a href="#sec-2">v0.4.5 · 2026-11-14</a></li><li class="toc-depth-3"><a href="#sec-3">分镜生成</a></li><li class="toc-depth-3"><a href="#sec-4">资产与风格一致性</a></li><li class="toc-depth-3"><a href="#sec-5">质量门禁与 P0 修复</a></li><li class="toc-depth-3"><a href="#sec-6">升级与兼容</a></li><li class="toc-depth-2"><a href="#sec-7">v0.4.4 · 2026-11-11</a></li><li class="toc-depth-3"><a href="#sec-8">连续性与修复回路</a></li><li class="toc-depth-3"><a href="#sec-9">首帧与资产引用</a></li><li class="toc-depth-3"><a href="#sec-10">提示词、模板与质量规则</a></li><li class="toc-depth-3"><a href="#sec-11">升级与迁移</a></li><li class="toc-depth-2"><a href="#sec-12">v0.4.3 · 2026-11-09</a></li><li class="toc-depth-2"><a href="#sec-13">v0.4.2 · 2026-11-06</a></li><li class="toc-depth-2"><a href="#sec-14">v0.4.1 · 2026-11-05</a></li><li class="toc-depth-2"><a href="#sec-15">v0.4.0 · 2026-11-03</a></li><li class="toc-depth-2"><a href="#sec-16">0.3.x 系列</a></li><li class="toc-depth-2"><a href="#sec-17">0.2.x 系列</a></li><li class="toc-depth-2"><a href="#sec-18">0.1.x 系列</a></li><li class="toc-depth-2"><a href="#sec-19">升级与兼容</a></li><li class="toc-depth-3"><a href="#sec-20">契约与文档对应关系</a></li><li class="toc-depth-2"><a href="#sec-21">版本号与文档策略</a></li><li class="toc-depth-2"><a href="#sec-22">相关链接</a></li></ul>
+          <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/changelog.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="docs-footer">
+  <div class="docs-footer__inner">
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <div class="docs-footer__links">
+      <a href="https://shot.helpenx.com">官网</a>
+      <a href="changelog.html">更新日志</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener">问题反馈</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/docs.js" defer></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="../assets/js/katex-init.js"></script>
+</body>
+</html>

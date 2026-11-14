@@ -110,5 +110,12 @@
     "description": "PenShot RAG 知识库的索引、分块、向量检索与模板召回实现，包含 LongScriptChunker、跨剧本只读复用、迁移脚本和当前接线状态。",
     "keywords": ["RAG", "知识库", "向量检索", "模板召回", "LongScriptChunker", "Chroma", "Embedding", "重排序", "分块", "跨剧本复用"],
     "updated": "2026-11-14"
+  },
+  "changelog": {
+    "title": "更新日志 · PenShot 文档",
+    "h1": "更新日志",
+    "description": "PenShot 从 0.1 到 0.4.5 的发布记录、功能与修复内容、契约变更、数据迁移与升级注意事项。",
+    "keywords": ["PenShot 更新日志", "CHANGELOG", "版本发布", "升级指南", "语义化版本", "0.4.5", "0.4.4", "契约版本"],
+    "updated": "2026-11-14"
   }
 }
