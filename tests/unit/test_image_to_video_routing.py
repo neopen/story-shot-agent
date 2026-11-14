@@ -504,8 +504,8 @@ def _scene_prompt(fragment_id: str, prompt: str) -> AIVideoPrompt:
     )
 
 
-def test_scene_anchor_mismatch_is_reported():
-    """片段写教室但镜头映射到走廊首帧时给出 warning 与替换建议"""
+def test_scene_anchor_mismatch_auto_replaces_first_frame():
+    """片段写教室但镜头映射到走廊首帧时自动替换为匹配场景资产"""
     contract = _scene_contract()
     instructions = AIVideoInstructions(
         fragments=[
@@ -531,11 +531,17 @@ def test_scene_anchor_mismatch_is_reported():
         packages, instructions, contract, fragments=fragments, shots=shots
     )
 
-    assert packages[0].warnings
-    message = packages[0].warnings[0]
+    package = packages[0]
+    assert package.status == "ready"
+    assert package.warnings
+    message = package.warnings[0]
+    assert "已自动替换" in message
     assert "教室" in message
     assert "scene_001" in message
     assert "走廊" in message
+    first_frame = next(ref for ref in package.references if ref.role == "first_frame")
+    assert first_frame.asset_id == "scene_001"
+    assert "at 教室" in package.image_prompt
 
 
 def test_scene_anchor_skips_prompt_without_location():
@@ -619,3 +625,78 @@ def test_scene_anchor_ignores_location_in_dialogue():
     )
 
     assert packages[0].warnings == []
+
+
+def test_scene_anchor_ambiguous_blocks_fragment():
+    """片段同时提到多个其他场景时无法唯一匹配，标记 needs_manual_fix 阻断"""
+    contract = _scene_contract()
+    contract.register_scene(
+        SceneContract(
+            scene_num=3,
+            location="操场",
+            time_of_day="noon",
+            characters_in_scene=["张晨"],
+        )
+    )
+    contract.register_asset(
+        AssetContract(
+            asset_id="scene_003",
+            asset_type="scene",
+            owner_name="操场",
+            asset_ref="/tmp/assets/scene_003.png",
+            image_prompt="establishing shot of 操场",
+            status="generated",
+        )
+    )
+    instructions = AIVideoInstructions(
+        fragments=[
+            _scene_prompt(
+                "frag_005",
+                "Zhang Chen runs from the classroom toward the playground",
+            )
+        ]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_005",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_005", shot_id="shot_005", description="")]
+    shots = [SimpleNamespace(id="shot_005", scene_id="scene_002")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    package = packages[0]
+    assert package.status == "needs_manual_fix"
+    assert "已阻断" in package.warnings[0]
+
+
+def test_scene_anchor_without_matching_asset_blocks_fragment():
+    """片段提到契约中不存在的场景时同样阻断，不能静默沿用错误首帧"""
+    contract = _scene_contract()
+    instructions = AIVideoInstructions(
+        fragments=[_scene_prompt("frag_006", "a lonely figure crosses the playground")]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_006",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_006", shot_id="shot_006", description="")]
+    shots = [SimpleNamespace(id="shot_006", scene_id="scene_002")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    package = packages[0]
+    assert package.status == "needs_manual_fix"
+    assert "已阻断" in package.warnings[0]

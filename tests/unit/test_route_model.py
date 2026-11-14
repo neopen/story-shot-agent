@@ -7,6 +7,11 @@
 import pytest
 
 from penshot.config.config import settings
+from penshot.neopen.agent.continuity_guardian.consistency_contract import (
+    AssetContract,
+    GlobalConsistencyContract,
+    SceneContract,
+)
 from penshot.neopen.agent.model_adapter import (
     adapt_instructions,
     get_adapter,
@@ -25,6 +30,14 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoInstructions,
     AIVideoPrompt,
     CameraMotion,
+)
+from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import (
+    ShotInfo,
+    ShotSequence,
+)
+from penshot.neopen.agent.video_splitter.video_splitter_models import (
+    FragmentSequence,
+    VideoFragment,
 )
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.agent.workflow.workflow_nodes import WorkflowNodes
@@ -221,6 +234,77 @@ def test_route_model_node_rebuilds_route_plan():
     assert "stale" not in plan
     assert state.execution.current_node == PipelineNode.ROUTE_MODEL
     assert nodes.storage.saved[0][0] == "prompt_converter_result.json"
+
+
+def test_route_model_node_marks_scene_anchor_replacement():
+    """路由节点把场景锚定的自动替换与阻断结果写回 decisions/blocked_fragments"""
+    nodes = object.__new__(WorkflowNodes)
+    nodes.storage = _FakeStorage()
+
+    state = WorkflowState.from_raw_script(
+        "测试剧本", task_id="task_003", script_id="script_003"
+    )
+    state.domain.contract = _scene_route_contract()
+    state.domain.instructions = AIVideoInstructions(
+        fragments=[
+            _prompt(
+                "medium shot, a woman in a high school classroom",
+                main_character="张晨",
+            )
+        ]
+    )
+    state.domain.shot_sequence = ShotSequence(
+        shots=[ShotInfo(id="shot_001", scene_id="scene_002", description="楼道空镜")]
+    )
+    state.domain.fragment_sequence = FragmentSequence(
+        fragments=[VideoFragment(id="frag_001", shot_id="shot_001", duration=3.0)]
+    )
+
+    nodes.route_model_node(state)
+
+    plan = state.domain.instructions.route_plan
+    decision = plan["decisions"][0]
+    assert decision["status"] == "ready"
+    assert "已自动替换" in decision["warnings"][0]
+    first_frame = next(
+        ref for ref in decision["references"] if ref["role"] == "first_frame"
+    )
+    assert first_frame["asset_id"] == "scene_001"
+    assert plan["blocked_fragments"] == []
+
+
+def _scene_route_contract() -> GlobalConsistencyContract:
+    """教室 + 走廊两个场景资产，用于验证路由节点的场景锚定回写"""
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.register_character("张晨", 1)
+    contract.register_scene(
+        SceneContract(
+            scene_num=1,
+            location="教室",
+            time_of_day="afternoon",
+            characters_in_scene=["张晨"],
+        )
+    )
+    contract.register_scene(
+        SceneContract(
+            scene_num=2,
+            location="走廊",
+            time_of_day="dusk",
+            characters_in_scene=["张晨"],
+        )
+    )
+    for asset_id, owner_name in (("scene_001", "教室"), ("scene_002", "走廊")):
+        contract.register_asset(
+            AssetContract(
+                asset_id=asset_id,
+                asset_type="scene",
+                owner_name=owner_name,
+                asset_ref=f"/tmp/assets/{asset_id}.png",
+                image_prompt=f"establishing shot of {owner_name}",
+                status="generated",
+            )
+        )
+    return contract
 
 
 def test_route_model_node_does_not_block_on_failure():

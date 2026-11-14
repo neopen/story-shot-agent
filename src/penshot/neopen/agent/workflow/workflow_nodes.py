@@ -1069,8 +1069,23 @@ class WorkflowNodes:
             package_warnings = {
                 package.fragment_id: package.warnings for package in adapted_packages
             }
+            package_status = {
+                package.fragment_id: package.status for package in adapted_packages
+            }
             for decision in plan.decisions:
                 decision.warnings = list(package_warnings.get(decision.fragment_id, []))
+                decision.status = package_status.get(decision.fragment_id, "ready")
+            # P0-1：场景锚定无法唯一匹配的片段必须阻断，不进入下游渲染队列
+            plan.blocked_fragments = [
+                fragment_id
+                for fragment_id, status in package_status.items()
+                if status != "ready"
+            ]
+            if plan.blocked_fragments:
+                warning(
+                    f"场景锚定无法唯一匹配，已阻断 {len(plan.blocked_fragments)} 个片段: "
+                    f"{', '.join(plan.blocked_fragments)}"
+                )
 
             instructions.route_plan = plan.model_dump(mode="json")
             instructions.asset_plan = asset_plan

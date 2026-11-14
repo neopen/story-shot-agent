@@ -183,6 +183,7 @@ def build_route_plan(
                 mode=rebuilt.mode,
                 asset_ref=rebuilt.asset_ref,
                 capability=capability,
+                references=list(rebuilt.references),
             )
         )
 

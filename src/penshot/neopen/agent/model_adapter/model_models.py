@@ -179,6 +179,10 @@ class AdaptedPromptPackage(BaseModel):
         default_factory=list,
         description="构建期发现但不阻断的声明式告警（如场景锚定不一致）",
     )
+    status: str = Field(
+        default="ready",
+        description="片段可执行状态：ready=可进入下游渲染，needs_manual_fix=已阻断待人工处理",
+    )
     model_params: Dict[str, Any] = Field(
         default_factory=dict, description="模型专属生成参数"
     )
@@ -206,6 +210,14 @@ class RouteDecision(BaseModel):
     warnings: List[str] = Field(
         default_factory=list, description="该片段的结构/逻辑告警（Gate 1 回写）"
     )
+    references: List[PromptReference] = Field(
+        default_factory=list,
+        description="该片段的资产引用；first_frame 即首帧场景资产",
+    )
+    status: str = Field(
+        default="ready",
+        description="片段可执行状态：ready=可进入下游渲染，needs_manual_fix=已阻断待人工处理",
+    )
 
 
 class RoutePlan(BaseModel):
@@ -226,6 +238,10 @@ class RoutePlan(BaseModel):
     )
     warnings: List[str] = Field(
         default_factory=list, description="跨片段结构/口径告警（Gate 1 回写）"
+    )
+    blocked_fragments: List[str] = Field(
+        default_factory=list,
+        description="已阻断的片段ID：状态非 ready，不得进入下游渲染队列",
     )
 
     def to_dict(self) -> Dict[str, Any]:

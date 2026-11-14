@@ -11,6 +11,7 @@ See LICENSE File For Details.
 """
 
 import re
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from penshot.neopen.agent.character_names import normalize_character_name
@@ -319,6 +320,127 @@ def _scene_asset_mentioned(asset: Any, text: str) -> bool:
     return any(_term_in_text(text, term) for term in _scene_location_terms(location))
 
 
+@dataclass
+class SceneAnchorResolution:
+    """场景锚定检测结果：供路由阶段做自动替换或阻断
+
+    Attributes:
+        current_asset_id: 当前首帧场景资产ID
+        current_name: 当前首帧场景地点
+        target_asset_id: 唯一匹配的目标场景资产ID；无法唯一匹配时为空
+        target_name: 目标场景地点；无法唯一匹配时为疑似地点或空
+        reason: 判定原因：``auto_replace`` / ``ambiguous`` / ``no_asset``
+        candidates: 文本命中的场景地点候选（用于追溯）
+        message: 可直接写入 warnings 的说明
+    """
+
+    current_asset_id: str
+    current_name: str
+    target_asset_id: str = ""
+    target_name: str = ""
+    reason: str = ""
+    candidates: List[str] = field(default_factory=list)
+    message: str = ""
+
+
+def resolve_scene_anchor(
+    prompt: AIVideoPrompt,
+    contract: Any,
+    scene: Any = None,
+    fragment: Any = None,
+    first_frame_asset_id: str = "",
+) -> Optional[SceneAnchorResolution]:
+    """判定片段场景与首帧场景资产是否一致，并给出替换/阻断结论
+
+    仅当片段文本明确提到其他场景、且未提到当前首帧场景时触发：
+    - 唯一命中其他场景资产 → ``auto_replace``；
+    - 命中多个场景资产 → ``ambiguous``（阻断）；
+    - 未命中任何场景资产但文本含其他场景词 → ``no_asset``（阻断）；
+    - 无场景证据 → 返回 None，不动作。
+
+    Returns:
+        场景锚定结论；无需处理时返回 None
+    """
+    asset_id = str(first_frame_asset_id or "").strip()
+    if contract is None or not asset_id:
+        return None
+
+    scenes = _contract_assets(contract, SCENE_ASSET_TYPE)
+    current = next(
+        (item for item in scenes if _attr(item, "asset_id") == asset_id), None
+    )
+    if current is None:
+        return None
+
+    text = _strip_quoted_content(
+        f"{_attr(fragment, 'description')} {_attr(prompt, 'prompt')}"
+    )
+    if _scene_asset_mentioned(current, text):
+        return None
+
+    current_terms = set(_scene_location_terms(_attr(current, "owner_name")))
+    mentioned = [
+        item
+        for item in scenes
+        if _attr(item, "asset_id") != asset_id and _scene_asset_mentioned(item, text)
+    ]
+    fragment_id = _attr(fragment, "id") or _attr(prompt, "fragment_id")
+    base = f"{fragment_id} 描述「"
+
+    if len(mentioned) == 1:
+        target = mentioned[0]
+        target_name = _attr(target, "owner_name")
+        return SceneAnchorResolution(
+            current_asset_id=asset_id,
+            current_name=_attr(current, "owner_name"),
+            target_asset_id=_attr(target, "asset_id"),
+            target_name=target_name,
+            reason="auto_replace",
+            candidates=[target_name],
+            message=(
+                f"{base}{target_name}」场景，但首帧资产为"
+                f"「{_attr(current, 'owner_name')}」，已自动替换为 "
+                f"{_attr(target, 'asset_id')}（{target_name}）"
+            ),
+        )
+
+    if len(mentioned) > 1:
+        names = [_attr(item, "owner_name") for item in mentioned]
+        return SceneAnchorResolution(
+            current_asset_id=asset_id,
+            current_name=_attr(current, "owner_name"),
+            reason="ambiguous",
+            candidates=names,
+            message=(
+                f"{base}{'/'.join(names)}」等多个场景，首帧资产为"
+                f"「{_attr(current, 'owner_name')}」，无法唯一匹配，已阻断待人工指定场景"
+            ),
+        )
+
+    # 零候选：文本出现其他场景词但没有对应资产，同样阻断而非静默放行
+    stray = [
+        key
+        for key, aliases in _SCENE_LOCATION_GLOSSARY.items()
+        if key not in current_terms
+        and (
+            _term_in_text(text, key)
+            or any(_term_in_text(text, alias) for alias in aliases)
+        )
+    ]
+    if not stray:
+        return None
+    return SceneAnchorResolution(
+        current_asset_id=asset_id,
+        current_name=_attr(current, "owner_name"),
+        reason="no_asset",
+        candidates=list(dict.fromkeys(stray)),
+        message=(
+            f"{base}{'/'.join(dict.fromkeys(stray))}」等场景，但契约无对应场景资产，"
+            f"首帧资产为「{_attr(current, 'owner_name')}」，已阻断待人工指定场景"
+        ),
+    )
+
+
 def check_scene_anchor_consistency(
     prompt: AIVideoPrompt,
     contract: Any,
@@ -328,44 +450,17 @@ def check_scene_anchor_consistency(
 ) -> str:
     """校验片段描述的场景与首帧场景资产是否一致（0.4.5 任务 7）
 
-    片段文本明确提到另一个场景地点、且未提到当前首帧场景时给出告警；文本没有
-    场景描述或同时提到多个场景时跳过，避免误报。
-
     Returns:
-        告警文本；无需告警时返回空串
+        说明文本；无需处理时返回空串
     """
-    asset_id = str(first_frame_asset_id or "").strip()
-    if contract is None or not asset_id:
-        return ""
-
-    scenes = _contract_assets(contract, SCENE_ASSET_TYPE)
-    current = next(
-        (item for item in scenes if _attr(item, "asset_id") == asset_id), None
+    resolution = resolve_scene_anchor(
+        prompt,
+        contract,
+        scene=scene,
+        fragment=fragment,
+        first_frame_asset_id=first_frame_asset_id,
     )
-    if current is None:
-        return ""
-
-    text = _strip_quoted_content(
-        f"{_attr(fragment, 'description')} {_attr(prompt, 'prompt')}"
-    )
-    if _scene_asset_mentioned(current, text):
-        return ""
-
-    mentioned = [
-        item
-        for item in scenes
-        if _attr(item, "asset_id") != asset_id and _scene_asset_mentioned(item, text)
-    ]
-    if len(mentioned) != 1:
-        return ""
-
-    target = mentioned[0]
-    fragment_id = _attr(fragment, "id") or _attr(prompt, "fragment_id")
-    return (
-        f"{fragment_id} 描述「{_attr(target, 'owner_name')}」场景，"
-        f"但首帧资产为「{_attr(current, 'owner_name')}」，"
-        f"建议改用 {_attr(target, 'asset_id')}（{_attr(target, 'owner_name')}）"
-    )
+    return resolution.message if resolution is not None else ""
 
 
 def _attr(source: Any, name: str, default: str = "") -> str:
