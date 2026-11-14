@@ -133,6 +133,13 @@ _PERSON_OUTFIT_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 片段提示词的角色服装标注：同一片段可能同时描述多个角色，正文服装子句
+# 无法区分归属，标注是唯一可信的角色级来源
+_CHARACTER_CLOTHING_RE = re.compile(
+    r"\[\s*character\s+consistency\s*:\s*([^,\]]+?)\s*,\s*clothing\s*:\s*([^\]]+?)\s*\]",
+    re.IGNORECASE,
+)
+
 
 def _strip_person_prefix(clause: str, character_name: str = "") -> str:
     """去掉“张晨穿着 / Zhang Chen wearing”等主语前缀，只保留服装短语"""
@@ -143,8 +150,31 @@ def _strip_person_prefix(clause: str, character_name: str = "") -> str:
     return _PERSON_OUTFIT_PREFIX_RE.sub("", text).strip()
 
 
+def _annotation_outfit_phrases(text: str, character_name: str) -> List[str]:
+    """提取片段提示词中属于该角色的服装标注"""
+    name = str(character_name or "").strip()
+    if not name:
+        return []
+    phrases: List[str] = []
+    for match in _CHARACTER_CLOTHING_RE.finditer(str(text or "")):
+        if match.group(1).strip() != name:
+            continue
+        phrase = match.group(2).strip(" ，,；;。")
+        if phrase and phrase not in phrases:
+            phrases.append(phrase)
+    return phrases
+
+
 def _outfit_clauses(text: str, character_name: str = "") -> List[Tuple[str, str]]:
-    """从片段文本提取服装子句，返回 (子句, 服装短语) 列表"""
+    """从片段文本提取服装子句，返回 (子句, 服装短语) 列表
+
+    片段带角色服装标注时只采信标注：正文可能同时出现其他角色的着装，
+    按“缺失字段最少 + 短语最长”挑选会把别人的制服写进本角色资产。
+    """
+    annotated = _annotation_outfit_phrases(text, character_name)
+    if annotated:
+        return [(phrase, phrase) for phrase in annotated]
+
     results: List[Tuple[str, str]] = []
     for raw in _CLAUSE_SPLIT_RE.split(str(text or "")):
         clause = _strip_person_prefix(raw, character_name)
@@ -166,6 +196,10 @@ def _outfit_from_prompt(image_prompt: str) -> str:
 
 # 剧本材质回填的来源字段：写入 outfit_backfill_source 便于追溯
 SCRIPT_MATERIAL_SOURCE = "global_metadata.character_outfits.material"
+SCRIPT_OUTFIT_SOURCE = "global_metadata.character_outfits.description"
+
+# 解析阶段对“无信息”的显式结论，不能当作服装文本回填
+_UNKNOWN_OUTFIT_VALUES = {"", "未知", "不详", "无", "none", "unknown", "n/a"}
 
 # attention_reason 中属于“缺失项/回填说明”的片段，重算时需要丢弃
 _REASON_MISSING_TOKENS = ("缺少", "仍缺", "均未提供", "已从")
@@ -173,21 +207,53 @@ _REASON_MISSING_TOKENS = ("缺少", "仍缺", "均未提供", "已从")
 _UNRESOLVED_SOURCE_NOTE = "剧本与片段均未提供"
 
 
-def _script_material_candidate(current: str, material: str) -> Optional[str]:
-    """用剧本结构化材质补全缺失材质（优先于片段提示词）
+def _normalize_outfit_value(value: Any) -> str:
+    """取结构化服装字段文本；“未知/不详”等占位结论返回空串"""
+    text = str(value or "").strip()
+    return "" if text.lower() in _UNKNOWN_OUTFIT_VALUES else text
 
-    ``global_metadata.character_outfits.material`` 是解析阶段的确定性结论，
-    比片段文本更可信；仅当当前描述确实缺少材质且合并后确有改善时返回。
+
+def _merge_outfit_texts(current: str, extra: str) -> str:
+    """按子句合并服装文本并去重，避免重复拼入同一段描述"""
+    parts: List[str] = []
+    for text in (current, extra):
+        for clause in _CLAUSE_SPLIT_RE.split(str(text or "")):
+            clause = clause.strip(" ，,；;。")
+            if clause and clause not in parts:
+                parts.append(clause)
+    return "，".join(parts)
+
+
+def _script_outfit_candidate(current: str, outfit: Any) -> Optional[Tuple[str, str]]:
+    """用剧本结构化服装补全缺失要素（优先于片段提示词）
+
+    ``global_metadata.character_outfits`` 是解析阶段的确定性结论：``material``
+    只补材质；``description`` 承载完整着装，材质为“未知”时仍是可信来源，
+    可避免回退到片段正文里其他角色的服装子句。
     """
-    value = str(material or "").strip()
-    if not value or not contains_keyword(value, MATERIAL_KEYWORDS):
+    if not outfit:
         return None
-    if "材质" not in _missing_outfit_fields(current):
-        return None
-    merged = f"{current}，{value}" if current else value
-    if len(_missing_outfit_fields(merged)) >= len(_missing_outfit_fields(current)):
-        return None
-    return merged
+    current_missing = len(_missing_outfit_fields(current))
+
+    if isinstance(outfit, str):
+        material, description = _normalize_outfit_value(outfit), ""
+    else:
+        material = _normalize_outfit_value(
+            outfit.get("material") if isinstance(outfit, Mapping) else None
+        )
+        description = _normalize_outfit_value(
+            outfit.get("description") if isinstance(outfit, Mapping) else None
+        )
+
+    if material and contains_keyword(material, MATERIAL_KEYWORDS):
+        merged = f"{current}，{material}" if current else material
+        if len(_missing_outfit_fields(merged)) < current_missing:
+            return merged, SCRIPT_MATERIAL_SOURCE
+    if description:
+        merged = _merge_outfit_texts(current, description)
+        if len(_missing_outfit_fields(merged)) < current_missing:
+            return merged, SCRIPT_OUTFIT_SOURCE
+    return None
 
 
 def _missing_reason_parts(reason: str) -> List[str]:
@@ -488,13 +554,15 @@ def build_character_sheet_specs(
 def backfill_character_outfits(
     plan: Any,
     texts_by_character: Mapping[str, Sequence[Tuple[str, str]]],
-    script_materials: Optional[Mapping[str, str]] = None,
+    script_outfits: Optional[Mapping[str, Any]] = None,
     asset_revisions: Optional[Mapping[str, int]] = None,
 ) -> List[str]:
-    """回填角色服装缺失要素：剧本材质优先，其次片段提示词（0.4.5 T-016/T-017）
+    """回填角色服装缺失要素：剧本结构化服装优先，其次片段提示词（0.4.5 T-016/T-017）
 
     ASSETS 节点早于提示词生成，此时只能依据剧本锚点标记“信息不足”；路由阶段
-    按“剧本 ``character_outfits.material`` > 该角色片段提示词”的顺序补全三视图。
+    按“剧本 ``character_outfits`` > 该角色片段提示词”的顺序补全三视图。
+    剧本来源先尝试 ``material``，再尝试 ``description``；片段来源只采信该角色的
+    ``[Character consistency: 角色, clothing: …]`` 标注。
     回填后重算缺失字段：全部解决时清除 ``outfit_missing_fields`` 与
     ``requires_special_attention``；仍缺失时保留标记并写明“剧本与片段均未提供”。
 
@@ -504,7 +572,8 @@ def backfill_character_outfits(
     Args:
         plan: 资产计划文档（``AssetPlanDocument`` 或字典），原地修改
         texts_by_character: 角色名 -> [(片段ID, 片段文本)]，片段文本含描述与提示词
-        script_materials: 角色名 -> 剧本结构化材质（来自 ``global_metadata``）
+        script_outfits: 角色名 -> 剧本结构化服装（材质字符串或
+            ``{description, material}`` 记录，来自 ``global_metadata``）
         asset_revisions: asset_id -> 清单修订号；缺省或 0 视为未编辑
 
     Returns:
@@ -535,11 +604,14 @@ def backfill_character_outfits(
                 _apply_outfit_metadata(spec, current)
             continue
 
-        phrase = _script_material_candidate(
-            current, (script_materials or {}).get(spec.owner_name, "")
+        phrase: Optional[str] = None
+        source: Optional[str] = None
+        script_candidate = _script_outfit_candidate(
+            current, (script_outfits or {}).get(spec.owner_name)
         )
-        source: Optional[str] = SCRIPT_MATERIAL_SOURCE if phrase else None
-        if phrase is None:
+        if script_candidate is not None:
+            phrase, source = script_candidate
+        else:
             candidate = _best_outfit_candidate(
                 current, spec.owner_name, texts_by_character.get(spec.owner_name, [])
             )
@@ -550,11 +622,19 @@ def backfill_character_outfits(
             # 无可用来源：只更新结论，写明剧本与片段均未提供
             _apply_outfit_metadata(spec, current)
             continue
-        if not current or current not in spec.image_prompt:
-            # 提示词已截断或服装未拼入时不做替换，避免破坏提示词结构
-            continue
+        if current:
+            if current not in spec.image_prompt:
+                # 提示词已截断或服装未拼入时不做替换，避免破坏提示词结构
+                continue
+            spec.image_prompt = spec.image_prompt.replace(current, phrase, 1)
+        elif CHARACTER_SHEET_TAIL in spec.image_prompt:
+            # 锚点未产出服装时插在固定结尾之前，保持三视图提示词结构
+            spec.image_prompt = spec.image_prompt.replace(
+                CHARACTER_SHEET_TAIL, f"{phrase}, {CHARACTER_SHEET_TAIL}", 1
+            )
+        else:
+            spec.image_prompt = f"{spec.image_prompt}, {phrase}"
 
-        spec.image_prompt = spec.image_prompt.replace(current, phrase, 1)
         spec.metadata["outfit_text"] = phrase
         spec.metadata["outfit_backfill_source"] = source
         _apply_outfit_metadata(spec, phrase)

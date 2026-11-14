@@ -22,6 +22,7 @@ from penshot.neopen.agent.asset_generator.asset_models import (
 )
 from penshot.neopen.agent.asset_generator.character_sheet_generator import (
     SCRIPT_MATERIAL_SOURCE,
+    SCRIPT_OUTFIT_SOURCE,
     _missing_outfit_fields,
     backfill_character_outfits,
 )
@@ -284,3 +285,128 @@ def test_wrapper_without_manifest_still_protects_edited_assets():
     assert changed == []
     assert plan.assets[0].metadata["outfit_text"] == "深蓝色标准地铁制服"
     assert edited.metadata["outfit_text"] == "深蓝色标准地铁制服"
+
+
+def _character_plan(
+    outfit_text: str = "",
+    image_prompt: str = "",
+    metadata: dict | None = None,
+) -> AssetPlanDocument:
+    """构造门口黑影三视图资产（默认无锚点服装，复现 0.4.5 污染样本）"""
+    return AssetPlanDocument(
+        assets=[
+            AssetSpec(
+                asset_id="char_003",
+                asset_type=AssetType.CHARACTER_SHEET,
+                owner_name="门口黑影",
+                image_prompt=image_prompt
+                or (
+                    "character reference sheet of 门口黑影, front view, side view "
+                    "and back view, full body, neutral grey background, soft even "
+                    "studio lighting, consistent facial identity and outfit, "
+                    "highly detailed character design"
+                ),
+                metadata=metadata
+                or {"role": "identity_anchor", "outfit_text": outfit_text},
+            )
+        ]
+    )
+
+
+def test_fragment_fallback_does_not_use_other_character_outfit():
+    """门口黑影不得回填同片段中陈默的外卖制服（0.4.5 发布阻断项）"""
+    plan = _character_plan(
+        outfit_text="全身黑色衣物，佩戴白色医用口罩",
+        image_prompt=(
+            "character reference sheet of 门口黑影, front view, side view and back "
+            "view, full body, neutral grey background, soft even studio lighting, "
+            "consistent facial identity and outfit, 全身黑色衣物，佩戴白色医用口罩, "
+            "highly detailed character design"
+        ),
+        metadata={
+            "role": "identity_anchor",
+            "outfit_text": "全身黑色衣物，佩戴白色医用口罩",
+            "outfit_missing_fields": ["类型", "材质"],
+            "requires_special_attention": True,
+            "attention_reason": "服装描述缺少类型和材质",
+        },
+    )
+    texts = {
+        "门口黑影": [
+            (
+                "frag_013",
+                "POV over-the-shoulder shot, Chen Mo in blue-yellow delivery "
+                "uniform rushing to the door. 一个全身黑色衣物、佩戴白色医用口罩的"
+                "黑影静静站立，缓缓将门关上。 [Character consistency: 门口黑影, "
+                "clothing: 全身黑色衣物，佩戴白色医用口罩]",
+            )
+        ]
+    }
+
+    changed = backfill_character_outfits(
+        plan,
+        texts,
+        {
+            "门口黑影": {
+                "description": "全身黑色衣物，佩戴白色医用口罩，面部特征被遮挡",
+                "material": "未知",
+            }
+        },
+    )
+
+    spec = plan.assets[0]
+    assert changed == []
+    assert "blue-yellow delivery uniform" not in spec.image_prompt
+    assert "全身黑色衣物，佩戴白色医用口罩" in spec.image_prompt
+    assert "outfit_backfill_source" not in spec.metadata
+
+
+def test_fragment_fallback_prefers_character_clothing_annotation():
+    """片段正文混入他人着装时，只采信该角色的 clothing 标注"""
+    plan = _outfit_plan("深色外套")
+    texts = {
+        "站台管理员": [
+            (
+                "frag_013",
+                "Chen Mo in blue-yellow delivery uniform rushing to the door. "
+                "[Character consistency: 站台管理员, clothing: 黑色棉质制服]",
+            )
+        ]
+    }
+
+    changed = backfill_character_outfits(
+        plan, texts, {"站台管理员": {"material": "未知"}}
+    )
+
+    spec = plan.assets[0]
+    assert changed == ["char_002"]
+    assert "黑色棉质制服" in spec.image_prompt
+    assert "delivery uniform" not in spec.image_prompt
+    assert spec.metadata["outfit_backfill_source"] == "frag_013"
+    assert "outfit_missing_fields" not in spec.metadata
+
+
+def test_script_description_backfills_when_anchor_has_no_outfit():
+    """锚点未产出服装时，剧本 description 优先于片段正文（材质“未知”不阻断）"""
+    plan = _character_plan()
+
+    changed = backfill_character_outfits(
+        plan,
+        {"门口黑影": [("frag_013", "Chen Mo in blue-yellow delivery uniform")]},
+        {
+            "门口黑影": {
+                "description": "全身黑色衣物，佩戴白色医用口罩",
+                "material": "未知",
+            }
+        },
+    )
+
+    spec = plan.assets[0]
+    assert changed == ["char_003"]
+    assert "全身黑色衣物，佩戴白色医用口罩" in spec.image_prompt
+    assert "delivery uniform" not in spec.image_prompt
+    assert spec.metadata["outfit_backfill_source"] == SCRIPT_OUTFIT_SOURCE
+    assert spec.metadata["outfit_missing_fields"] == ["类型", "材质"]
+    assert spec.image_prompt.endswith(
+        "全身黑色衣物，佩戴白色医用口罩, highly detailed character design"
+    )

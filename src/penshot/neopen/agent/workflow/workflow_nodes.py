@@ -1106,7 +1106,7 @@ class WorkflowNodes:
             parsed_script=state.domain.parsed_script,
             instructions=state.domain.instructions,
         )
-        # 0.4.5 T-016：剧本结构化材质优先，其次用最终提示词补全服装缺失要素
+        # 0.4.5 T-016：剧本结构化服装优先，其次用该角色片段标注补全服装缺失要素
         outfit_backfilled = backfill_outfits(
             plan,
             fragments=fragments,
