@@ -28,7 +28,7 @@ from penshot.neopen.agent.prompt_converter.camera_builder import (
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
 from penshot.neopen.agent.quality_auditor.base_quality_auditor import BaseQualityAuditor
-from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityAuditReport, RuleType, SeverityLevel
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import IssueType, QualityAuditReport, RuleType, SeverityLevel
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.str_count_utils import only_count_en
@@ -45,15 +45,20 @@ class RuleQualityAuditor(BaseQualityAuditor):
         self.last_audit_result = None
         self.audit_count = 0
 
-    def audit(self, instructions: AIVideoInstructions,
-              historical_context: Optional[Dict[str, Any]] = None,
-              contract: Optional[Any] = None) -> QualityAuditReport:
+    def audit(
+        self,
+        instructions: AIVideoInstructions,
+        historical_context: Optional[Dict[str, Any]] = None,
+        contract: Optional[Any] = None,
+        contract_violations: Optional[List[Dict[str, Any]]] = None,
+    ) -> QualityAuditReport:
         """执行基本规则审查
 
         Args:
             instructions: AI 视频指令集
             historical_context: 历史上下文（基本规则审查暂不使用）
-            contract: 全局一致性契约；用于外观锚点污染检查（FR-060）
+            contract: 全局一致性契约；用于外观锚点污染检查与契约违规复核（FR-060）
+            contract_violations: 契约校验违规项（Validator 产物，审计前复检合并传入）
         """
         info(f"开始基本规则审查，片段数: {len(instructions.fragments)}")
 
@@ -77,6 +82,7 @@ class RuleQualityAuditor(BaseQualityAuditor):
         self._check_model_support(instructions, report)
         # G 质量门禁（FR-060..FR-064）
         self._check_appearance_anchor_pollution(contract, report)
+        self._check_contract_violations(contract, contract_violations, report)
         self._check_shot_type_prompt_consistency(instructions, report)
         self._check_camera_motion_prompt_consistency(instructions, report)
         self._check_style_lighting_conflict(instructions, report)
@@ -282,6 +288,59 @@ class RuleQualityAuditor(BaseQualityAuditor):
             self._add_check(report, check_name, "passed", "所有角色外观锚点字段纯净")
         else:
             self._add_check(report, check_name, "failed", f"发现{pollution_count}个锚点污染问题")
+
+    def _check_contract_violations(
+        self,
+        contract: Optional[Any],
+        contract_violations: Optional[List[Dict[str, Any]]],
+        report: QualityAuditReport,
+    ) -> None:
+        """检查契约校验违规项（FR-060..FR-064 补强）
+
+        切镜/切片决策产出的契约违规项（unknown_character / orphan_fragment）
+        在审计前对最终产物复检合并后传入；审查报告必须计入这些违规并按
+        MAJOR 扣分，否则会出现"契约已告警而审查 100 分"的割裂。
+        """
+        check_name = "契约一致性复核检查"
+        if contract is None:
+            self._add_check(report, check_name, "skipped", "缺少一致性契约，跳过契约违规复核")
+            return
+        if not contract_violations:
+            self._add_check(report, check_name, "passed", "最终产物通过契约一致性复核")
+            return
+
+        stage_nodes = {
+            "segment_shot": PipelineNode.SEGMENT_SHOT,
+            "split_video": PipelineNode.SPLIT_VIDEO,
+        }
+        suggestions = {
+            "unknown_character": (
+                "该角色未通过契约一致性校验：剧本角色需补登记契约锚点，"
+                "幻觉角色需清除主角色标注"
+            ),
+            "orphan_fragment": "片段关联的镜头不存在：重新关联有效镜头或移除该片段",
+        }
+        for violation in contract_violations:
+            issue_code = str(violation.get("type") or "contract_violation")
+            self._add_base_violation(
+                report=report,
+                issue_code=issue_code,
+                issue_type=IssueType.CONTINUITY,
+                issue_desc=str(violation.get("message") or "契约一致性校验违规"),
+                issue_value=violation,
+                severity=SeverityLevel.MAJOR,
+                fragment_id=violation.get("fragment_id"),
+                source_node=stage_nodes.get(
+                    str(violation.get("stage") or ""), PipelineNode.SEGMENT_SHOT
+                ),
+                suggestion=suggestions.get(
+                    issue_code, str(violation.get("message") or "")
+                ),
+            )
+
+        self._add_check(
+            report, check_name, "failed", f"发现{len(contract_violations)}个契约违规项"
+        )
 
     def _check_shot_type_prompt_consistency(self, instructions: AIVideoInstructions, report: QualityAuditReport) -> None:
         """检查 camera.shot_type 与最终提示词景别表述是否一致（FR-061/FR-064）"""

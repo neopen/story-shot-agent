@@ -90,10 +90,14 @@ class QualityAuditorAgent:
         # 去重缓存
         self._seen_violations: Set[str] = set()
 
-    def qa_process(self, instructions: AIVideoInstructions,
-                   stage_issues: Optional[Dict[PipelineNode, List[BasicViolation]]] = None,
-                   historical_context: Optional[Dict[str, Any]] = None,
-                   contract: Optional[Any] = None) -> Optional[QualityAuditReport]:
+    def qa_process(
+        self,
+        instructions: AIVideoInstructions,
+        stage_issues: Optional[Dict[PipelineNode, List[BasicViolation]]] = None,
+        historical_context: Optional[Dict[str, Any]] = None,
+        contract: Optional[Any] = None,
+        contract_violations: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[QualityAuditReport]:
         """
         执行质量审查 - 合并基本规则、LLM结果和各阶段问题
 
@@ -102,6 +106,8 @@ class QualityAuditorAgent:
             stage_issues: 各阶段检测到的问题（来自各个智能体的detect_issues方法）
             historical_context: 历史上下文（可选，用于优化审查）
             contract: 全局一致性契约（可选，供外观锚点污染检查使用）
+            contract_violations: 契约校验违规项（可选，规则审查计入评分，
+                深度审查提示词采信为问题）
 
         Returns:
             质量审查报告
@@ -129,15 +135,23 @@ class QualityAuditorAgent:
             # 1. 执行基本规则审查
             # rule_auditor 由工厂按 AgentMode.RULE 创建，实际类型恒为 RuleQualityAuditor
             rule_report = cast(RuleQualityAuditor, self.rule_auditor).audit(
-                instructions, contract=contract
+                instructions, contract=contract, contract_violations=contract_violations
             )
             info(f"基本规则审查完成，发现{len(rule_report.violations)}个问题")
 
             # 2. 执行LLM深度审查（如果启用），传递历史上下文
             llm_report = None
             if self.llm_auditor:
-                llm_report = self.llm_auditor.audit(instructions, historical_context)  # 传递历史上下文
-                info(f"LLM审查完成，发现{len(llm_report.violations) if llm_report else 0}个问题")
+                # 契约违规项注入审查上下文，深度审查必须采信并标记为问题
+                llm_context = dict(historical_context or {})
+                if contract_violations:
+                    llm_context["contract_violations"] = contract_violations
+                llm_report = self.llm_auditor.audit(
+                    instructions, llm_context
+                )  # 传递历史上下文
+                info(
+                    f"LLM审查完成，发现{len(llm_report.violations) if llm_report else 0}个问题"
+                )
 
             # 3. 合并报告（包含各阶段问题，带去重）
             merged_report = self._merge_reports_with_dedup(rule_report, llm_report, instructions, stage_issues)

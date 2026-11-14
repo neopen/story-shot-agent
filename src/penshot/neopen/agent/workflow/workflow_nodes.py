@@ -25,6 +25,11 @@ from penshot.neopen.agent.continuity_guardian.contract_repair import (
     build_contract_repair_params,
     group_violations_by_stage,
     merge_repair_params,
+    merge_violations,
+)
+from penshot.neopen.agent.continuity_guardian.contract_validator import (
+    validate_fragment_sequence,
+    validate_shot_sequence,
 )
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
     ContinuityGuardianChecker,
@@ -1308,12 +1313,27 @@ class WorkflowNodes:
         self._update_task_progress(state.input.task_id, TaskStage.AUDITING, 20)
 
         try:
+            # 审计前对最终产物复检契约一致性（FR-060..FR-064 补强）：
+            # 合并历史违规项与当下复检结果，让审查读取契约校验告警，
+            # 避免出现"契约已告警而审查 100 分"的割裂
+            fresh_contract_violations = validate_shot_sequence(
+                state.domain.shot_sequence, state.domain.contract
+            ) + validate_fragment_sequence(
+                state.domain.fragment_sequence,
+                state.domain.shot_sequence,
+                state.domain.contract,
+            )
+            contract_violations = merge_violations(
+                state.domain.contract_violations, fresh_contract_violations
+            )
+
             # 执行质量审查
             result = self.quality_auditor.qa_process(
                 state.domain.instructions,
                 all_stage_issues,
                 historical_context,
                 contract=state.domain.contract,
+                contract_violations=contract_violations,
             )
 
             debug("质量审查完成:")
