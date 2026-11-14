@@ -236,8 +236,8 @@ generated = {}
     AP --&gt; IMG[下游图片服务&lt;br/&gt;角色/道具/场景]
     IMG --&gt; REF[references&lt;br/&gt;asset_id + as_first_frame]
     REF --&gt; VID[下游视频服务&lt;br/&gt;文生视频 / 图生视频]
-    IMG -.可选回填. -&gt; MF[asset_manifest&lt;br/&gt;bindings + asset_id_map]
-    MF -.下一次任务. -&gt; PS
+    IMG -.->|可选回填| MF[asset_manifest&lt;br/&gt;bindings + asset_id_map]
+    MF -.->|下一次任务| PS
 </pre>
 
 <h2 id="sec-4">asset_plan：声明式生图指令</h2>

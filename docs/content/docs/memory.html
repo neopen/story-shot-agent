@@ -102,7 +102,7 @@
     subgraph ShortTerm[&quot;短期记忆 (Short-Term)&quot;]
         S1[会话历史&lt;br/&gt;LangChain ChatMessageHistory]
         S2[滑动窗口&lt;br/&gt;deque maxlen=20]
-        S3[Redis 可选&lt;br/&gt;key: penshot:memory:{session_id}]
+        S3["Redis 可选&lt;br/&gt;key: penshot:memory:{session_id}"]
     end
 
     subgraph MediumTerm[&quot;中期记忆 (Medium-Term)&quot;]
@@ -115,7 +115,7 @@
         L1[成功模式]
         L2[常见问题模式]
         L3[可复用知识向量]
-        L_Vector[Chroma 向量库&lt;br/&gt;collection: script_{script_id}_memory]
+        L_Vector["Chroma 向量库&lt;br/&gt;collection: script_{script_id}_memory"]
     end
 
     subgraph Access[&quot;统一访问层&quot;]

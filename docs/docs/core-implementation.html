@@ -314,7 +314,7 @@
 <p>资产生成把“角色、道具、场景”从提示词描述提升为可回填的显式对象。默认配置 <code>image.default.enabled=false</code>，节点只产出 <code>asset_plan</code>，不调用任何生图接口。</p>
 <pre class="mermaid">flowchart LR
     A[解析产物&lt;br/&gt;角色/道具/场景] --&gt; B[AssetSpec 规格&lt;br/&gt;char_ / prop_ / scene_]
-    B --&gt; C[AssetPlanDocument&lt;br/&gt;assets[] + style_anchor]
+    B --&gt; C["AssetPlanDocument&lt;br/&gt;assets[] + style_anchor"]
     C --&gt; D{image.default.enabled?}
     D --&gt;|否| E[仅输出计划&lt;br/&gt;status=pending]
     D --&gt;|是| F[调用生图 provider&lt;br/&gt;生成 asset_ref]
