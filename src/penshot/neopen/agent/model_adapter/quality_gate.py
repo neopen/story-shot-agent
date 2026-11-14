@@ -20,7 +20,10 @@ from penshot.neopen.agent.asset_generator.asset_models import (
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     find_motion_clauses,
 )
-from penshot.neopen.agent.model_adapter.image_to_video import has_critical_text
+from penshot.neopen.agent.model_adapter.image_to_video import (
+    contains_readable_text,
+    has_critical_text,
+)
 from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
     RouteMode,
@@ -49,27 +52,6 @@ _SHOT_ALIASES: Dict[str, str] = {
     "over_shoulder": "over_shoulder",
     "over_the_shoulder": "over_shoulder",
 }
-
-# 首帧需要“可读文字”证据的标记；只出现“纸条”不算可读地址
-_READABLE_TEXT_MARKERS = (
-    "text",
-    "readable",
-    "address",
-    "handwriting",
-    "subtitle",
-    "文字",
-    "字迹",
-    "地址",
-    "手写",
-    "字幕",
-    "招牌",
-    "标牌",
-    "海报",
-    "书名",
-    "报纸",
-    "书信",
-    "标题",
-)
 
 _EN_DIALOGUE_RE = re.compile(r"['\"][A-Za-z][^'\"]{8,}['\"]")
 _ZH_DIALOGUE_RE = re.compile(r"[“\"][\u4e00-\u9fff][^”\"]{4,}[”\"]")
@@ -137,8 +119,7 @@ def _critical_text_warnings(package: AdaptedPromptPackage, prompt: Any) -> List[
         return []
     if not has_critical_text(getattr(prompt, "prompt", "")):
         return []
-    lowered = package.image_prompt.lower()
-    if any(marker in lowered for marker in _READABLE_TEXT_MARKERS):
+    if contains_readable_text(package.image_prompt):
         return []
     return ["critical_text 路由缺少首帧文字证据：image_prompt 未要求呈现可读文字"]
 

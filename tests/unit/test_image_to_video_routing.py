@@ -88,6 +88,14 @@ def test_has_critical_text_detects_text_signals():
     assert has_critical_text("a man walks in the rain") is False
 
 
+def test_has_critical_text_ignores_environmental_signage():
+    """环境招牌/屏幕/材质纹理不构成可读文字渲染需求（0.4.5 稳定版误报修复）"""
+    assert has_critical_text("green emergency exit sign glowing in the dark") is False
+    assert has_critical_text("uniform with polyester texture") is False
+    assert has_critical_text("TV screen flickering with blue static snow") is False
+    assert has_critical_text("subtitle displays the address") is True
+
+
 def test_should_use_image_to_video_for_high_consistency():
     contract = _contract()
     prompt = AIVideoPrompt(

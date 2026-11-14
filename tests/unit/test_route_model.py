@@ -142,7 +142,9 @@ def test_routing_config_is_loaded_and_models_registered():
 
 
 def test_critical_text_rule_has_highest_priority():
-    instructions = _instructions(_prompt("woman holding a sign, slow pan"))
+    instructions = _instructions(
+        _prompt("woman holding a poster with readable text, slow pan")
+    )
     packages = adapt_instructions(instructions, "runway_gen4")
 
     plan = build_route_plan(packages, instructions)
@@ -152,6 +154,21 @@ def test_critical_text_rule_has_highest_priority():
     assert plan.decisions[0].mode == RouteMode.IMAGE_TO_VIDEO
     # 适配包按最终目标模型重建，避免提示词与模型不一致
     assert packages[0].target_model == "kling_3"
+
+
+def test_environmental_sign_and_screen_do_not_route_critical_text():
+    """楼道空镜、门缝透光、人影背影不含文字渲染需求，不得路由 critical_text"""
+    for text in (
+        "only green emergency exit sign glowing with cold eerie light",
+        "Chen Mo wearing blue and yellow delivery uniform with polyester texture",
+        "single light source from old TV screen flickering blue static snow",
+    ):
+        instructions = _instructions(_prompt(text))
+        packages = adapt_instructions(instructions, "runway_gen4")
+
+        plan = build_route_plan(packages, instructions)
+
+        assert plan.decisions[0].reason != "critical_text"
 
 
 def test_routing_disabled_keeps_source_model(monkeypatch):
@@ -190,7 +207,9 @@ def test_route_model_node_rebuilds_route_plan():
     state = WorkflowState.from_raw_script(
         "测试剧本", task_id="task_001", script_id="script_001"
     )
-    instructions = _instructions(_prompt("woman holding a sign, slow pan"))
+    instructions = _instructions(
+        _prompt("woman holding a poster with readable text, slow pan")
+    )
     instructions.route_plan = {"stale": True}
     state.domain.instructions = instructions
 

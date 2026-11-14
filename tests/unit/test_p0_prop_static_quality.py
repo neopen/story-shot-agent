@@ -370,6 +370,31 @@ def test_quality_gate_clean_package_stays_empty() -> None:
     assert prompt.requires_special_attention is False
 
 
+def test_quality_gate_skips_critical_text_for_environmental_signage() -> None:
+    """楼道空镜的环境招牌不触发“缺少首帧文字证据”，避免自相矛盾告警"""
+    prompt = AIVideoPrompt(
+        fragment_id="frag_003",
+        prompt=(
+            "wide shot, 4 AM, narrow dim corridor, only green emergency exit "
+            "sign glowing with cold eerie light"
+        ),
+        duration=3.0,
+    )
+    instructions = AIVideoInstructions(fragments=[prompt])
+    package = AdaptedPromptPackage(
+        fragment_id="frag_003",
+        target_model="kling_3",
+        prompt="adapted",
+        duration=3.0,
+        mode=RouteMode.IMAGE_TO_VIDEO,
+        image_prompt="wide shot, empty corridor, green exit sign glowing",
+    )
+
+    apply_quality_gate([package], instructions)
+
+    assert package.warnings == []
+
+
 def test_quality_gate_accepts_normal_duration_semantic_gap() -> None:
     """三套时长口径语义不同：正常重算差异与元素推算值不产生交付偏差告警"""
     prompt = AIVideoPrompt(fragment_id="frag_004", prompt="a woman waits", duration=3.0)

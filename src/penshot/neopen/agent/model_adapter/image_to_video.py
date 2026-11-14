@@ -10,6 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/11/05
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 from penshot.logger import warning
@@ -30,21 +31,14 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 )
 from penshot.neopen.agent.prop_usage import advance_prop_state, mentions_prop
 
-# 文字/屏幕内容特征：这些片段的文字渲染最容易出错，优先走文生图 -> 图生视频
-CRITICAL_TEXT_MARKERS = (
-    "text",
-    "subtitle",
-    "sign",
-    "signage",
-    "poster",
-    "logo",
-    "book title",
-    "newspaper",
-    "letter",
-    "screen",
-    "menu",
-    "handwriting",
+# 可读文字渲染证据：只有明确要求呈现文字内容时才走两段式。
+# 场景里的招牌/屏幕/标牌只作氛围时不构成文字渲染需求，旧的宽子串词表会把
+# “texture / exit sign / TV screen”误判为 critical_text（0.4.5 稳定版误报修复）。
+READABLE_TEXT_MARKERS_ZH = (
     "文字",
+    "字迹",
+    "地址",
+    "手写",
     "字幕",
     "招牌",
     "标牌",
@@ -52,17 +46,38 @@ CRITICAL_TEXT_MARKERS = (
     "书名",
     "报纸",
     "书信",
-    "手机屏幕",
-    "屏幕",
     "标题",
-    "手写",
+)
+
+READABLE_TEXT_MARKERS_EN = (
+    "text",
+    "readable",
+    "address",
+    "handwriting",
+    "subtitle",
+    "newspaper",
+    "poster",
+    "menu",
+    "title",
+)
+
+# 英文按词边界匹配，避免 texture / context 等词命中 "text"
+_READABLE_TEXT_EN_RE = re.compile(
+    r"\b(?:" + "|".join(READABLE_TEXT_MARKERS_EN) + r")\b", re.IGNORECASE
 )
 
 
+def contains_readable_text(text: str) -> bool:
+    """文本是否明确要求渲染可读文字（路由与 Gate 共用的判定口径）"""
+    value = str(text or "")
+    if any(marker in value for marker in READABLE_TEXT_MARKERS_ZH):
+        return True
+    return bool(_READABLE_TEXT_EN_RE.search(value))
+
+
 def has_critical_text(prompt: str) -> bool:
-    """判断片段是否包含需要精确渲染的文字/屏幕内容"""
-    lowered = (prompt or "").lower()
-    return any(marker in lowered for marker in CRITICAL_TEXT_MARKERS)
+    """判断片段是否明确要求精确渲染可读文字"""
+    return contains_readable_text(prompt)
 
 
 def _character_has_anchors(prompt: AIVideoPrompt, contract: Any) -> bool:
