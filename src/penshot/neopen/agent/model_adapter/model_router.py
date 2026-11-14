@@ -172,6 +172,8 @@ def build_route_plan(
             )
             # 构建期告警必须随适配重建保留，否则 Gate 1 之外的既有告警会被静默丢弃
             rebuilt.warnings = list(package.warnings)
+            # 阻断状态同样必须保留，否则会出现"告警已阻断但 status=ready"的自相矛盾
+            rebuilt.status = package.status
         _apply_route_mode(rebuilt, prompt, mode)
         packages[index] = rebuilt
 
@@ -184,6 +186,7 @@ def build_route_plan(
                 asset_ref=rebuilt.asset_ref,
                 capability=capability,
                 references=list(rebuilt.references),
+                status=rebuilt.status,
             )
         )
 

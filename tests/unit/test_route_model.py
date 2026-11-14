@@ -307,6 +307,18 @@ def _scene_route_contract() -> GlobalConsistencyContract:
     return contract
 
 
+def test_route_plan_keeps_blocked_package_status():
+    """路由重建不得把已阻断的包重置为 ready，否则告警与状态自相矛盾"""
+    instructions = _instructions(_prompt("woman holding a poster with readable text"))
+    packages = adapt_instructions(instructions, "runway_gen4")
+    packages[0].status = "needs_manual_fix"
+
+    plan = build_route_plan(packages, instructions)
+
+    assert plan.decisions[0].status == "needs_manual_fix"
+    assert packages[0].status == "needs_manual_fix"
+
+
 def test_route_model_node_does_not_block_on_failure():
     nodes = object.__new__(WorkflowNodes)
     nodes.storage = _FakeStorage()

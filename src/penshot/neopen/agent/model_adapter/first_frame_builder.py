@@ -275,9 +275,14 @@ _SCENE_LOCATION_GLOSSARY: Dict[str, tuple[str, ...]] = {
     "家": ("home",),
 }
 
+# 同一地点的中文别称：场景资产写“楼道”时，提示词里的“走廊”不应算作另一个场景
+_SCENE_LOCATION_SYNONYMS: Dict[str, tuple[str, ...]] = {
+    "走廊": ("楼道", "过道", "通道"),
+}
+
 
 def _scene_location_terms(location: str) -> List[str]:
-    """把场景地点展开为可直接在文本中检索的词（中文原词 + 英文别名）"""
+    """把场景地点展开为可直接在文本中检索的词（中文原词 + 英文别名 + 同义别称）"""
     terms: List[str] = []
     for token in re.split(r"[/、·,，]", str(location or "")):
         token = token.strip()
@@ -287,6 +292,12 @@ def _scene_location_terms(location: str) -> List[str]:
         for key, aliases in _SCENE_LOCATION_GLOSSARY.items():
             if key == token or (len(key) > 1 and key in token):
                 terms.extend(aliases)
+        for key, synonyms in _SCENE_LOCATION_SYNONYMS.items():
+            family = (key, *synonyms)
+            if any(
+                item == token or (len(item) > 1 and item in token) for item in family
+            ):
+                terms.extend(family)
     return list(dict.fromkeys(terms))
 
 

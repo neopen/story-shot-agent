@@ -568,6 +568,67 @@ def test_scene_anchor_skips_prompt_without_location():
     assert packages[0].warnings == []
 
 
+def _hallway_contract() -> GlobalConsistencyContract:
+    """场景资产写成“楼道”，提示词常用“走廊/corridor”，两者是同一地点"""
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.register_character("陈默", 1)
+    contract.register_scene(
+        SceneContract(
+            scene_num=1,
+            location="老式居民楼楼道",
+            time_of_day="night",
+            characters_in_scene=["陈默"],
+        )
+    )
+    contract.register_asset(
+        AssetContract(
+            asset_id="scene_001",
+            asset_type="scene",
+            owner_name="老式居民楼楼道",
+            asset_ref="/tmp/assets/scene_001.png",
+            image_prompt="establishing shot of an old residential hallway",
+            status="generated",
+        )
+    )
+    return contract
+
+
+def test_scene_anchor_treats_hallway_synonyms_as_same_scene():
+    """楼道与走廊是同一语义，不得判为另一场景而阻断（P0-5）"""
+    contract = _hallway_contract()
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(
+                fragment_id="frag_001",
+                prompt="dark corridor in an old residential building, dim light",
+                duration=3.0,
+                main_character="陈默",
+            )
+        ]
+    )
+    packages = [
+        AdaptedPromptPackage(
+            fragment_id="frag_001",
+            target_model="runway_gen4",
+            prompt="adapted",
+            duration=3.0,
+        )
+    ]
+    fragments = [SimpleNamespace(id="frag_001", shot_id="shot_001", description="")]
+    shots = [SimpleNamespace(id="shot_001", scene_id="scene_001")]
+
+    apply_image_to_video_routing(
+        packages, instructions, contract, fragments=fragments, shots=shots
+    )
+
+    assert packages[0].status == "ready"
+    assert packages[0].warnings == []
+    first_frame = next(
+        ref for ref in packages[0].references if ref.role == "first_frame"
+    )
+    assert first_frame.asset_id == "scene_001"
+
+
 def test_scene_anchor_accepts_matching_location():
     """提示词与首帧场景一致时不告警（英文别名词表生效）"""
     contract = _scene_contract()
