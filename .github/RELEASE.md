@@ -2,7 +2,7 @@
 
 > 适用范围：`main` 分支的自动版本管理、tag、GitHub Release 与 PyPI 发布。
 > 相关文件：
-> - 工作流：`.github/workflows/release-please.yml`、`.github/workflows/publish-pypi.yml`
+> - 工作流：`.github/workflows/release-please.yml`、`.github/workflows/release-please-enrich.yml`、`.github/workflows/publish-pypi.yml`
 > - 配置：`.github/release-please-config.json`
 > - 版本基线：`.github/.release-please-manifest.json`
 > - 变更记录：`CHANGELOG.md`
@@ -76,6 +76,22 @@ release-please 只解析这个提交的消息；PR 正文中自动生成的提�
 | PR 标题写成 `Dev`、`Merge dev` 等非规范格式 | 无法识别类型，走 `default-bump-level: patch` 兜底 |
 | 标题写 `feat!` 但实际没有破坏性变更 | 会直接 bump 到 `1.0.0`，需谨慎 |
 | 手动修改发布 PR 的标题 | 可能破坏 release-please 对发布 PR 的识别 |
+
+### 2.2 发布 PR 正文自动富化
+
+发布 PR 的正文由三部分组成：
+
+| 来源 | 内容 |
+| --- | --- |
+| release-please | 版本标题与 `CHANGELOG.md` 中该版本的条目（粒度取决于 `main` 上的提交） |
+| `release-please-enrich.yml` | 发布 PR 打开或更新时，按版本号内联 `docs/plans/<version>-release-notes.md` 的正文小节 |
+| `release-please-config.json` | `pull-request-footer` 中的合并前检查清单（同时保留 release-please 尾注） |
+
+- `pull-request-footer` 会替换 release-please 的默认尾注，因此配置中同时保留了 “This PR was generated with [Release Please]” 这一行。
+- 发布说明文档缺失时，工作流回退到 `CHANGELOG.md` 中该版本的段落。
+- 因此发版前应在 `dev` 上准备好 `docs/plans/<version>-release-notes.md` 并随功能 PR 合入；否则发布 PR 只能展示自动生成的 CHANGELOG 条目。
+- 工作流用 `<!-- release-please-enrich:start/end -->` 标记做幂等替换：release-please 更新分支重写正文后，下一次触发会重新补齐，不会重复累积。
+- 明细段落由 `GITHUB_TOKEN` 写入，不会再触发工作流，不存在循环。
 
 ## 3. 升小版本（例如 0.4.x → 0.5.0）
 
