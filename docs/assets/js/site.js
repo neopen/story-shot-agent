@@ -106,15 +106,24 @@
   });
 
   /* -------------------------------------------------------------- reveals */
+  const docsReveal = document.body.classList.contains('docs-page')
+    ? $$(
+        '.doc-body > h2, .doc-body > h3, .doc-body > h4, .doc-body > table, .doc-body > pre, ' +
+          '.doc-body > blockquote, .doc-body > ul, .doc-body > ol, .doc-body > .doc-pager, ' +
+          '.doc-body > .doc-backtop'
+      )
+    : [];
+  docsReveal.forEach((item) => item.setAttribute('data-reveal', ''));
+
   const revealItems = $$('[data-reveal]');
   if ('IntersectionObserver' in window && revealItems.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
+        const entering = entries.filter((entry) => entry.isIntersecting);
+        entering.forEach((entry, index) => {
+          entry.target.style.transitionDelay = `${Math.min(index * 55, 220)}ms`;
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
         });
       },
       { rootMargin: '0px 0px -8% 0px', threshold: 0.08 }
@@ -122,6 +131,35 @@
     revealItems.forEach((item) => observer.observe(item));
   } else {
     revealItems.forEach((item) => item.classList.add('is-visible'));
+  }
+
+  /* ------------------------------------------------------ reading progress */
+  const article = $('.doc-body');
+  if (article) {
+    const progress = document.createElement('div');
+    progress.className = 'reading-progress';
+    progress.setAttribute('aria-hidden', 'true');
+    progress.innerHTML = '<span></span>';
+    document.body.appendChild(progress);
+    const fill = progress.firstElementChild;
+    const headerHeight = (header ? header.offsetHeight : 68);
+
+    let progressTicking = false;
+    const updateProgress = () => {
+      progressTicking = false;
+      const top = article.getBoundingClientRect().top + window.scrollY;
+      const distance = Math.max(article.offsetHeight + headerHeight - window.innerHeight, 1);
+      const ratio = Math.min(Math.max((window.scrollY - top + headerHeight) / distance, 0), 1);
+      fill.style.width = `${(ratio * 100).toFixed(2)}%`;
+    };
+    const onProgressScroll = () => {
+      if (progressTicking) return;
+      progressTicking = true;
+      window.requestAnimationFrame(updateProgress);
+    };
+    updateProgress();
+    window.addEventListener('scroll', onProgressScroll, { passive: true });
+    window.addEventListener('resize', onProgressScroll);
   }
 
   /* ------------------------------------------------------------ footer year */

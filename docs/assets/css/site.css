@@ -2438,12 +2438,51 @@ ol {
 .js [data-reveal] {
   opacity: 0;
   transform: translateY(16px);
-  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  transition: opacity 0.65s var(--ease), transform 0.65s var(--ease);
 }
 
 .js [data-reveal].is-visible {
   opacity: 1;
   transform: none;
+}
+
+.js .doc-body [data-reveal] {
+  transform: translateY(13px);
+}
+
+.js .doc-body [data-reveal].is-visible {
+  transform: none;
+}
+
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  height: 2px;
+  pointer-events: none;
+}
+
+.reading-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber), #ff7a1a);
+  box-shadow: 0 0 10px rgba(255, 176, 32, 0.45);
+  transition: width 0.1s linear;
+}
+
+@media print {
+  .reading-progress {
+    display: none !important;
+  }
+
+  .js [data-reveal],
+  .js .doc-body [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
