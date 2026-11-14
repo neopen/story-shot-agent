@@ -7,6 +7,13 @@
 
 ---
 
+## [0.4.5](https://github.com/neopen/story-shot-agent/compare/v0.4.4...v0.4.5) (2026-11-14)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 0.4.5 分镜缺陷修复与资产链收口 ([#95](https://github.com/neopen/story-shot-agent/issues/95)) ([4390f32](https://github.com/neopen/story-shot-agent/commit/4390f32243ea11402a55e0901a0cd885a6ae0b42))
+
 ## [0.4.4](https://github.com/neopen/story-shot-agent/compare/v0.4.3...v0.4.4) (2026-11-11)
 
 
