@@ -30,6 +30,7 @@ from .quality_auditor.quality_auditor_models import (
     IssueType,
     RuleType,
 )
+from .repair_outcome import record_repair_outcome
 from .script_parser.rule_script_parser import RuleScriptParser
 from .script_parser.script_parser_models import (
     ParsedScript,
@@ -854,6 +855,20 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         info(f"修复完成，执行了{len(repair_actions)}个修复操作")
         if repair_actions:
             debug(f"修复操作详情: {repair_actions[:10]}")
+        record_repair_outcome(
+            parsed_script.metadata,
+            "剧本解析",
+            issues,
+            repair_actions,
+            auto_types={
+                IssueType.SCENE.value,
+                IssueType.CHARACTER.value,
+                IssueType.DIALOGUE.value,
+                IssueType.ACTION.value,
+                IssueType.FORMAT.value,
+                IssueType.CONTINUITY.value,
+            },
+        )
 
         return parsed_script
 

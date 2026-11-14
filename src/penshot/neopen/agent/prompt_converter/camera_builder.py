@@ -378,6 +378,46 @@ def check_motion_consistency(text: str, motion: Any) -> Optional[Tuple[str, str]
     )
 
 
+def repair_motion_conflict(
+    text: str, motion: Any
+) -> Optional[Tuple[CameraMotion, str]]:
+    """运镜冲突的确定性修复：按提示词里的具体短语收敛 camera.motion
+
+    只处理可判定的一侧：提示词明确写了运镜或静止镜头时，结构化运镜跟随该具体
+    短语；无法判定时返回 None，交给人工处理。
+
+    Returns:
+        ``(修复后的运镜, 修复说明)``；无需或无法修复时返回 None
+    """
+    declared = _normalize_motion(motion)
+    if declared is None:
+        return None
+
+    detected, keyword = detect_motion_from_text(text)
+    lowered = (text or "").lower()
+
+    if detected is not None:
+        if declared != CameraMotion.STATIC and (
+            _MOTION_FAMILIES.get(declared) == _MOTION_FAMILIES.get(detected)
+        ):
+            return None
+        return (
+            detected,
+            f"运镜冲突取具体短语: {declared.value} -> {detected.value}（命中 {keyword}）",
+        )
+
+    if declared == CameraMotion.STATIC:
+        return None
+    static_hits = [marker for marker in _STATIC_PROMPT_MARKERS if marker in lowered]
+    if not static_hits:
+        return None
+    return (
+        CameraMotion.STATIC,
+        "运镜冲突取具体短语: "
+        f"{declared.value} -> static（提示词写为 {'/'.join(static_hits)}）",
+    )
+
+
 def build_camera_control(
     description: str, shot_type: Optional[str] = None
 ) -> CameraControl:

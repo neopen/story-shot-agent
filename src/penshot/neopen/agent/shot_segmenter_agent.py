@@ -18,6 +18,7 @@ from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.character_names import normalize_character_name
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import IssueType
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, RuleType, QualityRepairParams
+from penshot.neopen.agent.repair_outcome import record_repair_outcome
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_enhancer import DurationEnhancer
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_factory import estimator_factory
@@ -632,6 +633,24 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         info(f"分镜修复完成，执行了{len(repair_actions)}个修复操作")
         if repair_actions:
             debug(f"修复操作详情: {repair_actions[:10]}")
+        record_repair_outcome(
+            shot_sequence.metadata,
+            "分镜生成",
+            issues,
+            repair_actions,
+            # 角色服装/外观信息缺失等 CHARACTER 问题无法在镜头层自动补齐，
+            # 不纳入自动覆盖范围，交由最终输出标记 requires_manual_fix
+            auto_codes={
+                "shot_repetitive",
+                "shot_type_uniform",
+                "shot_type_invalid",
+                "shot_type_mismatch",
+            },
+            auto_types={
+                IssueType.DURATION.value,
+                IssueType.PROMPT.value,
+            },
+        )
 
         return shot_sequence
 

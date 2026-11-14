@@ -66,6 +66,11 @@ from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
+from penshot.neopen.agent.repair_outcome import (
+    REPAIR_STATUS_NO_ACTION,
+    REPAIR_STATUS_PARTIAL,
+    REPAIR_STATUS_REPAIRED,
+)
 from penshot.neopen.prompts.ingestion_policy import decide_ingestion
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 from penshot.neopen.prompts.recall_status import build_anchor_recall
@@ -1477,7 +1482,16 @@ class WorkflowNodes:
                     )
 
             # 调用各阶段修复器
+            repair_issue_count = 0
+            repair_actions_total = 0
+            history_before: Dict[str, int] = {}
             if result.repair_params:
+                repair_issue_count = sum(
+                    params.issue_count
+                    for params in result.repair_params.values()
+                    if getattr(params, "fix_needed", False)
+                )
+                history_before = self._repair_history_sizes(state)
                 for node, params in result.repair_params.items():
                     if not params.fix_needed:
                         continue
@@ -1531,6 +1545,46 @@ class WorkflowNodes:
                         state.errors.error_messages.append(
                             f"修复{node.value}失败: {str(e)}"
                         )
+
+                repair_actions_total = self._count_new_repair_actions(
+                    state, history_before
+                )
+
+            # P0-2：修复结论必须可核对——问题数与实际动作数分列，
+            # 零动作不得提升分数，未覆盖问题进入最终输出的人工项
+            manual_items = self._collect_manual_fix_items(state)
+            result.metadata["repair_issue_count"] = repair_issue_count
+            result.metadata["repair_action_count"] = repair_actions_total
+            if manual_items:
+                result.metadata["requires_manual_fix"] = manual_items
+
+            if repair_issue_count > 0 and repair_actions_total == 0:
+                result.metadata["repair_status"] = REPAIR_STATUS_NO_ACTION
+                error(
+                    f"修复环节空转：发现{repair_issue_count}个问题，执行0个修复操作；"
+                    f"已标记 repair_status={REPAIR_STATUS_NO_ACTION}，"
+                    f"post_repair_score 保持 detection_score={result.detection_score}"
+                )
+                result.post_repair_score = result.detection_score
+            elif repair_actions_total > 0:
+                # 覆盖全部问题时为 repaired，仍有未覆盖问题则如实标记 partial
+                result.metadata["repair_status"] = (
+                    REPAIR_STATUS_PARTIAL
+                    if self._has_uncovered_repairs(state)
+                    else REPAIR_STATUS_REPAIRED
+                )
+                # 复检口径仅规则与契约维度，需与检测分分列展示
+                result.metadata["post_repair_score_basis"] = "rule_recheck"
+                result.post_repair_score = self._recheck_prompt_score(state, result)
+            else:
+                result.post_repair_score = result.detection_score
+
+            info(
+                f"修复结果汇总: 问题数={repair_issue_count}, "
+                f"修复动作数={repair_actions_total}, 人工项={len(manual_items)}, "
+                f"detection_score={result.detection_score}, "
+                f"post_repair_score={result.post_repair_score}"
+            )
 
             # 保存审查结果
             self.storage.save_obj_result(
@@ -1913,6 +1967,8 @@ class WorkflowNodes:
         self._update_task_progress(state.input.task_id, TaskStage.OUTPUT_START, 0)
 
         try:
+            warnings = self._build_output_warnings(state)
+
             output_data = {
                 "task_id": state.input.task_id,
                 "script_analysis": state.domain.parsed_script.model_dump()
@@ -1937,6 +1993,7 @@ class WorkflowNodes:
                 "asset_generation": state.domain.asset_report,
                 "asset_plan": state.domain.asset_plan,
                 "asset_manifest": state.domain.asset_manifest,
+                "warnings": warnings,
                 "created_at": datetime.now().isoformat(),
                 "completed_at": datetime.now().isoformat(),
                 "status": "completed",
@@ -2585,6 +2642,109 @@ class WorkflowNodes:
         state.execution.current_node = PipelineNode.CONVERT_PROMPT
         state.execution.current_stage = AgentStage.CONVERTER
         return state
+
+    # ============================= 修复结果核算 =============================
+
+    @staticmethod
+    def _artifact_metadata(state: WorkflowState) -> Dict[str, Dict[str, Any]]:
+        """收集可修复产物的 metadata，按产物名索引"""
+        artifacts = {
+            "script": state.domain.parsed_script,
+            "shots": state.domain.shot_sequence,
+            "fragments": state.domain.fragment_sequence,
+            "prompts": state.domain.instructions,
+        }
+        return {
+            name: artifact.metadata
+            for name, artifact in artifacts.items()
+            if artifact is not None
+            and isinstance(getattr(artifact, "metadata", None), dict)
+        }
+
+    def _repair_history_sizes(self, state: WorkflowState) -> Dict[str, int]:
+        """记录各产物 repair_history 的当前长度，用于统计本轮新增动作"""
+        return {
+            name: len(metadata.get("repair_history") or [])
+            for name, metadata in self._artifact_metadata(state).items()
+        }
+
+    def _count_new_repair_actions(
+        self, state: WorkflowState, history_before: Dict[str, int]
+    ) -> int:
+        """统计本轮修复真实执行的动作数（仅新增 repair_history 的 fixed_issues）"""
+        total = 0
+        for name, metadata in self._artifact_metadata(state).items():
+            history = metadata.get("repair_history") or []
+            for entry in history[history_before.get(name, 0) :]:
+                try:
+                    total += int(entry.get("fixed_issues") or 0)
+                except (AttributeError, TypeError, ValueError):
+                    continue
+        return total
+
+    def _collect_manual_fix_items(self, state: WorkflowState) -> List[Dict[str, Any]]:
+        """汇总各产物中不可自动修复、需人工处理的问题项"""
+        items: List[Dict[str, Any]] = []
+        for metadata in self._artifact_metadata(state).values():
+            for item in metadata.get("requires_manual_fix") or []:
+                if item not in items:
+                    items.append(item)
+        return items
+
+    def _has_uncovered_repairs(self, state: WorkflowState) -> bool:
+        """本阶段产物是否仍有未自动覆盖、需人工处理的问题"""
+        for metadata in self._artifact_metadata(state).values():
+            if metadata.get("repair_status") == REPAIR_STATUS_PARTIAL:
+                return True
+            if metadata.get("requires_manual_fix"):
+                return True
+        return False
+
+    def _build_output_warnings(self, state: WorkflowState) -> List[Dict[str, Any]]:
+        """组装最终输出 warnings：人工处理项与阻断片段"""
+        warnings: List[Dict[str, Any]] = list(self._collect_manual_fix_items(state))
+
+        instructions = state.domain.instructions
+        route_plan = getattr(instructions, "route_plan", None) if instructions else None
+        if isinstance(route_plan, dict):
+            for fragment_id in route_plan.get("blocked_fragments") or []:
+                warnings.append(
+                    {
+                        "type": "blocked_fragment",
+                        "stage": "route_model",
+                        "fragment_id": fragment_id,
+                        "reason": "场景锚定无法唯一匹配，片段已阻断，不进入下游渲染队列",
+                    }
+                )
+
+        return warnings
+
+    def _recheck_prompt_score(
+        self, state: WorkflowState, result: QualityAuditReport
+    ) -> float:
+        """修复后规则复检评分；复检失败时回退检测分并告警"""
+        try:
+            fresh_violations = validate_shot_sequence(
+                state.domain.shot_sequence, state.domain.contract
+            ) + validate_fragment_sequence(
+                state.domain.fragment_sequence,
+                state.domain.shot_sequence,
+                state.domain.contract,
+            )
+            merged = merge_violations(
+                state.domain.contract_violations, fresh_violations
+            )
+            state.domain.contract_violations = merged
+            return float(
+                self.quality_auditor.recheck_rule_score(
+                    state.domain.instructions,
+                    contract=state.domain.contract,
+                    contract_violations=merged,
+                )
+            )
+        except Exception as e:
+            warning(f"修复后规则复检失败，沿用检测分: {e}")
+            return result.detection_score
 
     # ============================= 节点任务状态管理 =============================
 
