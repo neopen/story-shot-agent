@@ -669,6 +669,227 @@
   height: auto;
 }
 
+.doc-body pre.mermaid.is-zoomable {
+  position: relative;
+  cursor: zoom-in;
+}
+
+.doc-body pre.mermaid.is-zoomable:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.diagram-expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid #dfe3e9;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #697386;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease), border-color 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+
+.diagram-expand svg {
+  width: 11px;
+  height: 11px;
+}
+
+.doc-body pre.mermaid:hover .diagram-expand,
+.doc-body pre.mermaid:focus-within .diagram-expand,
+.diagram-expand:focus-visible {
+  opacity: 1;
+}
+
+.diagram-expand:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+/* fullscreen diagram viewer */
+.diagram-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  padding: 16px;
+  background: rgba(11, 13, 18, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.diagram-zoom[hidden] {
+  display: none;
+}
+
+.diagram-zoom__panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+}
+
+.diagram-zoom__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.diagram-zoom__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-zoom__tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diagram-zoom__tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease),
+    background 0.15s var(--ease);
+}
+
+.diagram-zoom__tools button:hover {
+  border-color: var(--line-strong);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.diagram-zoom__tools button:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+.diagram-zoom__close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.diagram-zoom__level {
+  min-width: 44px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagram-zoom__viewport {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background-color: #fff;
+  background-image: radial-gradient(#e9ecf1 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.diagram-zoom__viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.diagram-zoom__viewport:focus-visible {
+  outline: none;
+}
+
+.diagram-zoom__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.diagram-zoom__stage svg {
+  display: block;
+  max-width: none;
+}
+
+.diagram-zoom__hint {
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--muted-2);
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (hover: none) {
+  .diagram-expand {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .diagram-zoom {
+    padding: 0;
+  }
+
+  .diagram-zoom__panel {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .diagram-zoom__title {
+    font-size: 12px;
+  }
+
+  .diagram-zoom__tools button {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 7px;
+  }
+
+  .diagram-zoom__hint {
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+}
+
 .doc-body .katex-display {
   margin: 1.2em 0;
   padding: 4px 0;
