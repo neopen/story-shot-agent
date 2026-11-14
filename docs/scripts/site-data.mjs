@@ -8,8 +8,6 @@ export const site = {
   version: 'v0.4.4',
   license: 'MIT',
   repo: 'https://github.com/neopen/story-shot-agent',
-  repoEdit:
-    'https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/',
   pypi: 'https://pypi.org/project/penshot/',
   docker: 'https://hub.docker.com/r/neotems/penshot',
   issues: 'https://github.com/neopen/story-shot-agent/issues',

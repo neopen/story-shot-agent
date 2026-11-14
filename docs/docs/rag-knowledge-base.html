@@ -144,7 +144,6 @@
           <div class="doc-meta-row">
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 26 分钟阅读</span>
-            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/rag-knowledge-base.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
         <p>PenShot 0.4.4 的知识库与检索层分成两条独立链路：提示词模板按角色/场景锚点召回，默认阈值 0.80、单次取 2 条、最多注入 6 条，并在本剧本名额未满时只读补位其他剧本；剧本内容索引仍由 <code>ScriptKnowledgeBase</code> 承载，用手动余弦服务连续性检查。三层记忆是第三条链路，只在工作流节点与两者交界。</p>
@@ -713,13 +712,15 @@ python scripts/migrate_prompt_templates_044.py --apply             # 全库写�
     </a>
     <span class="pager-spacer"></span>
   </nav>
+        <div class="doc-backtop">
+          <a href="#main"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+        </div>
       </article>
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
       <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">能力与接线状态</a></li><li class="toc-depth-2"><a href="#sec-2">知识库架构</a></li><li class="toc-depth-2"><a href="#sec-3">索引与分块</a></li><li class="toc-depth-3"><a href="#sec-4">模板入库</a></li><li class="toc-depth-3"><a href="#sec-5">剧本内容入库</a></li><li class="toc-depth-3"><a href="#sec-6">长剧本分块：LongScriptChunker</a></li><li class="toc-depth-2"><a href="#sec-7">检索</a></li><li class="toc-depth-3"><a href="#sec-8">模板召回：本地优先，跨剧本补位</a></li><li class="toc-depth-3"><a href="#sec-9">剧本内容检索：手动余弦</a></li><li class="toc-depth-3"><a href="#sec-10">空结果与索引自愈</a></li><li class="toc-depth-2"><a href="#sec-11">重排序</a></li><li class="toc-depth-2"><a href="#sec-12">入库策略与提示词转换</a></li><li class="toc-depth-3"><a href="#sec-13">入库判定</a></li><li class="toc-depth-3"><a href="#sec-14">锚点召回与注入</a></li><li class="toc-depth-3"><a href="#sec-15">工作流调用点</a></li><li class="toc-depth-3"><a href="#sec-16">数据流</a></li><li class="toc-depth-2"><a href="#sec-17">持久化与恢复</a></li><li class="toc-depth-3"><a href="#sec-18">0.4.4 模板迁移</a></li><li class="toc-depth-2"><a href="#sec-19">当前限制</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
-          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/rag-knowledge-base.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
       </aside>
     </div>

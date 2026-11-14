@@ -144,7 +144,6 @@
           <div class="doc-meta-row">
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 14 分钟阅读</span>
-            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/asset-handoff.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
         <p>PenShot 默认不调用任何文生图或文生视频接口。它把角色三视图、关键道具与场景锚点写成一份<strong>声明式资产计划</strong>（<code>asset_plan</code>），由下游选择图片供应商生成，再把真实引用交回 PenShot 或直接用于视频生成。本页说明这套交接机制的字段、两种接入方式与常见降级行为。</p>
@@ -503,13 +502,15 @@ pytest tests/unit/test_asset_generator.py \
       <small>按片段特征在五个视频模型之间自动选型，输出可解释的 route_plan 与模型专属提示词。</small>
     </a>
   </nav>
+        <div class="doc-backtop">
+          <a href="#main"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+        </div>
       </article>
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
       <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">30 秒了解</a></li><li class="toc-depth-2"><a href="#sec-2">快速上手：一次任务，下游消费</a></li><li class="toc-depth-2"><a href="#sec-3">输出里能拿到什么</a></li><li class="toc-depth-2"><a href="#sec-4">asset_plan：声明式生图指令</a></li><li class="toc-depth-2"><a href="#sec-5">片段引用：三种角色</a></li><li class="toc-depth-2"><a href="#sec-6">使用范围与质量校验</a></li><li class="toc-depth-2"><a href="#sec-7">模式 B：回填 asset_manifest</a></li><li class="toc-depth-2"><a href="#sec-8">人工编辑资产提示词</a></li><li class="toc-depth-2"><a href="#sec-9">下游二次修改与溯源</a></li><li class="toc-depth-2"><a href="#sec-10">降级与排查</a></li><li class="toc-depth-2"><a href="#sec-11">验证与源码</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
-          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/asset-handoff.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
       </aside>
     </div>

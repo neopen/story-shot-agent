@@ -144,7 +144,6 @@
           <div class="doc-meta-row">
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 24 分钟阅读</span>
-            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/architecture.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
         <p>PenShot（<code>story-shot-agent</code>）是基于 LangGraph 的剧本分镜工作流：接入层接收剧本，任务层排队调度，<strong>八个业务节点</strong>顺序生成分镜提示词、资产计划与模型路由结果，四个控制节点负责循环计数、错误回退、人工干预与结果收口。当前版本 <strong>v0.4.4</strong>。</p>
@@ -1087,13 +1086,15 @@
       <small>逐个拆解八个业务节点：输入、规则、LLM 调用、资产计划与模型路由。</small>
     </a>
   </nav>
+        <div class="doc-backtop">
+          <a href="#main"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+        </div>
       </article>
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
       <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">分层架构</a></li><li class="toc-depth-3"><a href="#sec-2">技术栈</a></li><li class="toc-depth-2"><a href="#sec-3">节点构成</a></li><li class="toc-depth-2"><a href="#sec-4">工作流与决策路由</a></li><li class="toc-depth-3"><a href="#sec-5">决策路由表</a></li><li class="toc-depth-3"><a href="#sec-6">任务时序概览</a></li><li class="toc-depth-2"><a href="#sec-7">三级循环防护</a></li><li class="toc-depth-2"><a href="#sec-8">任务队列与持久化</a></li><li class="toc-depth-2"><a href="#sec-9">质量修复闭环</a></li><li class="toc-depth-2"><a href="#sec-10">错误处理</a></li><li class="toc-depth-3"><a href="#sec-11">关键默认值</a></li><li class="toc-depth-2"><a href="#sec-12">当前限制</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
-          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/architecture.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
       </aside>
     </div>

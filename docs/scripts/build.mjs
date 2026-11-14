@@ -362,17 +362,18 @@ ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
           <div class="doc-meta-row">
             <span>${icon('calendar', 12)}更新 ${updated}</span>
             <span>${icon('clock', 12)}约 ${minutes} 分钟阅读</span>
-            <a href="${site.repoEdit}${slug}.html" target="_blank" rel="noopener">${icon('edit', 12)}在 GitHub 编辑</a>
           </div>
         </header>
         ${body}
         ${pager(slug)}
+        <div class="doc-backtop">
+          <a href="#main">${icon('arrowUp', 13)}回到顶部</a>
+        </div>
       </article>
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           ${tocHtml}
           <a class="toc-back" href="#main">${icon('arrowUp', 11)}回到顶部</a>
-          <a class="toc-edit" href="${site.repoEdit}${slug}.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
       </aside>
     </div>

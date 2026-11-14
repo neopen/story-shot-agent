@@ -144,7 +144,6 @@
           <div class="doc-meta-row">
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 15 分钟阅读</span>
-            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/checkpoint.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
         <p>PenShot 用 LangGraph 检查点持久化工作流状态：每个 super-step 结束后把完整状态快照写入 saver，理论上可凭同一 <code>thread_id</code> 从最近快照恢复。当前版本只接通写入侧，断点续传尚未生效。</p>
@@ -599,13 +598,15 @@ final_state = workflow.invoke(
       <small>LLM 客户端、提示词管理、资产生成、模型适配、循环控制与任务调度的实现要点。</small>
     </a>
   </nav>
+        <div class="doc-backtop">
+          <a href="#main"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+        </div>
       </article>
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
       <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">能力边界</a></li><li class="toc-depth-2"><a href="#sec-2">写入机制</a></li><li class="toc-depth-2"><a href="#sec-3">存储模式与降级</a></li><li class="toc-depth-2"><a href="#sec-4">文件与表结构</a></li><li class="toc-depth-2"><a href="#sec-5">快照内容与观测</a></li><li class="toc-depth-2"><a href="#sec-6">WorkflowCheckpointer</a></li><li class="toc-depth-2"><a href="#sec-7">调用链与 thread_id 缺口</a></li><li class="toc-depth-2"><a href="#sec-8">异步执行边界</a></li><li class="toc-depth-2"><a href="#sec-9">配置项</a></li><li class="toc-depth-2"><a href="#sec-10">常见失效</a></li><li class="toc-depth-2"><a href="#sec-11">最小修复路径</a></li><li class="toc-depth-2"><a href="#sec-12">上线核对</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
-          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/checkpoint.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
       </aside>
     </div>
