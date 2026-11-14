@@ -109,6 +109,9 @@ class PromptReference(BaseModel):
     view: str = Field(default="front", description="希望使用的视角")
     as_first_frame: bool = Field(default=True, description="是否作为图生视频首帧")
     required: bool = Field(default=True, description="缺失时是否必须回退文生视频")
+    state: str = Field(
+        default="", description="道具状态变体（如 crumpled/balled），非道具为空"
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典表示"""
@@ -153,7 +156,10 @@ class AdaptedPromptPackage(BaseModel):
         default="", description="图生视频使用的资产锚点（角色三视图/场景静帧落盘引用）"
     )
     image_prompt: str = Field(
-        default="", description="两段式模式下的首帧文生图提示词"
+        default="", description="两段式模式下的首帧文生图提示词（动作开始前静态截面）"
+    )
+    motion_prompt: str = Field(
+        default="", description="图生视频的动作驱动提示词（首帧之后的动作序列）"
     )
     first_frame_instruction: str = Field(
         default="", description="下游图生视频可直接消费的首帧指令"
@@ -168,6 +174,14 @@ class AdaptedPromptPackage(BaseModel):
     revision: int = Field(default=0, description="修订序号")
     prompt_overrides: List[PromptOverride] = Field(
         default_factory=list, description="下游二次修改记录"
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="构建期发现但不阻断的声明式告警（如场景锚定不一致）",
+    )
+    status: str = Field(
+        default="ready",
+        description="片段可执行状态：ready=可进入下游渲染，needs_manual_fix=已阻断待人工处理",
     )
     model_params: Dict[str, Any] = Field(
         default_factory=dict, description="模型专属生成参数"
@@ -193,6 +207,21 @@ class RouteDecision(BaseModel):
     capability: Optional[ModelCapability] = Field(
         default=None, description="目标模型能力声明"
     )
+    warnings: List[str] = Field(
+        default_factory=list, description="该片段的结构/逻辑告警（Gate 1 回写）"
+    )
+    references: List[PromptReference] = Field(
+        default_factory=list,
+        description="该片段的资产引用；first_frame 即首帧场景资产",
+    )
+    status: str = Field(
+        default="ready",
+        description="片段可执行状态：ready=可进入下游渲染，needs_manual_fix=已阻断待人工处理",
+    )
+    degraded_assets: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="需降级生成的资产约束：asset_id/owner_name/missing_fields/constraint",
+    )
 
 
 class RoutePlan(BaseModel):
@@ -210,6 +239,13 @@ class RoutePlan(BaseModel):
     )
     adapted_packages: List[AdaptedPromptPackage] = Field(
         default_factory=list, description="适配后的提示词包列表"
+    )
+    warnings: List[str] = Field(
+        default_factory=list, description="跨片段结构/口径告警（Gate 1 回写）"
+    )
+    blocked_fragments: List[str] = Field(
+        default_factory=list,
+        description="已阻断的片段ID：状态非 ready，不得进入下游渲染队列",
     )
 
     def to_dict(self) -> Dict[str, Any]:

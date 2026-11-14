@@ -3,6 +3,9 @@ logs/
 outputs/
 uploads/
 *.egg-info/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
 .venv/
 .env/
 /data

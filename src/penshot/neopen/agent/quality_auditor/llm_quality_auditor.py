@@ -163,6 +163,21 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseLLMAgent):
             elif avg_score > 85:
                 hints.append(f"【质量趋势】近期审查质量良好({avg_score:.0f}分)，保持标准。")
 
+        # 4. 契约一致性警告（Validator 产物）：深度审查必须采信并标记为问题
+        contract_violations = historical_context.get("contract_violations")
+        if contract_violations and isinstance(contract_violations, list):
+            violation_lines = [
+                f"- {item.get('message')}"
+                for item in contract_violations[:10]
+                if isinstance(item, dict) and item.get("message")
+            ]
+            if violation_lines:
+                hints.append(
+                    "【契约一致性警告】以下镜头/片段未通过一致性契约校验，"
+                    "审查时必须标记为问题并给出修复建议：\n"
+                    + "\n".join(violation_lines)
+                )
+
         if not hints:
             return ""
 

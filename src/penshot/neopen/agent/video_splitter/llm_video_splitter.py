@@ -175,7 +175,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
             }
         )
 
-        return self.post_process(fragment_sequence)
+        return self.post_process(fragment_sequence, shot_sequence, parsed_script)
 
 
     def _build_history_hint(self, historical_context: Optional[Dict[str, Any]]) -> str:

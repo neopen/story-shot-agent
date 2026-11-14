@@ -10,12 +10,16 @@ See LICENSE File For Details.
 @Time: 2026/11/05
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
+from penshot.logger import info, warning
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     SCENE_ASSET_TYPE,
     build_first_frame_prompt,
+    build_motion_prompt,
     build_package_references,
+    resolve_scene_anchor,
 )
 from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
@@ -25,22 +29,16 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoInstructions,
     AIVideoPrompt,
 )
+from penshot.neopen.agent.prop_usage import advance_prop_state, mentions_prop
 
-# 文字/屏幕内容特征：这些片段的文字渲染最容易出错，优先走文生图 -> 图生视频
-CRITICAL_TEXT_MARKERS = (
-    "text",
-    "subtitle",
-    "sign",
-    "signage",
-    "poster",
-    "logo",
-    "book title",
-    "newspaper",
-    "letter",
-    "screen",
-    "menu",
-    "handwriting",
+# 可读文字渲染证据：只有明确要求呈现文字内容时才走两段式。
+# 场景里的招牌/屏幕/标牌只作氛围时不构成文字渲染需求，旧的宽子串词表会把
+# “texture / exit sign / TV screen”误判为 critical_text（0.4.5 稳定版误报修复）。
+READABLE_TEXT_MARKERS_ZH = (
     "文字",
+    "字迹",
+    "地址",
+    "手写",
     "字幕",
     "招牌",
     "标牌",
@@ -48,17 +46,38 @@ CRITICAL_TEXT_MARKERS = (
     "书名",
     "报纸",
     "书信",
-    "手机屏幕",
-    "屏幕",
     "标题",
-    "手写",
+)
+
+READABLE_TEXT_MARKERS_EN = (
+    "text",
+    "readable",
+    "address",
+    "handwriting",
+    "subtitle",
+    "newspaper",
+    "poster",
+    "menu",
+    "title",
+)
+
+# 英文按词边界匹配，避免 texture / context 等词命中 "text"
+_READABLE_TEXT_EN_RE = re.compile(
+    r"\b(?:" + "|".join(READABLE_TEXT_MARKERS_EN) + r")\b", re.IGNORECASE
 )
 
 
+def contains_readable_text(text: str) -> bool:
+    """文本是否明确要求渲染可读文字（路由与 Gate 共用的判定口径）"""
+    value = str(text or "")
+    if any(marker in value for marker in READABLE_TEXT_MARKERS_ZH):
+        return True
+    return bool(_READABLE_TEXT_EN_RE.search(value))
+
+
 def has_critical_text(prompt: str) -> bool:
-    """判断片段是否包含需要精确渲染的文字/屏幕内容"""
-    lowered = (prompt or "").lower()
-    return any(marker in lowered for marker in CRITICAL_TEXT_MARKERS)
+    """判断片段是否明确要求精确渲染可读文字"""
+    return contains_readable_text(prompt)
 
 
 def _character_has_anchors(prompt: AIVideoPrompt, contract: Any) -> bool:
@@ -168,6 +187,19 @@ def _resolve_scene(
     return None
 
 
+def _scene_for_asset(contract: Any, asset_id: str) -> Optional[Any]:
+    """按场景资产反查契约场景，供自动替换后重建首帧提示词"""
+    assets = getattr(contract, "assets", None) or {}
+    asset = assets.get(asset_id) if isinstance(assets, dict) else None
+    location = str(getattr(asset, "owner_name", "") or "")
+    scenes = getattr(contract, "scenes", None) or {}
+    values = scenes.values() if isinstance(scenes, dict) else scenes
+    for scene in values:
+        if str(getattr(scene, "location", "") or "") == location:
+            return scene
+    return None
+
+
 def _props_by_scene(parsed_script: Any) -> Dict[str, set[str]]:
     """道具引用约束：场景ID -> 该场景允许引用的道具名集合
 
@@ -183,6 +215,54 @@ def _props_by_scene(parsed_script: Any) -> Dict[str, set[str]]:
         for scene_id in getattr(prop, "appears_in", None) or []:
             mapping.setdefault(str(scene_id), set()).add(name)
     return mapping
+
+
+def _prop_names(parsed_script: Any) -> List[str]:
+    """从剧本元数据读取全局道具名（保持声明顺序）"""
+    metadata = getattr(parsed_script, "global_metadata", None)
+    names: List[str] = []
+    for prop in getattr(metadata, "key_props", None) or []:
+        name = str(getattr(prop, "name", "") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _prop_state_maps(
+    prompts: Dict[str, AIVideoPrompt],
+    fragments: Optional[List[Any]],
+    parsed_script: Any,
+) -> Dict[str, Dict[str, str]]:
+    """按片段顺序推导每个道具的状态，返回 道具名 -> {片段ID: 状态}
+
+    与 ``backfill_usage`` 共用 ``advance_prop_state`` 的单向状态机：
+    frag_007 揉成团后，后续片段即使文本仍写“皱巴巴”也保持 balled。
+    """
+    names = _prop_names(parsed_script)
+    if not names:
+        return {}
+
+    ordered: List[tuple[str, str]] = []
+    for fragment in fragments or []:
+        fragment_id = str(getattr(fragment, "id", "") or "")
+        prompt = prompts.get(fragment_id)
+        if not fragment_id or prompt is None:
+            continue
+        description = str(getattr(fragment, "description", "") or "")
+        ordered.append((fragment_id, f"{description} {prompt.prompt}".strip()))
+
+    result: Dict[str, Dict[str, str]] = {}
+    for name in names:
+        current = ""
+        states: Dict[str, str] = {}
+        for fragment_id, text in ordered:
+            if not mentions_prop(text, name):
+                continue
+            current = advance_prop_state(current, text, name)
+            if current:
+                states[fragment_id] = current
+        result[name] = states
+    return result
 
 
 def should_use_image_to_video(prompt: AIVideoPrompt, contract: Any = None) -> bool:
@@ -239,6 +319,7 @@ def apply_image_to_video_routing(
         if getattr(shot, "id", "")
     }
     prop_scene_map = _props_by_scene(parsed_script)
+    prop_state_maps = _prop_state_maps(prompts, fragments, parsed_script)
 
     triggered = 0
     for package in packages:
@@ -268,16 +349,24 @@ def apply_image_to_video_routing(
                 allowed_props = sorted(prop_scene_map.get(scene_id, set()))
 
         package.mode = RouteMode.IMAGE_TO_VIDEO
+        prop_states = {
+            name: states[package.fragment_id]
+            for name, states in prop_state_maps.items()
+            if package.fragment_id in states
+        }
         package.references = build_package_references(
             prompt,
             contract,
             scene=scene,
             fragment=fragment,
             prop_names=allowed_props,
+            prop_states=prop_states,
         )
         package.image_prompt = build_first_frame_prompt(
             prompt, contract, scene=scene, fragment=fragment
         )
+        package.motion_prompt = build_motion_prompt(prompt, fragment)
+        motion_text = package.motion_prompt or prompt.prompt
 
         scene_reference = next(
             (
@@ -287,6 +376,31 @@ def apply_image_to_video_routing(
             ),
             None,
         )
+        # 0.4.5 任务 7：片段场景与首帧场景资产不一致时自动替换或阻断
+        if scene_reference is not None:
+            resolution = resolve_scene_anchor(
+                prompt,
+                contract,
+                scene=scene,
+                fragment=fragment,
+                first_frame_asset_id=scene_reference.asset_id,
+            )
+            if resolution is not None:
+                package.warnings.append(resolution.message)
+                if resolution.reason == "auto_replace" and resolution.target_asset_id:
+                    scene_reference.asset_id = resolution.target_asset_id
+                    # 首帧提示词必须与替换后的场景资产同源，避免“资产是教室、提示词写走廊”
+                    package.image_prompt = build_first_frame_prompt(
+                        prompt,
+                        contract,
+                        scene=_scene_for_asset(contract, resolution.target_asset_id),
+                        fragment=fragment,
+                    )
+                    info(f"场景锚定已自动替换: {resolution.message}")
+                else:
+                    package.status = "needs_manual_fix"
+                    warning(f"场景锚定已阻断: {resolution.message}")
+
         scene_asset_ref = (
             _manifest_ref(manifest, scene_reference.asset_id)
             if scene_reference is not None
@@ -296,14 +410,14 @@ def apply_image_to_video_routing(
             package.asset_ref = scene_asset_ref
             package.first_frame_instruction = (
                 f"Use reference image {scene_asset_ref} as the first frame; "
-                f"animate: {prompt.prompt}"
+                f"animate: {motion_text}"
             )
         else:
             # 场景首帧尚未回填时保留声明式首帧提示词，由下游生成后再作首帧
             package.asset_ref = ""
             package.first_frame_instruction = (
                 f"Generate first frame with prompt: {package.image_prompt}; "
-                f"then use it as the first frame and animate: {prompt.prompt}"
+                f"then use it as the first frame and animate: {motion_text}"
             )
         triggered += 1
 

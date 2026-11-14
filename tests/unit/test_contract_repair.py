@@ -4,6 +4,8 @@
 RePairer（ContinuityRepairGenerator）按契约注入修复建议。
 """
 
+from types import SimpleNamespace
+
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     AssetContract,
     GlobalConsistencyContract,
@@ -181,6 +183,43 @@ class TestContractRepairParams:
         """无违规项时不生成修复参数"""
         assert build_contract_repair_params([], PipelineNode.SEGMENT_SHOT) is None
         assert build_contract_repair_params(None, PipelineNode.SEGMENT_SHOT) is None
+
+    def test_unknown_character_in_parsed_script_suggests_registration(self):
+        """剧本真实角色：建议补登记保留，而不是要求 LLM 删除"""
+        violation = {
+            "type": "unknown_character",
+            "stage": "segment_shot",
+            "shot_id": "shot_002",
+            "character": "门口黑影",
+            "message": "镜头 shot_002 的角色 门口黑影 不在一致性契约中",
+        }
+        parsed = SimpleNamespace(characters=[SimpleNamespace(name="门口黑影")])
+
+        params = build_contract_repair_params(
+            [violation], PipelineNode.SEGMENT_SHOT, _full_contract(), None, parsed
+        )
+
+        suggestion = params.suggestions["shot_002"][0]
+        assert "将补登记进契约并保留" in suggestion
+
+    def test_unknown_character_hallucination_suggests_removal(self):
+        """剧本角色表外的名字：建议清除主角色标注、保留画面描述"""
+        violation = {
+            "type": "unknown_character",
+            "stage": "segment_shot",
+            "shot_id": "shot_002",
+            "character": "神秘人",
+            "message": "镜头 shot_002 的角色 神秘人 不在一致性契约中",
+        }
+        parsed = SimpleNamespace(characters=[SimpleNamespace(name="小明")])
+
+        params = build_contract_repair_params(
+            [violation], PipelineNode.SEGMENT_SHOT, _full_contract(), None, parsed
+        )
+
+        suggestion = params.suggestions["shot_002"][0]
+        assert "属分镜生成幻觉" in suggestion
+        assert "清除其主角色标注" in suggestion
 
 
 class TestViolationAndParamMerging:

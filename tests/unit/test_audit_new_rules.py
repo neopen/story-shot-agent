@@ -15,6 +15,7 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AIVideoInstructions,
     AIVideoPrompt,
     CameraControl,
+    CameraMotion,
 )
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import SeverityLevel
 from penshot.neopen.agent.quality_auditor.rule_quality_auditor import (
@@ -165,10 +166,13 @@ def test_appearance_anchor_pollution_detected_with_asset_locator():
 
 
 def test_shot_type_prompt_mismatch_detected_with_fragment_id():
-    """FR-061/FR-064：camera 景别与提示词景别表述冲突时命中并带 fragment_id"""
+    """FR-061/FR-064：提示词景别与镜头计划不同时命中并带 fragment_id
+
+    结构化景别以来源镜头计划为准，提示词措辞漂移按 WARNING 记录，不触发修复。
+    """
     fragment = _fragment(
         prompt="wide shot of the city street at dusk while rain falls softly",
-        camera=CameraControl(shot_type="close_up"),
+        camera=CameraControl(shot_type="close_up", source_shot_type="close_up"),
     )
 
     report = _auditor().audit(_instructions(fragments=[fragment]))
@@ -180,7 +184,7 @@ def test_shot_type_prompt_mismatch_detected_with_fragment_id():
 
     assert len(violations) == 1
     violation = violations[0]
-    assert violation.severity == SeverityLevel.MAJOR
+    assert violation.severity == SeverityLevel.WARNING
     assert violation.fragment_id == "frag_001"
     assert violation.issue_value == {
         "camera_shot_type": "close_up",
@@ -240,3 +244,60 @@ def test_clean_inputs_produce_no_new_rule_violations():
     report = _auditor().audit(instructions, contract=_contract())
 
     assert _new_rule_violations(report) == []
+
+
+def _motion_violations(report):
+    return [
+        v for v in report.violations if v.issue_code == "camera_motion_prompt_mismatch"
+    ]
+
+
+def test_camera_motion_mismatch_detected_with_fragment_id():
+    """0.4.5 任务 5：提示词推镜、camera.motion=static 时按 WARNING 定位到片段"""
+    fragment = _fragment(
+        prompt="wide shot, slow push-in towards the memory wall",
+        camera=CameraControl(shot_type="wide_shot", motion=CameraMotion.STATIC),
+    )
+
+    report = _auditor().audit(_instructions(fragments=[fragment]))
+
+    violations = _motion_violations(report)
+    assert len(violations) == 1
+    assert violations[0].severity == SeverityLevel.WARNING
+    assert violations[0].fragment_id == "frag_001"
+
+
+def test_camera_motion_dolly_family_produces_no_warning():
+    """推镜与 dolly 语义相容（frag_015 场景），不告警"""
+    fragment = _fragment(
+        prompt="wide shot, slow push-in towards the memory wall",
+        camera=CameraControl(shot_type="wide_shot", motion=CameraMotion.DOLLY),
+    )
+
+    report = _auditor().audit(_instructions(fragments=[fragment]))
+
+    assert _motion_violations(report) == []
+
+
+def test_camera_motion_static_without_motion_produces_no_warning():
+    """frag_010：提示词没有运镜动词、motion=static 不误报"""
+    fragment = _fragment(
+        prompt="close-up of Li Ming's face, 35mm lens, static camera",
+        camera=CameraControl(shot_type="close_up", motion=CameraMotion.STATIC),
+    )
+
+    report = _auditor().audit(_instructions(fragments=[fragment]))
+
+    assert _motion_violations(report) == []
+
+
+def test_camera_motion_contradicts_static_prompt():
+    """frag_006：提示词明确写 static camera、motion=handheld 时告警"""
+    fragment = _fragment(
+        prompt="wide shot, Li Ming standing still, 35mm lens, static camera",
+        camera=CameraControl(shot_type="wide_shot", motion=CameraMotion.HANDHELD),
+    )
+
+    report = _auditor().audit(_instructions(fragments=[fragment]))
+
+    assert len(_motion_violations(report)) == 1

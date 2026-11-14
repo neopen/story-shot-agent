@@ -235,7 +235,17 @@ class QualityAuditReport(BaseModel):
 
     score: float = Field(
         default=100.0,
-        description="质量评分（0-100）"
+        description="质量评分（0-100）；检测阶段即本值，修复后见 post_repair_score"
+    )
+
+    detection_score: float = Field(
+        default=100.0,
+        description="检测评分（修复前），用于和修复后评分分列展示",
+    )
+
+    post_repair_score: Optional[float] = Field(
+        default=None,
+        description="修复后评分；未执行任何修复时与 detection_score 一致",
     )
 
     detailed_analysis: Dict[str, Any] = Field(

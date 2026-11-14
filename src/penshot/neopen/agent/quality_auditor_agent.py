@@ -90,10 +90,14 @@ class QualityAuditorAgent:
         # 去重缓存
         self._seen_violations: Set[str] = set()
 
-    def qa_process(self, instructions: AIVideoInstructions,
-                   stage_issues: Optional[Dict[PipelineNode, List[BasicViolation]]] = None,
-                   historical_context: Optional[Dict[str, Any]] = None,
-                   contract: Optional[Any] = None) -> Optional[QualityAuditReport]:
+    def qa_process(
+        self,
+        instructions: AIVideoInstructions,
+        stage_issues: Optional[Dict[PipelineNode, List[BasicViolation]]] = None,
+        historical_context: Optional[Dict[str, Any]] = None,
+        contract: Optional[Any] = None,
+        contract_violations: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[QualityAuditReport]:
         """
         执行质量审查 - 合并基本规则、LLM结果和各阶段问题
 
@@ -102,6 +106,8 @@ class QualityAuditorAgent:
             stage_issues: 各阶段检测到的问题（来自各个智能体的detect_issues方法）
             historical_context: 历史上下文（可选，用于优化审查）
             contract: 全局一致性契约（可选，供外观锚点污染检查使用）
+            contract_violations: 契约校验违规项（可选，规则审查计入评分，
+                深度审查提示词采信为问题）
 
         Returns:
             质量审查报告
@@ -129,15 +135,23 @@ class QualityAuditorAgent:
             # 1. 执行基本规则审查
             # rule_auditor 由工厂按 AgentMode.RULE 创建，实际类型恒为 RuleQualityAuditor
             rule_report = cast(RuleQualityAuditor, self.rule_auditor).audit(
-                instructions, contract=contract
+                instructions, contract=contract, contract_violations=contract_violations
             )
             info(f"基本规则审查完成，发现{len(rule_report.violations)}个问题")
 
             # 2. 执行LLM深度审查（如果启用），传递历史上下文
             llm_report = None
             if self.llm_auditor:
-                llm_report = self.llm_auditor.audit(instructions, historical_context)  # 传递历史上下文
-                info(f"LLM审查完成，发现{len(llm_report.violations) if llm_report else 0}个问题")
+                # 契约违规项注入审查上下文，深度审查必须采信并标记为问题
+                llm_context = dict(historical_context or {})
+                if contract_violations:
+                    llm_context["contract_violations"] = contract_violations
+                llm_report = self.llm_auditor.audit(
+                    instructions, llm_context
+                )  # 传递历史上下文
+                info(
+                    f"LLM审查完成，发现{len(llm_report.violations) if llm_report else 0}个问题"
+                )
 
             # 3. 合并报告（包含各阶段问题，带去重）
             merged_report = self._merge_reports_with_dedup(rule_report, llm_report, instructions, stage_issues)
@@ -156,6 +170,24 @@ class QualityAuditorAgent:
             error(f"质量审查异常: {e}")
             return self._create_fallback_report(instructions)
 
+    def recheck_rule_score(
+        self,
+        instructions: AIVideoInstructions,
+        contract: Optional[Any] = None,
+        contract_violations: Optional[List[Dict[str, Any]]] = None,
+    ) -> float:
+        """修复后规则复检评分（仅规则与契约维度）
+
+        检测分包含规则、契约、阶段与 LLM 问题；修复后只有规则与契约
+        能在本地复检，因此复检分只反映这部分问题是否真的被修掉，
+        不得当作全维度得分与检测分合并。
+        """
+        rule_report = cast(RuleQualityAuditor, self.rule_auditor).audit(
+            instructions,
+            contract=contract,
+            contract_violations=contract_violations,
+        )
+        return self._calculate_weighted_score(rule_report.violations)
 
     def record_repair(self, stage: str, issues_fixed: List[str], success: bool):
         """记录修复操作 - 修复版，避免存储日志内容"""
@@ -514,6 +546,10 @@ class QualityAuditorAgent:
             penalty = self.severity_weights.get(severity_str, 5)
             base_score -= penalty
         report.score = max(0.0, min(100.0, base_score))
+        # 检测分与修复后分分列：此处只写检测分，修复后由审计节点回填
+        report.detection_score = report.score
+        if report.post_repair_score is None:
+            report.post_repair_score = report.score
 
         # 确定最终状态
         error_count = severity_counts.get(SeverityLevel.ERROR.value, 0)

@@ -10,7 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/1/19
 """
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript, EmotionType
 from penshot.neopen.agent.shot_segmenter.estimator.estimator_models import CorrectionRecord, CorrectionReason, CorrectionLevel
@@ -173,14 +173,30 @@ class DurationEnhancer:
         return "neutral"
 
     def _update_stats(self, sequence: ShotSequence) -> Dict:
-        """更新统计数据"""
-        stats = {
+        """更新统计数据
+
+        增强会改变片段时长，因此继承上一阶段的时长报告字段并重算差值，
+        避免 ``element_duration`` / ``target_duration`` / ``duration_source``
+        在增强后被丢弃（0.4.5 FR-078）。
+        """
+        previous = sequence.stats or {}
+        total_duration = round(sum(s.duration for s in sequence.shots), 2)
+        target_duration = previous.get("target_duration")
+        stats: Dict[str, Any] = {
             "shot_count": len(sequence.shots),
-            "total_duration": round(sum(s.duration for s in sequence.shots), 2),
+            "total_duration": total_duration,
             "avg_shot_duration": 0.0,
             "close_up_count": 0,
             "wide_shot_count": 0,
-            "medium_shot_count": 0
+            "medium_shot_count": 0,
+            "element_duration": previous.get("element_duration"),
+            "target_duration": target_duration,
+            "duration_delta": (
+                None
+                if target_duration is None
+                else round(float(target_duration) - total_duration, 2)
+            ),
+            "duration_source": previous.get("duration_source"),
         }
 
         if stats["shot_count"] > 0:

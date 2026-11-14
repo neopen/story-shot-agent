@@ -17,6 +17,7 @@ from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import IssueType
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, RuleType
+from penshot.neopen.agent.repair_outcome import record_repair_outcome
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence
 from penshot.neopen.agent.video_splitter.video_splitter_factory import VideoSplitterFactory
@@ -496,6 +497,23 @@ class VideoSplitterAgent(BaseRepairableAgent[FragmentSequence, ShotSequence]):
         info(f"视频片段修复完成，执行了{len(repair_actions)}个修复操作")
         if repair_actions:
             debug(f"修复操作详情: {repair_actions[:10]}")
+        record_repair_outcome(
+            fragment_sequence.metadata,
+            "视频分割",
+            issues,
+            repair_actions,
+            auto_codes={
+                "fragment_time_gap",
+                "time_gap",
+                "fragment_overlap",
+                "time_overlap",
+                "fragment_no_elements",
+                "fragment_element_mismatch",
+                "fragment_no_continuity",
+                "fragment_continuity_broken",
+            },
+            auto_types={IssueType.DURATION.value},
+        )
 
         return fragment_sequence
 

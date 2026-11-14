@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from penshot.neopen.agent.continuity_guardian.consistency_contract import AssetContract
 from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
@@ -48,6 +48,15 @@ class AssetUsage(BaseModel):
     fragments: List[str] = Field(default_factory=list, description="使用该资产的片段ID")
 
 
+class PropStateVariant(BaseModel):
+    """道具状态变体：同一道具在不同片段中的形态（如 crumpled -> balled）"""
+
+    state: str = Field(..., description="状态名，如 crumpled / balled")
+    fragments: List[str] = Field(
+        default_factory=list, description="处于该状态的片段ID（按片段顺序）"
+    )
+
+
 class AssetConsistency(BaseModel):
     """资产的连续性约束，供下游执行器锁定角色身份"""
 
@@ -73,6 +82,10 @@ class AssetSpec(BaseModel):
     )
     consistency: AssetConsistency = Field(
         default_factory=AssetConsistency, description="连续性约束"
+    )
+    state_variants: List[PropStateVariant] = Field(
+        default_factory=list,
+        description="道具状态变体（仅道具资产，随片段顺序推导）",
     )
     status: AssetStatus = Field(default=AssetStatus.PENDING, description="生成状态")
     asset_ref: str = Field(default="", description="落盘后的本地引用")
@@ -135,6 +148,7 @@ class AssetBinding(BaseModel):
     seed: Optional[int] = Field(default=None, description="下游使用的随机种子")
     checksum: str = Field(default="", description="资产内容校验值")
     source: str = Field(default="", description="产出该绑定的执行器标识")
+    generated_at: str = Field(default="", description="下游产出的时间戳")
     revision: int = Field(default=0, description="绑定修订号")
     error: str = Field(default="", description="生成失败原因（空表示无错误）")
 
@@ -150,6 +164,8 @@ class AssetManifest(BaseModel):
         default=ASSET_SCHEMA_VERSION, description="资产回填契约版本"
     )
     task_id: str = Field(default="", description="任务ID")
+    script_id: str = Field(default="", description="剧本ID（可选，便于回溯）")
+    generated_at: str = Field(default="", description="清单产出时间（可选）")
     bindings: List[AssetBinding] = Field(
         default_factory=list, description="资产绑定列表"
     )
@@ -157,6 +173,15 @@ class AssetManifest(BaseModel):
         default_factory=dict,
         description="下游改名映射：PenShot 规范 asset_id -> 下游实际 asset_id",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_assets_alias(cls, data: Any) -> Any:
+        """兼容下游直接写 ``assets`` 的清单格式（0.4.5 任务 1）"""
+        if isinstance(data, dict) and not data.get("bindings") and data.get("assets"):
+            data = dict(data)
+            data["bindings"] = data.pop("assets")
+        return data
 
     def get_binding(self, asset_id: str) -> Optional[AssetBinding]:
         """按规范 asset_id 查找绑定；优先使用显式改名映射"""

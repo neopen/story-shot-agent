@@ -25,6 +25,11 @@ from penshot.neopen.agent.continuity_guardian.contract_repair import (
     build_contract_repair_params,
     group_violations_by_stage,
     merge_repair_params,
+    merge_violations,
+)
+from penshot.neopen.agent.continuity_guardian.contract_validator import (
+    validate_fragment_sequence,
+    validate_shot_sequence,
 )
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
     ContinuityGuardianChecker,
@@ -61,7 +66,15 @@ from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
-from penshot.neopen.prompts.ingestion_policy import decide_ingestion
+from penshot.neopen.agent.repair_outcome import (
+    REPAIR_STATUS_NO_ACTION,
+    REPAIR_STATUS_PARTIAL,
+    REPAIR_STATUS_REPAIRED,
+)
+from penshot.neopen.prompts.ingestion_policy import (
+    REASON_BELOW_THRESHOLD,
+    decide_ingestion,
+)
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 from penshot.neopen.prompts.recall_status import build_anchor_recall
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
@@ -73,11 +86,20 @@ from penshot.neopen.agent.model_adapter import (
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
+from penshot.neopen.agent.model_adapter.quality_gate import (
+    apply_asset_attention_constraints,
+    apply_quality_gate,
+)
 from penshot.neopen.agent.asset_generator import (
     AssetGeneratorAgent,
+    backfill_outfits,
     backfill_usage,
 )
-from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
+from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotSequence
+from penshot.neopen.agent.video_splitter.video_splitter_models import (
+    FragmentSequence,
+    VideoFragment,
+)
 
 
 class WorkflowNodes:
@@ -864,6 +886,13 @@ class WorkflowNodes:
             if provenance:
                 instructions.metadata["style_anchor_provenance"] = dict(provenance)
 
+            # 总时长报告（0.4.5 FR-078/079）：总时长以实际片段求和为准，
+            # 解析元素推算值与目标时长取自镜头序列统计
+            instructions.metadata["duration_report"] = self._build_duration_report(
+                state.domain.fragment_sequence,
+                state.domain.shot_sequence,
+            )
+
             # 统计提示词信息
             prompt_lengths = [len(f.prompt) for f in instructions.fragments]
             debug(
@@ -938,6 +967,70 @@ class WorkflowNodes:
 
         return state
 
+    @staticmethod
+    def _build_duration_report(
+        fragment_sequence: Optional[FragmentSequence],
+        shot_sequence: Optional[ShotSequence],
+    ) -> Dict[str, Any]:
+        """构造总时长报告（FR-078/079）
+
+        三个时长字段语义不同，报告内附 ``semantics`` 说明，避免被当成同一口径
+        互相比对：``total_duration`` 是切片器按文本重算后的实际交付总时长，
+        ``shot_duration`` 是切分前的镜头计划总时长，``element_duration`` 是
+        切分前的解析元素推算总时长。目标时长缺失时为 None，且不产生
+        “总时长不足”告警。
+
+        Args:
+            fragment_sequence: 分割后的片段序列
+            shot_sequence: 镜头序列，携带 ``estimate_sequence`` 统计
+
+        Returns:
+            写入 ``metadata.duration_report`` 的字典
+        """
+        fragments = getattr(fragment_sequence, "fragments", None) or []
+        stats = getattr(shot_sequence, "stats", None) or {}
+
+        total_duration = round(sum(fragment.duration for fragment in fragments), 2)
+        shot_duration = stats.get("total_duration")
+        target_duration = stats.get("target_duration")
+        duration_delta = (
+            None
+            if target_duration is None
+            else round(target_duration - total_duration, 2)
+        )
+        delivery_deviation = (
+            round(total_duration - shot_duration, 2)
+            if isinstance(shot_duration, (int, float))
+            else None
+        )
+
+        report = {
+            "total_duration": total_duration,
+            "shot_duration": shot_duration,
+            "element_duration": stats.get("element_duration"),
+            "target_duration": target_duration,
+            "duration_delta": duration_delta,
+            "delivery_deviation": delivery_deviation,
+            "duration_source": stats.get("duration_source"),
+            "semantics": {
+                "total_duration": "实际交付：片段时长求和（切片器按文本重算）",
+                "shot_duration": "切分前的镜头计划总时长",
+                "element_duration": "切分前的解析元素推算总时长",
+                "target_duration": "剧本声明的目标总时长",
+                "duration_delta": "目标总时长 - 实际交付总时长",
+                "delivery_deviation": "实际交付总时长 - 镜头计划总时长",
+            },
+        }
+
+        if duration_delta is not None and duration_delta > 0:
+            warning(
+                f"总时长不足：目标 {target_duration}s，实际 {total_duration}s，"
+                f"差 {duration_delta}s"
+            )
+
+        debug(f"总时长报告: {report}")
+        return report
+
     def route_model_node(self, state: WorkflowState) -> WorkflowState:
         """目标模型路由节点（M0.4.3）
 
@@ -970,13 +1063,57 @@ class WorkflowNodes:
                 adapted_packages, instructions, state.domain.contract
             )
             plan.adapted_packages = adapted_packages
-            instructions.route_plan = plan.model_dump(mode="json")
 
             # FR-014/AC-017：路由后回填 usage，并用与 ASSETS 节点一致的序列化路径
             # 重写 asset_plan.json，再同步 instructions.asset_plan 落盘
             asset_plan = self._backfill_asset_plan(
                 state, plan, fragments=fragments, shots=shots
             )
+
+            # P0-4 Gate 1：结构/逻辑问题回写 warnings，避免生成层自评全绿
+            # P0-6：服装关键信息不足的角色资产，引用片段必须带剪影/背影降级约束
+            attention_warnings, degraded_assets = apply_asset_attention_constraints(
+                adapted_packages, asset_plan
+            )
+            plan.warnings = (
+                apply_quality_gate(
+                    adapted_packages,
+                    instructions,
+                    asset_plan=asset_plan,
+                    fragments=fragments,
+                )
+                + attention_warnings
+            )
+            package_warnings = {
+                package.fragment_id: package.warnings for package in adapted_packages
+            }
+            package_status = {
+                package.fragment_id: package.status for package in adapted_packages
+            }
+            for decision in plan.decisions:
+                decision.warnings = list(package_warnings.get(decision.fragment_id, []))
+                decision.status = package_status.get(decision.fragment_id, "ready")
+                decision.degraded_assets = list(
+                    degraded_assets.get(decision.fragment_id, [])
+                )
+            if degraded_assets:
+                info(
+                    f"服装关键信息不足，已要求降级为剪影/背影: "
+                    f"{', '.join(degraded_assets)}"
+                )
+            # P0-1：场景锚定无法唯一匹配的片段必须阻断，不进入下游渲染队列
+            plan.blocked_fragments = [
+                fragment_id
+                for fragment_id, status in package_status.items()
+                if status != "ready"
+            ]
+            if plan.blocked_fragments:
+                warning(
+                    f"场景锚定无法唯一匹配，已阻断 {len(plan.blocked_fragments)} 个片段: "
+                    f"{', '.join(plan.blocked_fragments)}"
+                )
+
+            instructions.route_plan = plan.model_dump(mode="json")
             instructions.asset_plan = asset_plan
             instructions.asset_manifest = state.domain.asset_manifest
 
@@ -1026,7 +1163,19 @@ class WorkflowNodes:
             contract=state.domain.contract,
             route_plan=route_plan,
             parsed_script=state.domain.parsed_script,
+            instructions=state.domain.instructions,
         )
+        # 0.4.5 T-016：剧本结构化服装优先，其次用该角色片段标注补全服装缺失要素
+        outfit_backfilled = backfill_outfits(
+            plan,
+            fragments=fragments,
+            shots=shots,
+            instructions=state.domain.instructions,
+            parsed_script=state.domain.parsed_script,
+            manifest=state.domain.asset_manifest,
+        )
+        if outfit_backfilled:
+            debug(f"角色服装已从片段提示词回填: {', '.join(outfit_backfilled)}")
         state.domain.asset_plan = plan.to_dict()
         self.storage.save_obj_result(
             state.input.script_id,
@@ -1223,12 +1372,27 @@ class WorkflowNodes:
         self._update_task_progress(state.input.task_id, TaskStage.AUDITING, 20)
 
         try:
+            # 审计前对最终产物复检契约一致性（FR-060..FR-064 补强）：
+            # 合并历史违规项与当下复检结果，让审查读取契约校验告警，
+            # 避免出现"契约已告警而审查 100 分"的割裂
+            fresh_contract_violations = validate_shot_sequence(
+                state.domain.shot_sequence, state.domain.contract
+            ) + validate_fragment_sequence(
+                state.domain.fragment_sequence,
+                state.domain.shot_sequence,
+                state.domain.contract,
+            )
+            contract_violations = merge_violations(
+                state.domain.contract_violations, fresh_contract_violations
+            )
+
             # 执行质量审查
             result = self.quality_auditor.qa_process(
                 state.domain.instructions,
                 all_stage_issues,
                 historical_context,
                 contract=state.domain.contract,
+                contract_violations=contract_violations,
             )
 
             debug("质量审查完成:")
@@ -1289,6 +1453,14 @@ class WorkflowNodes:
                     ),
                     severities=[v.severity for v in result.violations],
                 )
+                # P0-3：质量门结论写入审计元数据，最终输出据此标记 quality_gate
+                result.metadata["quality_gate"] = {
+                    "status": decision.reason,
+                    "score": result.score,
+                    "blocking": False,
+                    "ingestion_allowed": decision.allowed,
+                    "audit_status": decision.audit_status,
+                }
                 if decision.allowed:
                     for fragment in state.domain.instructions.fragments:
                         self.knowledge_manager.save_successful_prompt(
@@ -1310,6 +1482,12 @@ class WorkflowNodes:
                         f"审计入库: source={decision.source}, "
                         f"audit_status={decision.audit_status}, "
                         f"片段数={len(state.domain.instructions.fragments)}"
+                    )
+                elif decision.reason == REASON_BELOW_THRESHOLD:
+                    # 方案 B：不达标但放行，产物照常输出并携带 quality_gate 标记
+                    info(
+                        f"未达标但放行，已标记: reason={decision.reason}, "
+                        f"score={result.score}, 产物仅供预览"
                     )
                 else:
                     info(
@@ -1339,7 +1517,16 @@ class WorkflowNodes:
                     )
 
             # 调用各阶段修复器
+            repair_issue_count = 0
+            repair_actions_total = 0
+            history_before: Dict[str, int] = {}
             if result.repair_params:
+                repair_issue_count = sum(
+                    params.issue_count
+                    for params in result.repair_params.values()
+                    if getattr(params, "fix_needed", False)
+                )
+                history_before = self._repair_history_sizes(state)
                 for node, params in result.repair_params.items():
                     if not params.fix_needed:
                         continue
@@ -1393,6 +1580,46 @@ class WorkflowNodes:
                         state.errors.error_messages.append(
                             f"修复{node.value}失败: {str(e)}"
                         )
+
+                repair_actions_total = self._count_new_repair_actions(
+                    state, history_before
+                )
+
+            # P0-2：修复结论必须可核对——问题数与实际动作数分列，
+            # 零动作不得提升分数，未覆盖问题进入最终输出的人工项
+            manual_items = self._collect_manual_fix_items(state)
+            result.metadata["repair_issue_count"] = repair_issue_count
+            result.metadata["repair_action_count"] = repair_actions_total
+            if manual_items:
+                result.metadata["requires_manual_fix"] = manual_items
+
+            if repair_issue_count > 0 and repair_actions_total == 0:
+                result.metadata["repair_status"] = REPAIR_STATUS_NO_ACTION
+                error(
+                    f"修复环节空转：发现{repair_issue_count}个问题，执行0个修复操作；"
+                    f"已标记 repair_status={REPAIR_STATUS_NO_ACTION}，"
+                    f"post_repair_score 保持 detection_score={result.detection_score}"
+                )
+                result.post_repair_score = result.detection_score
+            elif repair_actions_total > 0:
+                # 覆盖全部问题时为 repaired，仍有未覆盖问题则如实标记 partial
+                result.metadata["repair_status"] = (
+                    REPAIR_STATUS_PARTIAL
+                    if self._has_uncovered_repairs(state)
+                    else REPAIR_STATUS_REPAIRED
+                )
+                # 复检口径仅规则与契约维度，需与检测分分列展示
+                result.metadata["post_repair_score_basis"] = "rule_recheck"
+                result.post_repair_score = self._recheck_prompt_score(state, result)
+            else:
+                result.post_repair_score = result.detection_score
+
+            info(
+                f"修复结果汇总: 问题数={repair_issue_count}, "
+                f"修复动作数={repair_actions_total}, 人工项={len(manual_items)}, "
+                f"detection_score={result.detection_score}, "
+                f"post_repair_score={result.post_repair_score}"
+            )
 
             # 保存审查结果
             self.storage.save_obj_result(
@@ -1618,6 +1845,7 @@ class WorkflowNodes:
                             stage,
                             state.domain.contract,
                             state.domain.shot_sequence,
+                            state.domain.parsed_script,
                         )
                         repair_params = merge_repair_params(
                             repair_params, contract_params
@@ -1774,6 +2002,11 @@ class WorkflowNodes:
         self._update_task_progress(state.input.task_id, TaskStage.OUTPUT_START, 0)
 
         try:
+            quality_gate = None
+            if state.domain.audit_report:
+                quality_gate = state.domain.audit_report.metadata.get("quality_gate")
+            warnings = self._build_output_warnings(state)
+
             output_data = {
                 "task_id": state.input.task_id,
                 "script_analysis": state.domain.parsed_script.model_dump()
@@ -1798,6 +2031,8 @@ class WorkflowNodes:
                 "asset_generation": state.domain.asset_report,
                 "asset_plan": state.domain.asset_plan,
                 "asset_manifest": state.domain.asset_manifest,
+                "warnings": warnings,
+                "metadata": {"quality_gate": quality_gate},
                 "created_at": datetime.now().isoformat(),
                 "completed_at": datetime.now().isoformat(),
                 "status": "completed",
@@ -2446,6 +2681,123 @@ class WorkflowNodes:
         state.execution.current_node = PipelineNode.CONVERT_PROMPT
         state.execution.current_stage = AgentStage.CONVERTER
         return state
+
+    # ============================= 修复结果核算 =============================
+
+    @staticmethod
+    def _artifact_metadata(state: WorkflowState) -> Dict[str, Dict[str, Any]]:
+        """收集可修复产物的 metadata，按产物名索引"""
+        artifacts = {
+            "script": state.domain.parsed_script,
+            "shots": state.domain.shot_sequence,
+            "fragments": state.domain.fragment_sequence,
+            "prompts": state.domain.instructions,
+        }
+        return {
+            name: artifact.metadata
+            for name, artifact in artifacts.items()
+            if artifact is not None
+            and isinstance(getattr(artifact, "metadata", None), dict)
+        }
+
+    def _repair_history_sizes(self, state: WorkflowState) -> Dict[str, int]:
+        """记录各产物 repair_history 的当前长度，用于统计本轮新增动作"""
+        return {
+            name: len(metadata.get("repair_history") or [])
+            for name, metadata in self._artifact_metadata(state).items()
+        }
+
+    def _count_new_repair_actions(
+        self, state: WorkflowState, history_before: Dict[str, int]
+    ) -> int:
+        """统计本轮修复真实执行的动作数（仅新增 repair_history 的 fixed_issues）"""
+        total = 0
+        for name, metadata in self._artifact_metadata(state).items():
+            history = metadata.get("repair_history") or []
+            for entry in history[history_before.get(name, 0) :]:
+                try:
+                    total += int(entry.get("fixed_issues") or 0)
+                except (AttributeError, TypeError, ValueError):
+                    continue
+        return total
+
+    def _collect_manual_fix_items(self, state: WorkflowState) -> List[Dict[str, Any]]:
+        """汇总各产物中不可自动修复、需人工处理的问题项"""
+        items: List[Dict[str, Any]] = []
+        for metadata in self._artifact_metadata(state).values():
+            for item in metadata.get("requires_manual_fix") or []:
+                if item not in items:
+                    items.append(item)
+        return items
+
+    def _has_uncovered_repairs(self, state: WorkflowState) -> bool:
+        """本阶段产物是否仍有未自动覆盖、需人工处理的问题"""
+        for metadata in self._artifact_metadata(state).values():
+            if metadata.get("repair_status") == REPAIR_STATUS_PARTIAL:
+                return True
+            if metadata.get("requires_manual_fix"):
+                return True
+        return False
+
+    def _build_output_warnings(self, state: WorkflowState) -> List[Dict[str, Any]]:
+        """组装最终输出 warnings：人工处理项、阻断片段与质量门声明"""
+        warnings: List[Dict[str, Any]] = list(self._collect_manual_fix_items(state))
+
+        instructions = state.domain.instructions
+        route_plan = getattr(instructions, "route_plan", None) if instructions else None
+        if isinstance(route_plan, dict):
+            for fragment_id in route_plan.get("blocked_fragments") or []:
+                warnings.append(
+                    {
+                        "type": "blocked_fragment",
+                        "stage": "route_model",
+                        "fragment_id": fragment_id,
+                        "reason": "场景锚定无法唯一匹配，片段已阻断，不进入下游渲染队列",
+                    }
+                )
+
+        audit_report = state.domain.audit_report
+        gate = (
+            (audit_report.metadata or {}).get("quality_gate") if audit_report else None
+        )
+        if gate and gate.get("status") == REASON_BELOW_THRESHOLD:
+            warnings.append(
+                {
+                    "type": "quality_gate",
+                    "stage": "audit",
+                    "status": REASON_BELOW_THRESHOLD,
+                    "score": gate.get("score"),
+                    "reason": "本结果未达入库标准，仅供预览",
+                }
+            )
+        return warnings
+
+    def _recheck_prompt_score(
+        self, state: WorkflowState, result: QualityAuditReport
+    ) -> float:
+        """修复后规则复检评分；复检失败时回退检测分并告警"""
+        try:
+            fresh_violations = validate_shot_sequence(
+                state.domain.shot_sequence, state.domain.contract
+            ) + validate_fragment_sequence(
+                state.domain.fragment_sequence,
+                state.domain.shot_sequence,
+                state.domain.contract,
+            )
+            merged = merge_violations(
+                state.domain.contract_violations, fresh_violations
+            )
+            state.domain.contract_violations = merged
+            return float(
+                self.quality_auditor.recheck_rule_score(
+                    state.domain.instructions,
+                    contract=state.domain.contract,
+                    contract_violations=merged,
+                )
+            )
+        except Exception as e:
+            warning(f"修复后规则复检失败，沿用检测分: {e}")
+            return result.detection_score
 
     # ============================= 节点任务状态管理 =============================
 

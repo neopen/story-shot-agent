@@ -19,6 +19,7 @@ from penshot.neopen.agent.script_parser.llm_script_parser import LLMScriptParser
 from .base_models import AgentMode, ScriptType, ElementType
 from .base_repairable_agent import BaseRepairableAgent
 from .continuity_guardian.consistency_contract import (
+    CharacterContract,
     GlobalConsistencyContract,
     SceneContract,
 )
@@ -29,6 +30,7 @@ from .quality_auditor.quality_auditor_models import (
     IssueType,
     RuleType,
 )
+from .repair_outcome import record_repair_outcome
 from .script_parser.rule_script_parser import RuleScriptParser
 from .script_parser.script_parser_models import (
     ParsedScript,
@@ -124,10 +126,13 @@ def build_contract_from_parsed(
             continue
         description = getattr(char, "description", None) or ""
         outfit = outfit_index.get(name)
-        if not description and not outfit:
-            continue
         char_contract = contract.characters.get(name)
-        if char_contract is not None:
+        if char_contract is None:
+            # 场景元素未覆盖的剧本角色（如只出现在悬念/动作描写中）也必须登记，
+            # 否则分镜校验会把剧本真实角色误判为契约外角色并空转修复
+            char_contract = CharacterContract(name=name)
+            contract.characters[name] = char_contract
+        if description or outfit:
             char_contract._extract_appearance_features(description, outfit)
 
     # 提取风格锚点（ParsedScript 无 genre 字段，改用全局元数据与标题）
@@ -850,6 +855,20 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         info(f"修复完成，执行了{len(repair_actions)}个修复操作")
         if repair_actions:
             debug(f"修复操作详情: {repair_actions[:10]}")
+        record_repair_outcome(
+            parsed_script.metadata,
+            "剧本解析",
+            issues,
+            repair_actions,
+            auto_types={
+                IssueType.SCENE.value,
+                IssueType.CHARACTER.value,
+                IssueType.DIALOGUE.value,
+                IssueType.ACTION.value,
+                IssueType.FORMAT.value,
+                IssueType.CONTINUITY.value,
+            },
+        )
 
         return parsed_script
 

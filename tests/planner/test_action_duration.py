@@ -10,8 +10,31 @@ See LICENSE File For Details.
 @Time: 2025/10/24 14:21
 """
 from penshot.neopen.tools.action_duration_tool import ActionDurationEstimatorTool
-from typing import List, Dict, Any
+from types import SimpleNamespace
+from typing import Any, Dict, List
 import json
+
+import penshot.neopen.agent.shot_segmenter.estimator.estimator_factory as estimator_factory_module
+import penshot.neopen.agent.workflow.workflow_nodes as workflow_nodes_module
+from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
+    AIVideoInstructions,
+    AIVideoPrompt,
+)
+from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
+from penshot.neopen.agent.shot_segmenter.estimator.estimator_factory import (
+    DurationEstimatorFactory,
+)
+from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import (
+    ShotInfo,
+    ShotSequence,
+    ShotType,
+)
+from penshot.neopen.agent.video_splitter.video_splitter_models import (
+    FragmentSequence,
+    VideoFragment,
+)
+from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
+from penshot.neopen.agent.workflow.workflow_nodes import WorkflowNodes
 
 
 def extract_verbs_from_script(script: str) -> List[Dict[str, Any]]:
@@ -287,3 +310,239 @@ if __name__ == '__main__':
     print(json.dumps(storyboard_output, ensure_ascii=False, indent=2))
     
     print("\n=== 演示完成 ===")
+
+
+# ==================== 0.4.5 T-007：estimator 接入与总时长统计 ====================
+
+
+def _make_sequence(descriptions: List[str]) -> ShotSequence:
+    """按描述构造中等景别镜头序列"""
+    return ShotSequence(
+        shots=[
+            ShotInfo(
+                id=f"shot_{index:03d}",
+                scene_id="scene_001",
+                description=text,
+                shot_type=ShotType.MEDIUM_SHOT,
+            )
+            for index, text in enumerate(descriptions, start=1)
+        ]
+    )
+
+
+def _capture_warnings(monkeypatch) -> List[str]:
+    """替换 estimator_factory 的 warning，收集告警文案"""
+    messages: List[str] = []
+    monkeypatch.setattr(estimator_factory_module, "warning", messages.append)
+    return messages
+
+
+def test_estimate_sequence_uses_action_nodes_duration(monkeypatch):
+    """有描述时使用动作节点公式，元素估算只进报告不改写时长"""
+    _capture_warnings(monkeypatch)
+    sequence = _make_sequence(["她低头，随后抬头。"])
+
+    result = DurationEstimatorFactory.estimate_sequence(sequence, ParsedScript())
+
+    assert result.shots[0].duration == 2.7  # 1.5 + 0.6 * 2
+    assert result.stats["duration_source"] == "action_nodes"
+    assert result.stats["element_duration"] > 0
+    assert result.stats["target_duration"] is None
+    assert result.stats["duration_delta"] is None
+
+
+def test_estimate_sequence_total_equals_shot_sum(monkeypatch):
+    """总时长等于全部镜头时长之和"""
+    _capture_warnings(monkeypatch)
+    sequence = _make_sequence(
+        ["她低头，随后抬头。", "窗外的雨渐渐停了。", "他转身离开。"]
+    )
+
+    result = DurationEstimatorFactory.estimate_sequence(sequence, ParsedScript())
+
+    assert [shot.duration for shot in result.shots] == [2.7, 2.5, 2.5]
+    assert result.stats["total_duration"] == round(
+        sum(shot.duration for shot in result.shots), 2
+    )
+    assert result.stats["total_duration"] == 7.7
+
+
+def test_no_target_duration_has_no_shortage_warning(monkeypatch):
+    """未声明目标时长时不产生“总时长不足”告警"""
+    messages = _capture_warnings(monkeypatch)
+    sequence = _make_sequence(["她低头，随后抬头。"])
+
+    DurationEstimatorFactory.estimate_sequence(sequence, ParsedScript())
+
+    assert not any("总时长不足" in message for message in messages)
+
+
+def test_target_duration_records_delta_and_warning(monkeypatch):
+    """显式目标时长记录差值，差额为正时给出“总时长不足”告警"""
+    messages = _capture_warnings(monkeypatch)
+    sequence = _make_sequence(["她低头，随后抬头。"])
+    script = ParsedScript(metadata={"target_duration": 10.0})
+
+    result = DurationEstimatorFactory.estimate_sequence(sequence, script)
+
+    assert result.stats["target_duration"] == 10.0
+    assert result.stats["duration_delta"] == 7.3
+    assert any("总时长不足" in message and "7.3" in message for message in messages)
+
+
+def test_blank_description_falls_back_to_element_estimator(monkeypatch):
+    """缺少描述时回退到元素估算器，并标记来源"""
+    messages = _capture_warnings(monkeypatch)
+    sequence = _make_sequence(["   "])
+
+    result = DurationEstimatorFactory.estimate_sequence(sequence, ParsedScript())
+
+    shot = result.shots[0]
+    assert shot.duration >= 2.0
+    assert result.stats["duration_source"] == "fallback_estimator"
+    assert result.stats["element_duration"] == shot.duration
+    assert any("缺少描述" in message for message in messages)
+
+
+def test_invalid_target_duration_is_ignored(monkeypatch):
+    """非法目标时长被忽略并告警，不写负数差值"""
+    messages = _capture_warnings(monkeypatch)
+    sequence = _make_sequence(["她低头，随后抬头。"])
+    script = ParsedScript(metadata={"target_duration": "abc"})
+
+    result = DurationEstimatorFactory.estimate_sequence(sequence, script)
+
+    assert result.stats["target_duration"] is None
+    assert result.stats["duration_delta"] is None
+    assert any("非法目标时长" in message for message in messages)
+
+
+# ==================== 0.4.5 T-008：总时长报告落盘 ====================
+
+
+def _make_prompt_nodes(instructions: AIVideoInstructions) -> WorkflowNodes:
+    """构造只打桩外部依赖的提示词节点"""
+    nodes = object.__new__(WorkflowNodes)
+    nodes._update_task_progress = lambda *args, **kwargs: None
+    nodes._complete_stage = lambda *args, **kwargs: None
+    nodes._recall_patterns_by_anchors = lambda state: ([], {})
+    nodes.workflow_memory = SimpleNamespace(
+        get_memory_dict=lambda *args, **kwargs: {},
+        get_memory_list=lambda *args, **kwargs: [],
+        after_stage_completion=lambda *args, **kwargs: None,
+    )
+    nodes.prompt_converter = SimpleNamespace(
+        apply_historical_context=lambda *args, **kwargs: None,
+        apply_repair_params=lambda *args, **kwargs: None,
+        process=lambda *args, **kwargs: instructions,
+        detect_issues=lambda *args, **kwargs: [],
+        clear_repair_params=lambda *args, **kwargs: None,
+        clear_historical_context=lambda *args, **kwargs: None,
+    )
+    nodes.storage = SimpleNamespace(save_obj_result=lambda *args, **kwargs: None)
+    return nodes
+
+
+def _make_prompt_state(
+    fragment_durations: List[float], shot_stats: Dict[str, Any]
+) -> WorkflowState:
+    """构造含片段与镜头统计的最小状态"""
+    state = WorkflowState.from_raw_script("剧本内容")
+    state.domain.contract = None
+    state.domain.shot_sequence = ShotSequence(
+        shots=[
+            ShotInfo(
+                id="shot_001",
+                scene_id="scene_001",
+                description="她低头，随后抬头。",
+            )
+        ],
+        stats=shot_stats,
+    )
+    state.domain.fragment_sequence = FragmentSequence(
+        fragments=[
+            VideoFragment(
+                id=f"frag_{index:03d}",
+                shot_id="shot_001",
+                duration=duration,
+                description="她低头，随后抬头。",
+            )
+            for index, duration in enumerate(fragment_durations, start=1)
+        ]
+    )
+    return state
+
+
+def test_generate_prompts_writes_duration_report(monkeypatch):
+    """节点把片段总时长与解析元素推算值写入 metadata.duration_report"""
+    messages: List[str] = []
+    monkeypatch.setattr(workflow_nodes_module, "warning", messages.append)
+
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(fragment_id="frag_001", prompt="a woman waits", duration=3.0)
+        ]
+    )
+    nodes = _make_prompt_nodes(instructions)
+    state = _make_prompt_state(
+        [2.5, 3.0],
+        {
+            "total_duration": 5.0,
+            "element_duration": 9.9,
+            "target_duration": 12.0,
+            "duration_delta": 7.0,
+            "duration_source": "action_nodes",
+        },
+    )
+
+    nodes.generate_prompts_node(state)
+
+    assert instructions.metadata["duration_report"] == {
+        "total_duration": 5.5,
+        "shot_duration": 5.0,
+        "element_duration": 9.9,
+        "target_duration": 12.0,
+        "duration_delta": 6.5,
+        "delivery_deviation": 0.5,
+        "duration_source": "action_nodes",
+        "semantics": {
+            "total_duration": "实际交付：片段时长求和（切片器按文本重算）",
+            "shot_duration": "切分前的镜头计划总时长",
+            "element_duration": "切分前的解析元素推算总时长",
+            "target_duration": "剧本声明的目标总时长",
+            "duration_delta": "目标总时长 - 实际交付总时长",
+            "delivery_deviation": "实际交付总时长 - 镜头计划总时长",
+        },
+    }
+    assert any("总时长不足" in message and "6.5" in message for message in messages)
+
+
+def test_duration_report_without_target_has_no_shortage_warning(monkeypatch):
+    """无目标时长时报告为 None，且不产生“总时长不足”告警"""
+    messages: List[str] = []
+    monkeypatch.setattr(workflow_nodes_module, "warning", messages.append)
+
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(fragment_id="frag_001", prompt="a woman waits", duration=3.0)
+        ]
+    )
+    nodes = _make_prompt_nodes(instructions)
+    state = _make_prompt_state(
+        [2.5],
+        {
+            "total_duration": 2.5,
+            "element_duration": 3.1,
+            "target_duration": None,
+            "duration_delta": None,
+            "duration_source": "action_nodes",
+        },
+    )
+
+    nodes.generate_prompts_node(state)
+
+    report = instructions.metadata["duration_report"]
+    assert report["total_duration"] == 2.5
+    assert report["target_duration"] is None
+    assert report["duration_delta"] is None
+    assert not any("总时长不足" in message for message in messages)
