@@ -2470,6 +2470,20 @@ ol {
    -------------------------------------------------------------------------- */
 
 @media (max-width: 1080px) {
+  .site-nav,
+  .header-actions .search-trigger,
+  .header-actions .header-github span {
+    display: none;
+  }
+
+  .menu-toggle {
+    display: inline-flex;
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+
   .hero-grid {
     gap: 40px;
   }
@@ -2507,20 +2521,6 @@ ol {
 @media (max-width: 900px) {
   :root {
     --header-h: 62px;
-  }
-
-  .site-nav,
-  .header-actions .search-trigger,
-  .header-actions .header-github span {
-    display: none;
-  }
-
-  .menu-toggle {
-    display: inline-flex;
-  }
-
-  .header-actions {
-    margin-left: auto;
   }
 
   .hero {

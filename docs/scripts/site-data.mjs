@@ -13,6 +13,7 @@ export const site = {
   pypi: 'https://pypi.org/project/penshot/',
   docker: 'https://hub.docker.com/r/neotems/penshot',
   issues: 'https://github.com/neopen/story-shot-agent/issues',
+  hub: 'https://helpenx.com/',
   blog: 'https://pengline.cn',
   email: 'helpenx@gmail.com',
 };
