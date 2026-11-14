@@ -71,7 +71,10 @@ from penshot.neopen.agent.repair_outcome import (
     REPAIR_STATUS_PARTIAL,
     REPAIR_STATUS_REPAIRED,
 )
-from penshot.neopen.prompts.ingestion_policy import decide_ingestion
+from penshot.neopen.prompts.ingestion_policy import (
+    REASON_BELOW_THRESHOLD,
+    decide_ingestion,
+)
 from penshot.neopen.prompts.prompt_template_manager import PromptTemplateManager
 from penshot.neopen.prompts.recall_status import build_anchor_recall
 from penshot.neopen.task.task_models import TaskStage, TaskStatus
@@ -1432,6 +1435,14 @@ class WorkflowNodes:
                     ),
                     severities=[v.severity for v in result.violations],
                 )
+                # P0-3：质量门结论写入审计元数据，最终输出据此标记 quality_gate
+                result.metadata["quality_gate"] = {
+                    "status": decision.reason,
+                    "score": result.score,
+                    "blocking": False,
+                    "ingestion_allowed": decision.allowed,
+                    "audit_status": decision.audit_status,
+                }
                 if decision.allowed:
                     for fragment in state.domain.instructions.fragments:
                         self.knowledge_manager.save_successful_prompt(
@@ -1453,6 +1464,12 @@ class WorkflowNodes:
                         f"审计入库: source={decision.source}, "
                         f"audit_status={decision.audit_status}, "
                         f"片段数={len(state.domain.instructions.fragments)}"
+                    )
+                elif decision.reason == REASON_BELOW_THRESHOLD:
+                    # 方案 B：不达标但放行，产物照常输出并携带 quality_gate 标记
+                    info(
+                        f"未达标但放行，已标记: reason={decision.reason}, "
+                        f"score={result.score}, 产物仅供预览"
                     )
                 else:
                     info(
@@ -1967,6 +1984,9 @@ class WorkflowNodes:
         self._update_task_progress(state.input.task_id, TaskStage.OUTPUT_START, 0)
 
         try:
+            quality_gate = None
+            if state.domain.audit_report:
+                quality_gate = state.domain.audit_report.metadata.get("quality_gate")
             warnings = self._build_output_warnings(state)
 
             output_data = {
@@ -1994,6 +2014,7 @@ class WorkflowNodes:
                 "asset_plan": state.domain.asset_plan,
                 "asset_manifest": state.domain.asset_manifest,
                 "warnings": warnings,
+                "metadata": {"quality_gate": quality_gate},
                 "created_at": datetime.now().isoformat(),
                 "completed_at": datetime.now().isoformat(),
                 "status": "completed",
@@ -2701,7 +2722,7 @@ class WorkflowNodes:
         return False
 
     def _build_output_warnings(self, state: WorkflowState) -> List[Dict[str, Any]]:
-        """组装最终输出 warnings：人工处理项与阻断片段"""
+        """组装最终输出 warnings：人工处理项、阻断片段与质量门声明"""
         warnings: List[Dict[str, Any]] = list(self._collect_manual_fix_items(state))
 
         instructions = state.domain.instructions
@@ -2717,6 +2738,20 @@ class WorkflowNodes:
                     }
                 )
 
+        audit_report = state.domain.audit_report
+        gate = (
+            (audit_report.metadata or {}).get("quality_gate") if audit_report else None
+        )
+        if gate and gate.get("status") == REASON_BELOW_THRESHOLD:
+            warnings.append(
+                {
+                    "type": "quality_gate",
+                    "stage": "audit",
+                    "status": REASON_BELOW_THRESHOLD,
+                    "score": gate.get("score"),
+                    "reason": "本结果未达入库标准，仅供预览",
+                }
+            )
         return warnings
 
     def _recheck_prompt_score(
