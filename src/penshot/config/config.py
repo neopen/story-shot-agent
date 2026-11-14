@@ -38,6 +38,10 @@ DotEnvLoader().load()
 class Settings(BaseSettings):
     """主配置 - 优先级: 环境变量 > YAML > 模型默认值"""
 
+    def __init__(self, **values: Any):
+        with trusted_env_expansion():
+            super().__init__(**values)
+
     # 基础配置
     app: AppConfig = Field(default_factory=AppConfig)
     api: APIConfig = Field(default_factory=APIConfig)
