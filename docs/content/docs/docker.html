@@ -80,7 +80,7 @@ docker compose logs -f story-shot-agent
     M[&quot;docker compose&quot;] -.-> A
     M -.-> R
 </pre>
-<p>单容器即单进程：任务池、并发计数与 <code>split_cache</code> 都在容器内。多副本部署时各副本独立，必须共享 Redis；需要断点恢复时，还要把检查点放到各副本都能访问的存储。</p>
+<p>单容器即单进程：任务池、并发计数与 <code>split_cache</code> 都在容器内。多副本部署时各副本独立，必须共享 Redis 才能共享任务状态与短期记忆。检查点当前只写不读（见<a href="checkpoint.html">检查点与恢复</a>），把检查点目录放到共享存储也不会带来跨副本续跑能力。</p>
 
 <h2>数据与持久化</h2>
 <p>镜像工作目录为 <code>/app</code>。解析结果、模板缓存、SQLite 检查点与本地记忆默认写在 <code>/app/data</code>；Compose 没有挂载该目录，容器重建后这些数据会丢失，只有 Redis 卷保留。需要保留时挂载数据目录：</p>
@@ -93,7 +93,7 @@ docker run -d --name penshot \
   neotems/penshot:latest
 </code></pre>
 <p>容器以 uid 1000 运行，Linux 上需保证挂载目录可写：<code>sudo chown -R 1000:1000 data</code>。Docker Desktop 的绑定挂载通常无需额外处理。Redis 使用独立的 <code>redis_data</code> 卷，其余缓存不持久化，重建容器后重新生成。</p>
-<p>以上路径对应默认的 <code>development</code> 配置。若把 <code>PENSHOT_APP__ENVIRONMENT</code> 设为 <code>production</code>，向量库与缓存会改用 <code>/data/script-to-shot</code> 下的路径，需额外挂载该目录，否则数据落在容器可写层，重建后丢失。</p>
+<p>以上路径对应默认的 <code>development</code> 配置。环境配置文件由 <code>ENVIRONMENT</code> 变量选择（默认 <code>development</code>，可选 <code>production</code>），不是 <code>PENSHOT_APP__ENVIRONMENT</code>。切到 <code>production</code> 后，输入、输出、缓存与模型目录改用 <code>/data/script-to-shot</code>，日志写到 <code>/var/log/script-to-shot</code>，临时文件写到 <code>/tmp/script-to-shot</code>；嵌入索引、模板缓存、记忆与检查点仍取 <code>./data/...</code>，落在 <code>/app/data</code> 下。两类目录都要挂载，否则容器重建后数据丢失。</p>
 
 <h2>启动与健康检查</h2>
 <pre class="mermaid">flowchart TD
@@ -121,7 +121,7 @@ docker run -d --name penshot \
   -v &quot;$PWD/data:/app/data&quot; \
   neotems/penshot:latest
 </code></pre>
-<p>Compose 场景执行 <code>git pull &amp;&amp; docker compose up -d --build</code>。横向扩容时，每个副本都要连接同一 Redis，并把 <code>checkpoint_mode</code> 指向共享 SQLite 路径或 PostgreSQL；否则副本之间互不可见，任务也无法恢复。容器内的任务队列不会跨副本调度。</p>
+<p>Compose 场景执行 <code>git pull &amp;&amp; docker compose up -d --build</code>。横向扩容时，每个副本都要连接同一 Redis，否则任务与短期记忆互不可见。检查点只有 <code>memory</code> 与 <code>sqlite</code> 两种模式，没有 PostgreSQL 后端；把 <code>checkpoint_mode</code> 指向共享 SQLite 路径也不能承担多副本并发写与断点续跑，因为执行时 <code>thread_id</code> 不稳定且没有读取入口。容器内的任务队列不会跨副本调度，任务失败后仍会从头执行。</p>
 
 <h2>常见问题</h2>
 <table>
@@ -144,7 +144,7 @@ docker run -d --name penshot \
 <tr><th style="text-align:left">边界</th><th style="text-align:left">说明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align:left">单进程任务池</td><td style="text-align:left">多副本需共享 Redis 与检查点，<code>split_cache</code> 不跨副本</td></tr>
+<tr><td style="text-align:left">单进程任务池</td><td style="text-align:left">多副本需共享 Redis；检查点仅写不读，不能用于续跑，<code>split_cache</code> 不跨副本</td></tr>
 <tr><td style="text-align:left">无鉴权与 TLS</td><td style="text-align:left">只适合内网或网关之后，不要直接暴露公网</td></tr>
 <tr><td style="text-align:left">数据默认不持久化</td><td style="text-align:left">挂载 <code>/app/data</code>，否则容器重建即丢失</td></tr>
 <tr><td style="text-align:left">健康检查不校验模型</td><td style="text-align:left"><code>/health</code> 通过不代表 API Key 或嵌入模型可用</td></tr>

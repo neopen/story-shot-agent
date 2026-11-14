@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>快速开始 · PenShot 文档</title>
-  <meta name="description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。">
-  <meta name="keywords" content="PenShot 安装,penshot pip,快速开始,LLM 配置,嵌入模型,剧本分镜,Python SDK,任务提交">
+  <meta name="description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例、资产清单传入与常见配置项。">
+  <meta name="keywords" content="PenShot 安装,penshot pip,快速开始,LLM 配置,嵌入模型,剧本分镜,Python SDK,任务提交,asset_manifest">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="快速开始 · PenShot 文档">
-  <meta property="og:description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。">
+  <meta property="og:description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例、资产清单传入与常见配置项。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/quick-start.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="开始使用">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="快速开始 · PenShot 文档">
-  <meta name="twitter:description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。">
+  <meta name="twitter:description" content="从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例、资产清单传入与常见配置项。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"快速开始","name":"快速开始","description":"从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例与常见配置项。","url":"https://shot.helpenx.com/docs/quick-start.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/quick-start.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot 安装, penshot pip, 快速开始, LLM 配置, 嵌入模型, 剧本分镜, Python SDK, 任务提交","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"快速开始","name":"快速开始","description":"从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例、资产清单传入与常见配置项。","url":"https://shot.helpenx.com/docs/quick-start.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/quick-start.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot 安装, penshot pip, 快速开始, LLM 配置, 嵌入模型, 剧本分镜, Python SDK, 任务提交, asset_manifest","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -126,8 +130,8 @@
       <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
     </div>
     <details class="toc-mobile">
-      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 15 节</summary>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">前置条件</a></li><li class="toc-depth-2"><a href="#sec-2">安装</a></li><li class="toc-depth-2"><a href="#sec-3">配置</a></li><li class="toc-depth-2"><a href="#sec-4">最小调用</a></li><li class="toc-depth-3"><a href="#sec-5">同步调用</a></li><li class="toc-depth-3"><a href="#sec-6">异步调用</a></li><li class="toc-depth-3"><a href="#sec-7">同步与异步的选择</a></li><li class="toc-depth-3"><a href="#sec-8">任务状态与回调</a></li><li class="toc-depth-3"><a href="#sec-9">自定义配置</a></li><li class="toc-depth-2"><a href="#sec-10">输出示例</a></li><li class="toc-depth-2"><a href="#sec-11">六阶段说明</a></li><li class="toc-depth-2"><a href="#sec-12">常用配置</a></li><li class="toc-depth-2"><a href="#sec-13">质量与记忆</a></li><li class="toc-depth-2"><a href="#sec-14">故障排查</a></li><li class="toc-depth-2"><a href="#sec-15">下一步</a></li></ul>
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 16 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">前置条件</a></li><li class="toc-depth-2"><a href="#sec-2">安装</a></li><li class="toc-depth-2"><a href="#sec-3">配置</a></li><li class="toc-depth-2"><a href="#sec-4">最小调用</a></li><li class="toc-depth-3"><a href="#sec-5">同步调用</a></li><li class="toc-depth-3"><a href="#sec-6">异步调用</a></li><li class="toc-depth-3"><a href="#sec-7">资产回填</a></li><li class="toc-depth-3"><a href="#sec-8">同步与异步的选择</a></li><li class="toc-depth-3"><a href="#sec-9">任务状态与回调</a></li><li class="toc-depth-3"><a href="#sec-10">自定义配置</a></li><li class="toc-depth-2"><a href="#sec-11">输出示例</a></li><li class="toc-depth-2"><a href="#sec-12">八阶段说明</a></li><li class="toc-depth-2"><a href="#sec-13">常用配置</a></li><li class="toc-depth-2"><a href="#sec-14">质量与记忆</a></li><li class="toc-depth-2"><a href="#sec-15">故障排查</a></li><li class="toc-depth-2"><a href="#sec-16">下一步</a></li></ul>
     </details>
     <div class="docs-layout">
       <article class="doc-body">
@@ -136,12 +140,12 @@
           <h1>快速开始</h1>
           <p class="doc-deck">从安装、配置到跑通第一个分镜任务，完整走一遍最小可用链路。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 16 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 18 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/quick-start.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
-        <p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。</p>
+        <p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。当前版本 <strong>v0.4.4</strong>。</p>
 
 <h2 id="sec-1">前置条件</h2>
 <table>
@@ -176,7 +180,7 @@
 <tr>
 <td style="text-align:left">存储</td>
 <td style="text-align:left">建议 2GB 以上</td>
-<td style="text-align:left">缓存、记忆文件与结果落盘</td>
+<td style="text-align:left">缓存、记忆文件、资产计划与结果落盘</td>
 </tr>
 </tbody>
 </table>
@@ -185,13 +189,13 @@
 <h2 id="sec-2">安装</h2>
 <pre class="hljs"><code>pip install penshot
 
-# 使用 OpenAI / DeepSeek / 通义千问时安装厂商依赖
-pip install "penshot[llm-providers]"
+# 使用通义千问（DashScope）或本地 Ollama 时，安装可选能力
+pip install "penshot[full]"
 
 # 或使用官方镜像
 docker pull neotems/penshot
 </code></pre>
-<p>核心依赖自带 <code>langchain-ollama</code>，连接本地 Ollama 无需额外安装；缺少对应厂商 SDK 时请求会直接报错，不会静默切换模型。当前发布线为 v0.3.x。镜像的启动参数、Compose 与持久化配置见 <a href="docker.html">Docker 部署</a>。</p>
+<p>核心依赖包含 <code>langchain-openai</code>，OpenAI 与 DeepSeek 的 OpenAI 兼容接口可直接使用；Ollama 与 DashScope 分别在 <code>[full]</code> / <code>[docker]</code> 可选组中。<code>[full]</code> 还包含本地重排序依赖。缺少对应厂商 SDK 时请求会直接报错，不会静默切换模型。镜像的启动参数、Compose 与持久化配置见 <a href="docker.html">Docker 部署</a>。</p>
 
 <h2 id="sec-3">配置</h2>
 <p>在项目根目录创建 <code>.env</code>，最少配置对话模型、嵌入模型与可选的 Redis。对话侧支持 OpenAI、通义千问（DashScope）、DeepSeek 与 Ollama 四类厂商，<code>API_KEY</code> 支持 <code>${ENV_VAR}</code> 形式间接引用环境变量：</p>
@@ -225,7 +229,7 @@ PENSHOT_REDIS_URL=redis://:123456@localhost:6379/0
 <tr>
 <td style="text-align:left"><code>PENSHOT_EMBED__DEFAULT__*</code></td>
 <td style="text-align:left">文本向量化，供记忆与语义检索使用</td>
-<td style="text-align:left">使用记忆时需要</td>
+<td style="text-align:left">使用记忆或模板召回时需要</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>PENSHOT_REDIS_URL</code></td>
@@ -254,10 +258,12 @@ agent = create_penshot_agent()
 result = agent.breakdown_script(script)
 
 if result and result.success:
-    fragments = result.data["instructions"]["fragments"]
+    instructions = result.data["instructions"]
+    fragments = instructions["fragments"]
     print(f"片段数: {len(fragments)}")
+    print("路由模型:", instructions.get("metadata", {}).get("video_model"))
 </code></pre>
-<p><code>breakdown_script()</code> 内部是“提交任务 + 等待结果”的封装，默认等待 300 秒，超时返回 <code>None</code>，调用方必须判空。短剧本可以同步等待，长剧本推荐异步。</p>
+<p><code>breakdown_script()</code> 内部是“提交任务 + 等待结果”的封装，<code>wait_timeout</code> 默认 300 秒，超时返回 <code>None</code>，调用方必须判空。短剧本可以同步等待，长剧本推荐异步。</p>
 
 <h3 id="sec-6">异步调用</h3>
 <pre class="hljs"><code>import asyncio
@@ -289,7 +295,27 @@ asyncio.run(main())
 <li>必须调用 <code>shutdown()</code> 释放后台事件循环与线程，否则进程可能不退出。</li>
 </ul>
 
-<h3 id="sec-7">同步与异步的选择</h3>
+<h3 id="sec-7">资产回填</h3>
+<p>如果资产已由外部生成，可在提交任务时带上 <code>asset_manifest</code>，让片段直接引用首帧资产；批量方法对应 <code>asset_manifests</code> 参数。</p>
+<pre class="hljs"><code>manifest = {
+    "schema_version": "0.4.4",
+    "bindings": [
+        {
+            "asset_id": "char_001",
+            "view": "front",
+            "asset_ref": "https://cdn.example.com/assets/char_001.png",
+            "model": "flux-1.1-pro",
+            "seed": 42,
+        }
+    ],
+    "asset_id_map": {},
+}
+
+task_id = agent.breakdown_script_async(script, asset_manifest=manifest)
+</code></pre>
+<p>未回填或回填失败的资产保持 <code>pending</code>，不阻断主流程；路由节点会把无法唯一匹配场景锚点的片段写入 <code>blocked_fragments</code>，供下游跳过渲染。</p>
+
+<h3 id="sec-8">同步与异步的选择</h3>
 <table>
 <thead>
 <tr>
@@ -302,7 +328,7 @@ asyncio.run(main())
 <tr>
 <td style="text-align:left">短剧本、脚本调试</td>
 <td style="text-align:left">同步</td>
-<td style="text-align:left">代码简单，但需处理 300 秒超时返回 <code>None</code></td>
+<td style="text-align:left">代码简单，但需处理 300 秒等待超时返回 <code>None</code></td>
 </tr>
 <tr>
 <td style="text-align:left">长剧本、Web 服务</td>
@@ -316,16 +342,16 @@ asyncio.run(main())
 </tr>
 </tbody>
 </table>
-<p>同步封装的 300 秒只是调用方等待上限；异步任务本身受 <code>workflow_timeout</code> 约束，默认 1800 秒。</p>
+<p>同步封装的 300 秒只是调用方等待上限；异步任务本身的执行超时取 <code>InputState.timeout</code>，默认 600 秒。<code>ShotConfig.workflow_timeout</code>（默认 1800 秒）仅在未传 timeout 时作为兜底。</p>
 
-<h3 id="sec-8">任务状态与回调</h3>
+<h3 id="sec-9">任务状态与回调</h3>
 <ul>
-<li><code>get_task_status(task_id)</code> 返回字典，含 <code>status</code>、<code>stage</code>、<code>progress</code> 等字段，可用于轮询进度。</li>
+<li><code>get_task_status(task_id)</code> 返回字典，含 <code>status</code>、<code>stage</code>、<code>current_stage</code>、<code>progress</code> 等字段，可用于轮询进度。</li>
 <li><code>callback</code> 在任务完成时触发，参数为结果对象，可用于通知或落盘。</li>
 <li>任务进入终态后，可用 <code>get_task_result(task_id)</code> 直接取结果；任务池满时新任务进入队列，<code>queue_size</code> 为排队上限。</li>
 </ul>
 
-<h3 id="sec-9">自定义配置</h3>
+<h3 id="sec-10">自定义配置</h3>
 <pre class="hljs"><code>from penshot import ShotConfig
 
 config = ShotConfig(
@@ -335,17 +361,18 @@ config = ShotConfig(
 config.llm.temperature = 0.2  # 默认 0.1
 
 agent = create_penshot_agent(config=config)</code></pre>
-<p>配置在创建 Agent 时注入，<code>breakdown_script()</code> 本身不接受 <code>config</code> 参数。LLM 采样参数位于嵌套的 <code>config.llm</code>，记忆容量位于记忆模块的 <code>MemoryConfig</code>，两者不在 <code>ShotConfig</code> 顶层。</p>
+<p>配置在创建 Agent 时注入，<code>breakdown_script()</code> 本身不接受 <code>config</code> 参数。LLM 采样参数位于嵌套的 <code>config.llm</code>，记忆容量位于记忆模块的 <code>MemoryConfig</code>，两者不在 <code>ShotConfig</code> 顶层。资产出图与模型路由由 <code>settings.yaml</code> 的 <code>image</code> 与 <code>routing</code> 段控制，不在 <code>ShotConfig</code> 中。</p>
 
-<h2 id="sec-10">输出示例</h2>
+<h2 id="sec-11">输出示例</h2>
 <p>成功结果是一个 JSON 包，节选结构如下（示例任务为 13 个片段、总时长 48.0 秒）：</p>
 <pre class="hljs"><code>{
   "task_id": "HL202603061716542571",
+  "status": "completed",
   "success": true,
   "data": {
     "instructions": {
       "metadata": {
-        "video_model": "runway_gen2",
+        "video_model": "kling_3",
         "audio_model": "XTTSv2",
         "total_prompts": 13
       },
@@ -367,53 +394,56 @@ agent = create_penshot_agent(config=config)</code></pre>
           }
         }
       ],
+      "route_plan": {
+        "schema_version": "0.4.4",
+        "source_model": "runway_gen2",
+        "decisions": [],
+        "blocked_fragments": []
+      },
       "global_settings": { "style_consistency": true }
-    }
+    },
+    "asset_plan": { "schema_version": "0.4.4", "assets": [] },
+    "asset_manifest": { "schema_version": "0.4.4", "bindings": [] },
+    "audit_report": { "status": "passed", "score": 96 },
+    "continuity_issues": [],
+    "metadata": { "quality_gate": "pass" }
   }
 }</code></pre>
-<pre class="mermaid">flowchart TB
-    R[&quot;data.instructions&quot;] --&gt; M[&quot;metadata&lt;br/&gt;video_model / audio_model&quot;]
-    R --&gt; P[&quot;project_info&lt;br/&gt;total_fragments / total_duration&quot;]
-    R --&gt; F[&quot;fragments[]&quot;]
-    F --&gt; F1[&quot;fragment_id / prompt&lt;br/&gt;negative_prompt&quot;]
-    F --&gt; F2[&quot;duration / model / style&quot;]
-    F --&gt; F3[&quot;audio_prompt&quot;]
-    F3 --&gt; A1[&quot;model_type / voice_type&quot;]
-    F3 --&gt; A2[&quot;previous_audio_id&lt;br/&gt;串联音频上下文&quot;]
-</pre>
 <ul>
 <li><code>prompt</code> 为英文描述加中文对照，同一实体的措辞在片段间复用；<code>negative_prompt</code> 排除卡通、畸变手部、水印等瑕疵。</li>
 <li><code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，环境音用 AudioLDM_3、人声用 XTTSv2；<code>previous_audio_id</code> 逐段串联。</li>
-<li>每个片段自带 <code>model</code> 与 <code>style</code>，可直接投喂下游生成服务。上述数值来自一次示例任务，不作为性能基准。</li>
+<li><code>route_plan</code> 记录每个片段的目标模型、路由模式、首帧引用与阻塞片段；<code>asset_plan</code> 是声明式生图指令，<code>asset_manifest</code> 是回填后的绑定结果。</li>
+<li><code>metadata.quality_gate</code> 汇总结构检查结论；<code>audit_report</code> 给出分数、违规与建议。</li>
 <li><code>project_info</code> 汇总片段总数与总时长，可用于估算下游生成成本。</li>
 </ul>
 <p>样例落盘文件中的音频字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>；编写解析代码时以模型定义为准。失败时 <code>success</code> 为 <code>false</code>，<code>message</code> 字段给出原因。</p>
 
-<h2 id="sec-11">六阶段说明</h2>
+<h2 id="sec-12">八阶段说明</h2>
 <pre class="mermaid">flowchart LR
-    subgraph Input[&quot;输入层&quot;]
+    subgraph Input["输入层"]
         A[原始剧本&lt;br/&gt;自然语言 / 标准剧本]
     end
-    
-    subgraph Core[&quot;核心处理链（六个节点）&quot;]
+
+    subgraph Core["八个业务节点"]
         B[剧本解析&lt;br/&gt;parse_script]
-        C[分镜拆分&lt;br/&gt;segment_shot]
-        D[片段分割&lt;br/&gt;split_video]
-        E[提示词转换&lt;br/&gt;convert_prompt]
+        C[资产计划&lt;br/&gt;generate_assets]
+        D[镜头拆分&lt;br/&gt;segment_shot]
+        E[片段切割&lt;br/&gt;split_video]
+        F[提示词转换&lt;br/&gt;convert_prompt]
+        G[模型路由&lt;br/&gt;route_model]
+        H[质量审计&lt;br/&gt;audit_quality]
+        I[连续性守护&lt;br/&gt;continuity_check]
     end
-    
-    subgraph Control[&quot;质量与控制层&quot;]
-        F[质量审查&lt;br/&gt;audit_quality]
-        G[连续性检查&lt;br/&gt;continuity_check]
+
+    subgraph Output["输出层"]
+        J[分镜序列 + 双语提示词&lt;br/&gt;+ 资产计划 + 路由结果]
     end
-    
-    subgraph Output[&quot;输出层&quot;]
-        H[分镜序列 + 双语提示词&lt;br/&gt;+ 音频提示词]
-    end
-    
-    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H
-    F --&gt;|发现问题| I[生成修复参数&lt;br/&gt;打回上游重跑]
-    F --&gt;|严重问题| J[人工干预 / 错误处理]
+
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H --&gt; I --&gt; J
+    H --&gt;|发现问题| F
+    I --&gt;|按来源| D
+    I --&gt;|按来源| E
+    I --&gt;|按来源| F
 </pre>
 <table>
 <thead>
@@ -428,8 +458,14 @@ agent = create_penshot_agent(config=config)</code></pre>
 <tr>
 <td style="text-align:left">剧本解析</td>
 <td style="text-align:left"><code>parse_script</code></td>
-<td style="text-align:left">场景、角色、对话、动作</td>
-<td style="text-align:left">输出解析置信度与完整度</td>
+<td style="text-align:left">场景、角色、对话、动作、风格锚点</td>
+<td style="text-align:left">输出解析置信度、完整度与一致性契约</td>
+</tr>
+<tr>
+<td style="text-align:left">资产计划</td>
+<td style="text-align:left"><code>generate_assets</code></td>
+<td style="text-align:left">角色三视图、道具静帧、场景锚点规格</td>
+<td style="text-align:left">默认只声明计划；可回填 <code>asset_manifest</code></td>
 </tr>
 <tr>
 <td style="text-align:left">镜头拆分</td>
@@ -438,7 +474,7 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left">单镜头默认上限 60 秒</td>
 </tr>
 <tr>
-<td style="text-align:left">片段分割</td>
+<td style="text-align:left">片段切割</td>
 <td style="text-align:left"><code>split_video</code></td>
 <td style="text-align:left">约 5 秒的视频片段</td>
 <td style="text-align:left">规则与 LLM 双路径</td>
@@ -447,26 +483,32 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left">提示词转换</td>
 <td style="text-align:left"><code>convert_prompt</code></td>
 <td style="text-align:left">双语正向词、负向词、音频提示词</td>
-<td style="text-align:left">逐片段调用 LLM</td>
+<td style="text-align:left">逐片段调用 LLM，附带模板召回</td>
 </tr>
 <tr>
-<td style="text-align:left">质量审查</td>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left"><code>route_model</code></td>
+<td style="text-align:left">目标模型、生成模式、首帧指令</td>
+<td style="text-align:left">默认 5 条规则，能力注册表 5 个模型</td>
+</tr>
+<tr>
+<td style="text-align:left">质量审计</td>
 <td style="text-align:left"><code>audit_quality</code></td>
-<td style="text-align:left">违规条目与修复建议</td>
-<td style="text-align:left">5 项规则 + 1 项连贯性检查</td>
+<td style="text-align:left">违规条目与修复参数</td>
+<td style="text-align:left">11 项规则 + LLM 审查</td>
 </tr>
 <tr>
-<td style="text-align:left">连续性检查</td>
+<td style="text-align:left">连续性守护</td>
 <td style="text-align:left"><code>continuity_check</code></td>
 <td style="text-align:left">校验结论与修复路由</td>
-<td style="text-align:left">最多 5 次循环、2 次重试</td>
+<td style="text-align:left">六项检查，最多 3 轮修复</td>
 </tr>
 </tbody>
 </table>
 <p><code>split_video</code> 的分割路径由镜头时长决定：不超过 5.5 秒的镜头通常直接成为片段，不判断语义边界；超过阈值且 <code>enable_llm=True</code> 时交给 LLM，在动作停顿、句末或情绪转折处切分。关闭 LLM 时，超阈值镜头由规则路径按 2.5 秒左右等分；规则路径确定性强、无 API 成本，代价是割点可能落在动作中间。</p>
-<p>全链路耗时取决于 LLM 调用次数与模型响应速度，而非剧本字数。提示词转换为每个片段分别生成视频与音频提示词，通常是耗时最长的一环。</p>
+<p>全链路耗时取决于 LLM 调用次数与模型响应速度，而非剧本字数。提示词转换与模型路由通常是最耗时的一环；资产出图默认关闭，开启后会额外产生文生图调用。</p>
 
-<h2 id="sec-12">常用配置</h2>
+<h2 id="sec-13">常用配置</h2>
 <table>
 <thead>
 <tr>
@@ -529,7 +571,7 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left"><code>video_model</code></td>
 <td style="text-align:left">str</td>
 <td style="text-align:left">runway_gen2</td>
-<td style="text-align:left">提示词面向的视频模型</td>
+<td style="text-align:left">提示词面向的源视频模型；路由会按规则改写目标模型</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>audio_model</code></td>
@@ -541,13 +583,19 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left"><code>max_total_loops</code></td>
 <td style="text-align:left">int</td>
 <td style="text-align:left">20</td>
-<td style="text-align:left">工作流最大循环次数</td>
+<td style="text-align:left">全局循环预算基数，运行时上限为 40</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>workflow_timeout</code></td>
 <td style="text-align:left">int</td>
 <td style="text-align:left">1800</td>
-<td style="text-align:left">工作流超时（秒）</td>
+<td style="text-align:left">未传 <code>InputState.timeout</code> 时的兜底超时（秒）</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>human_intervention_timeout</code></td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">300</td>
+<td style="text-align:left">人工干预等待超时（秒）</td>
 </tr>
 </tbody>
 </table>
@@ -555,26 +603,27 @@ agent = create_penshot_agent(config=config)</code></pre>
 <p>旧文档中的 <code>llm_model</code>、<code>enable_memory</code>、<code>enable_quality_audit</code> 不在 <code>ShotConfig</code> 中；质量审查相关字段在源码中被注释保留，不要按旧示例编写代码。</p>
 </blockquote>
 
-<h2 id="sec-13">质量与记忆</h2>
+<h2 id="sec-14">质量与记忆</h2>
 <pre class="mermaid">flowchart TB
-    A[各阶段产物] --&gt; B[5 项规则检查]
-    B --&gt; C[LLM 连贯性检查]
-    C --&gt; D{存在 critical 问题?}
-    D --&gt;|是| E[needs_human_review&lt;br/&gt;需人工审核]
-    D --&gt;|否| F[recommended_actions&lt;br/&gt;修复建议落盘]
-    E --&gt; F
-    F --&gt; G[连续性检查节点&lt;br/&gt;可路由回上游重试]
+    A[各阶段产物] --&gt; B[11 项规则检查]
+    B --&gt; C[LLM 深度审查]
+    C --&gt; D{分数分档}
+    D --&gt;|PASSED/MINOR| E[放行]
+    D --&gt;|MODERATE/MAJOR| F[生成修复参数&lt;br/&gt;回转换节点]
+    D --&gt;|CRITICAL/FAILED| G[重试或人工]
+    E --&gt; H[连续性守护&lt;br/&gt;按来源路由修复]
+    H --&gt; I[最终输出]
 </pre>
-<p>质量审查的 5 项规则检查为片长限制、提示词内容、提示词长度、片段数量与模型支持，另加 1 项 LLM 连贯性检查（维度含气象、角色、场景、提示词、时长）。评分从 100 分起按 critical 40、major 25、moderate 10、warning 5、info 0 扣减；存在 critical 或 major 超过 2 条时置位 <code>needs_human_review</code>。审计会给出 <code>recommended_actions</code>，但当前版本的自动修复尚未闭环，主要靠人工按建议修正。</p>
+<p>质量审计的 11 项规则检查覆盖片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突与资产使用，另加 LLM 深度审查。评分从 100 分起按 warning 5、moderate 10、major 25、critical 40、error 60 扣减；存在 critical 或 major 超过 2 条时置位 <code>needs_human_review</code>。修复参数会回到提示词转换节点，连续性问题的修复目标按来源阶段动态决定，形成闭环。</p>
 <pre class="mermaid">flowchart TB
-    subgraph Short[&quot;短期记忆（会话窗口）&quot;]
-        S1[消息缓冲 deque&lt;br/&gt;maxlen=short_term_size]
+    subgraph Short["短期记忆（会话窗口）"]
+        S1[消息缓冲 deque&lt;br/&gt;maxlen=20]
         S2[RedisChatMessageHistory&lt;br/&gt;可选持久化]
     end
-    subgraph Medium[&quot;中期记忆（阶段摘要）&quot;]
-        M1[阶段产出摘要&lt;br/&gt;受 max_tokens 约束]
+    subgraph Medium["中期记忆（阶段摘要）"]
+        M1[阶段产出摘要&lt;br/&gt;上限 500 tokens]
     end
-    subgraph Long[&quot;长期记忆（向量检索）&quot;]
+    subgraph Long["长期记忆（向量检索）"]
         L1[VectorStoreRetrieverMemory]
         L2[top_k=3&lt;br/&gt;score_threshold=0.7]
     end
@@ -585,9 +634,9 @@ agent = create_penshot_agent(config=config)</code></pre>
     Medium -.-&gt;|阶段摘要| Output
     Short -.-&gt;|即时上下文| Output
 </pre>
-<p>三层记忆的默认参数：短期保留 20 条消息、TTL 3600 秒；中期摘要上限 500 tokens；长期检索 <code>k=3</code>、相似度阈值 0.7。跨片段的角色与道具衔接主要来自各阶段产物中的连续性信息（镜头时间轴、<code>continuity_plan</code>、提示词复用），记忆系统提供的是增强而非唯一来源。</p>
+<p>三层记忆的默认参数：短期保留 20 条消息、TTL 3600 秒；中期摘要上限 500 tokens；长期检索 <code>k=3</code>、相似度阈值 0.7。跨片段的角色与道具衔接主要来自一致性契约、资产锚点、镜头时间轴与 <code>continuity_notes</code>，记忆系统提供的是增强而非唯一来源。</p>
 
-<h2 id="sec-14">故障排查</h2>
+<h2 id="sec-15">故障排查</h2>
 <table>
 <thead>
 <tr>
@@ -605,7 +654,7 @@ agent = create_penshot_agent(config=config)</code></pre>
 <tr>
 <td style="text-align:left">缺少厂商 SDK 报错</td>
 <td style="text-align:left">未安装可选依赖</td>
-<td style="text-align:left"><code>pip install "penshot[llm-providers]"</code></td>
+<td style="text-align:left"><code>pip install "penshot[full]"</code></td>
 </tr>
 <tr>
 <td style="text-align:left">Redis 连接失败</td>
@@ -621,6 +670,16 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left">割点落在动作中间</td>
 <td style="text-align:left">规则分割不判断语义</td>
 <td style="text-align:left">确认镜头超过 5.5 秒且 <code>enable_llm=True</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>route_plan</code> 为空</td>
+<td style="text-align:left">路由异常或目标模型未注册</td>
+<td style="text-align:left">检查 <code>settings.yaml</code> 的 <code>routing.rules</code> 与能力注册表</td>
+</tr>
+<tr>
+<td style="text-align:left">部分片段出现在 <code>blocked_fragments</code></td>
+<td style="text-align:left">场景锚定无法唯一匹配，或资产需人工修复</td>
+<td style="text-align:left">补齐 <code>asset_manifest</code> 或人工编辑资产提示词</td>
 </tr>
 <tr>
 <td style="text-align:left">提示词被截断</td>
@@ -640,7 +699,7 @@ agent = create_penshot_agent(config=config)</code></pre>
 </tbody>
 </table>
 
-<h2 id="sec-15">下一步</h2>
+<h2 id="sec-16">下一步</h2>
 <p>需要 HTTP 服务或 MCP 入口时，安装后可直接启动；也可以用容器运行：</p>
 <pre class="hljs"><code># REST，默认监听 0.0.0.0:8000
 story-shot-agent serve-rest
@@ -653,11 +712,11 @@ docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
 </code></pre>
 <ul>
 <li><a href="docker.html">Docker 部署</a>：镜像、Compose、Redis、持久化与健康检查。</li>
-<li><a href="architecture.html">技术架构</a>：节点编排、决策路由与三级循环防护。</li>
+<li><a href="architecture.html">技术架构</a>：十二个注册节点、八态决策路由与三级循环防护。</li>
 <li><a href="nodes.html">工作流节点</a>：每个节点的输入、规则与失败降级。</li>
-<li><a href="consistency.html">一致性策略</a>：跨片段连贯性的具体保障手段。</li>
+<li><a href="consistency.html">一致性策略</a>：契约、资产锚点与修复回路。</li>
 <li><a href="checkpoint.html">检查点与恢复</a>：状态落盘与恢复的当前能力。</li>
-<li><a href="integration.html">集成指南</a>：REST、Python SDK 与 A2A 接入。</li>
+<li><a href="integration.html">集成指南</a>：REST、Python SDK 与 MCP 接入。</li>
 <li><a href="mcp.html">MCP 服务</a>：七个工具与 Claude Desktop 配置。</li>
 </ul>
 <p>源码与安装包：<a href="https://github.com/neopen/story-shot-agent">GitHub</a>、<a href="https://pypi.org/project/penshot/">PyPI</a>；产品信息见 <a href="https://pengline.cn">pengline.cn</a>。</p>
@@ -666,7 +725,7 @@ docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
     <a class="pager-link" href="overview.html">
       <span class="pager-link__label">← 上一篇 · 开始使用</span>
       <strong>项目概览</strong>
-      <small>一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本。</small>
+      <small>一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本，并交付资产计划与模型路由。</small>
     </a>
     <a class="pager-link pager-link--next" href="docker.html">
       <span class="pager-link__label">下一篇 → · 开始使用</span>
@@ -678,7 +737,7 @@ docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">前置条件</a></li><li class="toc-depth-2"><a href="#sec-2">安装</a></li><li class="toc-depth-2"><a href="#sec-3">配置</a></li><li class="toc-depth-2"><a href="#sec-4">最小调用</a></li><li class="toc-depth-3"><a href="#sec-5">同步调用</a></li><li class="toc-depth-3"><a href="#sec-6">异步调用</a></li><li class="toc-depth-3"><a href="#sec-7">同步与异步的选择</a></li><li class="toc-depth-3"><a href="#sec-8">任务状态与回调</a></li><li class="toc-depth-3"><a href="#sec-9">自定义配置</a></li><li class="toc-depth-2"><a href="#sec-10">输出示例</a></li><li class="toc-depth-2"><a href="#sec-11">六阶段说明</a></li><li class="toc-depth-2"><a href="#sec-12">常用配置</a></li><li class="toc-depth-2"><a href="#sec-13">质量与记忆</a></li><li class="toc-depth-2"><a href="#sec-14">故障排查</a></li><li class="toc-depth-2"><a href="#sec-15">下一步</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">前置条件</a></li><li class="toc-depth-2"><a href="#sec-2">安装</a></li><li class="toc-depth-2"><a href="#sec-3">配置</a></li><li class="toc-depth-2"><a href="#sec-4">最小调用</a></li><li class="toc-depth-3"><a href="#sec-5">同步调用</a></li><li class="toc-depth-3"><a href="#sec-6">异步调用</a></li><li class="toc-depth-3"><a href="#sec-7">资产回填</a></li><li class="toc-depth-3"><a href="#sec-8">同步与异步的选择</a></li><li class="toc-depth-3"><a href="#sec-9">任务状态与回调</a></li><li class="toc-depth-3"><a href="#sec-10">自定义配置</a></li><li class="toc-depth-2"><a href="#sec-11">输出示例</a></li><li class="toc-depth-2"><a href="#sec-12">八阶段说明</a></li><li class="toc-depth-2"><a href="#sec-13">常用配置</a></li><li class="toc-depth-2"><a href="#sec-14">质量与记忆</a></li><li class="toc-depth-2"><a href="#sec-15">故障排查</a></li><li class="toc-depth-2"><a href="#sec-16">下一步</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
           <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/quick-start.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
@@ -689,7 +748,7 @@ docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

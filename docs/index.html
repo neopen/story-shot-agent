@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PenShot · 把剧本拆成连贯的 AI 视频分镜</title>
-  <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。">
+  <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，附带资产计划与模型路由，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。">
   <meta name="keywords" content="PenShot,剧本分镜,剧本分镜智能体,AI视频,AI分镜,分镜脚本生成,剧本转视频,剧本解析,镜头拆分,视频片段生成,AI视频提示词,中英双语提示词,LangGraph,多智能体,Sora,Veo,Runway,可灵,MCP,RAG,Python SDK,REST API,Docker">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
@@ -71,7 +71,7 @@
         "applicationCategory": "MultimediaApplication",
         "applicationSubCategory": "AI 视频分镜与提示词生成",
         "operatingSystem": "Linux, macOS, Windows",
-        "softwareVersion": "0.3.x",
+        "softwareVersion": "0.4.4",
         "license": "https://opensource.org/licenses/MIT",
         "codeRepository": "https://github.com/neopen/story-shot-agent",
         "downloadUrl": "https://pypi.org/project/penshot/",
@@ -88,6 +88,8 @@
           "镜头拆分",
           "视频片段切割",
           "中英双语提示词生成",
+          "资产计划与下游交接",
+          "模型路由与首帧生成",
           "跨片段一致性检查",
           "Python SDK",
           "REST API",
@@ -171,8 +173,8 @@
           <span class="eyebrow">Open source · LangGraph multi-agent</span>
           <h1>把剧本，拆成<br><em>连贯的 AI 视频片段</em></h1>
           <p class="hero-sub">
-            PenShot 是一个开源的剧本分镜智能体。自动完成剧本解析、镜头拆分、片段切割与提示词生成，
-            输出可直接投喂 <strong>Sora、Veo、Runway、可灵</strong> 的 5 秒级分镜脚本。
+            PenShot 是一个开源的剧本分镜智能体。自动完成剧本解析、镜头拆分、片段切割、提示词生成与模型路由，
+            输出可直接投喂 <strong>Sora、Veo、Runway、可灵</strong> 的 5 秒级分镜脚本与资产清单。
           </p>
           <div class="hero-actions">
             <a class="btn btn--accent btn--lg" href="docs/quick-start.html">
@@ -237,8 +239,8 @@
     <div class="hero-stats">
       <div class="container">
         <div class="hero-stat">
-          <strong><span>6</span> 个</strong>
-          <small>核心智能体节点</small>
+          <strong><span>8</span> 个</strong>
+          <small>业务节点，12 个注册节点</small>
         </div>
         <div class="hero-stat">
           <strong><span>5</span> 秒</strong>
@@ -291,7 +293,7 @@
           <p>每个片段独立生成，角色长相、服装、场景光线很容易前后不一致，拼接后立刻穿帮。</p>
           <div class="solution">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
-            <span><b>三层记忆 + 连续性守护</b>，把一致性交给系统。</span>
+            <span><b>一致性契约 + 连续性守护 + 修复回路</b>，把一致性交给系统。</span>
           </div>
         </article>
         <article class="problem-card" data-reveal>
@@ -312,50 +314,62 @@
     <div class="container">
       <div class="section-head" data-reveal>
         <span class="eyebrow">Pipeline</span>
-        <h2>六段式分镜流水线</h2>
-        <p>从原始剧本到可执行的分镜提示词包，每一步都有明确的输入、输出与失败降级。</p>
+        <h2>八段式分镜流水线</h2>
+        <p>从原始剧本到可执行的分镜提示词包与资产清单，每一步都有明确的输入、输出与失败降级。</p>
       </div>
       <div class="workflow" data-reveal>
         <article class="workflow-step">
           <span class="w-num">01</span>
           <h3>剧本解析</h3>
-          <p>识别场景、角色、对话与动作，输出结构化剧本。</p>
+          <p>识别场景、角色、对话与动作，建立一致性契约。</p>
           <span class="w-tag">parse_script</span>
         </article>
         <article class="workflow-step">
           <span class="w-num">02</span>
+          <h3>资产计划</h3>
+          <p>生成角色设定、道具与场景的资产计划，可选图片生成。</p>
+          <span class="w-tag">generate_assets</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">03</span>
           <h3>镜头拆分</h3>
           <p>按叙事与动作变化划分镜头，估算景别与时长。</p>
           <span class="w-tag">segment_shot</span>
         </article>
         <article class="workflow-step">
-          <span class="w-num">03</span>
+          <span class="w-num">04</span>
           <h3>片段切割</h3>
           <p>规则或 LLM 双模式切分，让单段适配 5 秒限制。</p>
           <span class="w-tag">split_video</span>
         </article>
         <article class="workflow-step">
-          <span class="w-num">04</span>
+          <span class="w-num">05</span>
           <h3>提示词转换</h3>
           <p>生成中英双语正向词、负面词与音频提示词。</p>
           <span class="w-tag">convert_prompt</span>
         </article>
         <article class="workflow-step">
-          <span class="w-num">05</span>
+          <span class="w-num">06</span>
+          <h3>模型路由</h3>
+          <p>按能力注册表选择模型与生成方式，支持首帧图生视频。</p>
+          <span class="w-tag">route_model</span>
+        </article>
+        <article class="workflow-step">
+          <span class="w-num">07</span>
           <h3>质量审计</h3>
-          <p>规则 + LLM 双重检查，自动修复时长、间隙与关联问题。</p>
+          <p>11 项规则检查，把问题转成修复参数回流到转换节点。</p>
           <span class="w-tag">audit_quality</span>
         </article>
         <article class="workflow-step">
-          <span class="w-num">06</span>
+          <span class="w-num">08</span>
           <h3>连续性守护</h3>
-          <p>跨片段校验角色、场景、道具与动作的一致性。</p>
+          <p>跨片段校验角色、场景、道具与动作，并路由到对应阶段修复。</p>
           <span class="w-tag">continuity_check</span>
         </article>
       </div>
       <p class="doc-deck" style="margin-top:20px;font-size:13px">
-        六个业务节点之外，还有循环检查、错误处理与人工干预等控制节点。
-        <a class="text-link" href="docs/architecture.html">查看十节点状态机 →</a>
+        八个业务节点之外，还有循环检查、错误处理与人工干预等控制节点。
+        <a class="text-link" href="docs/architecture.html">查看十二节点状态机 →</a>
       </p>
     </div>
   </section>
@@ -366,20 +380,20 @@
       <div class="section-head" data-reveal>
         <span class="eyebrow">Capabilities</span>
         <h2>为分镜而生的工程能力</h2>
-        <p>不只是一个提示词模板：记忆、检索、切割、审查与多协议接入，都在同一条链路里。</p>
+        <p>不只是一个提示词模板：记忆、检索、资产、路由、审查与多协议接入，都在同一条链路里。</p>
       </div>
       <div class="bento">
         <article class="bento-card bento-card--dark bento-card--wide" data-reveal>
           <span class="bento-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>
           </span>
-          <h3>三层记忆，守住跨片段一致性</h3>
-          <p>短期记忆缓存任务状态，中期记忆保存上下文，长期记忆通过向量检索召回角色、场景与历史分镜。跨片段的角色与场景信息由系统显式传递。</p>
+          <h3>一致性契约，守住跨片段连贯</h3>
+          <p>解析阶段建立一致性契约，资产计划固定角色、道具与场景外观；转换阶段把契约与连续性注释注入每个片段，审查与守护阶段再按规则校验并回流修复。</p>
           <div class="memory-visual" aria-hidden="true">
-            <div class="memory-row"><i></i>短期记忆 · Redis 任务缓存<b>TTL</b></div>
-            <div class="memory-row"><i></i>中期记忆 · 任务上下文<b>context</b></div>
+            <div class="memory-row"><i></i>一致性契约 · 全局元数据<b>contract</b></div>
+            <div class="memory-row"><i></i>资产计划 · 角色 / 道具 / 场景<b>assets</b></div>
             <div class="memory-row"><i></i>长期记忆 · 向量语义检索<b>Chroma</b></div>
-            <div class="memory-row"><i></i>连续性守护 · 快照传递<b>guardian</b></div>
+            <div class="memory-row"><i></i>连续性守护 · 修复路由<b>guardian</b></div>
           </div>
         </article>
 
@@ -415,15 +429,15 @@
 
         <article class="bento-card bento-card--third" data-reveal>
           <span class="bento-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>
           </span>
-          <h3>可插拔 LLM</h3>
-          <p>OpenAI、通义千问、DeepSeek、Ollama 通过统一配置切换，不绑定单一模型供应商。</p>
+          <h3>资产计划与模型路由</h3>
+          <p>按剧本自动生成角色设定、道具与场景资产，再依据能力注册表为每个片段选择模型与生成方式，支持首帧图生视频。</p>
           <div class="chip-row">
-            <span class="chip">OpenAI</span>
-            <span class="chip">Qwen</span>
-            <span class="chip">DeepSeek</span>
-            <span class="chip">Ollama</span>
+            <span class="chip">asset_plan</span>
+            <span class="chip">runway_gen4</span>
+            <span class="chip">kling_3</span>
+            <span class="chip">sora_2</span>
           </div>
         </article>
 
@@ -467,7 +481,11 @@
             </li>
             <li>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
-              保留 task_id 与 source_fragments，分镜可双向追溯
+              附带 asset_plan 与 route_plan，资产与模型选择可直接交给下游
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>
+              保留 task_id、一致性契约与质量门禁结果，分镜可双向追溯
             </li>
           </ul>
           <p style="margin-top:24px"><a class="text-link" href="docs/quick-start.html#sec-5">查看完整输出示例 →</a></p>
@@ -563,7 +581,7 @@ task_id = agent.breakdown_script_async(script)
 result = agent.wait_for_result(task_id)
 <span class="c-fn">print</span>(result.data[<span class="c-str">"instructions"</span>][<span class="c-str">"project_info"</span>])</code></pre>
             <div class="code-panel__foot">
-              <a href="docs/quick-start.html">快速开始</a> · <a href="https://github.com/neopen/story-shot-agent/tree/main/example">完整示例</a>
+              <a href="docs/quick-start.html">快速开始</a> · <a href="https://github.com/neopen/story-shot-agent/tree/main/examples">完整示例</a>
             </div>
           </div>
 
@@ -573,7 +591,7 @@ result = agent.wait_for_result(task_id)
               <button class="bar-copy" type="button" data-copy-target="#rest-code">复制</button>
             </div>
             <pre id="rest-code"><code><span class="c-com"># 启动服务</span>
-python main.py
+story-shot-agent serve-rest --port <span class="c-num">8000</span>
 
 <span class="c-com"># 提交分镜任务</span>
 curl -X POST http://localhost:<span class="c-num">8000</span>/api/v1/storyboard \
@@ -664,7 +682,7 @@ curl http://localhost:8000/api/v1/health</code></pre>
       <div class="section-head" data-reveal>
         <span class="eyebrow">Documentation</span>
         <h2>从快速开始到源码细节</h2>
-        <p>文档按使用路径组织：先跑通，再理解架构与节点，最后接入记忆与检索能力。</p>
+        <p>文档按使用路径组织：先跑通，再理解架构与节点，然后掌握资产、路由与首帧，最后接入记忆与检索能力。</p>
       </div>
       <div class="docs-grid">
         <a class="doc-card" href="docs/quick-start.html" data-reveal>
@@ -682,7 +700,7 @@ curl http://localhost:8000/api/v1/health</code></pre>
             <span class="doc-card__cat">核心设计</span>
           </div>
           <h3>技术架构</h3>
-          <p>十节点状态机、决策路由与三级循环防护的完整拆解。</p>
+          <p>十二节点状态机、八态决策路由与三级循环防护的完整拆解。</p>
           <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
         </a>
         <a class="doc-card" href="docs/consistency.html" data-reveal>
@@ -691,7 +709,34 @@ curl http://localhost:8000/api/v1/health</code></pre>
             <span class="doc-card__cat">核心设计</span>
           </div>
           <h3>一致性策略</h3>
-          <p>三层记忆、快照与连续性检查如何压制角色漂移。</p>
+          <p>一致性契约、资产锚点与修复回路如何压制角色漂移。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/asset-handoff.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+            <span class="doc-card__cat">进阶能力</span>
+          </div>
+          <h3>资产计划与交接</h3>
+          <p>asset_plan、references 与 asset_manifest：让下游生成资产再安全接回。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/model-routing.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg></span>
+            <span class="doc-card__cat">进阶能力</span>
+          </div>
+          <h3>模型路由</h3>
+          <p>五个模型的能力对比、规则优先级与可解释的 route_plan。</p>
+          <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+        </a>
+        <a class="doc-card" href="docs/first-frame.html" data-reveal>
+          <div class="doc-card__top">
+            <span class="doc-card__icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="m8 7-4 5 4 5"/><path d="m16 7 4 5-4 5"/></svg></span>
+            <span class="doc-card__cat">进阶能力</span>
+          </div>
+          <h3>首帧与图生视频</h3>
+          <p>静态首帧 + 动作驱动：关键文字与角色一致性的两段式生成。</p>
           <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
         </a>
         <a class="doc-card" href="docs/integration.html" data-reveal>
@@ -700,7 +745,7 @@ curl http://localhost:8000/api/v1/health</code></pre>
             <span class="doc-card__cat">集成与接口</span>
           </div>
           <h3>集成指南</h3>
-          <p>SDK、REST、MCP 与 A2A 四条路径的边界与用法。</p>
+          <p>SDK、REST 与 MCP 三条路径的边界与用法，另附 LangGraph、A2A 示例。</p>
           <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
         </a>
         <a class="doc-card" href="docs/mcp.html" data-reveal>
@@ -718,11 +763,11 @@ curl http://localhost:8000/api/v1/health</code></pre>
             <span class="doc-card__cat">检索与记忆</span>
           </div>
           <h3>知识库与检索</h3>
-          <p>RAG 知识库、剧本分块、向量检索与重排序的当前实现。</p>
+          <p>模板召回、剧本分块、跨剧本复用与检索链路的当前实现。</p>
           <span class="doc-card__more">阅读文档 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
         </a>
       </div>
-      <p style="margin-top:28px"><a class="text-link" href="docs/">浏览全部 12 篇文档 →</a></p>
+      <p style="margin-top:28px"><a class="text-link" href="docs/">浏览全部 16 篇文档 →</a></p>
     </div>
   </section>
 
@@ -754,7 +799,7 @@ curl http://localhost:8000/api/v1/health</code></pre>
           <img src="assets/img/logo-mark.svg" alt="" width="30" height="30">
           <span>PenShot<small>Storyboard Agent</small></span>
         </a>
-        <p>开源的剧本分镜智能体。把任意长度的剧本拆成 5 秒级、视觉连贯的 AI 视频片段脚本。</p>
+        <p>开源的剧本分镜智能体。把任意长度的剧本拆成 5 秒级、视觉连贯的 AI 视频片段脚本，并交付资产计划与模型路由。</p>
         <div class="footer-badges">
           <span>MIT License</span>
           <span>Python 3.10+</span>

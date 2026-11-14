@@ -6,7 +6,7 @@
 <tr><th>路径</th><th>适用场景</th><th>入口</th></tr>
 </thead>
 <tbody>
-<tr><td>Python SDK</td><td>嵌入自有 Python 服务，需要回调、批量或动态并发</td><td><code>penshot.api.PenshotFunction</code></td></tr>
+<tr><td>Python SDK</td><td>嵌入自有 Python 服务，需要回调、批量或动态并发</td><td><code>penshot.api.PenshotFunction</code>，13 个公开方法</td></tr>
 <tr><td>REST API</td><td>前后端分离、跨语言调用，或直接作为内部服务</td><td><code>/api/v1</code>，17 个端点</td></tr>
 <tr><td>MCP Server</td><td>挂载到 Claude Desktop、Cursor 等 MCP 客户端</td><td>7 个工具，stdio 或 HTTP</td></tr>
 <tr><td>Docker</td><td>独立部署 REST 服务，或交给容器平台托管</td><td><code>neotems/penshot</code></td></tr>
@@ -20,7 +20,7 @@
     E --&gt; B
     B --&gt; F[&quot;TaskFactory 任务池&quot;]
     C --&gt; F
-    F --&gt; G[&quot;工作流编排&quot;]
+    F --&gt; G[&quot;八阶段工作流&quot;]
     G --&gt; H[&quot;PenshotResult / JSON 结果&quot;]
 </pre>
 <p>SDK、REST 与 MCP 最终都进入同一套任务模型，差异在协议适配层。Docker 运行的是同一 REST 应用，只是把进程与依赖封装进容器。REST 与 MCP 不需要额外编写业务逻辑；需要自定义鉴权、计费或路由时，再用 SDK 嵌入自有服务。容器启动、Redis 与持久化配置见 <a href="docker.html">Docker 部署</a>。</p>
@@ -29,13 +29,13 @@
 <h2>安装与配置</h2>
 <pre class="hljs"><code>pip install penshot
 
-<span class="hljs-comment"># 通义千问</span>
-pip install dashscope
+<span class="hljs-comment"># 通义千问 / Ollama 厂商 SDK + 本地重排序</span>
+pip install &quot;penshot[full]&quot;
 
-<span class="hljs-comment"># 本地 Ollama</span>
-pip install langchain-ollama
+<span class="hljs-comment"># 仅容器场景需要的厂商 SDK</span>
+pip install &quot;penshot[docker]&quot;
 </code></pre>
-<p>最小配置写在项目根目录的 <code>.env</code>，导入 <code>penshot.config</code> 时自动加载。对话模型必填，嵌入模型在使用记忆或语义检索时需要；Redis 仅用于多进程任务记录共享。</p>
+<p>核心依赖已包含 <code>langchain-openai</code>，OpenAI 兼容接口开箱可用；DashScope 与 <code>langchain-ollama</code> 位于可选组。缺少对应厂商依赖时，请求会直接报错，不会静默切换模型。最小配置写在项目根目录的 <code>.env</code>，导入 <code>penshot.config</code> 时自动加载。对话模型必填，嵌入模型在使用记忆或语义检索时需要；Redis 仅用于多进程任务记录与短期记忆共享。</p>
 <table>
 <thead>
 <tr><th>变量组</th><th>用途</th><th>必需性</th></tr>
@@ -70,10 +70,10 @@ pip install langchain-ollama
 <tr><th>方法</th><th>关键参数与默认值</th><th>返回</th></tr>
 </thead>
 <tbody>
-<tr><td><code>breakdown_script</code></td><td><code>script_text, script_id=None, style=None, language=None, wait_timeout=300.0, priority=NORMAL</code></td><td><code>PenshotResult</code> 或 <code>None</code>（等待超时）</td></tr>
-<tr><td><code>breakdown_script_async</code></td><td><code>script_text, script_id=None, style=None, language=None, callback=None, priority=NORMAL</code></td><td><code>str</code> 类型的 task_id；普通函数，不是协程</td></tr>
-<tr><td><code>batch_breakdown</code></td><td><code>scripts, language=None, wait_timeout=600.0, priority=NORMAL</code></td><td><code>List[PenshotResult]</code></td></tr>
-<tr><td><code>batch_breakdown_async</code></td><td><code>scripts, language=None, max_concurrent=3, priority=NORMAL</code></td><td>协程，返回 <code>List[PenshotResult]</code></td></tr>
+<tr><td><code>breakdown_script</code></td><td><code>script_text, script_id=None, style=None, language=None, wait_timeout=300.0, priority=NORMAL, asset_manifest=None</code></td><td><code>PenshotResult</code> 或 <code>None</code>（等待超时）</td></tr>
+<tr><td><code>breakdown_script_async</code></td><td><code>script_text, script_id=None, style=None, language=None, callback=None, priority=NORMAL, asset_manifest=None</code></td><td><code>str</code> 类型的 task_id；普通函数，不是协程</td></tr>
+<tr><td><code>batch_breakdown</code></td><td><code>scripts, language=None, wait_timeout=600.0, priority=NORMAL, asset_manifests=None</code></td><td><code>List[PenshotResult]</code></td></tr>
+<tr><td><code>batch_breakdown_async</code></td><td><code>scripts, language=None, max_concurrent=3, priority=NORMAL, asset_manifests=None</code></td><td>协程，返回 <code>List[PenshotResult]</code></td></tr>
 <tr><td><code>get_task_status</code></td><td><code>task_id</code></td><td><code>dict</code> 或 <code>None</code>，含 <code>status</code>、<code>stage_name</code>、<code>progress</code></td></tr>
 <tr><td><code>get_task_result</code></td><td><code>task_id</code></td><td><code>PenshotResult</code> 或 <code>None</code></td></tr>
 <tr><td><code>wait_for_result</code></td><td><code>task_id, timeout=300.0</code></td><td>阻塞等待，超时返回 <code>None</code></td></tr>
@@ -99,7 +99,7 @@ agent = create_penshot_agent(language=ShotLanguage.ZH, max_concurrent=<span clas
     agent.shutdown()
 </code></pre>
 <p><code>breakdown_script_async()</code> 只负责提交并立即返回，不会阻塞；<code>wait_for_result_async()</code> 才是协程。在 asyncio 环境中直接 <code>await wait_for_result_async(task_id)</code>，不要对提交方法加 <code>await</code>。回调参数是一个接收 <code>PenshotResult</code> 的普通函数，在任务完成时触发。</p>
-<p><code>breakdown_script()</code> 是“提交 + 等待”的同步封装，默认等待 300 秒，超时返回 <code>None</code>；任务本身仍受 <code>workflow_timeout</code>（默认 1800 秒）约束。同步等待上限应小于任务总预算，避免外层已返回、内层仍在运行。</p>
+<p><code>breakdown_script()</code> 是“提交 + 等待”的同步封装，默认等待 300 秒，超时返回 <code>None</code>；工作流本身受输入状态 <code>timeout</code>（默认 600 秒）约束，<code>ShotConfig.workflow_timeout</code>（默认 1800 秒）只在未设置输入超时时作为回退。同步等待上限应小于任务总预算，避免外层已返回、内层仍在运行。</p>
 <table>
 <thead>
 <tr><th>场景</th><th>建议方式</th><th>注意点</th></tr>
@@ -125,8 +125,58 @@ agent = create_penshot_agent(language=ShotLanguage.ZH, max_concurrent=<span clas
 <tr><td><code>processing_time_ms</code></td><td><code>int</code></td><td>处理耗时，单位毫秒</td></tr>
 </tbody>
 </table>
-<p>分镜结果的主要字段位于 <code>data[&quot;instructions&quot;]</code>：<code>metadata</code>、<code>project_info</code> 与 <code>fragments</code>。<code>fragments</code> 中每个片段包含 <code>fragment_id</code>、<code>prompt</code>、<code>negative_prompt</code>、<code>duration</code>、<code>model</code>、<code>style</code> 与可选的 <code>audio_prompt</code>；<code>metadata.repair_history</code> 记录提示词截断等修复动作。</p>
-<p><code>data</code> 只在成功结果中包含业务内容，失败或处理中可能为空。读取前先判断 <code>success</code>，并对 <code>instructions</code>、<code>fragments</code> 做空值保护。</p>
+<p><code>data</code> 是工作流的最终输出对象，常用键如下：</p>
+<table>
+<thead>
+<tr><th>键</th><th>内容</th></tr>
+</thead>
+<tbody>
+<tr><td><code>instructions</code></td><td>分镜指令包；<code>fragments</code>、<code>metadata</code>、<code>project_info</code>、<code>route_plan</code>、<code>asset_plan</code>、<code>asset_manifest</code></td></tr>
+<tr><td><code>script_analysis</code> / <code>shot_sequence</code> / <code>fragment_sequence</code></td><td>各阶段中间产物</td></tr>
+<tr><td><code>audit_report</code></td><td>质量审查报告；<code>metadata.quality_gate</code> 给出质量门结论</td></tr>
+<tr><td><code>continuity_issues</code></td><td>连续性检查问题列表</td></tr>
+<tr><td><code>consistency_contract</code></td><td>全局一致性契约</td></tr>
+<tr><td><code>asset_generation</code></td><td>资产生成报告，含逐资产状态与统计</td></tr>
+<tr><td><code>asset_plan</code> / <code>asset_manifest</code></td><td>资产计划与回填清单</td></tr>
+<tr><td><code>warnings</code> / <code>metadata.quality_gate</code></td><td>放行告警与质量门标记</td></tr>
+</tbody>
+</table>
+<p><code>fragments</code> 中每个片段包含 <code>fragment_id</code>、<code>prompt</code>、<code>negative_prompt</code>、<code>duration</code>、<code>model</code>、<code>style</code> 与音频对象。<code>route_plan</code> 在路由开启时为对象，失败或关闭时可能为 <code>null</code>；<code>blocked_fragments</code> 列出未通过质量门、需下游处理的片段。<code>data</code> 只在成功结果中包含业务内容，读取前先判断 <code>success</code>，并对 <code>instructions</code>、<code>fragments</code> 做空值保护。</p>
+
+<h3>资产回填 asset_manifest</h3>
+<p>工作流默认只输出声明式 <code>asset_plan</code>，不调用任何生图接口。下游完成角色、道具、场景资产生成后，把 <code>asset_manifest</code> 回传，流程就会用真实资产引用替换占位符，并跳过重复生成。</p>
+<table>
+<thead>
+<tr><th>字段</th><th>必填</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><code>schema_version</code></td><td>否</td><td>默认 <code>0.4.4</code>，与 <code>asset_plan</code> 契约版本一致</td></tr>
+<tr><td><code>bindings[]</code></td><td>是</td><td><code>asset_id</code>、<code>asset_ref</code>、<code>view</code>、<code>model</code>、<code>seed</code>、<code>checksum</code>、<code>source</code>、<code>revision</code> 等</td></tr>
+<tr><td><code>asset_id_map</code></td><td>否</td><td>PenShot 规范 ID 到下游实际 ID 的改名映射</td></tr>
+</tbody>
+</table>
+<pre class="hljs"><code>manifest = {
+    &quot;schema_version&quot;: &quot;0.4.4&quot;,
+    &quot;bindings&quot;: [
+        {
+            &quot;asset_id&quot;: &quot;char_001&quot;,
+            &quot;view&quot;: &quot;front&quot;,
+            &quot;asset_ref&quot;: &quot;oss://bucket/assets/char_001_front.png&quot;,
+            &quot;model&quot;: &quot;flux-1.1-pro&quot;,
+        }
+    ],
+}
+
+task_id = agent.breakdown_script_async(script, asset_manifest=manifest)
+result = agent.wait_for_result(task_id, timeout=<span class="hljs-number">600.0</span>)
+</code></pre>
+<ul>
+<li>批量方法用 <code>asset_manifests</code>，与 <code>scripts</code> 按下标对应，允许某条为 <code>None</code>，长度必须一致。</li>
+<li>回传清单后，<code>asset_plan</code> 中对应资产的 <code>status</code> 变为 <code>generated</code>，<code>asset_ref</code> 指向下游资产；未命中的资产保持 <code>pending</code>。</li>
+<li>清单只覆盖已有资产，不会新增或删除资产规格；需要改提示词时走人工干预的资产编辑，编辑记录在 <code>execution.asset_prompt_edits</code> 内累计。</li>
+<li><code>bindings</code> 也接受 <code>assets</code> 别名；两种写法二选一，不要同时提供。</li>
+</ul>
+<p>完整字段、直接消费与回填两种模式、失败降级规则见<a href="asset-handoff.html">资产计划与交接</a>；首帧引用与图生视频调用见<a href="first-frame.html">首帧与图生视频</a>。</p>
 
 <h3>任务状态</h3>
 <table>
@@ -145,7 +195,7 @@ agent = create_penshot_agent(language=ShotLanguage.ZH, max_concurrent=<span clas
 </tbody>
 </table>
 <p>成功终态是 <code>SUCCESS</code>，不存在 <code>COMPLETED</code>。轮询应以 <code>success</code>、<code>failed</code>、<code>cancelled</code> 结束，并对 <code>not_found</code> 停止重试。<code>TaskStatus</code> 是字符串枚举，<code>TaskStatus.SUCCESS == &quot;success&quot;</code> 成立，但比较时建议统一取 <code>.value</code> 或直接与枚举成员比较。</p>
-<p><code>get_task_status()</code> 返回的 <code>progress</code> 按阶段权重累加：解析 0–15、拆分 15–30、分段 30–50、转换 50–70、审查 70–85、连续性 85–95、输出 95–100。<code>stages_progress</code> 以阶段名为键，包含阶段级 <code>progress</code> 与 <code>status</code>；阶段级 <code>completed</code> 只表示该阶段结束，与任务状态枚举无关。</p>
+<p><code>get_task_status()</code> 返回的 <code>progress</code> 按阶段权重累加：解析 0–15、拆分 15–30、分段 30–50、转换 50–70、审查 70–85、连续性 85–95、输出 95–100。资产生成与模型路由未单列任务阶段，其耗时并入相邻阶段。<code>stages_progress</code> 以阶段名为键，包含阶段级 <code>progress</code> 与 <code>status</code>；阶段级 <code>completed</code> 只表示该阶段结束，与任务状态枚举无关。</p>
 
 <h2>REST API</h2>
 <p>内置 REST 服务由 FastAPI 实现，路由前缀固定为 <code>/api/v1</code>。启动后可直接访问 <code>/docs</code> 查看交互文档，无需另写包装层。</p>
@@ -161,10 +211,10 @@ python -m penshot.http_server --port 8000
 <tr><th>类别</th><th>方法</th><th>路径</th><th>说明</th></tr>
 </thead>
 <tbody>
-<tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard</code></td><td>异步提交，立即返回 <code>task_id</code></td></tr>
+<tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard</code></td><td>异步提交，立即返回 <code>task_id</code>；单批不超过 50 条</td></tr>
 <tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard/sync</code></td><td>同步生成，默认等待 300 秒</td></tr>
-<tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard/batch</code></td><td>异步批量提交，单批最多 50 个</td></tr>
-<tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard/batch/sync</code></td><td>批量同步生成</td></tr>
+<tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard/batch</code></td><td>异步批量提交，最多 50 个剧本</td></tr>
+<tr><td>分镜生成</td><td>POST</td><td><code>/api/v1/storyboard/batch/sync</code></td><td>批量同步生成，最多 20 个剧本</td></tr>
 <tr><td>批量任务</td><td>GET</td><td><code>/api/v1/batch/status/{batch_id}</code></td><td>批量状态</td></tr>
 <tr><td>批量任务</td><td>GET</td><td><code>/api/v1/batch/result/{batch_id}</code></td><td>批量结果</td></tr>
 <tr><td>单任务</td><td>GET</td><td><code>/api/v1/status/{task_id}</code></td><td>任务状态与阶段进度</td></tr>
@@ -180,17 +230,37 @@ python -m penshot.http_server --port 8000
 <tr><td>运维</td><td>GET</td><td><code>/api/v1/health</code></td><td>健康检查，聚合统计与队列</td></tr>
 </tbody>
 </table>
-<p>提交请求的字段为 <code>script</code>（剧本正文，必填）、<code>script_id</code>、<code>style</code>、<code>language</code>、<code>config</code> 与 <code>callback_url</code>。异步接口返回 <code>status=&quot;pending&quot;</code> 与 <code>task_id</code>；批量接口的 <code>scripts</code> 最多 50 条。</p>
+
+<h3>请求模型</h3>
+<table>
+<thead>
+<tr><th>端点</th><th>字段</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><code>/storyboard</code></td><td><code>script</code>（必填）、<code>style</code>、<code>config</code>、<code>callback_url</code>、<code>script_id</code>、<code>language</code>、<code>asset_manifest</code></td><td><code>style</code> 默认 <code>realistic</code>，<code>language</code> 默认 <code>zh</code></td></tr>
+<tr><td><code>/storyboard/sync</code></td><td><code>script</code>（必填）、<code>script_id</code>、<code>language</code>、<code>config</code>、<code>timeout</code>（默认 300）、<code>asset_manifest</code></td><td>不支持 <code>style</code> 与 <code>callback_url</code></td></tr>
+<tr><td><code>/storyboard/batch</code></td><td><code>scripts</code>、<code>config</code>、<code>batch_id</code>、<code>language</code>、<code>asset_manifests</code></td><td><code>scripts</code> 为 1–50 条</td></tr>
+<tr><td><code>/storyboard/batch/sync</code></td><td>同批量异步</td><td>超过 20 条返回 400</td></tr>
+</tbody>
+</table>
+<p><code>asset_manifest</code> 的结构与 SDK 一致；批量接口的 <code>asset_manifests</code> 长度必须与 <code>scripts</code> 相同，任一条目可为 <code>null</code>。异步接口返回 <code>status=&quot;pending&quot;</code> 与 <code>task_id</code>，批量接口另返回 <code>batch_id</code>。</p>
 <pre class="hljs"><code>curl -X POST http://localhost:8000/api/v1/storyboard \
   -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
-  -d <span class="hljs-string">&#x27;{&quot;script&quot;:&quot;现代办公室，小李正在写代码，突然接到电话。&quot;,&quot;language&quot;:&quot;zh&quot;,&quot;script_id&quot;:&quot;demo-001&quot;}&#x27;</span>
+  -d <span class="hljs-string">&#x27;{
+    &quot;script&quot;: &quot;现代办公室，小李正在写代码，突然接到电话。&quot;,
+    &quot;language&quot;: &quot;zh&quot;,
+    &quot;script_id&quot;: &quot;demo-001&quot;,
+    &quot;asset_manifest&quot;: {
+      &quot;bindings&quot;: [{&quot;asset_id&quot;: &quot;char_001&quot;, &quot;asset_ref&quot;: &quot;oss://bucket/char_001.png&quot;}]
+    }
+  }&#x27;</span>
 
 curl http://localhost:8000/api/v1/status/TSK2026xxxx
 curl http://localhost:8000/api/v1/result/TSK2026xxxx
 </code></pre>
 <pre class="hljs"><code>{<span class="hljs-attr">&quot;task_id&quot;</span>:<span class="hljs-string">&quot;TSK2026xxxx&quot;</span>,<span class="hljs-attr">&quot;script_id&quot;</span>:<span class="hljs-string">&quot;demo-001&quot;</span>,<span class="hljs-attr">&quot;status&quot;</span>:<span class="hljs-string">&quot;pending&quot;</span>,<span class="hljs-attr">&quot;success&quot;</span>:<span class="hljs-literal">true</span>,<span class="hljs-attr">&quot;message&quot;</span>:<span class="hljs-string">&quot;任务已提交，请使用任务ID查询状态&quot;</span>}
 </code></pre>
-<p>提交响应的 <code>success=true</code> 只表示任务已进入队列，不代表分镜生成成功；最终状态以查询接口的 <code>status</code> 为准。<code>/tasks</code> 当前只返回分页骨架，任务明细应通过 <code>/status/{task_id}</code> 或 <code>/pending-tasks</code> 获取。<code>/result/{task_id}</code> 在任务未结束时仍返回 200，<code>message</code> 会提示当前状态。</p>
+<p>提交响应的 <code>success=true</code> 只表示任务已进入队列，不代表分镜生成成功；最终状态以查询接口的 <code>status</code> 为准。<code>/tasks</code> 当前只返回分页骨架，任务明细应通过 <code>/status/{task_id}</code> 或 <code>/pending-tasks</code> 获取。<code>/result/{task_id}</code> 在任务未结束时仍返回 200，<code>message</code> 会提示当前状态。结果中的 <code>data</code> 与 SDK 的 <code>PenshotResult.data</code> 同构。</p>
 
 <h3>错误响应</h3>
 <table>
@@ -198,7 +268,7 @@ curl http://localhost:8000/api/v1/result/TSK2026xxxx
 <tr><th>HTTP 状态</th><th>触发条件</th><th>响应要点</th></tr>
 </thead>
 <tbody>
-<tr><td><code>400</code></td><td>参数校验失败、同步任务失败、取消已结束任务</td><td><code>error</code> 为具体原因</td></tr>
+<tr><td><code>400</code></td><td>参数校验失败、同步任务失败、取消已结束任务、批量超限或回填清单长度不符</td><td><code>error</code> 为具体原因</td></tr>
 <tr><td><code>404</code></td><td>任务或批量任务不存在</td><td><code>error</code> 含任务 ID</td></tr>
 <tr><td><code>500</code></td><td>未捕获异常</td><td><code>error</code> 固定为 <code>Internal server error</code></td></tr>
 </tbody>
@@ -215,8 +285,10 @@ curl http://localhost:8000/api/v1/result/TSK2026xxxx
 <tr><td>对提交方法使用 <code>await</code> 报 <code>TypeError</code></td><td><code>breakdown_script_async</code> 是普通函数，去掉 <code>await</code></td></tr>
 <tr><td>传入 <code>task_id</code> 参数报错</td><td>提交参数名为 <code>script_id</code>，真实任务 ID 用返回值</td></tr>
 <tr><td>轮询长期不结束</td><td>判断条件写成了 <code>completed</code>，应检查 <code>success</code> 等终态</td></tr>
-<tr><td><code>wait_for_result</code> 返回 <code>None</code></td><td>等待超时，核对 <code>wait_timeout</code> 与 <code>workflow_timeout</code></td></tr>
+<tr><td><code>wait_for_result</code> 返回 <code>None</code></td><td>等待超时，核对 <code>wait_timeout</code> 与输入 <code>timeout</code></td></tr>
 <tr><td>多进程下刚提交就查不到</td><td>未配置 Redis，提交与查询落在不同进程</td></tr>
+<tr><td>批量请求返回 400</td><td>同步批量超过 20 条，或 <code>asset_manifests</code> 长度与 <code>scripts</code> 不一致</td></tr>
+<tr><td><code>route_plan</code> 为 <code>null</code></td><td>路由关闭或路由阶段失败；检查 <code>settings.yaml</code> 的 <code>routing.enabled</code> 与日志</td></tr>
 </tbody>
 </table>
 
@@ -225,7 +297,7 @@ curl http://localhost:8000/api/v1/result/TSK2026xxxx
 <p>REST 与 MCP 是并列的协议入口，不需要同时启用。已经通过 HTTP 暴露服务时，MCP 只增加面向 LLM 客户端的工具描述，不改变任务执行链路。</p>
 
 <h2>LangGraph 与 A2A</h2>
-<p><code>examples/workflow/01_langgraph_integration.py</code> 与 <code>examples/integrations/a2a_integration.py</code> 属于示例层代码，不是产品内置能力，也不随 SDK 契约提供兼容承诺。</p>
+<p><code>examples/workflow/01_langgraph_integration.py</code> 与 <code>examples/integrations/a2a_integration.py</code> 属于示例层代码，不是产品内置能力，也不随 SDK 契约提供兼容承诺。资产回填的完整示例见 <code>examples/sdk/08_asset_handoff.py</code>。</p>
 <p>LangGraph 示例把调用拆成提交节点与等待节点：提交节点是同步函数，直接取得 <code>task_id</code>；等待节点使用 <code>await wait_for_result_async()</code>。轮询模式会设置 60 次上限，避免无密钥或上游卡死时无限循环。</p>
 <pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">submit_node</span>(<span class="hljs-params">state</span>):
     task_id = agent.breakdown_script_async(script_text=state.script, script_id=state.script_id)
@@ -245,29 +317,31 @@ curl http://localhost:8000/api/v1/result/TSK2026xxxx
 </thead>
 <tbody>
 <tr><td><code>enable_llm</code></td><td><code>True</code></td><td>关闭后使用规则解析与拆分</td></tr>
-<tr><td><code>max_total_loops</code></td><td><code>20</code></td><td>工作流最大总循环次数</td></tr>
+<tr><td><code>max_total_loops</code></td><td><code>20</code></td><td>工作流最大总循环次数；运行时全局上限为其 2 倍</td></tr>
 <tr><td><code>max_shot_duration</code> / <code>min_shot_duration</code> / <code>default_shot_duration</code></td><td><code>60.0</code> / <code>1.0</code> / <code>3.0</code></td><td>镜头时长上限、下限与默认值，单位秒</td></tr>
 <tr><td><code>llm_confidence</code></td><td><code>0.6</code></td><td>低于该置信度触发规则修正</td></tr>
 <tr><td><code>duration_split_threshold</code></td><td><code>5.5</code></td><td>片段超过该秒数触发再分割</td></tr>
 <tr><td><code>max_fragment_duration</code> / <code>min_fragment_duration</code></td><td><code>5.0</code> / <code>1.0</code></td><td>分割片段时长区间</td></tr>
-<tr><td><code>video_model</code> / <code>audio_model</code></td><td><code>runway_gen2</code> / <code>XTTSv2</code></td><td>写入提示词的生成模型标识</td></tr>
+<tr><td><code>video_model</code> / <code>audio_model</code></td><td><code>runway_gen2</code> / <code>XTTSv2</code></td><td>写入提示词的生成模型标识；实际路由目标由 <code>settings.yaml</code> 决定</td></tr>
 <tr><td><code>max_prompt_length</code> / <code>min_prompt_length</code></td><td><code>200</code> / <code>20</code></td><td>提示词单词数上下限</td></tr>
 <tr><td><code>human_intervention_mode</code></td><td><code>interactive</code></td><td><code>auto</code> / <code>interactive</code> / <code>callback</code></td></tr>
-<tr><td><code>workflow_timeout</code></td><td><code>1800</code></td><td>工作流总超时，单位秒</td></tr>
-<tr><td><code>checkpoint_mode</code></td><td><code>auto</code></td><td><code>auto</code> / <code>memory</code> / <code>sqlite</code> / <code>postgres</code></td></tr>
+<tr><td><code>human_intervention_timeout</code></td><td><code>300</code></td><td>人工干预等待时长，单位秒</td></tr>
+<tr><td><code>workflow_timeout</code></td><td><code>1800</code></td><td>输入未设置 <code>timeout</code> 时的回退超时</td></tr>
+<tr><td><code>checkpoint_mode</code></td><td><code>auto</code></td><td><code>auto</code> / <code>memory</code> / <code>sqlite</code> 生效；<code>postgres</code> 仅有字段，未实现后端</td></tr>
 <tr><td><code>max_checkpoints_per_script</code></td><td><code>10</code></td><td>单剧本保留的检查点数量</td></tr>
 </tbody>
 </table>
 <p><code>AIConfig</code> 还提供 <code>cinematic_knowledge</code>、<code>pacing_principles</code> 两个默认开启的影视知识开关，以及默认关闭的 <code>enable_llm_cache</code>（缓存 TTL 300 秒）。构造时会校验时长与长度区间，<code>max</code> 不大于 <code>min</code> 会直接抛出 <code>ValueError</code>。</p>
-<p>部署时按 LLM 供应商的速率限制设置 <code>max_concurrent</code> 与 <code>queue_size</code>，运行中可用 <code>set_max_concurrent()</code> 调整；同步等待值应小于 <code>workflow_timeout</code>。多 worker 或容器多副本必须配置 Redis，否则任务记录只存在于单个进程。长剧本或需要中断恢复的场景，应把 <code>checkpoint_mode</code> 固定为 <code>sqlite</code> 或 <code>postgres</code>。</p>
+<p>部署时按 LLM 供应商的速率限制设置 <code>max_concurrent</code> 与 <code>queue_size</code>，运行中可用 <code>set_max_concurrent()</code> 调整；同步等待值应小于输入 <code>timeout</code>。多 worker 或容器多副本必须配置 Redis，否则任务记录只存在于单个进程。检查点当前为写入型留痕，不提供按检查点断点续跑，详见<a href="checkpoint.html">检查点与恢复</a>。</p>
 
 <h2>接入检查清单</h2>
 <ol>
 <li>通过 <code>create_penshot_agent()</code> 或 REST 启动服务，确认 <code>/api/v1/health</code> 返回 <code>healthy</code>。</li>
 <li>轮询条件使用 <code>success</code>、<code>failed</code>、<code>cancelled</code>，不要写 <code>completed</code>。</li>
-<li>同步等待为 <code>None</code> 时按超时处理，并为异步任务保留 <code>workflow_timeout</code> 预算。</li>
+<li>同步等待为 <code>None</code> 时按超时处理，并为异步任务保留输入 <code>timeout</code> 预算。</li>
 <li>多进程或容器多副本部署时配置 Redis，确保提交与查询看到同一份任务记录。</li>
-<li>结果读取统一走 <code>result.data[&quot;instructions&quot;]</code>，不要假设顶层直接存在 <code>fragments</code>。</li>
-<li>长剧本按章节分批提交，复用 <code>script_id</code> 关联同一剧本；需要恢复时固定 <code>checkpoint_mode</code>。</li>
+<li>结果读取统一走 <code>result.data[&quot;instructions&quot;]</code>，并检查 <code>data[&quot;warnings&quot;]</code> 与 <code>metadata.quality_gate</code>。</li>
+<li>需要固定角色外观时，先取 <code>asset_plan</code> 生成资产，再用 <code>asset_manifest</code> 回填；批量场景用 <code>asset_manifests</code> 对齐下标。</li>
+<li>长剧本按章节分批提交，复用 <code>script_id</code> 关联同一剧本；恢复语义以当前检查点实现为准。</li>
 </ol>
 <p>接口与默认值以当前源码为准；工作流内部实现见 <a href="dev-guide.html">开发指南</a>，检查点与恢复见 <a href="checkpoint.html">检查点与恢复</a>，版本记录以 <a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a> 为准。</p>

@@ -1,0 +1,343 @@
+<p>PenShot 默认不调用任何文生图或文生视频接口。它把角色三视图、关键道具与场景锚点写成一份<strong>声明式资产计划</strong>（<code>asset_plan</code>），由下游选择图片供应商生成，再把真实引用交回 PenShot 或直接用于视频生成。本页说明这套交接机制的字段、两种接入方式与常见降级行为。</p>
+
+<blockquote>本页对应 v0.4.4 源码。资产计划只描述“要生成什么”，不负责“用哪个模型生成”。如果显式开启 <code>image.enabled</code> 或注入 <code>AssetExecutionAdapter</code>，资产节点也可以调用执行器生图并产出回填清单；默认关闭，本文以声明式交接为主。</blockquote>
+
+<h2>30 秒了解</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">它解决的问题</th><th style="text-align:left">PenShot 的做法</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">不想绑定图片供应商</td><td style="text-align:left">资产以提示词、负向词、尺寸、视角声明，不发起外部调用</td></tr>
+<tr><td style="text-align:left">同一角色在多个片段出现</td><td style="text-align:left">一个角色只产出一个 <code>char_001</code> 资产，片段通过 <code>references</code> 复用</td></tr>
+<tr><td style="text-align:left">下游会改名或换存储</td><td style="text-align:left">用 <code>asset_id_map</code> 建立“规范 ID → 实际 ID”映射，<code>asset_id</code> 本身不变</td></tr>
+<tr><td style="text-align:left">不想全量生成资产</td><td style="text-align:left"><code>usage.fragments</code> 标明每个资产被哪些片段使用，可按需生成</td></tr>
+<tr><td style="text-align:left">需要人工修提示词</td><td style="text-align:left">人工干预节点选择 <code>[7] EDIT_ASSET</code>，改完回到资产节点重建</td></tr>
+<tr><td style="text-align:left">资产生成后想重新路由</td><td style="text-align:left">把 <code>asset_manifest</code> 随下一次任务提交，PenShot 解析真实引用</td></tr>
+</tbody>
+</table>
+
+<h2>快速上手：一次任务，下游消费</h2>
+<p>推荐先走“直接消费”模式：运行一次 PenShot，读取 <code>asset_plan</code> 生成资产，再按 <code>route_plan.adapted_packages[].references</code> 调用视频服务。</p>
+
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> create_penshot_agent
+
+agent = create_penshot_agent()
+result = agent.breakdown_script(script_text)
+data = result.data
+
+plan = data[<span class="hljs-string">&quot;asset_plan&quot;</span>]
+instructions = data[<span class="hljs-string">&quot;instructions&quot;</span>]
+generated = {}
+
+<span class="hljs-comment"># 1) 只生成尚未回填的资产</span>
+<span class="hljs-keyword">for</span> asset <span class="hljs-keyword">in</span> plan[<span class="hljs-string">&quot;assets&quot;</span>]:
+    <span class="hljs-keyword">if</span> asset[<span class="hljs-string">&quot;status&quot;</span>] != <span class="hljs-string">&quot;pending&quot;</span>:
+        <span class="hljs-keyword">continue</span>
+    generated[asset[<span class="hljs-string">&quot;asset_id&quot;</span>]] = image_service.generate(
+        prompt=asset[<span class="hljs-string">&quot;image_prompt&quot;</span>],
+        negative_prompt=asset[<span class="hljs-string">&quot;negative_prompt&quot;</span>],
+        size=asset[<span class="hljs-string">&quot;size&quot;</span>],
+        seed=asset[<span class="hljs-string">&quot;consistency&quot;</span>][<span class="hljs-string">&quot;seed&quot;</span>],
+    )
+
+<span class="hljs-comment"># 2) 只有 as_first_frame=true 的引用用于图生视频首帧</span>
+<span class="hljs-keyword">for</span> package <span class="hljs-keyword">in</span> instructions[<span class="hljs-string">&quot;route_plan&quot;</span>][<span class="hljs-string">&quot;adapted_packages&quot;</span>]:
+    first = next(
+        (ref <span class="hljs-keyword">for</span> ref <span class="hljs-keyword">in</span> package[<span class="hljs-string">&quot;references&quot;</span>] <span class="hljs-keyword">if</span> ref[<span class="hljs-string">&quot;as_first_frame&quot;</span>]),
+        <span class="hljs-keyword">None</span>,
+    )
+    <span class="hljs-keyword">if</span> first <span class="hljs-keyword">is</span> <span class="hljs-keyword">None</span>:
+        video_service.text_to_video(package[<span class="hljs-string">&quot;prompt&quot;</span>])
+        <span class="hljs-keyword">continue</span>
+
+    first_frame = generated.get(first[<span class="hljs-string">&quot;asset_id&quot;</span>])
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> first_frame:
+        <span class="hljs-comment"># 资产未就绪：保留声明式提示词，先回退文生视频</span>
+        video_service.text_to_video(package[<span class="hljs-string">&quot;prompt&quot;</span>])
+        <span class="hljs-keyword">continue</span>
+
+    video_service.image_to_video(
+        prompt=package[<span class="hljs-string">&quot;prompt&quot;</span>],
+        first_frame=first_frame,
+        duration=package[<span class="hljs-string">&quot;duration&quot;</span>],
+    )
+</code></pre>
+
+<p>完整可运行、且不需要 LLM / 图片 / 视频密钥的示例：<code>examples/sdk/08_asset_handoff.py</code>。</p>
+
+<h2>输出里能拿到什么</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">路径</th><th style="text-align:left">内容</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>data.asset_plan</code></td><td style="text-align:left">资产计划文档：角色三视图、道具、场景的声明式生图指令</td></tr>
+<tr><td style="text-align:left"><code>data.instructions.asset_plan</code></td><td style="text-align:left">同一份资产计划在指令集里的内嵌副本</td></tr>
+<tr><td style="text-align:left"><code>data.instructions.route_plan.adapted_packages[]</code></td><td style="text-align:left">每个片段的路由结果、模型适配提示词与生成模式</td></tr>
+<tr><td style="text-align:left"><code>…adapted_packages[].references[]</code></td><td style="text-align:left">片段需要的资产引用：规范 ID、视角、是否首帧</td></tr>
+<tr><td style="text-align:left"><code>…adapted_packages[].image_prompt</code></td><td style="text-align:left">该片段首帧的文生图提示词（动作开始前的静态截面）</td></tr>
+<tr><td style="text-align:left"><code>…adapted_packages[].first_frame_instruction</code></td><td style="text-align:left">给下游的首帧生成或使用指令</td></tr>
+<tr><td style="text-align:left"><code>data.asset_manifest</code></td><td style="text-align:left">本次提交若带回填清单，为解析后的清单；否则为空</td></tr>
+<tr><td style="text-align:left"><code>data.instructions.asset_manifest</code></td><td style="text-align:left">同一份回填清单的内嵌副本</td></tr>
+</tbody>
+</table>
+
+<pre class="mermaid">flowchart LR
+    PS[PenShot 工作流] --&gt; AP[asset_plan&lt;br/&gt;声明式生图指令]
+    AP --&gt; IMG[下游图片服务&lt;br/&gt;角色/道具/场景]
+    IMG --&gt; REF[references&lt;br/&gt;asset_id + as_first_frame]
+    REF --&gt; VID[下游视频服务&lt;br/&gt;文生视频 / 图生视频]
+    IMG -.可选回填. -&gt; MF[asset_manifest&lt;br/&gt;bindings + asset_id_map]
+    MF -.下一次任务. -&gt; PS
+</pre>
+
+<h2>asset_plan：声明式生图指令</h2>
+<p>资产计划由资产节点产出，包含全局风格锚点与一组 <code>AssetSpec</code>。默认状态全部为 <code>pending</code>，不触发任何外部调用。</p>
+
+<pre class="hljs"><code>{
+  <span class="hljs-attr">&quot;schema_version&quot;</span>: <span class="hljs-string">&quot;0.4.4&quot;</span>,
+  <span class="hljs-attr">&quot;task_id&quot;</span>: <span class="hljs-string">&quot;t1&quot;</span>,
+  <span class="hljs-attr">&quot;script_id&quot;</span>: <span class="hljs-string">&quot;s1&quot;</span>,
+  <span class="hljs-attr">&quot;style_anchor&quot;</span>: {
+    <span class="hljs-attr">&quot;genre&quot;</span>: <span class="hljs-string">&quot;neo-noir&quot;</span>,
+    <span class="hljs-attr">&quot;description&quot;</span>: <span class="hljs-string">&quot;cinematic, moody lighting&quot;</span>
+  },
+  <span class="hljs-attr">&quot;assets&quot;</span>: [
+    {
+      <span class="hljs-attr">&quot;asset_id&quot;</span>: <span class="hljs-string">&quot;char_001&quot;</span>,
+      <span class="hljs-attr">&quot;asset_type&quot;</span>: <span class="hljs-string">&quot;character_sheet&quot;</span>,
+      <span class="hljs-attr">&quot;owner_name&quot;</span>: <span class="hljs-string">&quot;林然&quot;</span>,
+      <span class="hljs-attr">&quot;image_prompt&quot;</span>: <span class="hljs-string">&quot;character reference sheet of 林然, front view, side view and back view, ...&quot;</span>,
+      <span class="hljs-attr">&quot;negative_prompt&quot;</span>: <span class="hljs-string">&quot;multiple characters, duplicate faces, ...&quot;</span>,
+      <span class="hljs-attr">&quot;size&quot;</span>: <span class="hljs-string">&quot;1024x1024&quot;</span>,
+      <span class="hljs-attr">&quot;views&quot;</span>: [<span class="hljs-string">&quot;front&quot;</span>, <span class="hljs-string">&quot;side&quot;</span>, <span class="hljs-string">&quot;back&quot;</span>],
+      <span class="hljs-attr">&quot;usage&quot;</span>: {
+        <span class="hljs-attr">&quot;characters&quot;</span>: [<span class="hljs-string">&quot;林然&quot;</span>],
+        <span class="hljs-attr">&quot;scenes&quot;</span>: [],
+        <span class="hljs-attr">&quot;fragments&quot;</span>: []
+      },
+      <span class="hljs-attr">&quot;consistency&quot;</span>: {
+        <span class="hljs-attr">&quot;identity_lock&quot;</span>: <span class="hljs-keyword">true</span>,
+        <span class="hljs-attr">&quot;preferred_view&quot;</span>: <span class="hljs-string">&quot;front&quot;</span>,
+        <span class="hljs-attr">&quot;seed&quot;</span>: <span class="hljs-keyword">null</span>
+      },
+      <span class="hljs-attr">&quot;status&quot;</span>: <span class="hljs-string">&quot;pending&quot;</span>,
+      <span class="hljs-attr">&quot;asset_ref&quot;</span>: <span class="hljs-string">&quot;&quot;</span>
+    }
+  ]
+}
+</code></pre>
+
+<table>
+<thead>
+<tr><th style="text-align:left">资产类型</th><th style="text-align:left">内容</th><th style="text-align:left">下游用途</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>character_sheet</code></td><td style="text-align:left">角色正、侧、背三视图，<code>identity_lock=true</code></td><td style="text-align:left">身份参考，不作为首帧</td></tr>
+<tr><td style="text-align:left"><code>prop</code></td><td style="text-align:left">关键道具静帧，可带 <code>state_variants</code></td><td style="text-align:left">道具外观与状态参考</td></tr>
+<tr><td style="text-align:left"><code>scene</code></td><td style="text-align:left">场景锚点静帧（地点、时间、天气）</td><td style="text-align:left">唯一可作为图生视频首帧的资产类型</td></tr>
+</tbody>
+</table>
+
+<p><code>status</code> 有四种取值：<code>pending</code> 仅有提示词、等待下游生成；<code>generated</code> 已回填真实引用；<code>failed</code> 生成失败；<code>skipped</code> 已有可用资产、本次跳过。状态变化只影响下游判断，不会让主流程抛异常。</p>
+
+<h2>片段引用：三种角色</h2>
+<p>路由完成后，每个片段会带上 <code>references</code>。引用只描述“需要哪个资产、用来做什么”，不代表资产已经生成。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">role</th><th style="text-align:left">来源资产</th><th style="text-align:left">as_first_frame</th><th style="text-align:left">语义</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>identity_reference</code></td><td style="text-align:left">角色三视图</td><td style="text-align:left"><code>false</code></td><td style="text-align:left">锁定角色身份，不直接当首帧</td></tr>
+<tr><td style="text-align:left"><code>first_frame</code></td><td style="text-align:left">场景锚点</td><td style="text-align:left"><code>true</code></td><td style="text-align:left">图生视频的唯一首帧来源</td></tr>
+<tr><td style="text-align:left"><code>prop</code></td><td style="text-align:left">道具静帧</td><td style="text-align:left"><code>false</code></td><td style="text-align:left">道具外观与状态参考</td></tr>
+</tbody>
+</table>
+
+<p>三条硬规则：</p>
+<ul>
+<li><code>references[].asset_id</code> 始终是 PenShot 规范 ID，下游改名必须通过 <code>asset_id_map</code>，不要修改它；</li>
+<li>只有 <code>as_first_frame=true</code> 的引用适合作为视频首帧；角色三视图与道具静帧不再承担首帧职责；</li>
+<li><code>asset_ref</code> 只承载“已回填的场景首帧引用”，不会写入角色三视图的真实图片地址。</li>
+</ul>
+
+<h2>使用范围与质量校验</h2>
+<p><code>usage.fragments</code> 是资产的使用范围。路由结束时会按片段主角、场景地点与道具出现场景回填，并强制并入 <code>route_plan</code> 中显式引用的片段；引用集合必须是使用范围的子集。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">字段</th><th style="text-align:left">含义</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>usage.characters</code></td><td style="text-align:left">使用该资产的角名</td></tr>
+<tr><td style="text-align:left"><code>usage.scenes</code></td><td style="text-align:left">使用该资产的场景地点</td></tr>
+<tr><td style="text-align:left"><code>usage.fragments</code></td><td style="text-align:left">使用该资产的片段 ID，按需生成的主要依据</td></tr>
+</tbody>
+</table>
+
+<p>质量审查会检查片段引用是否落在使用范围内。片段引用了未声明的资产时记为 <code>asset_usage_missing</code>（major），告警同时带 <code>fragment_id</code> 与 <code>asset_id</code>，可直接定位。道具还会额外校验“文本提及 + 场景约束”，避免把无关道具挂进片段。</p>
+
+<h2>模式 B：回填 asset_manifest</h2>
+<p>如果下游生成资产后希望 PenShot 重新解析首帧引用，可以构造回填清单并随下一次任务提交。</p>
+
+<pre class="hljs"><code>{
+  <span class="hljs-attr">&quot;schema_version&quot;</span>: <span class="hljs-string">&quot;0.4.4&quot;</span>,
+  <span class="hljs-attr">&quot;task_id&quot;</span>: <span class="hljs-string">&quot;t1&quot;</span>,
+  <span class="hljs-attr">&quot;bindings&quot;</span>: [
+    {
+      <span class="hljs-attr">&quot;asset_id&quot;</span>: <span class="hljs-string">&quot;ds_char_001&quot;</span>,
+      <span class="hljs-attr">&quot;view&quot;</span>: <span class="hljs-string">&quot;front&quot;</span>,
+      <span class="hljs-attr">&quot;asset_ref&quot;</span>: <span class="hljs-string">&quot;/cdn/ds_char_001_front.png&quot;</span>,
+      <span class="hljs-attr">&quot;model&quot;</span>: <span class="hljs-string">&quot;flux-pro&quot;</span>,
+      <span class="hljs-attr">&quot;seed&quot;</span>: <span class="hljs-keyword">null</span>,
+      <span class="hljs-attr">&quot;checksum&quot;</span>: <span class="hljs-string">&quot;&quot;</span>,
+      <span class="hljs-attr">&quot;source&quot;</span>: <span class="hljs-string">&quot;downstream_image_service&quot;</span>,
+      <span class="hljs-attr">&quot;revision&quot;</span>: <span class="hljs-number">1</span>
+    }
+  ],
+  <span class="hljs-attr">&quot;asset_id_map&quot;</span>: {
+    <span class="hljs-string">&quot;char_001&quot;</span>: <span class="hljs-string">&quot;ds_char_001&quot;</span>
+  }
+}
+</code></pre>
+
+<p>提交方式与普通任务一致，只是多一个参数：</p>
+
+<pre class="hljs"><code>agent.breakdown_script(script_text, asset_manifest=manifest)
+
+<span class="hljs-comment"># 批量任务按脚本下标对应，允许某条为 None</span>
+agent.batch_breakdown(scripts, asset_manifests=[manifest_1, <span class="hljs-keyword">None</span>])
+</code></pre>
+
+<pre class="hljs"><code>POST /api/v1/storyboard
+Content-Type: application/json
+
+{
+  <span class="hljs-attr">&quot;script&quot;</span>: <span class="hljs-string">&quot;剧本内容&quot;</span>,
+  <span class="hljs-attr">&quot;language&quot;</span>: <span class="hljs-string">&quot;zh&quot;</span>,
+  <span class="hljs-attr">&quot;asset_manifest&quot;</span>: {
+    <span class="hljs-attr">&quot;schema_version&quot;</span>: <span class="hljs-string">&quot;0.4.4&quot;</span>,
+    <span class="hljs-attr">&quot;bindings&quot;</span>: [
+      {<span class="hljs-attr">&quot;asset_id&quot;</span>: <span class="hljs-string">&quot;ds_char_001&quot;</span>, <span class="hljs-attr">&quot;asset_ref&quot;</span>: <span class="hljs-string">&quot;/cdn/ds_char_001_front.png&quot;</span>}
+    ],
+    <span class="hljs-attr">&quot;asset_id_map&quot;</span>: {<span class="hljs-string">&quot;char_001&quot;</span>: <span class="hljs-string">&quot;ds_char_001&quot;</span>}
+  }
+}
+</code></pre>
+
+<p>MCP 的 <code>breakdown_script</code> 工具同样声明了 <code>asset_manifest</code> 参数。清单解析遵循以下顺序：</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">规则</th><th style="text-align:left">行为</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">ID 解析</td><td style="text-align:left">先按 <code>asset_id_map</code> 映射到下游实际 ID，再回退到规范 ID</td></tr>
+<tr><td style="text-align:left">清单优先</td><td style="text-align:left">下游提供了清单时，清单引用优先于契约中已有的 <code>asset_ref</code></td></tr>
+<tr><td style="text-align:left">版本标记</td><td style="text-align:left">当前消费端不会因为 <code>schema_version</code> 不同而拒绝清单；字段结构仍需按 <code>0.4.4</code> 提供</td></tr>
+<tr><td style="text-align:left">未知资产 ID</td><td style="text-align:left">记录错误，但只跳过对应绑定</td></tr>
+<tr><td style="text-align:left">本地引用不可用</td><td style="text-align:left"><code>file://</code> 文件缺失或校验和不匹配时保持 <code>pending</code> 并记录原因，避免把坏引用挂进契约</td></tr>
+<tr><td style="text-align:left">显式空引用</td><td style="text-align:left">清单已声明该资产但 <code>asset_ref</code> 为空时，首帧引用保持为空，不回退任何旧引用</td></tr>
+</tbody>
+</table>
+
+<p>清单也兼容直接用 <code>assets</code> 字段承载绑定列表的写法；只要没有 <code>bindings</code>，<code>assets</code> 会被当作绑定数组解析。</p>
+
+<h2>人工编辑资产提示词</h2>
+<p>工作流进入人工干预节点时，如果已生成资产计划，界面会展示每个资产的提示词摘要。选择 <code>[7] EDIT_ASSET</code> 后可以按编号修改：</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">可编辑字段</th><th style="text-align:left">说明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>image_prompt</code></td><td style="text-align:left">角色三视图、道具或场景的正向提示词</td></tr>
+<tr><td style="text-align:left"><code>negative_prompt</code></td><td style="text-align:left">对应的负向提示词</td></tr>
+</tbody>
+</table>
+
+<p>编辑生效后会依次发生五件事：</p>
+<ol>
+<li>修改立即写回 <code>asset_plan</code> 与全局契约；</li>
+<li>该资产的旧 <code>asset_ref</code> 清空、<code>status</code> 回到 <code>pending</code>；</li>
+<li>回填清单中对应的 <code>bindings</code> 与 <code>asset_id_map</code> 被移除，避免继续使用旧图；</li>
+<li>工作流回到 <code>GENERATE_ASSETS</code> 重建资产计划，再继续分段与提示词转换；</li>
+<li>编辑记录写入 <code>execution.asset_prompt_edits</code>，资产 <code>metadata</code> 写入 <code>human_edited</code>、<code>edit_source</code>、<code>edit_revision</code>。</li>
+</ol>
+
+<p>没有资产计划或没有修改任何字段时，<code>EDIT_ASSET</code> 会自动回退为 <code>CONTINUE</code>，不会卡住流程。</p>
+
+<h2>下游二次修改与溯源</h2>
+<p>调用视频服务前，下游可以修改提示词或切换目标模型，但必须使用白名单接口并保留溯源信息。</p>
+
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.neopen.agent.model_adapter <span class="hljs-keyword">import</span> PromptOverride, apply_overrides
+
+apply_overrides(
+    adapted_packages,
+    [
+        PromptOverride(
+            target_id=<span class="hljs-string">&quot;f1&quot;</span>,
+            field=<span class="hljs-string">&quot;prompt&quot;</span>,
+            value=<span class="hljs-string">&quot;Lin Ran steps into the alley, neon reflections&quot;</span>,
+            source=<span class="hljs-string">&quot;downstream_repair&quot;</span>,
+            revision_id=<span class="hljs-string">&quot;rev-42&quot;</span>,
+        )
+    ],
+)
+</code></pre>
+
+<table>
+<thead>
+<tr><th style="text-align:left">允许覆盖</th><th style="text-align:left">不可覆盖</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>prompt</code>、<code>negative_prompt</code>、<code>image_prompt</code>、<code>first_frame_instruction</code>、<code>style</code>、<code>camera</code>、<code>target_model</code></td><td style="text-align:left"><code>asset_id</code>、<code>asset_ref</code>、<code>references</code></td></tr>
+</tbody>
+</table>
+
+<p>每次覆盖会写入 <code>revision_id</code>、<code>revision_source</code>、<code>parent_id</code> 与递增的 <code>revision</code>，形成可追溯的修订链。资产改名必须走 <code>asset_id_map</code>，不能在提示词包里静默替换 ID。</p>
+
+<h2>降级与排查</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">现象</th><th style="text-align:left">实际行为与处理建议</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">资产一直是 <code>pending</code></td><td style="text-align:left">正常状态：仅声明提示词，不阻断主流程。下游按 <code>image_prompt</code> 生成即可</td></tr>
+<tr><td style="text-align:left">高一致性或含关键文字片段缺角色资产</td><td style="text-align:left">该片段回退 <code>text_to_video</code>，避免生成无身份约束的画面</td></tr>
+<tr><td style="text-align:left">清单版本号不同</td><td style="text-align:left">当前版本不校验版本号，仍会按 <code>bindings</code> 解析；请确保字段结构与 <code>0.4.4</code> 一致</td></tr>
+<tr><td style="text-align:left">回填后仍显示 <code>pending</code></td><td style="text-align:left">检查 <code>bindings[].asset_id</code> 是否命中 <code>asset_id_map</code>；本地文件引用还需检查文件与校验和</td></tr>
+<tr><td style="text-align:left">片段引用了不存在的资产</td><td style="text-align:left">审查未声明的 <code>asset_id</code> 会被忽略；使用范围缺失会记 <code>asset_usage_missing</code></td></tr>
+<tr><td style="text-align:left">首帧始终为空</td><td style="text-align:left">确认片段有 <code>as_first_frame=true</code> 的场景引用，且清单已回填该场景资产</td></tr>
+</tbody>
+</table>
+
+<h2>验证与源码</h2>
+<pre class="hljs"><code><span class="hljs-comment"># 下游接入示例（离线可跑）</span>
+python examples/sdk/08_asset_handoff.py
+
+<span class="hljs-comment"># 相关单元测试</span>
+pytest tests/unit/test_asset_generator.py \
+       tests/unit/test_image_to_video_routing.py \
+       tests/unit/test_asset_manifest_plumbing.py \
+       tests/unit/test_asset_prompt_edit.py \
+       tests/unit/test_route_model.py -q
+</code></pre>
+
+<table>
+<thead>
+<tr><th style="text-align:left">能力</th><th style="text-align:left">源码位置</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">资产计划与回填模型</td><td style="text-align:left"><code>src/penshot/neopen/agent/asset_generator/asset_models.py</code></td></tr>
+<tr><td style="text-align:left">资产智能体与状态处理</td><td style="text-align:left"><code>src/penshot/neopen/agent/asset_generator/asset_generator_agent.py</code></td></tr>
+<tr><td style="text-align:left">可选执行器扩展点</td><td style="text-align:left"><code>src/penshot/neopen/agent/asset_generator/execution_adapter.py</code></td></tr>
+<tr><td style="text-align:left">图生视频引用解析</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/image_to_video.py</code></td></tr>
+<tr><td style="text-align:left">下游覆盖与溯源</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/model_models.py</code></td></tr>
+<tr><td style="text-align:left">工作流输出与回填</td><td style="text-align:left"><code>src/penshot/neopen/agent/workflow/workflow_nodes.py</code></td></tr>
+</tbody>
+</table>
+
+<p>资产如何变成首帧、何时回退文生视频，见<a href="first-frame.html">首帧与图生视频</a>；目标模型如何选择见<a href="model-routing.html">模型路由</a>；契约中的资产锚点见<a href="consistency.html">一致性策略</a>。</p>

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>检查点与恢复 · PenShot 文档</title>
-  <meta name="description" content="PenShot 的 LangGraph 检查点机制、SQLite/内存双模式、任务恢复流程，以及当前版本在断点续传上的已知边界。">
+  <meta name="description" content="PenShot 的 LangGraph 检查点机制、内存与 SQLite 模式、任务恢复流程，以及当前版本在断点续传上的已知边界。">
   <meta name="keywords" content="检查点,断点恢复,LangGraph checkpoint,SQLite,任务恢复,持久化,状态机">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="检查点与恢复 · PenShot 文档">
-  <meta property="og:description" content="PenShot 的 LangGraph 检查点机制、SQLite/内存双模式、任务恢复流程，以及当前版本在断点续传上的已知边界。">
+  <meta property="og:description" content="PenShot 的 LangGraph 检查点机制、内存与 SQLite 模式、任务恢复流程，以及当前版本在断点续传上的已知边界。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/checkpoint.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="检查点与恢复 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot 的 LangGraph 检查点机制、SQLite/内存双模式、任务恢复流程，以及当前版本在断点续传上的已知边界。">
+  <meta name="twitter:description" content="PenShot 的 LangGraph 检查点机制、内存与 SQLite 模式、任务恢复流程，以及当前版本在断点续传上的已知边界。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"检查点与恢复","name":"检查点与恢复","description":"PenShot 的 LangGraph 检查点机制、SQLite/内存双模式、任务恢复流程，以及当前版本在断点续传上的已知边界。","url":"https://shot.helpenx.com/docs/checkpoint.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/checkpoint.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"检查点, 断点恢复, LangGraph checkpoint, SQLite, 任务恢复, 持久化, 状态机","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"检查点与恢复","name":"检查点与恢复","description":"PenShot 的 LangGraph 检查点机制、内存与 SQLite 模式、任务恢复流程，以及当前版本在断点续传上的已知边界。","url":"https://shot.helpenx.com/docs/checkpoint.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/checkpoint.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"检查点, 断点恢复, LangGraph checkpoint, SQLite, 任务恢复, 持久化, 状态机","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html" class="is-active" aria-current="page">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -136,14 +140,14 @@
           <h1>检查点与恢复</h1>
           <p class="doc-deck">状态如何落盘、任务如何恢复，以及当前版本的能力边界。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 15 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/checkpoint.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
         <p>PenShot 用 LangGraph 检查点持久化工作流状态：每个 super-step 结束后把完整状态快照写入 saver，理论上可凭同一 <code>thread_id</code> 从最近快照恢复。当前版本只接通写入侧，断点续传尚未生效。</p>
 <blockquote>
-<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.3.x 源码。检查点文件只用于状态回溯，不能替代业务结果存档。</p>
+<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.4.4 源码。检查点文件只用于状态回溯，不能替代业务结果存档。</p>
 </blockquote>
 <h2 id="sec-1">能力边界</h2>
 <table>
@@ -585,12 +589,12 @@ final_state = workflow.invoke(
     <a class="pager-link" href="consistency.html">
       <span class="pager-link__label">← 上一篇 · 核心设计</span>
       <strong>一致性策略</strong>
-      <small>三层记忆、快照与连续性检查，如何压制跨片段的角色与场景漂移。</small>
+      <small>一致性契约、资产锚点与修复回路，如何压制跨片段的角色、场景与风格漂移。</small>
     </a>
     <a class="pager-link pager-link--next" href="core-implementation.html">
       <span class="pager-link__label">下一篇 → · 核心设计</span>
       <strong>核心实现</strong>
-      <small>LLM 客户端、提示词管理、循环控制与任务调度的实现要点。</small>
+      <small>LLM 客户端、提示词管理、资产生成、模型适配、循环控制与任务调度的实现要点。</small>
     </a>
   </nav>
       </article>
@@ -608,7 +612,7 @@ final_state = workflow.invoke(
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MCP 服务 · PenShot 文档</title>
-  <meta name="description" content="PenShot MCP Server 的七个工具契约、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。">
-  <meta name="keywords" content="MCP Server,Model Context Protocol,Claude Desktop,Cursor,stdio,HTTP,七个工具,智能体工具">
+  <meta name="description" content="PenShot MCP Server 的七个工具契约、breakdown_script 参数 schema、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。">
+  <meta name="keywords" content="MCP Server,Model Context Protocol,Claude Desktop,Cursor,stdio,HTTP,七个工具,asset_manifest,智能体工具">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="MCP 服务 · PenShot 文档">
-  <meta property="og:description" content="PenShot MCP Server 的七个工具契约、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。">
+  <meta property="og:description" content="PenShot MCP Server 的七个工具契约、breakdown_script 参数 schema、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/mcp.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="集成与接口">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="MCP 服务 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot MCP Server 的七个工具契约、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。">
+  <meta name="twitter:description" content="PenShot MCP Server 的七个工具契约、breakdown_script 参数 schema、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"MCP 服务","name":"MCP 服务","description":"PenShot MCP Server 的七个工具契约、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。","url":"https://shot.helpenx.com/docs/mcp.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/mcp.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"集成与接口","keywords":"MCP Server, Model Context Protocol, Claude Desktop, Cursor, stdio, HTTP, 七个工具, 智能体工具","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"MCP 服务","name":"MCP 服务","description":"PenShot MCP Server 的七个工具契约、breakdown_script 参数 schema、stdio/HTTP 双传输、JSON-RPC 交互流程与 Claude Desktop、Cursor 客户端配置。","url":"https://shot.helpenx.com/docs/mcp.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/mcp.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"集成与接口","keywords":"MCP Server, Model Context Protocol, Claude Desktop, Cursor, stdio, HTTP, 七个工具, asset_manifest, 智能体工具","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html" class="is-active" aria-current="page">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -136,7 +140,7 @@
           <h1>MCP 服务</h1>
           <p class="doc-deck">七个工具、双传输与 Claude Desktop / Cursor 客户端配置。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 17 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/mcp.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
@@ -185,7 +189,7 @@
 <tr><th>工具</th><th>参数</th><th>返回</th></tr>
 </thead>
 <tbody>
-<tr><td><code>breakdown_script</code></td><td><code>script</code> 必填；<code>language</code> 默认 <code>zh</code>；<code>wait</code> 默认 <code>false</code>；<code>timeout</code> 默认 300 秒</td><td>异步返回 <code>task_id</code>、<code>status=pending</code> 与提示信息；同步返回任务结果</td></tr>
+<tr><td><code>breakdown_script</code></td><td><code>script</code> 必填；<code>language</code> 默认 <code>zh</code>；<code>wait</code> 默认 <code>false</code>；<code>timeout</code> 默认 300 秒；<code>asset_manifest</code> 可选（仅 stdio）</td><td>异步返回 <code>task_id</code>、<code>status=pending</code> 与提示信息；同步返回任务结果</td></tr>
 <tr><td><code>get_task_status</code></td><td><code>task_id</code></td><td><code>status</code>、<code>progress</code>、<code>current_stage</code>、<code>stage_name</code>、<code>stages_progress</code></td></tr>
 <tr><td><code>get_task_result</code></td><td><code>task_id</code></td><td><code>task_id</code>、<code>success</code>、<code>status</code>、<code>data</code>、<code>error</code>、<code>processing_time_ms</code></td></tr>
 <tr><td><code>cancel_task</code></td><td><code>task_id</code></td><td><code>{task_id, cancelled}</code></td></tr>
@@ -194,7 +198,7 @@
 <tr><td><code>get_stats</code></td><td>无</td><td>提交、完成、失败、取消计数与队列快照</td></tr>
 </tbody>
 </table>
-<p><code>breakdown_script</code> 只接受上述四个键，不支持 SDK 中的 <code>script_id</code>、<code>style</code> 与 <code>priority</code>；需要这些参数时改用 Python SDK 或 REST。异步调用立即返回任务号，同步调用在 <code>timeout</code> 内等待完整结果。</p>
+<p>stdio 版 <code>breakdown_script</code> 接受五个键，其中 <code>asset_manifest</code> 用于回传下游生成的资产引用；HTTP 版请求模型只有 <code>script</code>、<code>language</code>、<code>wait</code>、<code>timeout</code>，需要资产回填时改用 SDK 或 REST。两者都不支持 SDK 中的 <code>script_id</code>、<code>style</code> 与 <code>priority</code>。异步调用立即返回任务号，同步调用在 <code>timeout</code> 内等待完整结果。</p>
 <p><code>language</code> 的解析在两种传输下不同：stdio 仅把字面量 <code>zh</code> 视为中文，其余值（包括 <code>中文</code>、<code>cn</code>）一律按英文处理；HTTP 使用 <code>ShotLanguage.from_string</code>，接受 <code>zh</code>、<code>中文</code>、<code>en</code>、<code>英文</code> 并忽略大小写，无法识别的值回退中文。跨传输复用时不要依赖同一个语言字符串。</p>
 <p><code>list_tasks</code> 的 <code>total</code> 是本次返回条数，不是任务总数。stdio 版只读取 <code>limit</code>，传入 <code>status_filter</code> 不会生效；HTTP 版才提供筛选。</p>
 
@@ -237,7 +241,8 @@
 }
 </code></pre>
 <p><code>status</code> 为 <code>success</code> 时调用 <code>get_task_result</code>，结果位于 <code>data.instructions</code>，与 SDK、REST 的结构一致。同步调用把 <code>wait</code> 设为 <code>true</code> 并给出 <code>timeout</code>，响应直接包含 <code>data</code> 与 <code>error</code>；超时返回 <code>status=timeout</code>，后台任务仍会继续，可保留 <code>task_id</code> 改用轮询。</p>
-<p><code>data.instructions</code> 通常包含项目信息与片段数组，片段数量随剧本长度变化。需要稳定字段时应以 SDK 的 <code>PenshotResult.data</code> 为准，不要把展示用文案当作契约。</p>
+<p><code>data.instructions</code> 通常包含项目信息与片段数组，另含 <code>route_plan</code>、<code>asset_plan</code> 与 <code>asset_manifest</code>；<code>data</code> 顶层还提供 <code>audit_report</code>、<code>asset_generation</code> 与 <code>metadata.quality_gate</code>。需要稳定字段时应以 SDK 的 <code>PenshotResult.data</code> 为准，不要把展示用文案当作契约。</p>
+<p>需要固定角色外观时，先读取 <code>asset_plan</code> 生成资产，再以 <code>asset_manifest</code> 重新提交。stdio 工具支持该参数，HTTP 工具不支持，完整结构见<a href="integration.html">集成指南</a>的资产回填章节。</p>
 
 <h2 id="sec-4">任务生命周期</h2>
 <pre class="mermaid">flowchart LR
@@ -264,11 +269,11 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 </thead>
 <tbody>
 <tr><td><code>initialize</code></td><td>返回 <code>protocolVersion 0.1.0</code>、<code>serverInfo</code>（<code>penshot-mcp-server</code> / <code>1.0.0</code>）与 <code>capabilities.tools</code></td></tr>
-<tr><td><code>tools/list</code></td><td>返回七个工具，每个工具的 <code>parameters</code> 均为空对象</td></tr>
+<tr><td><code>tools/list</code></td><td>返回七个工具；<code>breakdown_script</code> 带显式 JSON Schema，其余六个的 <code>parameters</code> 为空对象</td></tr>
 <tr><td><code>tools/call</code></td><td>按 <code>name</code> 调用工具，结果写入 <code>result.content[0].text</code></td></tr>
 </tbody>
 </table>
-<p>服务只实现这三个方法。<code>notifications/initialized</code> 等通知与其他方法一律返回 <code>-32601</code>；resources、prompts 与订阅能力不可用。由于 <code>tools/list</code> 的参数 schema 为空，客户端无法从协议层获知参数名，需要在系统提示词中约定，或改用 HTTP 版联调。</p>
+<p>服务只实现这三个方法。<code>notifications/initialized</code> 等通知与其他方法一律返回 <code>-32601</code>；resources、prompts 与订阅能力不可用。<code>breakdown_script</code> 的参数可从协议层获知，其余六个工具的参数 schema 为空，客户端需要自行约定参数名，或改用 HTTP 版联调。</p>
 <p>协议按行分帧：一行一个 JSON 对象，请求 <code>id</code> 原样回填，客户端按 <code>id</code> 匹配响应。服务不会强制先执行 <code>initialize</code>，直接发送 <code>tools/call</code> 也能得到结果，但标准客户端仍会先握手。stdin 关闭时循环退出，进程结束；需要常驻时应由客户端或进程管理器负责重启。</p>
 
 <h2 id="sec-6">HTTP 传输</h2>
@@ -282,7 +287,7 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 <tbody>
 <tr><td>GET</td><td><code>/</code></td><td>服务名称、版本与端点清单</td></tr>
 <tr><td>GET</td><td><code>/tools</code></td><td>七个工具及参数说明</td></tr>
-<tr><td>POST</td><td><code>/tools/breakdown_script</code></td><td>请求体为 <code>script</code>、<code>language</code>、<code>wait</code>、<code>timeout</code></td></tr>
+<tr><td>POST</td><td><code>/tools/breakdown_script</code></td><td>请求体为 <code>script</code>、<code>language</code>、<code>wait</code>、<code>timeout</code>，无 <code>asset_manifest</code></td></tr>
 <tr><td>POST</td><td><code>/tools/get_task_status</code></td><td>查询状态，任务不存在返回 404</td></tr>
 <tr><td>POST</td><td><code>/tools/get_task_result</code></td><td>获取结果，任务不存在返回 404</td></tr>
 <tr><td>POST</td><td><code>/tools/cancel_task</code></td><td>取消任务，返回 <code>cancelled</code></td></tr>
@@ -378,7 +383,7 @@ PENSHOT_EMBED__DEFAULT__DIMENSIONS=1536
 </thead>
 <tbody>
 <tr><td>客户端看不到工具</td><td>解释器路径错误，或依赖未安装</td><td>用同一解释器执行 <code>python -m penshot.mcp_server</code> 验证</td></tr>
-<tr><td>参数不被识别</td><td>stdio 版 schema 为空</td><td>在提示词中约定参数，或改用 HTTP 版</td></tr>
+<tr><td>参数不被识别</td><td>六个工具没有显式 schema，或 HTTP 版不接受 <code>asset_manifest</code></td><td>在提示词中约定参数，或改用支持该参数的入口</td></tr>
 <tr><td>任务长时间 pending</td><td>队列积压或工作器未消费</td><td>查看 <code>get_queue_status</code> 与服务日志</td></tr>
 <tr><td>同步调用超时</td><td>剧本较长或模型较慢</td><td>设置 <code>wait=false</code> 后轮询</td></tr>
 <tr><td>状态判断不命中</td><td>把 <code>completed</code> 当作任务终态</td><td>使用 <code>success</code>、<code>failed</code>、<code>cancelled</code></td></tr>
@@ -398,7 +403,7 @@ PENSHOT_EMBED__DEFAULT__DIMENSIONS=1536
     <a class="pager-link" href="integration.html">
       <span class="pager-link__label">← 上一篇 · 集成与接口</span>
       <strong>集成指南</strong>
-      <small>Python SDK、REST API、MCP 与 LangGraph/A2A 的接入方式。</small>
+      <small>Python SDK、REST API、MCP 三条接入路径，以及仓库中的 LangGraph/A2A 示例。</small>
     </a>
     <a class="pager-link pager-link--next" href="memory.html">
       <span class="pager-link__label">下一篇 → · 检索与记忆</span>
@@ -421,7 +426,7 @@ PENSHOT_EMBED__DEFAULT__DIMENSIONS=1536
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

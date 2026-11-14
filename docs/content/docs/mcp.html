@@ -42,7 +42,7 @@
 <tr><th>工具</th><th>参数</th><th>返回</th></tr>
 </thead>
 <tbody>
-<tr><td><code>breakdown_script</code></td><td><code>script</code> 必填；<code>language</code> 默认 <code>zh</code>；<code>wait</code> 默认 <code>false</code>；<code>timeout</code> 默认 300 秒</td><td>异步返回 <code>task_id</code>、<code>status=pending</code> 与提示信息；同步返回任务结果</td></tr>
+<tr><td><code>breakdown_script</code></td><td><code>script</code> 必填；<code>language</code> 默认 <code>zh</code>；<code>wait</code> 默认 <code>false</code>；<code>timeout</code> 默认 300 秒；<code>asset_manifest</code> 可选（仅 stdio）</td><td>异步返回 <code>task_id</code>、<code>status=pending</code> 与提示信息；同步返回任务结果</td></tr>
 <tr><td><code>get_task_status</code></td><td><code>task_id</code></td><td><code>status</code>、<code>progress</code>、<code>current_stage</code>、<code>stage_name</code>、<code>stages_progress</code></td></tr>
 <tr><td><code>get_task_result</code></td><td><code>task_id</code></td><td><code>task_id</code>、<code>success</code>、<code>status</code>、<code>data</code>、<code>error</code>、<code>processing_time_ms</code></td></tr>
 <tr><td><code>cancel_task</code></td><td><code>task_id</code></td><td><code>{task_id, cancelled}</code></td></tr>
@@ -51,7 +51,7 @@
 <tr><td><code>get_stats</code></td><td>无</td><td>提交、完成、失败、取消计数与队列快照</td></tr>
 </tbody>
 </table>
-<p><code>breakdown_script</code> 只接受上述四个键，不支持 SDK 中的 <code>script_id</code>、<code>style</code> 与 <code>priority</code>；需要这些参数时改用 Python SDK 或 REST。异步调用立即返回任务号，同步调用在 <code>timeout</code> 内等待完整结果。</p>
+<p>stdio 版 <code>breakdown_script</code> 接受五个键，其中 <code>asset_manifest</code> 用于回传下游生成的资产引用；HTTP 版请求模型只有 <code>script</code>、<code>language</code>、<code>wait</code>、<code>timeout</code>，需要资产回填时改用 SDK 或 REST。两者都不支持 SDK 中的 <code>script_id</code>、<code>style</code> 与 <code>priority</code>。异步调用立即返回任务号，同步调用在 <code>timeout</code> 内等待完整结果。</p>
 <p><code>language</code> 的解析在两种传输下不同：stdio 仅把字面量 <code>zh</code> 视为中文，其余值（包括 <code>中文</code>、<code>cn</code>）一律按英文处理；HTTP 使用 <code>ShotLanguage.from_string</code>，接受 <code>zh</code>、<code>中文</code>、<code>en</code>、<code>英文</code> 并忽略大小写，无法识别的值回退中文。跨传输复用时不要依赖同一个语言字符串。</p>
 <p><code>list_tasks</code> 的 <code>total</code> 是本次返回条数，不是任务总数。stdio 版只读取 <code>limit</code>，传入 <code>status_filter</code> 不会生效；HTTP 版才提供筛选。</p>
 
@@ -94,7 +94,8 @@
 }
 </code></pre>
 <p><code>status</code> 为 <code>success</code> 时调用 <code>get_task_result</code>，结果位于 <code>data.instructions</code>，与 SDK、REST 的结构一致。同步调用把 <code>wait</code> 设为 <code>true</code> 并给出 <code>timeout</code>，响应直接包含 <code>data</code> 与 <code>error</code>；超时返回 <code>status=timeout</code>，后台任务仍会继续，可保留 <code>task_id</code> 改用轮询。</p>
-<p><code>data.instructions</code> 通常包含项目信息与片段数组，片段数量随剧本长度变化。需要稳定字段时应以 SDK 的 <code>PenshotResult.data</code> 为准，不要把展示用文案当作契约。</p>
+<p><code>data.instructions</code> 通常包含项目信息与片段数组，另含 <code>route_plan</code>、<code>asset_plan</code> 与 <code>asset_manifest</code>；<code>data</code> 顶层还提供 <code>audit_report</code>、<code>asset_generation</code> 与 <code>metadata.quality_gate</code>。需要稳定字段时应以 SDK 的 <code>PenshotResult.data</code> 为准，不要把展示用文案当作契约。</p>
+<p>需要固定角色外观时，先读取 <code>asset_plan</code> 生成资产，再以 <code>asset_manifest</code> 重新提交。stdio 工具支持该参数，HTTP 工具不支持，完整结构见<a href="integration.html">集成指南</a>的资产回填章节。</p>
 
 <h2>任务生命周期</h2>
 <pre class="mermaid">flowchart LR
@@ -121,11 +122,11 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 </thead>
 <tbody>
 <tr><td><code>initialize</code></td><td>返回 <code>protocolVersion 0.1.0</code>、<code>serverInfo</code>（<code>penshot-mcp-server</code> / <code>1.0.0</code>）与 <code>capabilities.tools</code></td></tr>
-<tr><td><code>tools/list</code></td><td>返回七个工具，每个工具的 <code>parameters</code> 均为空对象</td></tr>
+<tr><td><code>tools/list</code></td><td>返回七个工具；<code>breakdown_script</code> 带显式 JSON Schema，其余六个的 <code>parameters</code> 为空对象</td></tr>
 <tr><td><code>tools/call</code></td><td>按 <code>name</code> 调用工具，结果写入 <code>result.content[0].text</code></td></tr>
 </tbody>
 </table>
-<p>服务只实现这三个方法。<code>notifications/initialized</code> 等通知与其他方法一律返回 <code>-32601</code>；resources、prompts 与订阅能力不可用。由于 <code>tools/list</code> 的参数 schema 为空，客户端无法从协议层获知参数名，需要在系统提示词中约定，或改用 HTTP 版联调。</p>
+<p>服务只实现这三个方法。<code>notifications/initialized</code> 等通知与其他方法一律返回 <code>-32601</code>；resources、prompts 与订阅能力不可用。<code>breakdown_script</code> 的参数可从协议层获知，其余六个工具的参数 schema 为空，客户端需要自行约定参数名，或改用 HTTP 版联调。</p>
 <p>协议按行分帧：一行一个 JSON 对象，请求 <code>id</code> 原样回填，客户端按 <code>id</code> 匹配响应。服务不会强制先执行 <code>initialize</code>，直接发送 <code>tools/call</code> 也能得到结果，但标准客户端仍会先握手。stdin 关闭时循环退出，进程结束；需要常驻时应由客户端或进程管理器负责重启。</p>
 
 <h2>HTTP 传输</h2>
@@ -139,7 +140,7 @@ python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 <tbody>
 <tr><td>GET</td><td><code>/</code></td><td>服务名称、版本与端点清单</td></tr>
 <tr><td>GET</td><td><code>/tools</code></td><td>七个工具及参数说明</td></tr>
-<tr><td>POST</td><td><code>/tools/breakdown_script</code></td><td>请求体为 <code>script</code>、<code>language</code>、<code>wait</code>、<code>timeout</code></td></tr>
+<tr><td>POST</td><td><code>/tools/breakdown_script</code></td><td>请求体为 <code>script</code>、<code>language</code>、<code>wait</code>、<code>timeout</code>，无 <code>asset_manifest</code></td></tr>
 <tr><td>POST</td><td><code>/tools/get_task_status</code></td><td>查询状态，任务不存在返回 404</td></tr>
 <tr><td>POST</td><td><code>/tools/get_task_result</code></td><td>获取结果，任务不存在返回 404</td></tr>
 <tr><td>POST</td><td><code>/tools/cancel_task</code></td><td>取消任务，返回 <code>cancelled</code></td></tr>
@@ -235,7 +236,7 @@ PENSHOT_EMBED__DEFAULT__DIMENSIONS=1536
 </thead>
 <tbody>
 <tr><td>客户端看不到工具</td><td>解释器路径错误，或依赖未安装</td><td>用同一解释器执行 <code>python -m penshot.mcp_server</code> 验证</td></tr>
-<tr><td>参数不被识别</td><td>stdio 版 schema 为空</td><td>在提示词中约定参数，或改用 HTTP 版</td></tr>
+<tr><td>参数不被识别</td><td>六个工具没有显式 schema，或 HTTP 版不接受 <code>asset_manifest</code></td><td>在提示词中约定参数，或改用支持该参数的入口</td></tr>
 <tr><td>任务长时间 pending</td><td>队列积压或工作器未消费</td><td>查看 <code>get_queue_status</code> 与服务日志</td></tr>
 <tr><td>同步调用超时</td><td>剧本较长或模型较慢</td><td>设置 <code>wait=false</code> 后轮询</td></tr>
 <tr><td>状态判断不命中</td><td>把 <code>completed</code> 当作任务终态</td><td>使用 <code>success</code>、<code>failed</code>、<code>cancelled</code></td></tr>

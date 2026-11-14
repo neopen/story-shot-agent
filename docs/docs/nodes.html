@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>工作流节点 · PenShot 文档</title>
-  <meta name="description" content="PenShot 六个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、镜头拆分、视频分段、指令转换、质量审查与连续性守护。">
-  <meta name="keywords" content="工作流节点,剧本解析,镜头拆分,视频分段,指令转换,质量审查,连续性守护,多智能体">
+  <meta name="description" content="PenShot 八个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、资产生成、镜头拆分、视频分段、指令转换、模型路由、质量审查与连续性守护。">
+  <meta name="keywords" content="工作流节点,剧本解析,资产生成,镜头拆分,视频分段,指令转换,模型路由,质量审查,连续性守护,多智能体">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="工作流节点 · PenShot 文档">
-  <meta property="og:description" content="PenShot 六个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、镜头拆分、视频分段、指令转换、质量审查与连续性守护。">
+  <meta property="og:description" content="PenShot 八个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、资产生成、镜头拆分、视频分段、指令转换、模型路由、质量审查与连续性守护。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/nodes.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="工作流节点 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot 六个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、镜头拆分、视频分段、指令转换、质量审查与连续性守护。">
+  <meta name="twitter:description" content="PenShot 八个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、资产生成、镜头拆分、视频分段、指令转换、模型路由、质量审查与连续性守护。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"工作流节点","name":"工作流节点","description":"PenShot 六个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、镜头拆分、视频分段、指令转换、质量审查与连续性守护。","url":"https://shot.helpenx.com/docs/nodes.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/nodes.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"工作流节点, 剧本解析, 镜头拆分, 视频分段, 指令转换, 质量审查, 连续性守护, 多智能体","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"工作流节点","name":"工作流节点","description":"PenShot 八个业务节点的职责、输入输出、核心规则与失败处理：剧本解析、资产生成、镜头拆分、视频分段、指令转换、模型路由、质量审查与连续性守护。","url":"https://shot.helpenx.com/docs/nodes.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/nodes.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"工作流节点, 剧本解析, 资产生成, 镜头拆分, 视频分段, 指令转换, 模型路由, 质量审查, 连续性守护, 多智能体","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html" class="is-active" aria-current="page">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -126,117 +130,110 @@
       <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
     </div>
     <details class="toc-mobile">
-      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 12 节</summary>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">节点总览</a></li><li class="toc-depth-2"><a href="#sec-2">剧本解析 PARSE_SCRIPT</a></li><li class="toc-depth-3"><a href="#sec-3">格式识别</a></li><li class="toc-depth-3"><a href="#sec-4">质量评估与校验</a></li><li class="toc-depth-2"><a href="#sec-5">镜头拆分 SEGMENT_SHOT</a></li><li class="toc-depth-3"><a href="#sec-6">规则模式</a></li><li class="toc-depth-3"><a href="#sec-7">时长估算</a></li><li class="toc-depth-2"><a href="#sec-8">视频分段 SPLIT_VIDEO</a></li><li class="toc-depth-2"><a href="#sec-9">指令转换 CONVERT_PROMPT</a></li><li class="toc-depth-2"><a href="#sec-10">质量审查 AUDIT_QUALITY</a></li><li class="toc-depth-2"><a href="#sec-11">连续性守护 CONTINUITY_CHECK</a></li><li class="toc-depth-2"><a href="#sec-12">节点级限制</a></li></ul>
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 14 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">节点总览</a></li><li class="toc-depth-2"><a href="#sec-2">剧本解析 PARSE_SCRIPT</a></li><li class="toc-depth-3"><a href="#sec-3">格式识别</a></li><li class="toc-depth-3"><a href="#sec-4">质量评估与校验</a></li><li class="toc-depth-2"><a href="#sec-5">资产计划 GENERATE_ASSETS</a></li><li class="toc-depth-2"><a href="#sec-6">镜头拆分 SEGMENT_SHOT</a></li><li class="toc-depth-3"><a href="#sec-7">规则模式</a></li><li class="toc-depth-3"><a href="#sec-8">时长估算</a></li><li class="toc-depth-2"><a href="#sec-9">片段切割 SPLIT_VIDEO</a></li><li class="toc-depth-2"><a href="#sec-10">提示词转换 CONVERT_PROMPT</a></li><li class="toc-depth-2"><a href="#sec-11">模型路由 ROUTE_MODEL</a></li><li class="toc-depth-2"><a href="#sec-12">质量审计 AUDIT_QUALITY</a></li><li class="toc-depth-2"><a href="#sec-13">连续性守护 CONTINUITY_CHECK</a></li><li class="toc-depth-2"><a href="#sec-14">节点级限制</a></li></ul>
     </details>
     <div class="docs-layout">
       <article class="doc-body">
         <header class="doc-header">
           <span class="doc-header__cat">核心设计</span>
           <h1>工作流节点</h1>
-          <p class="doc-deck">逐个拆解六大智能体节点：输入、规则、LLM 调用与失败降级。</p>
+          <p class="doc-deck">逐个拆解八个业务节点：输入、规则、LLM 调用、资产计划与模型路由。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 22 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 28 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/nodes.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
-        <p>PenShot 的六段工作流由 LangGraph 编排：每个业务节点完成一次内容生产，经决策函数返回七种状态之一，再进入下一节点、重试或转人工。</p>
+        <p>PenShot 的八段工作流由 LangGraph 编排：每个业务节点完成一次内容生产，经决策函数返回八种状态之一，再进入下一节点、重试、修复或转人工。</p>
 
 <h2 id="sec-1">节点总览</h2>
-<p>业务节点按“解析→拆分→分段→转换→审查→守护”顺序执行；拆分、分段、转换成功后先经过 LOOP_CHECK，错误处理与人工干预为全局兜底。</p>
+<p>业务节点按“解析→资产计划→拆分→切割→转换→模型路由→审计→守护”顺序执行；拆分、切割、转换、路由成功后先经过 LOOP_CHECK，错误处理与人工干预为全局兜底。</p>
 
 <pre class="mermaid">graph TD
     Start[开始/剧本输入] --&gt; Parse[剧本解析]
-    
+
     Parse --&gt; Decision1{解析结果判断}
-    Decision1 --&gt;|SUCCESS| Split[镜头拆分]
+    Decision1 --&gt;|SUCCESS| Assets[资产计划]
     Decision1 --&gt;|NEEDS_RETRY| Parse
     Decision1 --&gt;|NEEDS_HUMAN| Human[人工干预]
     Decision1 --&gt;|FAILED| Error[错误处理]
-    
+
+    Assets --&gt; DecisionA{资产结果判断}
+    DecisionA --&gt;|SUCCESS/VALID| Split[镜头拆分]
+    DecisionA --&gt;|NEEDS_HUMAN| Human
+    DecisionA --&gt;|FAILED| Error
+
     Split --&gt; Decision2{拆分结果判断}
     Decision2 --&gt;|SUCCESS| Loop{循环检查&lt;br/&gt;LOOP_CHECK}
-    Decision2 --&gt;|NEEDS_RETRY| Split
-    Decision2 --&gt;|NEEDS_REPAIR| Split
+    Decision2 --&gt;|NEEDS_RETRY/NEEDS_REPAIR| Split
     Decision2 --&gt;|FAILED| Error
-    
-    Loop --&gt;|阶段推进| Fragment[视频分段]
-    
+
+    Loop --&gt;|阶段推进| Fragment[片段切割]
+
     Fragment --&gt; Decision3{分段结果判断}
     Decision3 --&gt;|SUCCESS| Loop
-    Decision3 --&gt;|NEEDS_RETRY| Fragment
-    Decision3 --&gt;|NEEDS_REPAIR| Fragment
+    Decision3 --&gt;|NEEDS_RETRY/NEEDS_REPAIR| Fragment
     Decision3 --&gt;|NEEDS_HUMAN| Human
     Decision3 --&gt;|FAILED| Error
-    
-    Loop --&gt;|阶段推进| Prompt[提示词生成]
-    
+
+    Loop --&gt;|阶段推进| Prompt[提示词转换]
+
     Prompt --&gt; DecisionP{生成结果判断}
-    DecisionP --&gt;|SUCCESS| Loop
-    DecisionP --&gt;|NEEDS_RETRY| Prompt
-    DecisionP --&gt;|NEEDS_REPAIR| Prompt
+    DecisionP --&gt;|SUCCESS/VALID| Route[模型路由]
+    DecisionP --&gt;|NEEDS_RETRY/NEEDS_REPAIR| Prompt
     DecisionP --&gt;|FAILED| Error
-    
-    Loop --&gt;|阶段推进| Audit[质量审查]
-    
+
+    Route --&gt; DecisionR{路由结果判断}
+    DecisionR --&gt;|SUCCESS/VALID| Loop
+    DecisionR --&gt;|NEEDS_RETRY/NEEDS_REPAIR| Route
+    DecisionR --&gt;|NEEDS_HUMAN| Human
+    DecisionR --&gt;|FAILED| Error
+
+    Loop --&gt;|阶段推进| Audit[质量审计]
+
     Audit --&gt; Decision4{审查结果判断}
-    Decision4 --&gt;|SUCCESS| Continuity[连续性检查]
+    Decision4 --&gt;|SUCCESS| Continuity[连续性守护]
     Decision4 --&gt;|VALID| Continuity
-    Decision4 --&gt;|NEEDS_RETRY| Prompt
-    Decision4 --&gt;|NEEDS_REPAIR| Prompt
+    Decision4 --&gt;|NEEDS_RETRY/NEEDS_REPAIR| Prompt
     Decision4 --&gt;|NEEDS_HUMAN| Human
     Decision4 --&gt;|FAILED| Error
-    
+
     Continuity --&gt; Decision5{连续性判断}
-    Decision5 --&gt;|SUCCESS| Output[生成输出]
-    Decision5 --&gt;|VALID| Output
-    Decision5 --&gt;|NEEDS_REPAIR| Prompt
+    Decision5 --&gt;|SUCCESS/VALID| Output[生成输出]
+    Decision5 --&gt;|按来源修复| FixNode[解析/拆分/切割/转换]
     Decision5 --&gt;|NEEDS_HUMAN| Human
     Decision5 --&gt;|FAILED| Error
-    
+
     Output --&gt; End[工作流完成]
-    
+
     Error --&gt; DecisionE{错误处理判断}
-    DecisionE --&gt;|VALID| Parse
-    DecisionE --&gt;|NEEDS_RETRY| Parse
-    DecisionE --&gt;|NEEDS_REPAIR| Prompt
+    DecisionE --&gt;|按来源回退| Node[对应阶段节点]
     DecisionE --&gt;|NEEDS_HUMAN| Human
     DecisionE --&gt;|ABORT| End
-    DecisionE --&gt;|FAILED| End
-    
+
     Human --&gt; DecisionH{人工决策判断}
-    DecisionH --&gt;|SUCCESS| Output
-    DecisionH --&gt;|VALID| Output
+    DecisionH --&gt;|SUCCESS/VALID| Output
     DecisionH --&gt;|NEEDS_RETRY| Parse
     DecisionH --&gt;|NEEDS_REPAIR| Prompt
-    DecisionH --&gt;|NEEDS_HUMAN| Human
+    DecisionH --&gt;|NEEDS_ASSET_EDIT| Assets
     DecisionH --&gt;|ABORT| End
     DecisionH --&gt;|FAILED| Error
-    
-    %% 样式定义
+
     style Start fill:#4CAF50,color:white
     style End fill:#F44336,color:white
     style Human fill:#FF9800,color:black
     style Error fill:#9E9E9E,color:white
     style Loop fill:#FFEB3B,color:black
     style Parse fill:#2196F3,color:white
+    style Assets fill:#2196F3,color:white
     style Split fill:#2196F3,color:white
     style Fragment fill:#2196F3,color:white
     style Prompt fill:#2196F3,color:white
+    style Route fill:#2196F3,color:white
     style Audit fill:#2196F3,color:white
     style Continuity fill:#2196F3,color:white
     style Output fill:#4CAF50,color:white
-    
-    %% 决策节点样式
-    style Decision1 fill:#FFEB3B,color:black
-    style Decision2 fill:#FFEB3B,color:black
-    style Decision3 fill:#FFEB3B,color:black
-    style DecisionP fill:#FFEB3B,color:black
-    style Decision4 fill:#FFEB3B,color:black
-    style Decision5 fill:#FFEB3B,color:black
-    style DecisionE fill:#FFEB3B,color:black
-    style DecisionH fill:#FFEB3B,color:black
 </pre>
 
 <table>
@@ -256,6 +253,12 @@
 <td style="text-align:left">六格式识别、LLM 提取、五维评分</td>
 </tr>
 <tr>
+<td style="text-align:left">GENERATE_ASSETS</td>
+<td style="text-align:left">结构化剧本 + 契约</td>
+<td style="text-align:left"><code>AssetPlanDocument</code></td>
+<td style="text-align:left">资产规格、使用范围、可选出图、回填清单</td>
+</tr>
+<tr>
 <td style="text-align:left">SEGMENT_SHOT</td>
 <td style="text-align:left"><code>ParsedScript</code></td>
 <td style="text-align:left"><code>ShotSequence</code></td>
@@ -271,19 +274,25 @@
 <td style="text-align:left">CONVERT_PROMPT</td>
 <td style="text-align:left"><code>FragmentSequence</code></td>
 <td style="text-align:left"><code>AIVideoInstructions</code></td>
-<td style="text-align:left">双语提示词、音频提示词、负面词</td>
+<td style="text-align:left">双语提示词、音频提示词、负面词、模板召回</td>
+</tr>
+<tr>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left"><code>AIVideoInstructions</code> + 契约</td>
+<td style="text-align:left"><code>RoutePlan</code></td>
+<td style="text-align:left">能力适配、规则路由、图生视频首帧、阻塞标记</td>
 </tr>
 <tr>
 <td style="text-align:left">AUDIT_QUALITY</td>
-<td style="text-align:left"><code>AIVideoInstructions</code></td>
+<td style="text-align:left"><code>AIVideoInstructions</code> + 路由</td>
 <td style="text-align:left"><code>QualityAuditReport</code></td>
-<td style="text-align:left">五项检查、加权扣分</td>
+<td style="text-align:left">11 项规则 + LLM 审查、加权扣分</td>
 </tr>
 <tr>
 <td style="text-align:left">CONTINUITY_CHECK</td>
 <td style="text-align:left">各阶段产物</td>
 <td style="text-align:left"><code>ContinuityCheckResult</code></td>
-<td style="text-align:left">六维规则检查、签名去重</td>
+<td style="text-align:left">六维规则检查、签名去重、按来源修复</td>
 </tr>
 </tbody>
 </table>
@@ -293,47 +302,49 @@
     participant User as 用户
     participant System as 流程编排器
     participant Parser as 剧本解析
+    participant Assets as 资产计划
     participant Splitter as 镜头拆分
-    participant Fragmenter as 视频分段
-    participant Converter as 指令转换
-    participant Auditor as 质量审查
+    participant Fragmenter as 片段切割
+    participant Converter as 提示词转换
+    participant Router as 模型路由
+    participant Auditor as 质量审计
     participant Guardian as 连续性守护
-    
+
     User-&gt;&gt;System: 提交剧本
-    
-    %% 阶段1-4: 顺序执行
+
     System-&gt;&gt;Parser: 解析剧本
     Parser--&gt;&gt;System: 结构化剧本
-    
+
+    System-&gt;&gt;Assets: 生成资产计划
+    Assets--&gt;&gt;System: AssetPlanDocument
+
     System-&gt;&gt;Splitter: 镜头拆分
     Splitter--&gt;&gt;System: 镜头序列
-    
-    System-&gt;&gt;Fragmenter: 视频分段
+
+    System-&gt;&gt;Fragmenter: 片段切割
     Fragmenter--&gt;&gt;System: 片段序列
-    
-    System-&gt;&gt;Converter: 生成指令
+
+    System-&gt;&gt;Converter: 生成提示词
     Converter--&gt;&gt;System: Prompt序列
-    
-    %% 阶段5: 质量审查
-    System-&gt;&gt;Auditor: 质量审查
+
+    System-&gt;&gt;Router: 路由目标模型
+    Router--&gt;&gt;System: RoutePlan
+
+    System-&gt;&gt;Auditor: 质量审计
     Auditor--&gt;&gt;System: 审查报告
-    
+
     alt 审查不通过
-        System--&gt;&gt;Converter: 返回修复
-        Note over Converter,Auditor: 修复后重新审查
+        System--&gt;&gt;Converter: 携带修复参数重生成
     end
-    
-    %% 阶段6: 连续性检查
+
     System-&gt;&gt;Guardian: 连续性检查
     Guardian--&gt;&gt;System: 检查结果
-    
-    alt 发现严重连续性问题
-        System--&gt;&gt;Converter: 返回修复
-        Note over Converter,Guardian: 修复后重新检查
+
+    alt 发现问题且可修复
+        System--&gt;&gt;Splitter: 按来源回到拆分/切割/转换
     end
-    
-    %% 最终输出
-    System-&gt;&gt;User: 返回AI指令
+
+    System--&gt;&gt;User: 返回AI指令 + 资产计划 + 路由结果
 </pre>
 
 <p>决策语义与路由表见<a href="architecture.html">技术架构</a>。节点内部失败不直接抛异常，而是转为问题列表或错误对象，由决策函数决定重试、修复、人工或中止。</p>
@@ -425,25 +436,104 @@
 <h3 id="sec-4">质量评估与校验</h3>
 <p><code>_evaluate_completeness</code> 给出五维加权分：场景 0.25、角色 0.25、对话 0.20、动作 0.20、总体覆盖率 0.10；再按 <code>min(0.2, 问题数 × 0.05)</code> 扣分。元素 <code>sequence</code> 汇总后校验是否为 1…N，不连续只记 Warning，不阻断流程；缺失 <code>id</code> 时按 <code>elem_{场景序号}_{元素序号}</code> 补全。</p>
 
-<pre class="mermaid">sequenceDiagram
-    participant User as 用户
-    participant API as 流程编排器
-    participant Parser as 剧本解析智能体
-    participant LLM as LLM服务
-    
-    User-&gt;&gt;API: POST 剧本解析请求
-    API-&gt;&gt;Parser: 调用解析任务
-    Parser-&gt;&gt;LLM: 发送解析请求
-    Note over Parser,LLM: 使用提示词让LLM提取&lt;br/&gt;场景、角色、对话、动作
-    LLM--&gt;&gt;Parser: 返回结构化JSON
-    Parser-&gt;&gt;Parser: 添加元数据
-    Parser--&gt;&gt;API: 返回解析结果
-    API--&gt;&gt;User: 返回结构化剧本
+<p>解析阶段同时写入全局风格锚点与溯源信息（<code>style_anchor_provenance</code>），供资产计划与提示词转换复用。失败与降级：结果为空或完整性过低时，<code>decide_after_parsing</code> 路由回本节点重试；正则漏判退回 <code>MIXED_FORMAT</code> 通用提示词；没有原文偏移量回溯，<code>sequence</code> 的正确性依赖 LLM 输出质量。</p>
+
+<h2 id="sec-5">资产计划 GENERATE_ASSETS</h2>
+<p>把角色、道具、场景转换为可复用的资产锚点规格，默认<strong>只产出声明式计划</strong>，不调用任何外部文生图服务；同时接受下游回填的资产清单，把声明式 <code>asset_id</code> 绑定到真实资产引用。字段、两种接入方式与人工编辑流程见<a href="asset-handoff.html">资产计划与交接</a>。</p>
+
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[结构化剧本 + 一致性契约]
+        B[下游 asset_manifest 可选]
+    end
+
+    subgraph Process[计划流程]
+        C[角色三视图规格&lt;br/&gt;front/side/back] --&gt; E[道具状态变体&lt;br/&gt;按片段顺序推导]
+        D[道具静帧规格] --&gt; E
+        F[场景锚点规格] --&gt; E
+        E --&gt; G{资产清单已回填?}
+        G --&gt;|是| H[应用绑定&lt;br/&gt;asset_ref / 校验]
+        G --&gt;|否| I[保持 pending]
+        H --&gt; J[可选真实出图&lt;br/&gt;image.enabled]
+        I --&gt; J
+    end
+
+    subgraph Output
+        K[asset_plan + asset_manifest&lt;br/&gt;+ asset_generation_report]
+    end
+
+    A --&gt; C
+    B --&gt; H
+    J --&gt; K
 </pre>
 
-<p>失败与降级：结果为空或完整性过低时，<code>decide_after_parsing</code> 路由回本节点重试；正则漏判退回 <code>MIXED_FORMAT</code> 通用提示词；没有原文偏移量回溯，<code>sequence</code> 的正确性依赖 LLM 输出质量。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">资产类型</th>
+<th style="text-align:left">ID 前缀</th>
+<th style="text-align:left">内容</th>
+<th style="text-align:left">使用范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>character_sheet</code></td>
+<td style="text-align:left"><code>char_</code></td>
+<td style="text-align:left">角色三视图，视角 <code>front</code> / <code>side</code> / <code>back</code>，锁定身份</td>
+<td style="text-align:left"><code>usage.characters</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>prop</code></td>
+<td style="text-align:left"><code>prop_</code></td>
+<td style="text-align:left">关键道具静帧，可带状态变体（如 crumpled → balled）</td>
+<td style="text-align:left"><code>usage.fragments</code>、<code>usage.scenes</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>scene</code></td>
+<td style="text-align:left"><code>scene_</code></td>
+<td style="text-align:left">场景锚点静帧，承载地点、时间与光照</td>
+<td style="text-align:left"><code>usage.scenes</code></td>
+</tr>
+</tbody>
+</table>
 
-<h2 id="sec-5">镜头拆分 SEGMENT_SHOT</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">状态</th>
+<th style="text-align:left">含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>pending</code></td>
+<td style="text-align:left">仅声明，等待下游执行器生成</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>generated</code></td>
+<td style="text-align:left">已生成并落盘，<code>asset_ref</code> 可用</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>failed</code></td>
+<td style="text-align:left">生成失败，原因写入报告</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>skipped</code></td>
+<td style="text-align:left">已有可用资产，跳过重复生成</td>
+</tr>
+</tbody>
+</table>
+
+<p>每个资产以 <code>AssetSpec</code> 描述：<code>asset_id</code>、<code>asset_type</code>、<code>owner_name</code>、正负提示词、尺寸、视角、使用范围、连续性约束（<code>identity_lock</code>、<code>preferred_view</code>、建议 seed）与状态。计划整体序列化为 <code>AssetPlanDocument</code>，带 <code>schema_version</code>、<code>style_anchor</code> 与资产列表，写入 <code>asset_plan.json</code>。</p>
+
+<p>报告 <code>AssetGenerationReport</code> 记录 <code>mode</code>（<code>plan</code> / <code>manifest</code> / <code>generated</code>）、供应商、总数、成功/失败/待生成/跳过数量、回填应用数量与错误。无论是否启用出图，<code>asset_plan.json</code> 与 <code>asset_generation_report.json</code> 都会落盘；资产失败不阻断主流程，由下游首帧指令兜底。真实出图默认关闭（<code>image.default.enabled=false</code>），开启后由 <code>ImageClientExecutionAdapter</code> 调用文生图客户端。</p>
+
+<p>回填清单 <code>AssetManifest</code> 支持 <code>bindings</code> 与 <code>asset_id_map</code>（下游改名映射），并兼容下游直接写 <code>assets</code> 的格式。绑定包含 <code>asset_id</code>、<code>view</code>、<code>asset_ref</code>、<code>model</code>、<code>seed</code>、<code>checksum</code>、<code>revision</code> 与错误信息；引用会做格式校验，非法引用降级为警告。</p>
+
+<p>失败与降级：计划生成失败或未启用出图时，资产保持 <code>pending</code> 并继续拆分；同一角色只保留首值外观锚点，后续服装变化进入 <code>outfit_sequence</code>，不会覆盖首次身份特征。</p>
+
+<h2 id="sec-6">镜头拆分 SEGMENT_SHOT</h2>
 <p>把场景中的元素序列划分为视觉独立的镜头，并给出景别与时长。LLM 与规则两种实现共享 <code>ShotSequence</code> 输出，由 <code>ShotSegmenterFactory</code> 按 <code>enable_llm</code> 选择。</p>
 
 <pre class="mermaid">flowchart LR
@@ -485,7 +575,7 @@
 </tbody>
 </table>
 
-<h3 id="sec-6">规则模式</h3>
+<h3 id="sec-7">规则模式</h3>
 <table>
 <thead>
 <tr>
@@ -515,14 +605,12 @@
 
 <p>景别判定：组内含对话→特写 <code>close_up</code>；含场景描述→全景 <code>wide_shot</code>；其余→中景 <code>medium_shot</code>。<code>ShotType</code> 枚举共 13 种，提示词列出 8 种使用场景供 LLM 选择。</p>
 
-<h3 id="sec-7">时长估算</h3>
+<h3 id="sec-8">时长估算</h3>
 <p>LLM 给出的时长只作草案，拆分完成后 <code>estimator_factory.estimate_sequence()</code> 会覆写 <code>shot.duration</code>。动作估算器按中景基准 2.8 秒起算，叠加描述复杂度、速度关键词、场景情绪、角色特征，再与 <code>ActionDurationEstimatorTool</code> 结果按 0.4 : 0.6 加权，最后 clamp 到景别区间。<code>DurationEnhancer</code> 负责边界校准、情感特写至少 3.0 秒、开场/结尾 ×1.2、连续同型镜头错开 0.3 秒。</p>
 
 <p>失败与降级：估算器是关键词与固定系数规则，不感知语义；<code>merge_consecutive_actions=False</code> 会把连续动作拆成多个镜头；增强器中 climax / transition 的节奏系数尚未被引用，当前仅 opening / ending 生效。</p>
 
-<p>规则模式零 Token、输出稳定，适合批量草稿与离线环境；LLM 模式按语义划分，但镜头边界会随模型输出波动。两种模式共用同一个 <code>estimator_factory</code>，时长后处理不受选择影响。</p>
-
-<h2 id="sec-8">视频分段 SPLIT_VIDEO</h2>
+<h2 id="sec-9">片段切割 SPLIT_VIDEO</h2>
 <p>把超长镜头切分为符合单段时长上限的片段，并把镜头级连续性信息写入片段注释。</p>
 
 <pre class="mermaid">flowchart LR
@@ -596,8 +684,8 @@
 
 <p>失败与降级：LLM 切分抛异常时记录日志并自动降级为规则均分。LLM 模式下 <code>_should_use_llm_split</code> 末尾为无条件 <code>return True</code>，复杂镜头与对话关键词分支实际是死代码；规则均分最多 3 段，超长镜头仍可能超过 5.5 秒。</p>
 
-<h2 id="sec-9">指令转换 CONVERT_PROMPT</h2>
-<p>把片段序列转换为面向视频模型与音频模型的提示词包，是全链路唯一直接面向生成模型的一层。</p>
+<h2 id="sec-10">提示词转换 CONVERT_PROMPT</h2>
+<p>把片段序列转换为面向视频模型与音频模型的提示词包，并召回可复用的模板；模型适配与路由交给下一节点，转换阶段不改写目标模型。</p>
 
 <pre class="mermaid">flowchart LR
     subgraph Input
@@ -605,17 +693,18 @@
     end
 
     subgraph Process[转换流程]
-        B[组装上下文&lt;br/&gt;全局元数据/场景/角色JSON/音频语境] --&gt; C[注入修复与历史提示&lt;br/&gt;repair_hint / history_hint]
-        C --&gt; D[LLM 单次调用&lt;br/&gt;视频 + 音频同批生成]
-        D --&gt; E[双语拼装&lt;br/&gt;英文提示词 + 原语言提示词]
-        E --&gt; F[构造 AIVideoPrompt&lt;br/&gt;挂载关联音频对象]
+        B[组装上下文&lt;br/&gt;全局元数据/场景/角色JSON/音频语境] --&gt; C[模板召回&lt;br/&gt;RAG 相似度过滤]
+        C --&gt; D[注入修复与历史提示&lt;br/&gt;repair_hint / history_hint]
+        D --&gt; E[LLM 单次调用&lt;br/&gt;视频 + 音频同批生成]
+        E --&gt; F[双语拼装&lt;br/&gt;英文提示词 + 原语言提示词]
+        F --&gt; G[构造 AIVideoPrompt&lt;br/&gt;挂载关联音频对象]
     end
 
     subgraph Output
-        G[AI视频指令 JSON]
+        H[AI视频指令 JSON]
     end
 
-    A --&gt; B --&gt; G
+    A --&gt; B --&gt; H
 </pre>
 
 <table>
@@ -637,34 +726,127 @@
 <li class="lvl-2"><p>双语提示词拼为单字段：<code>combined_prompt = f"{english_prompt}\n\n{original_prompt}"</code>，英文在前、原语言在后。</p></li>
 <li class="lvl-2"><p>负面提示词取 LLM 返回的 <code>negative_prompt</code>，缺失时用默认值 <code>blurry, distorted, low quality, cartoonish, bad anatomy</code>。</p></li>
 <li class="lvl-2"><p>音频与视频同批生成：台词 / 旁白默认 <code>XTTSv2</code>，背景声可用 <code>AudioLDM_3</code>，并以 <code>previous_audio_id</code> 串联音色。</p></li>
-<li class="lvl-2"><p>模型适配不加载模板，而是把 <code>video_model</code> 注入提示词模板，再写入每个 <code>AIVideoPrompt.model</code>；白名单由质量审查把关。</p></li>
+<li class="lvl-2"><p>模板召回按相似度阈值、Top-K 与最多注入条数过滤，跨剧本模板只读复用；命中模板作为参考，不直接复制。</p></li>
 <li class="lvl-2"><p>片段时长沿用分段结果，转换阶段不重新估算，也不改变片段数量。</p></li>
 </ul>
 
-<p>失败与降级：转换阶段不做格式强校验，合规性交给下游审查；<code>AIAudioPrompt</code> 字段名为 <code>voice_character</code>，但 <code>get_model_specific_config()</code> 引用了不存在的 <code>voice_id</code>，调用该方法会抛 <code>AttributeError</code>。</p>
+<p>失败与降级：转换阶段不做格式强校验，合规性交给下游审计；模板召回失败时退化为无模板生成，不阻断任务。<code>AIAudioPrompt</code> 字段名为 <code>voice_character</code>，但 <code>get_model_specific_config()</code> 引用了不存在的 <code>voice_id</code>，调用该方法会抛 <code>AttributeError</code>。</p>
 
-<h2 id="sec-10">质量审查 AUDIT_QUALITY</h2>
-<p>对提示词包做最后一道程序化检查：五项硬规则、按严重度加权扣分，输出放行、修复或人工三种走向。规则版实现为 <code>RuleQualityAuditor</code>。</p>
+<h2 id="sec-11">模型路由 ROUTE_MODEL</h2>
+<p>在提示词生成之后独立执行“目标模型适配 → 规则路由 → 路由计划落盘”，使提示词重建与路由决策解耦。路由失败不阻断主流程，只记录告警。能力表、特征抽取与兜底策略见<a href="model-routing.html">模型路由</a>；首帧构建与场景阻断见<a href="first-frame.html">首帧与图生视频</a>。</p>
+
+<pre class="mermaid">flowchart LR
+    subgraph Input
+        A[AI视频指令]
+        B[一致性契约 + 资产计划/清单]
+    end
+
+    subgraph Process[路由流程]
+        C[能力适配&lt;br/&gt;时长/镜头/模式] --&gt; D[图生视频优先&lt;br/&gt;挂载资产引用与首帧指令]
+        D --&gt; E[规则匹配&lt;br/&gt;priority 从高到低]
+        E --&gt; F[回填资产 usage&lt;br/&gt;重写 asset_plan.json]
+        F --&gt; G[Gate 1 检查&lt;br/&gt;阻断不可用片段]
+    end
+
+    subgraph Output
+        H[RoutePlan + AdaptedPromptPackage]
+    end
+
+    A --&gt; C
+    B --&gt; D
+    G --&gt; H
+</pre>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">优先级</th>
+<th style="text-align:left">规则</th>
+<th style="text-align:left">条件</th>
+<th style="text-align:left">目标模型</th>
+<th style="text-align:left">模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">100</td>
+<td style="text-align:left"><code>critical_text</code></td>
+<td style="text-align:left"><code>has_critical_text</code></td>
+<td style="text-align:left"><code>kling_3</code></td>
+<td style="text-align:left"><code>image_to_video</code></td>
+</tr>
+<tr>
+<td style="text-align:left">90</td>
+<td style="text-align:left"><code>high_consistency</code></td>
+<td style="text-align:left"><code>character_consistency_need=high</code></td>
+<td style="text-align:left"><code>kling_3</code></td>
+<td style="text-align:left"><code>image_to_video</code></td>
+</tr>
+<tr>
+<td style="text-align:left">80</td>
+<td style="text-align:left"><code>complex_motion</code></td>
+<td style="text-align:left"><code>motion_complexity=high</code></td>
+<td style="text-align:left"><code>sora_2</code></td>
+<td style="text-align:left"><code>text_to_video</code></td>
+</tr>
+<tr>
+<td style="text-align:left">70</td>
+<td style="text-align:left"><code>anime_style</code></td>
+<td style="text-align:left"><code>style_bias=anime</code></td>
+<td style="text-align:left"><code>kling_3</code></td>
+<td style="text-align:left"><code>text_to_video</code></td>
+</tr>
+<tr>
+<td style="text-align:left">60</td>
+<td style="text-align:left"><code>cinematic_long_take</code></td>
+<td style="text-align:left"><code>style_bias=cinematic</code> 且 <code>min_duration=8.0</code></td>
+<td style="text-align:left"><code>runway_gen4</code></td>
+<td style="text-align:left"><code>text_to_video</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>所有规则都不命中时使用 <code>routing.default_model</code>（默认 <code>kling_3</code>）；未注册的模型会被跳过。目标模型超出片段时长时，按“时长上限 ≥ 片段时长且一致性最高”回退。能力注册表当前收录 <code>runway_gen4</code>、<code>kling_3</code>、<code>luma_dream</code>、<code>sora_2</code>、<code>pika_2</code>，记录最大时长、是否支持图生视频、镜头控制、一致性与风格倾向。</p>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">输入</th>
+<th style="text-align:left">输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>AIVideoInstructions</code>、<code>GlobalConsistencyContract</code>、<code>asset_plan</code>、<code>asset_manifest</code></td>
+<td style="text-align:left"><code>RoutePlan</code>：<code>source_model</code>、<code>decisions[]</code>、<code>adapted_packages[]</code>、<code>warnings</code>、<code>blocked_fragments</code></td>
+</tr>
+</tbody>
+</table>
+
+<ul class="lvl-0">
+<li class="lvl-2"><p>图生视频优先：能从资产清单解析到首帧引用的片段，先挂载 <code>asset_ref</code>、<code>image_prompt</code> 与首帧指令，再由规则覆盖目标模型与模式。</p></li>
+<li class="lvl-2"><p>适配包保留原提示词、负向词、时长、风格与镜头控制，并追加目标模型参数；<code>OVERRIDABLE_FIELDS</code> 允许覆盖提示词与参数，但资产身份字段不可覆盖。</p></li>
+<li class="lvl-2"><p>路由后回填资产 <code>usage</code>，重写 <code>asset_plan.json</code> 与 <code>prompt_converter_result.json</code>，保证两份计划的使用范围一致。</p></li>
+<li class="lvl-2"><p>Gate 1 检查把结构/逻辑问题写入 <code>plan.warnings</code>；场景锚定无法唯一匹配、状态为 <code>needs_manual_fix</code> 的片段进入 <code>blocked_fragments</code>，不进入下游渲染队列。</p></li>
+<li class="lvl-2"><p>服装关键信息不足的角色资产，引用片段自动追加剪影/背影降级约束，并记录 <code>degraded_assets</code>。</p></li>
+</ul>
+
+<p>失败与降级：路由异常时 <code>route_plan</code> 置空，决策层记录告警并继续审计；能力注册表为静态数据，新模型需要扩展注册表后重新部署。</p>
+
+<h2 id="sec-12">质量审计 AUDIT_QUALITY</h2>
+<p>对提示词包做最后一道程序化检查：11 项硬规则、按严重度加权扣分，再合并 LLM 深度审查，输出放行、修复或人工三种走向。规则版实现为 <code>RuleQualityAuditor</code>。</p>
 
 <pre class="mermaid">flowchart TD
-    A[AI指令序列] --&gt; B[逐项执行五项检查]
-    B --&gt; C[片段时长限制检查]
-    B --&gt; D[提示词内容检查]
-    B --&gt; E[提示词长度检查]
-    B --&gt; F[片段数量检查]
-    B --&gt; G[模型支持检查]
-    C --&gt; H[违规项记入 violations&lt;br/&gt;按严重度加权扣分]
-    D --&gt; H
-    E --&gt; H
-    F --&gt; H
-    G --&gt; H
-    H --&gt; I{score 分档}
-    I --&gt;|≥90| J[PASSED 放行]
-    I --&gt;|≥75| K[MINOR_ISSUES]
-    I --&gt;|≥60| L[MODERATE_ISSUES 修复]
-    I --&gt;|≥40| M[MAJOR_ISSUES 修复]
-    I --&gt;|≥20| N[CRITICAL_ISSUES 重试/人工]
-    I --&gt;|低于20| O[FAILED 重试/人工]
+    A[AI指令序列 + 路由结果] --&gt; B[逐项执行 11 项检查]
+    B --&gt; C[违规项记入 violations&lt;br/&gt;按严重度加权扣分]
+    C --&gt; D[合并 LLM 审查报告]
+    D --&gt; E{score 分档}
+    E --&gt;|≥90| F[PASSED 放行]
+    E --&gt;|≥75| G[MINOR_ISSUES]
+    E --&gt;|≥60| H[MODERATE_ISSUES 修复]
+    E --&gt;|≥40| I[MAJOR_ISSUES 修复]
+    E --&gt;|≥20| J[CRITICAL_ISSUES 重试/人工]
+    E --&gt;|低于20| K[FAILED 重试/人工]
 </pre>
 
 <table>
@@ -676,7 +858,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align:left"><code>AIVideoInstructions</code></td>
+<td style="text-align:left"><code>AIVideoInstructions</code>、<code>route_plan</code>、资产计划</td>
 <td style="text-align:left"><code>QualityAuditReport</code>：<code>status</code>、<code>checks[]</code>、<code>violations[]</code>、<code>stats</code>、<code>score</code>、<code>suggestions</code></td>
 </tr>
 </tbody>
@@ -718,20 +900,50 @@
 </tr>
 <tr>
 <td style="text-align:left">模型支持</td>
-<td style="text-align:left">模型不在 runway_gen2 / sora / pika 白名单</td>
+<td style="text-align:left">模型名无法匹配支持列表</td>
+<td style="text-align:left">WARNING（建议含 runway_gen2 / sora / pika）</td>
+</tr>
+<tr>
+<td style="text-align:left">外观锚点污染</td>
+<td style="text-align:left">提示词写入资产锚点外的外观描述，或锚点缺失</td>
+<td style="text-align:left">MAJOR（带 <code>asset_id</code>）</td>
+</tr>
+<tr>
+<td style="text-align:left">契约违规</td>
+<td style="text-align:left">角色、场景或道具违反一致性契约</td>
+<td style="text-align:left">MAJOR</td>
+</tr>
+<tr>
+<td style="text-align:left">景别一致性</td>
+<td style="text-align:left">提示词景别与镜头 <code>shot_type</code> 不符</td>
 <td style="text-align:left">WARNING</td>
+</tr>
+<tr>
+<td style="text-align:left">镜头运动一致性</td>
+<td style="text-align:left">提示词镜头运动与控制字段不符</td>
+<td style="text-align:left">WARNING</td>
+</tr>
+<tr>
+<td style="text-align:left">风格光照冲突</td>
+<td style="text-align:left">风格与光照描述互相冲突</td>
+<td style="text-align:left">WARNING</td>
+</tr>
+<tr>
+<td style="text-align:left">资产使用</td>
+<td style="text-align:left">片段使用了计划外资产，或必需资产缺失</td>
+<td style="text-align:left">MAJOR（带 <code>fragment_id</code> / <code>asset_id</code>）</td>
 </tr>
 </tbody>
 </table>
 
-<p>扣分从 100 起算：warning 5、moderate 10、major 25、critical 40、error 60，下限 0。状态分档：≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，否则 FAILED。PASSED 放行；MINOR 默认放行，违规超过 3 个转修复；MODERATE / MAJOR 回 CONVERT_PROMPT；CRITICAL 重试或转人工。FAILED 但分数 ≥80 仍按 VALID 放行。</p>
+<p>扣分从 100 起算：warning 5、moderate 10、major 25、critical 40、error 60，下限 0。状态分档：≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，否则 FAILED。PASSED 放行；MINOR 默认放行，违规超过 3 个转修复；MODERATE / MAJOR 回 CONVERT_PROMPT；CRITICAL 重试或转人工。FAILED 但分数 ≥80 仍按 VALID 放行；存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>。</p>
 
-<p>报告中的违规项按 <code>PipelineNode</code> 转成修复参数，写入 <code>state.domain.repair_params</code>；下一轮 CONVERT_PROMPT 只读取属于自己的键，应用成功后可调用 <code>clear_repair_params()</code> 清理。</p>
+<p>报告中的违规项按 <code>PipelineNode</code> 转成修复参数，写入 <code>state.domain.repair_params</code>；下一轮 CONVERT_PROMPT 只读取属于自己的键，应用成功后可调用 <code>clear_repair_params()</code> 清理。LLM 深度审查失败时不阻断规则审查结论。</p>
 
-<p>失败与降级：5.5 秒同时作为分段触发阈值与审查红线，分段漏切会在此处直接报 ERROR；五项检查只覆盖可程序化判定的是非问题，合规但平庸的提示词仍可通过。规则版审查不调用模型，LLM 不可用时仍能给出时长与空值结论。</p>
+<p>失败与降级：5.5 秒同时作为分段触发阈值与审查红线，分段漏切会在此处直接报 ERROR；规则检查只覆盖可程序化判定的是非问题，合规但平庸的提示词仍可通过。规则版审查不调用模型，LLM 不可用时仍能给出时长、空值与结构结论。</p>
 
-<h2 id="sec-11">连续性守护 CONTINUITY_CHECK</h2>
-<p>跨阶段检查角色、场景、动作、风格、时间、道具六类问题。实现为关键词与数值规则（<code>ContinuityGuardianChecker</code>），不是 LLM 语义审查。</p>
+<h2 id="sec-13">连续性守护 CONTINUITY_CHECK</h2>
+<p>跨阶段检查角色、场景、动作、风格、时间、道具六类问题。实现为关键词与数值规则（<code>ContinuityGuardianChecker</code>），不是 LLM 语义审查；检查结果会驱动上游修复。</p>
 
 <pre class="mermaid">flowchart LR
     subgraph Input
@@ -751,7 +963,7 @@
     end
 
     subgraph Output
-        J[问题列表&lt;br/&gt;含严重度+可修复标记]
+        J[问题列表&lt;br/&gt;含严重度+来源阶段+可修复标记]
     end
 
     A --&gt; B --&gt; H --&gt; J
@@ -816,11 +1028,13 @@
 
 <p>通过判定：任一 CRITICAL，或 MAJOR 超过 3 个，即 <code>passed=False</code>；其余级别不改变结论。问题签名由“类型 + 片段 + 场景 + 严重度 + 位置 + 描述前 100 字”组成，同一位置同类问题只报一次；描述超过 500 字符截断。</p>
 
-<p>失败与降级：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；上下文缺失时对应检查直接跳过。更关键的是修复回流未接通：决策函数读取顶层 <code>state.continuity_issues</code>，实际字段在 <code>state.domain.continuity_issues</code>，导致恒为 SUCCESS；返回的 NEEDS_RETRY 也不在条件边键集合中。因此问题会被记录，但不会自动回退上游。</p>
+<p>修复回流：节点把可修复问题写入 <code>domain.repair_params</code>，并设置 <code>needs_continuity_repair</code> 与来源阶段；决策函数据此返回阶段节点名，路由回解析、拆分、切割或转换。修复最多 3 轮（<code>max_continuity_retries</code>），轮次耗尽或存在未定位来源的问题时转人工。</p>
+
+<p>失败与降级：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；上下文缺失时对应检查直接跳过。检查只做词表与数值判断，不理解语义，因此适合发现显性漂移，无法判断隐喻或叙事层面的连贯性。</p>
 
 <p>限制按节点归集，跨节点的路由与计数问题见<a href="architecture.html">技术架构</a>的“当前限制”。</p>
 
-<h2 id="sec-12">节点级限制</h2>
+<h2 id="sec-14">节点级限制</h2>
 <table>
 <thead>
 <tr>
@@ -836,6 +1050,11 @@
 <td style="text-align:left">顺序正确性依赖 LLM</td>
 </tr>
 <tr>
+<td style="text-align:left">GENERATE_ASSETS</td>
+<td style="text-align:left">默认只声明计划，真实出图默认关闭</td>
+<td style="text-align:left">资产 <code>asset_ref</code> 需下游回填</td>
+</tr>
+<tr>
 <td style="text-align:left">SEGMENT_SHOT</td>
 <td style="text-align:left">时长估算基于关键词与固定系数</td>
 <td style="text-align:left">语义微妙的描述误差较大</td>
@@ -846,9 +1065,19 @@
 <td style="text-align:left">超长镜头可能仍超 5.5 秒</td>
 </tr>
 <tr>
+<td style="text-align:left">CONVERT_PROMPT</td>
+<td style="text-align:left">音频模型的 <code>voice_id</code> 字段引用不存在</td>
+<td style="text-align:left">调用音频模型配置方法会抛异常</td>
+</tr>
+<tr>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left">能力注册表为静态数据；路由失败不阻断</td>
+<td style="text-align:left">新模型需改代码；失败时无路由结果</td>
+</tr>
+<tr>
 <td style="text-align:left">CONTINUITY_CHECK</td>
-<td style="text-align:left">修复回流未接通，NEEDS_RETRY 未映射</td>
-<td style="text-align:left">问题只记录、不自动修复</td>
+<td style="text-align:left">词表与数值规则，语义判断有限</td>
+<td style="text-align:left">隐性漂移可能漏检</td>
 </tr>
 </tbody>
 </table>
@@ -859,19 +1088,19 @@
     <a class="pager-link" href="architecture.html">
       <span class="pager-link__label">← 上一篇 · 核心设计</span>
       <strong>技术架构</strong>
-      <small>十个节点、决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。</small>
+      <small>十二个注册节点、八态决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。</small>
     </a>
     <a class="pager-link pager-link--next" href="consistency.html">
       <span class="pager-link__label">下一篇 → · 核心设计</span>
       <strong>一致性策略</strong>
-      <small>三层记忆、快照与连续性检查，如何压制跨片段的角色与场景漂移。</small>
+      <small>一致性契约、资产锚点与修复回路，如何压制跨片段的角色、场景与风格漂移。</small>
     </a>
   </nav>
       </article>
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">节点总览</a></li><li class="toc-depth-2"><a href="#sec-2">剧本解析 PARSE_SCRIPT</a></li><li class="toc-depth-3"><a href="#sec-3">格式识别</a></li><li class="toc-depth-3"><a href="#sec-4">质量评估与校验</a></li><li class="toc-depth-2"><a href="#sec-5">镜头拆分 SEGMENT_SHOT</a></li><li class="toc-depth-3"><a href="#sec-6">规则模式</a></li><li class="toc-depth-3"><a href="#sec-7">时长估算</a></li><li class="toc-depth-2"><a href="#sec-8">视频分段 SPLIT_VIDEO</a></li><li class="toc-depth-2"><a href="#sec-9">指令转换 CONVERT_PROMPT</a></li><li class="toc-depth-2"><a href="#sec-10">质量审查 AUDIT_QUALITY</a></li><li class="toc-depth-2"><a href="#sec-11">连续性守护 CONTINUITY_CHECK</a></li><li class="toc-depth-2"><a href="#sec-12">节点级限制</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">节点总览</a></li><li class="toc-depth-2"><a href="#sec-2">剧本解析 PARSE_SCRIPT</a></li><li class="toc-depth-3"><a href="#sec-3">格式识别</a></li><li class="toc-depth-3"><a href="#sec-4">质量评估与校验</a></li><li class="toc-depth-2"><a href="#sec-5">资产计划 GENERATE_ASSETS</a></li><li class="toc-depth-2"><a href="#sec-6">镜头拆分 SEGMENT_SHOT</a></li><li class="toc-depth-3"><a href="#sec-7">规则模式</a></li><li class="toc-depth-3"><a href="#sec-8">时长估算</a></li><li class="toc-depth-2"><a href="#sec-9">片段切割 SPLIT_VIDEO</a></li><li class="toc-depth-2"><a href="#sec-10">提示词转换 CONVERT_PROMPT</a></li><li class="toc-depth-2"><a href="#sec-11">模型路由 ROUTE_MODEL</a></li><li class="toc-depth-2"><a href="#sec-12">质量审计 AUDIT_QUALITY</a></li><li class="toc-depth-2"><a href="#sec-13">连续性守护 CONTINUITY_CHECK</a></li><li class="toc-depth-2"><a href="#sec-14">节点级限制</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
           <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/nodes.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
@@ -882,7 +1111,7 @@
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

@@ -1,37 +1,40 @@
-<p>PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo 等视频模型逐段生成的分镜提示词包。</p>
+<p>PenShot（<code>story-shot-agent</code>）是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo、可灵等视频模型逐段生成的分镜提示词包，并附带资产计划与模型路由结果。当前版本 <strong>v0.4.4</strong>。</p>
 
 <h2>功能定位</h2>
 <p>主流视频模型单次通常只能生成 5–10 秒画面，更长的成片需要先拆分剧本、逐段生成再拼接。PenShot 处理其中最容易出错的一步：把剧本拆成符合时长限制的片段，并让片段之间在角色、场景、道具和动作上保持衔接。</p>
-<p>输入可以是自然语言剧本、标准剧本或已有分镜文本；输出是片段序列，以及每个片段的正向提示词、负向提示词、目标模型、时长与音频提示词。视频生成、拼接与口型对齐由下游工具完成。典型用途包括短视频批量分镜、影视预可视化与游戏过场动画原型。</p>
-<p>提示词面向的模型由枚举定义：<code>VideoModelType</code> 覆盖 Runway Gen-2、Sora、Veo、Pika、Midjourney、Stable、DALL·E 等，共 8 种；<code>AudioModelType</code> 覆盖 XTTSv2、AudioLDM_3、Bark、ElevenLabs、Azure TTS、OpenAI TTS，共 6 种。</p>
+<p>输入可以是自然语言剧本、标准剧本或已有分镜文本；输出是片段序列、每个片段的中英双语正向提示词与负向提示词、按能力匹配的模型路由结果，以及角色三视图 / 道具静帧 / 场景锚点的资产计划。视频生成、拼接与口型对齐由下游工具完成。典型用途包括短视频批量分镜、影视预可视化与游戏过场动画原型。</p>
+<p>模型适配分两层：<code>VideoModelType</code> 枚举覆盖 Runway Gen-2、Sora、Veo、Pika、Midjourney、Stable、DALL·E 等 8 种基础模型；v0.4.3 起的模型能力注册表进一步收录 <code>runway_gen4</code>、<code>kling_3</code>、<code>luma_dream</code>、<code>sora_2</code>、<code>pika_2</code>，记录时长上限、是否支持图生视频、镜头控制、一致性与风格倾向。<code>AudioModelType</code> 覆盖 XTTSv2、AudioLDM_3、Bark、ElevenLabs、Azure TTS、OpenAI TTS，共 6 种。</p>
 
-<h2>六阶段工作流</h2>
+<h2>八阶段工作流</h2>
 <pre class="mermaid">flowchart LR
     subgraph Input[&quot;输入层&quot;]
         A[原始剧本&lt;br/&gt;自然语言 / 标准剧本]
     end
-    
-    subgraph Core[&quot;核心处理链（六个节点）&quot;]
+
+    subgraph Core[&quot;八个业务节点&quot;]
         B[剧本解析&lt;br/&gt;parse_script]
-        C[分镜拆分&lt;br/&gt;segment_shot]
-        D[片段分割&lt;br/&gt;split_video]
-        E[提示词转换&lt;br/&gt;convert_prompt]
+        C[资产计划&lt;br/&gt;generate_assets]
+        D[镜头拆分&lt;br/&gt;segment_shot]
+        E[片段切割&lt;br/&gt;split_video]
+        F[提示词转换&lt;br/&gt;convert_prompt]
+        G[模型路由&lt;br/&gt;route_model]
+        H[质量审计&lt;br/&gt;audit_quality]
+        I[连续性守护&lt;br/&gt;continuity_check]
     end
-    
-    subgraph Control[&quot;质量与控制层&quot;]
-        F[质量审查&lt;br/&gt;audit_quality]
-        G[连续性检查&lt;br/&gt;continuity_check]
-    end
-    
+
     subgraph Output[&quot;输出层&quot;]
-        H[分镜序列 + 双语提示词&lt;br/&gt;+ 音频提示词]
+        J[分镜序列 + 双语提示词&lt;br/&gt;+ 资产计划 + 路由模型]
     end
-    
-    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H
-    F --&gt;|发现问题| I[生成修复参数&lt;br/&gt;打回上游重跑]
-    F --&gt;|严重问题| J[人工干预 / 错误处理]
+
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H --&gt; I --&gt; J
+    H --&gt;|发现问题| F
+    I --&gt;|按问题来源| D
+    I --&gt;|按问题来源| E
+    I --&gt;|按问题来源| F
+    H -.-&gt;|严重问题| K[人工干预 / 错误处理]
+    I -.-&gt;|严重问题| K
 </pre>
-<p>六个核心节点对应 <code>PipelineNode</code> 枚举中的六个值；输出、修复与人工干预属于辅助节点。质量审查发现问题时生成修复参数并打回上游，严重问题转入人工干预。连续性检查节点受循环上限约束，最多循环 5 次、重试 2 次，避免问题片段无限返工。</p>
+<p>八个业务节点对应 <code>PipelineNode</code> 中的 <code>PARSE_SCRIPT</code>、<code>GENERATE_ASSETS</code>、<code>SEGMENT_SHOT</code>、<code>SPLIT_VIDEO</code>、<code>CONVERT_PROMPT</code>、<code>ROUTE_MODEL</code>、<code>AUDIT_QUALITY</code>、<code>CONTINUITY_CHECK</code>。图中之外还有 <code>HUMAN_INTERVENTION</code>、<code>ERROR_HANDLER</code>、<code>LOOP_CHECK</code>、<code>GENERATE_OUTPUT</code> 四个控制节点；LangGraph 共注册 12 个节点（<code>END</code> 不是注册节点）。审计发现可修复问题时生成修复参数打回转换节点，连续性守护按问题来源动态路由回镜头拆分、片段切割或提示词转换。</p>
 <table>
 <thead>
 <tr>
@@ -46,7 +49,13 @@
 <td style="text-align:left">剧本解析</td>
 <td style="text-align:left"><code>parse_script</code></td>
 <td style="text-align:left">原始文本 → 结构化剧本</td>
-<td style="text-align:left">提取场景、角色、对话、动作，给出置信度</td>
+<td style="text-align:left">提取场景、角色、对话、动作，给出置信度与风格溯源</td>
+</tr>
+<tr>
+<td style="text-align:left">资产计划</td>
+<td style="text-align:left"><code>generate_assets</code></td>
+<td style="text-align:left">契约 → 资产计划 / 回填清单</td>
+<td style="text-align:left">生成角色三视图、道具静帧、场景锚点规格；可选真实出图</td>
 </tr>
 <tr>
 <td style="text-align:left">镜头拆分</td>
@@ -55,7 +64,7 @@
 <td style="text-align:left">按内容划分镜头，标注景别与时长</td>
 </tr>
 <tr>
-<td style="text-align:left">片段分割</td>
+<td style="text-align:left">片段切割</td>
 <td style="text-align:left"><code>split_video</code></td>
 <td style="text-align:left">镜头序列 → 视频片段</td>
 <td style="text-align:left">规则或 LLM 切分，继承连续性约束</td>
@@ -67,13 +76,19 @@
 <td style="text-align:left">逐片段生成双语正向词、负向词与音频提示词</td>
 </tr>
 <tr>
-<td style="text-align:left">质量审查</td>
-<td style="text-align:left"><code>audit_quality</code></td>
-<td style="text-align:left">提示词 → 审查报告</td>
-<td style="text-align:left">规则检查与 LLM 连贯性检查</td>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left"><code>route_model</code></td>
+<td style="text-align:left">提示词 → 路由计划 / 适配包</td>
+<td style="text-align:left">按能力规则选模型，处理图生视频首帧与镜头控制</td>
 </tr>
 <tr>
-<td style="text-align:left">连续性检查</td>
+<td style="text-align:left">质量审计</td>
+<td style="text-align:left"><code>audit_quality</code></td>
+<td style="text-align:left">提示词与路由 → 审查报告</td>
+<td style="text-align:left">11 项规则检查，输出违规条目与修复参数</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性守护</td>
 <td style="text-align:left"><code>continuity_check</code></td>
 <td style="text-align:left">全阶段产物 → 校验结论</td>
 <td style="text-align:left">视觉、角色、场景、动作四类校验，按来源路由修复</td>
@@ -92,7 +107,15 @@
 <tbody>
 <tr>
 <td style="text-align:left">剧本解析</td>
-<td style="text-align:left">识别场景、角色、对话与动作，输出结构化元素及解析置信度</td>
+<td style="text-align:left">识别场景、角色、对话与动作，输出结构化元素、解析置信度与全局风格锚点</td>
+</tr>
+<tr>
+<td style="text-align:left">资产计划</td>
+<td style="text-align:left">产出 <code>AssetPlanDocument</code>：角色三视图、道具静帧、场景锚点的提示词、尺寸、视角与使用范围；默认只声明计划，不调用外部服务</td>
+</tr>
+<tr>
+<td style="text-align:left">资产回填</td>
+<td style="text-align:left">接受 <code>AssetManifest</code>（<code>bindings</code> / <code>asset_id_map</code>），把声明式 <code>asset_id</code> 绑定到下游真实资产引用</td>
 </tr>
 <tr>
 <td style="text-align:left">镜头拆分</td>
@@ -104,32 +127,37 @@
 </tr>
 <tr>
 <td style="text-align:left">提示词工程</td>
-<td style="text-align:left">逐片段生成中英双语正向词、负向词与音频提示词，措辞跨片段复用</td>
+<td style="text-align:left">逐片段生成中英双语正向词、负向词与音频提示词，措辞跨片段复用，支持 RAG 模板召回</td>
 </tr>
 <tr>
-<td style="text-align:left">质量审查</td>
-<td style="text-align:left">5 项规则检查加 1 项 LLM 连贯性检查，输出违规条目与修复建议</td>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left">静态能力注册表 + yaml 规则（默认 5 条），按文本复杂度、一致性要求、镜头运动与风格选模型，输出 <code>RoutePlan</code> 与 <code>AdaptedPromptPackage</code></td>
+</tr>
+<tr>
+<td style="text-align:left">质量审计</td>
+<td style="text-align:left">11 项规则检查：片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突、资产使用</td>
 </tr>
 <tr>
 <td style="text-align:left">连续性守护</td>
-<td style="text-align:left">按视觉、角色、场景、动作四类校验，问题可路由回对应上游阶段</td>
+<td style="text-align:left">一致性契约、资产锚点与修复回路：问题按来源路由回对应阶段，最多 3 轮修复</td>
 </tr>
 <tr>
 <td style="text-align:left">工程接入</td>
-<td style="text-align:left">同步、异步与批量调用，任务池、检查点、三层记忆与 MCP Server</td>
+<td style="text-align:left">13 个 SDK 方法、17 个 REST 端点、7 个 MCP 工具，任务池、检查点、三层记忆</td>
 </tr>
 </tbody>
 </table>
 
 <h2>输出形态</h2>
-<p>结果是单个 JSON 包，顶层为 <code>task_id</code>、<code>success</code> 与 <code>data.instructions</code>；<code>instructions</code> 下分 <code>metadata</code>、<code>project_info</code>、<code>fragments</code>、<code>global_settings</code> 与 <code>execution_suggestions</code>。每个片段自带模型与风格字段，可独立投喂下游生成服务。</p>
+<p>任务结果顶层为 <code>task_id</code>、<code>status</code>、<code>success</code> 与 <code>data</code>；<code>data</code> 下除 <code>instructions</code> 外，还包含 <code>asset_plan</code>、<code>asset_manifest</code>、<code>asset_generation</code>、<code>audit_report</code>、<code>consistency_contract</code>、<code>continuity_issues</code>、<code>warnings</code> 与 <code>metadata.quality_gate</code>。每个片段自带模型与风格字段，可独立投喂下游生成服务。</p>
 <pre class="hljs"><code>{
   "task_id": "HL202603061716542571",
+  "status": "completed",
   "success": true,
   "data": {
     "instructions": {
       "metadata": {
-        "video_model": "runway_gen2",
+        "video_model": "kling_3",
         "audio_model": "XTTSv2",
         "total_prompts": 13
       },
@@ -151,11 +179,21 @@
           }
         }
       ],
+      "route_plan": {
+        "schema_version": "0.4.4",
+        "source_model": "runway_gen2",
+        "decisions": [
+          { "fragment_id": "frag_001", "target_model": "kling_3", "mode": "image_to_video" }
+        ]
+      },
       "global_settings": { "style_consistency": true }
-    }
+    },
+    "asset_plan": { "schema_version": "0.4.4", "assets": [] },
+    "asset_manifest": { "schema_version": "0.4.4", "bindings": [] },
+    "metadata": { "quality_gate": "pass" }
   }
 }</code></pre>
-<p><code>project_info</code> 汇总片段数与总时长；<code>execution_suggestions</code> 是通用执行建议文本，不是强制参数。<code>prompt</code> 为英文描述加中文对照；<code>negative_prompt</code> 排除卡通、畸变手部、水印等常见瑕疵；<code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，并以 <code>previous_audio_id</code> 串联上下文。样例落盘文件的字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>，写解析代码时以模型定义为准。</p>
+<p><code>project_info</code> 汇总片段数与总时长；<code>route_plan</code> 记录每个片段的目标模型、路由模式与被阻塞片段；<code>asset_plan</code> 是声明式生图指令，<code>asset_manifest</code> 是下游回填后的绑定结果。<code>prompt</code> 为英文描述加中文对照；<code>negative_prompt</code> 排除卡通、畸变手部、水印等常见瑕疵；<code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，并以 <code>previous_audio_id</code> 串联上下文。样例落盘文件的字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>，写解析代码时以模型定义为准。</p>
 
 <h2>接入方式</h2>
 <table>
@@ -170,12 +208,12 @@
 <tr>
 <td style="text-align:left">Python SDK</td>
 <td style="text-align:left"><code>create_penshot_agent()</code>、<code>PenshotFunction</code></td>
-<td style="text-align:left">同步、异步与批量调用；任务池默认并发 10、队列 1000</td>
+<td style="text-align:left">13 个方法，含 <code>asset_manifest</code> / <code>asset_manifests</code> 参数；任务池默认并发 10、队列 1000</td>
 </tr>
 <tr>
 <td style="text-align:left">REST</td>
 <td style="text-align:left"><code>/api/v1</code>，默认端口 8000</td>
-<td style="text-align:left">内置 FastAPI 服务，共 17 个端点，含提交、状态、结果与队列观测</td>
+<td style="text-align:left">内置 FastAPI 服务，17 个端点，含提交、状态、结果、资产回填与队列观测</td>
 </tr>
 <tr>
 <td style="text-align:left">Docker</td>
@@ -185,7 +223,7 @@
 <tr>
 <td style="text-align:left">MCP</td>
 <td style="text-align:left"><code>python -m penshot.mcp_server</code></td>
-<td style="text-align:left">7 个工具，默认 stdio 传输，可接入 Claude Desktop、Cursor 等客户端</td>
+<td style="text-align:left">7 个工具，默认 stdio 传输，<code>breakdown_script</code> 接受 <code>asset_manifest</code></td>
 </tr>
 <tr>
 <td style="text-align:left">CLI</td>
@@ -206,8 +244,8 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align:left">只产出提示词</td>
-<td style="text-align:left">不生成视频，拼接、转场与口型对齐需外部工具完成</td>
+<td style="text-align:left">只产出提示词与资产计划</td>
+<td style="text-align:left">默认不生成视频；资产出图为可选项（<code>image_generation.enabled</code> 默认关闭），拼接、转场与口型对齐需外部工具完成</td>
 </tr>
 <tr>
 <td style="text-align:left">分割策略</td>
@@ -219,7 +257,11 @@
 </tr>
 <tr>
 <td style="text-align:left">修复闭环</td>
-<td style="text-align:left">审计输出 <code>violations</code> 与 <code>recommended_actions</code>，存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；自动修复尚未完全闭环</td>
+<td style="text-align:left">审计与连续性检查均已接入动态修复路由，连续性修复最多 3 轮；超过轮次或存在阻断问题时转入人工干预</td>
+</tr>
+<tr>
+<td style="text-align:left">执行超时</td>
+<td style="text-align:left">工作流实际超时取 <code>InputState.timeout</code>，默认 600 秒；<code>config.workflow_timeout=1800</code> 仅在未传 timeout 时作为兜底</td>
 </tr>
 <tr>
 <td style="text-align:left">分割缓存</td>
@@ -236,9 +278,9 @@
 <h2>下一步</h2>
 <ul>
 <li><a href="quick-start.html">快速开始</a>：安装、配置并跑通第一个任务。</li>
-<li><a href="architecture.html">技术架构</a>：十个节点、决策路由与循环防护。</li>
-<li><a href="nodes.html">工作流节点</a>：六个智能体节点的输入、规则与降级。</li>
-<li><a href="consistency.html">一致性策略</a>：跨片段的角色与场景漂移如何压制。</li>
+<li><a href="architecture.html">技术架构</a>：十二个注册节点、八态决策路由与循环防护。</li>
+<li><a href="nodes.html">工作流节点</a>：八个业务节点的输入、规则与降级。</li>
+<li><a href="consistency.html">一致性策略</a>：一致性契约、资产锚点与修复回路。</li>
 <li><a href="checkpoint.html">检查点与恢复</a>：状态落盘与任务恢复的当前能力。</li>
 </ul>
 <p>源码与安装包：<a href="https://github.com/neopen/story-shot-agent">GitHub</a>、<a href="https://pypi.org/project/penshot/">PyPI</a>；更多工程测评见 <a href="https://pengline.cn">pengline.cn</a>。</p>

@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="开始使用">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Docker 部署 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Docker 部署","name":"Docker 部署","description":"用官方镜像或 Docker Compose 部署 PenShot REST 服务：镜像入口、环境变量、Redis、数据持久化、健康检查与多副本边界。","url":"https://shot.helpenx.com/docs/docker.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/docker.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot Docker, Docker 部署, docker compose, REST 服务, Redis, 容器镜像, 健康检查, 数据持久化","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Docker 部署","name":"Docker 部署","description":"用官方镜像或 Docker Compose 部署 PenShot REST 服务：镜像入口、环境变量、Redis、数据持久化、健康检查与多副本边界。","url":"https://shot.helpenx.com/docs/docker.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/docker.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot Docker, Docker 部署, docker compose, REST 服务, Redis, 容器镜像, 健康检查, 数据持久化","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -136,7 +140,7 @@
           <h1>Docker 部署</h1>
           <p class="doc-deck">官方镜像与 Compose 启动 REST 服务，含 Redis、持久化与健康检查。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 10 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/docker.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
@@ -223,7 +227,7 @@ docker compose logs -f story-shot-agent
     M[&quot;docker compose&quot;] -.-> A
     M -.-> R
 </pre>
-<p>单容器即单进程：任务池、并发计数与 <code>split_cache</code> 都在容器内。多副本部署时各副本独立，必须共享 Redis；需要断点恢复时，还要把检查点放到各副本都能访问的存储。</p>
+<p>单容器即单进程：任务池、并发计数与 <code>split_cache</code> 都在容器内。多副本部署时各副本独立，必须共享 Redis 才能共享任务状态与短期记忆。检查点当前只写不读（见<a href="checkpoint.html">检查点与恢复</a>），把检查点目录放到共享存储也不会带来跨副本续跑能力。</p>
 
 <h2 id="sec-6">数据与持久化</h2>
 <p>镜像工作目录为 <code>/app</code>。解析结果、模板缓存、SQLite 检查点与本地记忆默认写在 <code>/app/data</code>；Compose 没有挂载该目录，容器重建后这些数据会丢失，只有 Redis 卷保留。需要保留时挂载数据目录：</p>
@@ -236,7 +240,7 @@ docker run -d --name penshot \
   neotems/penshot:latest
 </code></pre>
 <p>容器以 uid 1000 运行，Linux 上需保证挂载目录可写：<code>sudo chown -R 1000:1000 data</code>。Docker Desktop 的绑定挂载通常无需额外处理。Redis 使用独立的 <code>redis_data</code> 卷，其余缓存不持久化，重建容器后重新生成。</p>
-<p>以上路径对应默认的 <code>development</code> 配置。若把 <code>PENSHOT_APP__ENVIRONMENT</code> 设为 <code>production</code>，向量库与缓存会改用 <code>/data/script-to-shot</code> 下的路径，需额外挂载该目录，否则数据落在容器可写层，重建后丢失。</p>
+<p>以上路径对应默认的 <code>development</code> 配置。环境配置文件由 <code>ENVIRONMENT</code> 变量选择（默认 <code>development</code>，可选 <code>production</code>），不是 <code>PENSHOT_APP__ENVIRONMENT</code>。切到 <code>production</code> 后，输入、输出、缓存与模型目录改用 <code>/data/script-to-shot</code>，日志写到 <code>/var/log/script-to-shot</code>，临时文件写到 <code>/tmp/script-to-shot</code>；嵌入索引、模板缓存、记忆与检查点仍取 <code>./data/...</code>，落在 <code>/app/data</code> 下。两类目录都要挂载，否则容器重建后数据丢失。</p>
 
 <h2 id="sec-7">启动与健康检查</h2>
 <pre class="mermaid">flowchart TD
@@ -264,7 +268,7 @@ docker run -d --name penshot \
   -v &quot;$PWD/data:/app/data&quot; \
   neotems/penshot:latest
 </code></pre>
-<p>Compose 场景执行 <code>git pull &amp;&amp; docker compose up -d --build</code>。横向扩容时，每个副本都要连接同一 Redis，并把 <code>checkpoint_mode</code> 指向共享 SQLite 路径或 PostgreSQL；否则副本之间互不可见，任务也无法恢复。容器内的任务队列不会跨副本调度。</p>
+<p>Compose 场景执行 <code>git pull &amp;&amp; docker compose up -d --build</code>。横向扩容时，每个副本都要连接同一 Redis，否则任务与短期记忆互不可见。检查点只有 <code>memory</code> 与 <code>sqlite</code> 两种模式，没有 PostgreSQL 后端；把 <code>checkpoint_mode</code> 指向共享 SQLite 路径也不能承担多副本并发写与断点续跑，因为执行时 <code>thread_id</code> 不稳定且没有读取入口。容器内的任务队列不会跨副本调度，任务失败后仍会从头执行。</p>
 
 <h2 id="sec-9">常见问题</h2>
 <table>
@@ -287,7 +291,7 @@ docker run -d --name penshot \
 <tr><th style="text-align:left">边界</th><th style="text-align:left">说明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align:left">单进程任务池</td><td style="text-align:left">多副本需共享 Redis 与检查点，<code>split_cache</code> 不跨副本</td></tr>
+<tr><td style="text-align:left">单进程任务池</td><td style="text-align:left">多副本需共享 Redis；检查点仅写不读，不能用于续跑，<code>split_cache</code> 不跨副本</td></tr>
 <tr><td style="text-align:left">无鉴权与 TLS</td><td style="text-align:left">只适合内网或网关之后，不要直接暴露公网</td></tr>
 <tr><td style="text-align:left">数据默认不持久化</td><td style="text-align:left">挂载 <code>/app/data</code>，否则容器重建即丢失</td></tr>
 <tr><td style="text-align:left">健康检查不校验模型</td><td style="text-align:left"><code>/health</code> 通过不代表 API Key 或嵌入模型可用</td></tr>
@@ -304,7 +308,7 @@ docker run -d --name penshot \
     <a class="pager-link pager-link--next" href="architecture.html">
       <span class="pager-link__label">下一篇 → · 核心设计</span>
       <strong>技术架构</strong>
-      <small>十个节点、决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。</small>
+      <small>十二个注册节点、八态决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。</small>
     </a>
   </nav>
       </article>
@@ -322,7 +326,7 @@ docker run -d --name penshot \
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

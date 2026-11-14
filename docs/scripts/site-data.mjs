@@ -3,9 +3,9 @@ export const site = {
   cnName: '剧本分镜智能体',
   tagline: '把剧本变成连贯的 AI 视频分镜',
   description:
-    'PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。',
+    'PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，附带资产计划与模型路由，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。',
   url: 'https://shot.helpenx.com',
-  version: 'v0.3.x',
+  version: 'v0.4.4',
   license: 'MIT',
   repo: 'https://github.com/neopen/story-shot-agent',
   repoEdit:
@@ -40,6 +40,13 @@ export const categories = [
     ],
   },
   {
+    id: 'advanced',
+    name: '进阶能力',
+    desc: '资产交接、模型路由与首帧图生视频',
+    icon: 'route',
+    docs: ['asset-handoff', 'model-routing', 'first-frame'],
+  },
+  {
     id: 'integration',
     name: '集成与接口',
     desc: 'Python SDK、REST 与 MCP 接入',
@@ -58,7 +65,7 @@ export const categories = [
 export const docs = {
   overview: {
     title: '项目概览',
-    deck: '一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本。',
+    deck: '一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本，并交付资产计划与模型路由。',
     featured: true,
   },
   'quick-start': {
@@ -76,16 +83,16 @@ export const docs = {
   },
   architecture: {
     title: '技术架构',
-    deck: '十个节点、决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。',
+    deck: '十二个注册节点、八态决策路由与三级循环防护：PenShot 如何把一条剧本变成可执行的分镜流水线。',
     featured: true,
   },
   nodes: {
     title: '工作流节点',
-    deck: '逐个拆解六大智能体节点：输入、规则、LLM 调用与失败降级。',
+    deck: '逐个拆解八个业务节点：输入、规则、LLM 调用、资产计划与模型路由。',
   },
   consistency: {
     title: '一致性策略',
-    deck: '三层记忆、快照与连续性检查，如何压制跨片段的角色与场景漂移。',
+    deck: '一致性契约、资产锚点与修复回路，如何压制跨片段的角色、场景与风格漂移。',
   },
   checkpoint: {
     title: '检查点与恢复',
@@ -93,11 +100,23 @@ export const docs = {
   },
   'core-implementation': {
     title: '核心实现',
-    deck: 'LLM 客户端、提示词管理、循环控制与任务调度的实现要点。',
+    deck: 'LLM 客户端、提示词管理、资产生成、模型适配、循环控制与任务调度的实现要点。',
+  },
+  'asset-handoff': {
+    title: '资产计划与交接',
+    deck: '声明式资产计划、片段引用与下游回填：角色、场景与道具在 PenShot 之外生成，再安全接回路由。',
+  },
+  'model-routing': {
+    title: '模型路由',
+    deck: '按片段特征在五个视频模型之间自动选型，输出可解释的 route_plan 与模型专属提示词。',
+  },
+  'first-frame': {
+    title: '首帧与图生视频',
+    deck: '关键文字与高一致性片段如何拆成“静态首帧 + 动作驱动”，含场景锚点的替换与阻断。',
   },
   integration: {
     title: '集成指南',
-    deck: 'Python SDK、REST API、MCP 与 LangGraph/A2A 的接入方式。',
+    deck: 'Python SDK、REST API、MCP 三条接入路径，以及仓库中的 LangGraph/A2A 示例。',
     featured: true,
   },
   mcp: {
@@ -110,7 +129,7 @@ export const docs = {
   },
   'rag-knowledge-base': {
     title: '知识库与检索',
-    deck: 'RAG 知识库、分块、向量检索与重排序的当前实现。',
+    deck: 'RAG 知识库、模板召回、分块、向量检索与跨剧本复用的当前实现。',
   },
 };
 

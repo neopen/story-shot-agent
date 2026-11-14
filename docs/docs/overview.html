@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>项目概览 · PenShot 文档</title>
-  <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。">
-  <meta name="keywords" content="PenShot,项目概览,剧本分镜智能体,LangGraph,多智能体,剧本转视频,AI 视频分镜,开源">
+  <meta name="description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段，并输出资产计划与模型路由结果。本页介绍工作流、核心能力、输出结构与当前版本边界。">
+  <meta name="keywords" content="PenShot,项目概览,剧本分镜智能体,LangGraph,多智能体,剧本转视频,AI 视频分镜,资产计划,模型路由,开源">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="项目概览 · PenShot 文档">
-  <meta property="og:description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。">
+  <meta property="og:description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段，并输出资产计划与模型路由结果。本页介绍工作流、核心能力、输出结构与当前版本边界。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/overview.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="开始使用">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="项目概览 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。">
+  <meta name="twitter:description" content="PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段，并输出资产计划与模型路由结果。本页介绍工作流、核心能力、输出结构与当前版本边界。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"项目概览","name":"项目概览","description":"PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段。本页介绍工作流、核心能力、输出结构与当前版本边界。","url":"https://shot.helpenx.com/docs/overview.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/overview.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot, 项目概览, 剧本分镜智能体, LangGraph, 多智能体, 剧本转视频, AI 视频分镜, 开源","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"项目概览","name":"项目概览","description":"PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：把任意长度的剧本拆成 5 秒级、角色与场景连贯的 AI 视频提示词片段，并输出资产计划与模型路由结果。本页介绍工作流、核心能力、输出结构与当前版本边界。","url":"https://shot.helpenx.com/docs/overview.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/overview.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot, 项目概览, 剧本分镜智能体, LangGraph, 多智能体, 剧本转视频, AI 视频分镜, 资产计划, 模型路由, 开源","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -127,54 +131,57 @@
     </div>
     <details class="toc-mobile">
       <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 7 节</summary>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">功能定位</a></li><li class="toc-depth-2"><a href="#sec-2">六阶段工作流</a></li><li class="toc-depth-2"><a href="#sec-3">核心能力</a></li><li class="toc-depth-2"><a href="#sec-4">输出形态</a></li><li class="toc-depth-2"><a href="#sec-5">接入方式</a></li><li class="toc-depth-2"><a href="#sec-6">当前边界</a></li><li class="toc-depth-2"><a href="#sec-7">下一步</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">功能定位</a></li><li class="toc-depth-2"><a href="#sec-2">八阶段工作流</a></li><li class="toc-depth-2"><a href="#sec-3">核心能力</a></li><li class="toc-depth-2"><a href="#sec-4">输出形态</a></li><li class="toc-depth-2"><a href="#sec-5">接入方式</a></li><li class="toc-depth-2"><a href="#sec-6">当前边界</a></li><li class="toc-depth-2"><a href="#sec-7">下一步</a></li></ul>
     </details>
     <div class="docs-layout">
       <article class="doc-body">
         <header class="doc-header">
           <span class="doc-header__cat">开始使用</span>
           <h1>项目概览</h1>
-          <p class="doc-deck">一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本。</p>
+          <p class="doc-deck">一个基于 LangGraph 的多智能体系统：把任意长度的剧本拆成 5 秒级、视觉连贯的视频片段脚本，并交付资产计划与模型路由。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 7 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 10 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/overview.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
-        <p>PenShot 是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo 等视频模型逐段生成的分镜提示词包。</p>
+        <p>PenShot（<code>story-shot-agent</code>）是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo、可灵等视频模型逐段生成的分镜提示词包，并附带资产计划与模型路由结果。当前版本 <strong>v0.4.4</strong>。</p>
 
 <h2 id="sec-1">功能定位</h2>
 <p>主流视频模型单次通常只能生成 5–10 秒画面，更长的成片需要先拆分剧本、逐段生成再拼接。PenShot 处理其中最容易出错的一步：把剧本拆成符合时长限制的片段，并让片段之间在角色、场景、道具和动作上保持衔接。</p>
-<p>输入可以是自然语言剧本、标准剧本或已有分镜文本；输出是片段序列，以及每个片段的正向提示词、负向提示词、目标模型、时长与音频提示词。视频生成、拼接与口型对齐由下游工具完成。典型用途包括短视频批量分镜、影视预可视化与游戏过场动画原型。</p>
-<p>提示词面向的模型由枚举定义：<code>VideoModelType</code> 覆盖 Runway Gen-2、Sora、Veo、Pika、Midjourney、Stable、DALL·E 等，共 8 种；<code>AudioModelType</code> 覆盖 XTTSv2、AudioLDM_3、Bark、ElevenLabs、Azure TTS、OpenAI TTS，共 6 种。</p>
+<p>输入可以是自然语言剧本、标准剧本或已有分镜文本；输出是片段序列、每个片段的中英双语正向提示词与负向提示词、按能力匹配的模型路由结果，以及角色三视图 / 道具静帧 / 场景锚点的资产计划。视频生成、拼接与口型对齐由下游工具完成。典型用途包括短视频批量分镜、影视预可视化与游戏过场动画原型。</p>
+<p>模型适配分两层：<code>VideoModelType</code> 枚举覆盖 Runway Gen-2、Sora、Veo、Pika、Midjourney、Stable、DALL·E 等 8 种基础模型；v0.4.3 起的模型能力注册表进一步收录 <code>runway_gen4</code>、<code>kling_3</code>、<code>luma_dream</code>、<code>sora_2</code>、<code>pika_2</code>，记录时长上限、是否支持图生视频、镜头控制、一致性与风格倾向。<code>AudioModelType</code> 覆盖 XTTSv2、AudioLDM_3、Bark、ElevenLabs、Azure TTS、OpenAI TTS，共 6 种。</p>
 
-<h2 id="sec-2">六阶段工作流</h2>
+<h2 id="sec-2">八阶段工作流</h2>
 <pre class="mermaid">flowchart LR
     subgraph Input[&quot;输入层&quot;]
         A[原始剧本&lt;br/&gt;自然语言 / 标准剧本]
     end
-    
-    subgraph Core[&quot;核心处理链（六个节点）&quot;]
+
+    subgraph Core[&quot;八个业务节点&quot;]
         B[剧本解析&lt;br/&gt;parse_script]
-        C[分镜拆分&lt;br/&gt;segment_shot]
-        D[片段分割&lt;br/&gt;split_video]
-        E[提示词转换&lt;br/&gt;convert_prompt]
+        C[资产计划&lt;br/&gt;generate_assets]
+        D[镜头拆分&lt;br/&gt;segment_shot]
+        E[片段切割&lt;br/&gt;split_video]
+        F[提示词转换&lt;br/&gt;convert_prompt]
+        G[模型路由&lt;br/&gt;route_model]
+        H[质量审计&lt;br/&gt;audit_quality]
+        I[连续性守护&lt;br/&gt;continuity_check]
     end
-    
-    subgraph Control[&quot;质量与控制层&quot;]
-        F[质量审查&lt;br/&gt;audit_quality]
-        G[连续性检查&lt;br/&gt;continuity_check]
-    end
-    
+
     subgraph Output[&quot;输出层&quot;]
-        H[分镜序列 + 双语提示词&lt;br/&gt;+ 音频提示词]
+        J[分镜序列 + 双语提示词&lt;br/&gt;+ 资产计划 + 路由模型]
     end
-    
-    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H
-    F --&gt;|发现问题| I[生成修复参数&lt;br/&gt;打回上游重跑]
-    F --&gt;|严重问题| J[人工干预 / 错误处理]
+
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G --&gt; H --&gt; I --&gt; J
+    H --&gt;|发现问题| F
+    I --&gt;|按问题来源| D
+    I --&gt;|按问题来源| E
+    I --&gt;|按问题来源| F
+    H -.-&gt;|严重问题| K[人工干预 / 错误处理]
+    I -.-&gt;|严重问题| K
 </pre>
-<p>六个核心节点对应 <code>PipelineNode</code> 枚举中的六个值；输出、修复与人工干预属于辅助节点。质量审查发现问题时生成修复参数并打回上游，严重问题转入人工干预。连续性检查节点受循环上限约束，最多循环 5 次、重试 2 次，避免问题片段无限返工。</p>
+<p>八个业务节点对应 <code>PipelineNode</code> 中的 <code>PARSE_SCRIPT</code>、<code>GENERATE_ASSETS</code>、<code>SEGMENT_SHOT</code>、<code>SPLIT_VIDEO</code>、<code>CONVERT_PROMPT</code>、<code>ROUTE_MODEL</code>、<code>AUDIT_QUALITY</code>、<code>CONTINUITY_CHECK</code>。图中之外还有 <code>HUMAN_INTERVENTION</code>、<code>ERROR_HANDLER</code>、<code>LOOP_CHECK</code>、<code>GENERATE_OUTPUT</code> 四个控制节点；LangGraph 共注册 12 个节点（<code>END</code> 不是注册节点）。审计发现可修复问题时生成修复参数打回转换节点，连续性守护按问题来源动态路由回镜头拆分、片段切割或提示词转换。</p>
 <table>
 <thead>
 <tr>
@@ -189,7 +196,13 @@
 <td style="text-align:left">剧本解析</td>
 <td style="text-align:left"><code>parse_script</code></td>
 <td style="text-align:left">原始文本 → 结构化剧本</td>
-<td style="text-align:left">提取场景、角色、对话、动作，给出置信度</td>
+<td style="text-align:left">提取场景、角色、对话、动作，给出置信度与风格溯源</td>
+</tr>
+<tr>
+<td style="text-align:left">资产计划</td>
+<td style="text-align:left"><code>generate_assets</code></td>
+<td style="text-align:left">契约 → 资产计划 / 回填清单</td>
+<td style="text-align:left">生成角色三视图、道具静帧、场景锚点规格；可选真实出图</td>
 </tr>
 <tr>
 <td style="text-align:left">镜头拆分</td>
@@ -198,7 +211,7 @@
 <td style="text-align:left">按内容划分镜头，标注景别与时长</td>
 </tr>
 <tr>
-<td style="text-align:left">片段分割</td>
+<td style="text-align:left">片段切割</td>
 <td style="text-align:left"><code>split_video</code></td>
 <td style="text-align:left">镜头序列 → 视频片段</td>
 <td style="text-align:left">规则或 LLM 切分，继承连续性约束</td>
@@ -210,13 +223,19 @@
 <td style="text-align:left">逐片段生成双语正向词、负向词与音频提示词</td>
 </tr>
 <tr>
-<td style="text-align:left">质量审查</td>
-<td style="text-align:left"><code>audit_quality</code></td>
-<td style="text-align:left">提示词 → 审查报告</td>
-<td style="text-align:left">规则检查与 LLM 连贯性检查</td>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left"><code>route_model</code></td>
+<td style="text-align:left">提示词 → 路由计划 / 适配包</td>
+<td style="text-align:left">按能力规则选模型，处理图生视频首帧与镜头控制</td>
 </tr>
 <tr>
-<td style="text-align:left">连续性检查</td>
+<td style="text-align:left">质量审计</td>
+<td style="text-align:left"><code>audit_quality</code></td>
+<td style="text-align:left">提示词与路由 → 审查报告</td>
+<td style="text-align:left">11 项规则检查，输出违规条目与修复参数</td>
+</tr>
+<tr>
+<td style="text-align:left">连续性守护</td>
 <td style="text-align:left"><code>continuity_check</code></td>
 <td style="text-align:left">全阶段产物 → 校验结论</td>
 <td style="text-align:left">视觉、角色、场景、动作四类校验，按来源路由修复</td>
@@ -235,7 +254,15 @@
 <tbody>
 <tr>
 <td style="text-align:left">剧本解析</td>
-<td style="text-align:left">识别场景、角色、对话与动作，输出结构化元素及解析置信度</td>
+<td style="text-align:left">识别场景、角色、对话与动作，输出结构化元素、解析置信度与全局风格锚点</td>
+</tr>
+<tr>
+<td style="text-align:left">资产计划</td>
+<td style="text-align:left">产出 <code>AssetPlanDocument</code>：角色三视图、道具静帧、场景锚点的提示词、尺寸、视角与使用范围；默认只声明计划，不调用外部服务</td>
+</tr>
+<tr>
+<td style="text-align:left">资产回填</td>
+<td style="text-align:left">接受 <code>AssetManifest</code>（<code>bindings</code> / <code>asset_id_map</code>），把声明式 <code>asset_id</code> 绑定到下游真实资产引用</td>
 </tr>
 <tr>
 <td style="text-align:left">镜头拆分</td>
@@ -247,32 +274,37 @@
 </tr>
 <tr>
 <td style="text-align:left">提示词工程</td>
-<td style="text-align:left">逐片段生成中英双语正向词、负向词与音频提示词，措辞跨片段复用</td>
+<td style="text-align:left">逐片段生成中英双语正向词、负向词与音频提示词，措辞跨片段复用，支持 RAG 模板召回</td>
 </tr>
 <tr>
-<td style="text-align:left">质量审查</td>
-<td style="text-align:left">5 项规则检查加 1 项 LLM 连贯性检查，输出违规条目与修复建议</td>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left">静态能力注册表 + yaml 规则（默认 5 条），按文本复杂度、一致性要求、镜头运动与风格选模型，输出 <code>RoutePlan</code> 与 <code>AdaptedPromptPackage</code></td>
+</tr>
+<tr>
+<td style="text-align:left">质量审计</td>
+<td style="text-align:left">11 项规则检查：片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突、资产使用</td>
 </tr>
 <tr>
 <td style="text-align:left">连续性守护</td>
-<td style="text-align:left">按视觉、角色、场景、动作四类校验，问题可路由回对应上游阶段</td>
+<td style="text-align:left">一致性契约、资产锚点与修复回路：问题按来源路由回对应阶段，最多 3 轮修复</td>
 </tr>
 <tr>
 <td style="text-align:left">工程接入</td>
-<td style="text-align:left">同步、异步与批量调用，任务池、检查点、三层记忆与 MCP Server</td>
+<td style="text-align:left">13 个 SDK 方法、17 个 REST 端点、7 个 MCP 工具，任务池、检查点、三层记忆</td>
 </tr>
 </tbody>
 </table>
 
 <h2 id="sec-4">输出形态</h2>
-<p>结果是单个 JSON 包，顶层为 <code>task_id</code>、<code>success</code> 与 <code>data.instructions</code>；<code>instructions</code> 下分 <code>metadata</code>、<code>project_info</code>、<code>fragments</code>、<code>global_settings</code> 与 <code>execution_suggestions</code>。每个片段自带模型与风格字段，可独立投喂下游生成服务。</p>
+<p>任务结果顶层为 <code>task_id</code>、<code>status</code>、<code>success</code> 与 <code>data</code>；<code>data</code> 下除 <code>instructions</code> 外，还包含 <code>asset_plan</code>、<code>asset_manifest</code>、<code>asset_generation</code>、<code>audit_report</code>、<code>consistency_contract</code>、<code>continuity_issues</code>、<code>warnings</code> 与 <code>metadata.quality_gate</code>。每个片段自带模型与风格字段，可独立投喂下游生成服务。</p>
 <pre class="hljs"><code>{
   "task_id": "HL202603061716542571",
+  "status": "completed",
   "success": true,
   "data": {
     "instructions": {
       "metadata": {
-        "video_model": "runway_gen2",
+        "video_model": "kling_3",
         "audio_model": "XTTSv2",
         "total_prompts": 13
       },
@@ -294,11 +326,21 @@
           }
         }
       ],
+      "route_plan": {
+        "schema_version": "0.4.4",
+        "source_model": "runway_gen2",
+        "decisions": [
+          { "fragment_id": "frag_001", "target_model": "kling_3", "mode": "image_to_video" }
+        ]
+      },
       "global_settings": { "style_consistency": true }
-    }
+    },
+    "asset_plan": { "schema_version": "0.4.4", "assets": [] },
+    "asset_manifest": { "schema_version": "0.4.4", "bindings": [] },
+    "metadata": { "quality_gate": "pass" }
   }
 }</code></pre>
-<p><code>project_info</code> 汇总片段数与总时长；<code>execution_suggestions</code> 是通用执行建议文本，不是强制参数。<code>prompt</code> 为英文描述加中文对照；<code>negative_prompt</code> 排除卡通、畸变手部、水印等常见瑕疵；<code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，并以 <code>previous_audio_id</code> 串联上下文。样例落盘文件的字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>，写解析代码时以模型定义为准。</p>
+<p><code>project_info</code> 汇总片段数与总时长；<code>route_plan</code> 记录每个片段的目标模型、路由模式与被阻塞片段；<code>asset_plan</code> 是声明式生图指令，<code>asset_manifest</code> 是下游回填后的绑定结果。<code>prompt</code> 为英文描述加中文对照；<code>negative_prompt</code> 排除卡通、畸变手部、水印等常见瑕疵；<code>audio_prompt</code> 用 <code>voice_type</code> 区分旁白与角色台词，并以 <code>previous_audio_id</code> 串联上下文。样例落盘文件的字段名为 <code>audio_prompt</code>，当前 <code>AIVideoPrompt</code> 模型的字段名为 <code>audio</code>，写解析代码时以模型定义为准。</p>
 
 <h2 id="sec-5">接入方式</h2>
 <table>
@@ -313,12 +355,12 @@
 <tr>
 <td style="text-align:left">Python SDK</td>
 <td style="text-align:left"><code>create_penshot_agent()</code>、<code>PenshotFunction</code></td>
-<td style="text-align:left">同步、异步与批量调用；任务池默认并发 10、队列 1000</td>
+<td style="text-align:left">13 个方法，含 <code>asset_manifest</code> / <code>asset_manifests</code> 参数；任务池默认并发 10、队列 1000</td>
 </tr>
 <tr>
 <td style="text-align:left">REST</td>
 <td style="text-align:left"><code>/api/v1</code>，默认端口 8000</td>
-<td style="text-align:left">内置 FastAPI 服务，共 17 个端点，含提交、状态、结果与队列观测</td>
+<td style="text-align:left">内置 FastAPI 服务，17 个端点，含提交、状态、结果、资产回填与队列观测</td>
 </tr>
 <tr>
 <td style="text-align:left">Docker</td>
@@ -328,7 +370,7 @@
 <tr>
 <td style="text-align:left">MCP</td>
 <td style="text-align:left"><code>python -m penshot.mcp_server</code></td>
-<td style="text-align:left">7 个工具，默认 stdio 传输，可接入 Claude Desktop、Cursor 等客户端</td>
+<td style="text-align:left">7 个工具，默认 stdio 传输，<code>breakdown_script</code> 接受 <code>asset_manifest</code></td>
 </tr>
 <tr>
 <td style="text-align:left">CLI</td>
@@ -349,8 +391,8 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align:left">只产出提示词</td>
-<td style="text-align:left">不生成视频，拼接、转场与口型对齐需外部工具完成</td>
+<td style="text-align:left">只产出提示词与资产计划</td>
+<td style="text-align:left">默认不生成视频；资产出图为可选项（<code>image_generation.enabled</code> 默认关闭），拼接、转场与口型对齐需外部工具完成</td>
 </tr>
 <tr>
 <td style="text-align:left">分割策略</td>
@@ -362,7 +404,11 @@
 </tr>
 <tr>
 <td style="text-align:left">修复闭环</td>
-<td style="text-align:left">审计输出 <code>violations</code> 与 <code>recommended_actions</code>，存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；自动修复尚未完全闭环</td>
+<td style="text-align:left">审计与连续性检查均已接入动态修复路由，连续性修复最多 3 轮；超过轮次或存在阻断问题时转入人工干预</td>
+</tr>
+<tr>
+<td style="text-align:left">执行超时</td>
+<td style="text-align:left">工作流实际超时取 <code>InputState.timeout</code>，默认 600 秒；<code>config.workflow_timeout=1800</code> 仅在未传 timeout 时作为兜底</td>
 </tr>
 <tr>
 <td style="text-align:left">分割缓存</td>
@@ -379,9 +425,9 @@
 <h2 id="sec-7">下一步</h2>
 <ul>
 <li><a href="quick-start.html">快速开始</a>：安装、配置并跑通第一个任务。</li>
-<li><a href="architecture.html">技术架构</a>：十个节点、决策路由与循环防护。</li>
-<li><a href="nodes.html">工作流节点</a>：六个智能体节点的输入、规则与降级。</li>
-<li><a href="consistency.html">一致性策略</a>：跨片段的角色与场景漂移如何压制。</li>
+<li><a href="architecture.html">技术架构</a>：十二个注册节点、八态决策路由与循环防护。</li>
+<li><a href="nodes.html">工作流节点</a>：八个业务节点的输入、规则与降级。</li>
+<li><a href="consistency.html">一致性策略</a>：一致性契约、资产锚点与修复回路。</li>
 <li><a href="checkpoint.html">检查点与恢复</a>：状态落盘与任务恢复的当前能力。</li>
 </ul>
 <p>源码与安装包：<a href="https://github.com/neopen/story-shot-agent">GitHub</a>、<a href="https://pypi.org/project/penshot/">PyPI</a>；更多工程测评见 <a href="https://pengline.cn">pengline.cn</a>。</p>
@@ -398,7 +444,7 @@
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">功能定位</a></li><li class="toc-depth-2"><a href="#sec-2">六阶段工作流</a></li><li class="toc-depth-2"><a href="#sec-3">核心能力</a></li><li class="toc-depth-2"><a href="#sec-4">输出形态</a></li><li class="toc-depth-2"><a href="#sec-5">接入方式</a></li><li class="toc-depth-2"><a href="#sec-6">当前边界</a></li><li class="toc-depth-2"><a href="#sec-7">下一步</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">功能定位</a></li><li class="toc-depth-2"><a href="#sec-2">八阶段工作流</a></li><li class="toc-depth-2"><a href="#sec-3">核心能力</a></li><li class="toc-depth-2"><a href="#sec-4">输出形态</a></li><li class="toc-depth-2"><a href="#sec-5">接入方式</a></li><li class="toc-depth-2"><a href="#sec-6">当前边界</a></li><li class="toc-depth-2"><a href="#sec-7">下一步</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
           <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/overview.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
@@ -409,7 +455,7 @@
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

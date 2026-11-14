@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模型路由 · PenShot 文档</title>
+  <meta name="description" content="PenShot 模型路由：五个视频模型能力表、确定性路由特征、规则优先级、兜底策略、route_plan 结构、模型专属提示词适配与配置扩展。">
+  <meta name="keywords" content="模型路由,route_plan,ModelCapability,Runway Gen-4,Kling 3,Sora 2,Luma Dream,Pika 2,提示词适配,路由规则">
+  <meta name="author" content="PenShot Team">
+  <meta name="application-name" content="PenShot">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+  <meta name="theme-color" content="#0b0d12">
+  <link rel="canonical" href="https://shot.helpenx.com/docs/model-routing.html">
+  <meta property="og:site_name" content="PenShot">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="模型路由 · PenShot 文档">
+  <meta property="og:description" content="PenShot 模型路由：五个视频模型能力表、确定性路由特征、规则优先级、兜底策略、route_plan 结构、模型专属提示词适配与配置扩展。">
+  <meta property="og:url" content="https://shot.helpenx.com/docs/model-routing.html">
+  <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:section" content="进阶能力">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="模型路由 · PenShot 文档">
+  <meta name="twitter:description" content="PenShot 模型路由：五个视频模型能力表、确定性路由特征、规则优先级、兜底策略、route_plan 结构、模型专属提示词适配与配置扩展。">
+  <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/docs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"模型路由","name":"模型路由","description":"PenShot 模型路由：五个视频模型能力表、确定性路由特征、规则优先级、兜底策略、route_plan 结构、模型专属提示词适配与配置扩展。","url":"https://shot.helpenx.com/docs/model-routing.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/model-routing.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"进阶能力","keywords":"模型路由, route_plan, ModelCapability, Runway Gen-4, Kling 3, Sora 2, Luma Dream, Pika 2, 提示词适配, 路由规则","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+</head>
+<body class="docs-page" data-search-index="search-index.json">
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="../index.html" aria-label="PenShot 首页">
+      <img src="../assets/img/logo-mark.svg" alt="" width="30" height="30">
+      <span>PenShot<small>Storyboard Agent</small></span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="../index.html">首页</a>
+      <a href="../index.html#features">功能</a>
+      <a href="../index.html#workflow">工作流程</a>
+      <a href="../index.html#integrations">集成</a>
+      <a href="index.html" class="is-active">文档</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">博客</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+      <a class="header-github" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg><span>GitHub</span>
+      </a>
+      <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="打开导航">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" data-mobile-nav>
+  <a href="../index.html">首页</a>
+  <a href="../index.html#features">功能</a>
+  <a href="../index.html#workflow">工作流程</a>
+  <a href="../index.html#integrations">集成方式</a>
+  <a href="index.html">文档</a>
+  <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+  <div class="mobile-nav__cta">
+    <a class="btn btn--primary" href="quick-start.html">快速开始</a>
+    <a class="btn btn--ghost" href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<main id="main">
+  <div class="docs-shell">
+  <aside class="docs-sidebar" data-docs-sidebar aria-label="文档导航">
+    <button class="sidebar-close" type="button" data-sidebar-close aria-label="关闭目录"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="sidebar-search">
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索文档</span><kbd>Ctrl K</kbd></button>
+    </div>
+    <a class="sidebar-home" href="index.html"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8"/><path d="M5 9v12h14V9"/><path d="M9 21v-6h6v6"/></svg>文档中心</a>
+    <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>开始使用</div>
+        <ul class="sidebar-links"><li><a href="overview.html">项目概览</a></li><li><a href="quick-start.html">快速开始</a></li><li><a href="docker.html">Docker 部署</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>核心设计</div>
+        <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html" class="is-active" aria-current="page">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
+        <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
+      </div>
+<div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>检索与记忆</div>
+        <ul class="sidebar-links"><li><a href="memory.html">记忆系统</a></li><li><a href="rag-knowledge-base.html">知识库与检索</a></li></ul>
+      </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-extra">
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5a5.4 5.4 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-4 1.5a13.4 13.4 0 0 0-7 0C4.6 1.6 3.4 2 3.4 2a5 5 0 0 0-.1 3.7A5.4 5.4 0 0 0 2 9.5c0 3.5 3 5.5 6 5.5a4.8 4.8 0 0 0-1 3.5v4"/><path d="M9 18c-3 1-3-1.5-4-2"/></svg>GitHub 源码</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>PyPI 安装包</a>
+      <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
+    </div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+  </aside>
+  <div class="sidebar-overlay" data-sidebar-overlay></div>
+  <div class="docs-main">
+    <nav class="breadcrumbs" aria-label="面包屑">
+      <a href="../index.html">首页</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html">文档</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <a href="index.html#advanced">进阶能力</a><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <span>模型路由</span>
+    </nav>
+    <div class="docs-mobile-bar">
+      <button type="button" data-sidebar-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>文档目录</button>
+      <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+    </div>
+    <details class="toc-mobile">
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 12 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">30 秒了解</a></li><li class="toc-depth-2"><a href="#sec-2">快速上手：读取 route_plan</a></li><li class="toc-depth-2"><a href="#sec-3">五个模型的能力表</a></li><li class="toc-depth-2"><a href="#sec-4">路由特征如何抽取</a></li><li class="toc-depth-2"><a href="#sec-5">规则匹配与优先级</a></li><li class="toc-depth-2"><a href="#sec-6">兜底策略</a></li><li class="toc-depth-2"><a href="#sec-7">route_plan 结构</a></li><li class="toc-depth-2"><a href="#sec-8">同一份提示词，五种适配风格</a></li><li class="toc-depth-2"><a href="#sec-9">与图生视频的关系</a></li><li class="toc-depth-2"><a href="#sec-10">配置与扩展</a></li><li class="toc-depth-2"><a href="#sec-11">边界与排查</a></li><li class="toc-depth-2"><a href="#sec-12">验证与源码</a></li></ul>
+    </details>
+    <div class="docs-layout">
+      <article class="doc-body">
+        <header class="doc-header">
+          <span class="doc-header__cat">进阶能力</span>
+          <h1>模型路由</h1>
+          <p class="doc-deck">按片段特征在五个视频模型之间自动选型，输出可解释的 route_plan 与模型专属提示词。</p>
+          <div class="doc-meta-row">
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 11 分钟阅读</span>
+            <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/model-routing.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
+          </div>
+        </header>
+        <p>不同视频模型擅长的东西不一样：有的文字渲染准，有的长镜头稳，有的图生视频一致性好。PenShot 的模型路由节点在提示词生成之后，按<strong>确定性规则</strong>为每个片段选择目标模型与生成模式，输出一份可解释、可直接消费的 <code>route_plan</code>。</p>
+
+<blockquote>本页对应 v0.4.4 源码。路由只做选型与提示词适配，不调用任何视频生成接口；真实渲染仍由下游完成。</blockquote>
+
+<h2 id="sec-1">30 秒了解</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">问题</th><th style="text-align:left">路由的做法</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">每个片段该用哪个模型</td><td style="text-align:left">抽取片段的文字、动作、一致性、风格、时长特征，匹配优先级最高的规则</td></tr>
+<tr><td style="text-align:left">规则是否可复现</td><td style="text-align:left">全部是关键词与数值判定，不调用 LLM，同一输入得到同一决策</td></tr>
+<tr><td style="text-align:left">为什么选了这个模型</td><td style="text-align:left">每个决策带 <code>reason</code> 与能力声明，可直接写入日志或审核界面</td></tr>
+<tr><td style="text-align:left">模型只支持 5 秒怎么办</td><td style="text-align:left">提示词包时长被收敛到模型上限；若片段超出上限，自动换一个能覆盖时长的模型</td></tr>
+<tr><td style="text-align:left">规则引用了未注册模型</td><td style="text-align:left">跳过该规则，继续匹配下一条；最终兜底到默认模型</td></tr>
+<tr><td style="text-align:left">路由失败会中断任务吗</td><td style="text-align:left">不会。异常只记录告警，<code>route_plan</code> 保持为空，其余产物照常输出</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-2">快速上手：读取 route_plan</h2>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> create_penshot_agent
+
+result = create_penshot_agent().breakdown_script(script_text)
+route_plan = result.data[<span class="hljs-string">&quot;instructions&quot;</span>][<span class="hljs-string">&quot;route_plan&quot;</span>]
+
+<span class="hljs-keyword">for</span> decision <span class="hljs-keyword">in</span> route_plan[<span class="hljs-string">&quot;decisions&quot;</span>]:
+    <span class="hljs-built_in">print</span>(
+        decision[<span class="hljs-string">&quot;fragment_id&quot;</span>],
+        decision[<span class="hljs-string">&quot;target_model&quot;</span>],
+        decision[<span class="hljs-string">&quot;mode&quot;</span>],
+        decision[<span class="hljs-string">&quot;reason&quot;</span>],
+    )
+
+<span class="hljs-keyword">for</span> blocked <span class="hljs-keyword">in</span> route_plan[<span class="hljs-string">&quot;blocked_fragments&quot;</span>]:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;需人工处理，禁止渲染:&quot;</span>, blocked)
+</code></pre>
+
+<p>下游真正需要的是 <code>adapted_packages</code>：每个片段一份模型专属提示词包，包含 <code>prompt</code>、<code>negative_prompt</code>、<code>duration</code>、<code>camera</code>、<code>model_params</code>，以及在图生视频模式下的 <code>image_prompt</code>、<code>motion_prompt</code>、<code>references</code> 与 <code>asset_ref</code>。<code>decisions</code> 主要供解释、审计和监控使用。</p>
+
+<h2 id="sec-3">五个模型的能力表</h2>
+<p>能力声明是路由匹配与提示词适配的共同依据。评分是 0 到 1 的相对值，用于比较而不是对外承诺。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">模型</th><th style="text-align:left">最大时长</th><th style="text-align:left">图生视频</th><th style="text-align:left">结构化相机</th><th style="text-align:left">文字渲染</th><th style="text-align:left">人物一致性</th><th style="text-align:left">美学偏好</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>runway_gen4</code></td><td style="text-align:left">10s</td><td style="text-align:left">支持</td><td style="text-align:left">支持</td><td style="text-align:left">0.5</td><td style="text-align:left">0.8</td><td style="text-align:left">cinematic</td></tr>
+<tr><td style="text-align:left"><code>kling_3</code></td><td style="text-align:left">10s</td><td style="text-align:left">支持</td><td style="text-align:left">支持</td><td style="text-align:left">0.7</td><td style="text-align:left">0.9</td><td style="text-align:left">realistic</td></tr>
+<tr><td style="text-align:left"><code>luma_dream</code></td><td style="text-align:left">5s</td><td style="text-align:left">支持</td><td style="text-align:left">支持</td><td style="text-align:left">0.6</td><td style="text-align:left">0.7</td><td style="text-align:left">cinematic</td></tr>
+<tr><td style="text-align:left"><code>sora_2</code></td><td style="text-align:left">60s</td><td style="text-align:left">不支持</td><td style="text-align:left">不支持</td><td style="text-align:left">0.95</td><td style="text-align:left">0.85</td><td style="text-align:left">realistic</td></tr>
+<tr><td style="text-align:left"><code>pika_2</code></td><td style="text-align:left">4s</td><td style="text-align:left">支持</td><td style="text-align:left">支持</td><td style="text-align:left">0.4</td><td style="text-align:left">0.6</td><td style="text-align:left">anime</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-4">路由特征如何抽取</h2>
+<p>路由节点读取每个 <code>AIVideoPrompt</code> 与全局契约，产出六个确定性特征。没有 LLM 参与，因此不会出现同一片段两次路由结果不同的情况。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">特征</th><th style="text-align:left">判定方式</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>has_critical_text</code></td><td style="text-align:left">提示词明确要求呈现可读文字。中文词表含“文字、字迹、地址、手写、字幕、招牌、标牌、海报、书名、报纸、书信、标题”；英文按整词匹配 <code>text</code>、<code>readable</code>、<code>address</code>、<code>handwriting</code>、<code>subtitle</code>、<code>newspaper</code>、<code>poster</code>、<code>menu</code>、<code>title</code></td></tr>
+<tr><td style="text-align:left"><code>motion_complexity</code></td><td style="text-align:left">命中打斗、追逐、战斗、爆炸、舞蹈、奔跑、翻滚、旋转、飞跃等关键词为 <code>high</code>；命中走、转身、推、拿起、拥抱等为 <code>medium</code>；其余为 <code>low</code></td></tr>
+<tr><td style="text-align:left"><code>character_consistency_need</code></td><td style="text-align:left">主角在契约中登记了外观锚点为 <code>high</code>；有主角但无锚点为 <code>medium</code>；无主角为 <code>low</code></td></tr>
+<tr><td style="text-align:left"><code>style_bias</code></td><td style="text-align:left">从提示词风格与正文关键词判断 <code>anime</code>、<code>realistic</code> 或 <code>cinematic</code>，默认 <code>cinematic</code></td></tr>
+<tr><td style="text-align:left"><code>duration</code></td><td style="text-align:left">片段原始时长，单位秒</td></tr>
+<tr><td style="text-align:left"><code>needs_first_last_frame</code></td><td style="text-align:left">是否属于关键文字或角色外观锚点片段。场景锚点覆盖的片段也会进入两段式，但不会单独把该特征置真</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-5">规则匹配与优先级</h2>
+<p>默认配置开启路由（<code>routing.enabled: true</code>），规则按 <code>priority</code> 从大到小排序；优先级相同时按规则名升序。对每个片段，取第一条“条件全部满足且模型已注册”的规则。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">优先级</th><th style="text-align:left">规则</th><th style="text-align:left">条件</th><th style="text-align:left">目标模型</th><th style="text-align:left">模式</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">100</td><td style="text-align:left"><code>critical_text</code></td><td style="text-align:left"><code>has_critical_text = true</code></td><td style="text-align:left"><code>kling_3</code></td><td style="text-align:left">image_to_video</td></tr>
+<tr><td style="text-align:left">90</td><td style="text-align:left"><code>high_consistency</code></td><td style="text-align:left"><code>character_consistency_need = high</code></td><td style="text-align:left"><code>kling_3</code></td><td style="text-align:left">image_to_video</td></tr>
+<tr><td style="text-align:left">80</td><td style="text-align:left"><code>complex_motion</code></td><td style="text-align:left"><code>motion_complexity = high</code></td><td style="text-align:left"><code>sora_2</code></td><td style="text-align:left">text_to_video</td></tr>
+<tr><td style="text-align:left">70</td><td style="text-align:left"><code>anime_style</code></td><td style="text-align:left"><code>style_bias = anime</code></td><td style="text-align:left"><code>kling_3</code></td><td style="text-align:left">text_to_video</td></tr>
+<tr><td style="text-align:left">60</td><td style="text-align:left"><code>cinematic_long_take</code></td><td style="text-align:left"><code>style_bias = cinematic</code> 且时长不少于 8 秒</td><td style="text-align:left"><code>runway_gen4</code></td><td style="text-align:left">text_to_video</td></tr>
+</tbody>
+</table>
+
+<p>条件的组合是“与”：<code>min_duration</code> 与 <code>max_duration</code> 同时参与判断，未填写的字段不约束。一个片段可能同时满足多条规则，此时只采用优先级最高的一条，不会把多个模型拼在一起。</p>
+
+<h2 id="sec-6">兜底策略</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">情况</th><th style="text-align:left">结果</th><th style="text-align:left">decision.reason</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">规则命中且模型已注册</td><td style="text-align:left">采用规则的目标模型与模式</td><td style="text-align:left">规则名，如 <code>critical_text</code></td></tr>
+<tr><td style="text-align:left">没有规则命中，当前目标模型已注册</td><td style="text-align:left">保留当前模型与模式</td><td style="text-align:left"><code>fallback_current_model</code></td></tr>
+<tr><td style="text-align:left">没有规则命中，当前目标模型未注册</td><td style="text-align:left">改用 <code>routing.default_model</code>（默认 <code>kling_3</code>）</td><td style="text-align:left"><code>fallback_default_model</code></td></tr>
+<tr><td style="text-align:left">片段时长超过目标模型上限</td><td style="text-align:left">在能覆盖该时长的模型里，选人物一致性最高者；一致性相同则选最大时长更小者</td><td style="text-align:left">原原因 + <code>+duration_fallback:模型名</code></td></tr>
+</tbody>
+</table>
+
+<p>关闭 <code>routing.enabled</code> 后不再匹配规则，但“未注册模型 → 默认模型”和时长兜底仍然生效。这样即使下游传入一个 PenShot 不认识的模型名，也不会产出无法消费的路由。</p>
+
+<h2 id="sec-7">route_plan 结构</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">字段</th><th style="text-align:left">说明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>schema_version</code></td><td style="text-align:left">路由契约版本，当前 <code>0.4.4</code></td></tr>
+<tr><td style="text-align:left"><code>plan_id</code></td><td style="text-align:left">本次路由计划唯一标识</td></tr>
+<tr><td style="text-align:left"><code>source_model</code></td><td style="text-align:left">提示词阶段声明的原始模型名，来自 <code>instructions.metadata.video_model</code></td></tr>
+<tr><td style="text-align:left"><code>decisions[]</code></td><td style="text-align:left">每个片段的路由决策、模式、原因与能力声明</td></tr>
+<tr><td style="text-align:left"><code>adapted_packages[]</code></td><td style="text-align:left">按最终目标模型重新适配后的提示词包，下游直接消费</td></tr>
+<tr><td style="text-align:left"><code>warnings[]</code></td><td style="text-align:left">Gate 1 跨片段告警与资产约束告警</td></tr>
+<tr><td style="text-align:left"><code>blocked_fragments[]</code></td><td style="text-align:left">状态不为 <code>ready</code> 的片段，禁止进入下游渲染队列</td></tr>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr><th style="text-align:left">RouteDecision 字段</th><th style="text-align:left">说明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>fragment_id</code> / <code>target_model</code></td><td style="text-align:left">片段与最终选中的模型</td></tr>
+<tr><td style="text-align:left"><code>mode</code></td><td style="text-align:left"><code>text_to_video</code> 或 <code>image_to_video</code></td></tr>
+<tr><td style="text-align:left"><code>reason</code></td><td style="text-align:left">规则名或兜底原因</td></tr>
+<tr><td style="text-align:left"><code>asset_ref</code></td><td style="text-align:left">图生视频引用的场景首帧引用，没有则为空</td></tr>
+<tr><td style="text-align:left"><code>capability</code></td><td style="text-align:left">目标模型完整能力声明</td></tr>
+<tr><td style="text-align:left"><code>references</code></td><td style="text-align:left">片段资产引用；<code>first_frame</code> 即首帧场景资产</td></tr>
+<tr><td style="text-align:left"><code>warnings</code> / <code>status</code></td><td style="text-align:left">片段级告警与可执行状态</td></tr>
+<tr><td style="text-align:left"><code>degraded_assets</code></td><td style="text-align:left">需要降级为剪影或背影的资产约束</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-8">同一份提示词，五种适配风格</h2>
+<p>路由选中模型后，会按该模型的习惯重写提示词。差异不只是模型名，还包括正向前缀、负向词、相机表述与生成参数。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">模型</th><th style="text-align:left">正向提示词</th><th style="text-align:left">负向提示词</th><th style="text-align:left">相机表述</th><th style="text-align:left">典型参数</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">Runway Gen-4</td><td style="text-align:left">不足时补 <code>cinematic film still, </code> 前缀</td><td style="text-align:left">原负向词 + <code>blurry, low quality, jitter</code></td><td style="text-align:left"><code>camera: {shot_type}, {motion}</code></td><td style="text-align:left">16:9、<code>motion_scale 1.0</code></td></tr>
+<tr><td style="text-align:left">Kling 3</td><td style="text-align:left">追加 <code>main character: X</code> 与 <code>high detail, cinematic lighting, 8k</code></td><td style="text-align:left"><code>avoid: {负向词}</code>，缺省为 <code>blurry, distorted</code></td><td style="text-align:left"><code>shot: X, movement: Y</code></td><td style="text-align:left"><code>mode std</code>、相机控制开启</td></tr>
+<tr><td style="text-align:left">Luma Dream</td><td style="text-align:left">保留原文，不加前缀</td><td style="text-align:left">原样保留，不补词</td><td style="text-align:left"><code>[shot] [motion]</code></td><td style="text-align:left">720p、16:9、不循环</td></tr>
+<tr><td style="text-align:left">Sora 2</td><td style="text-align:left">补 <code>A cinematic scene: </code> 前缀</td><td style="text-align:left">固定为空，不使用负向提示词</td><td style="text-align:left"><code>Shot type: X. Camera movement: Y.</code></td><td style="text-align:left">1080p、文字渲染开启</td></tr>
+<tr><td style="text-align:left">Pika 2</td><td style="text-align:left">追加 <code>anime style, smooth motion, vibrant colors</code></td><td style="text-align:left"><code>negative_prompt: {负向词}</code></td><td style="text-align:left"><code>-camera {motion} {shot_type}</code></td><td style="text-align:left"><code>motion 1</code>、<code>guidance_scale 12</code>、24fps</td></tr>
+</tbody>
+</table>
+
+<p>如果提示词阶段已经产出结构化 <code>camera</code>，且目标模型支持结构化相机控制，适配器会直接透传该参数，不再生成文字相机描述；不支持时降级为模型惯用的文字表述。片段时长统一收敛为 <code>min(片段时长, 模型最大时长)</code>，被收敛时 Gate 1 会写入告警。</p>
+
+<h2 id="sec-9">与图生视频的关系</h2>
+<p>路由节点先执行两段式判定，再执行规则路由。两条链路的分工是：</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">阶段</th><th style="text-align:left">作用</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>apply_image_to_video_routing</code></td><td style="text-align:left">判定片段是否值得两段式生成，挂载首帧提示词、动作提示词与资产引用</td></tr>
+<tr><td style="text-align:left"><code>build_route_plan</code></td><td style="text-align:left">按特征选择目标模型与模式，并按最终模型重建提示词包</td></tr>
+</tbody>
+</table>
+
+<p>规则可以把片段改成 <code>text_to_video</code>，此时两段式字段会被清空，避免下游拿到失效的资产引用；改成 <code>image_to_video</code> 时，已有的引用、首帧提示词、动作提示词、告警与状态会被保留。若片段没有经过片段级首帧构建，路由会补一份静态首帧提示词与动作提示词，不会让图生视频包缺少首帧。</p>
+
+<h2 id="sec-10">配置与扩展</h2>
+<p>默认规则位于 <code>src/penshot/config/settings.yaml</code> 的 <code>routing</code> 段。新增模型分两步：</p>
+
+<ol>
+<li>用 <code>register_model(ModelCapability(...))</code> 注册能力声明；</li>
+<li>在规则中引用该模型名，并设置条件、模式与优先级。</li>
+</ol>
+
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.neopen.agent.model_adapter <span class="hljs-keyword">import</span> ModelCapability, register_model
+
+register_model(
+    ModelCapability(
+        model_name=<span class="hljs-string">&quot;my_video_model&quot;</span>,
+        max_duration=<span class="hljs-number">8.0</span>,
+        supports_image_to_video=<span class="hljs-keyword">True</span>,
+        supports_camera_control=<span class="hljs-keyword">False</span>,
+        text_rendering_score=<span class="hljs-number">0.6</span>,
+        character_consistency=<span class="hljs-number">0.8</span>,
+        aesthetic_bias=<span class="hljs-string">&quot;cinematic&quot;</span>,
+    )
+)
+</code></pre>
+
+<p>注册表是进程内静态表，不会持久化；每个需要路由的进程都要完成注册。适配器注册表当前只内置上述五个模型：只注册能力而没有适配器时，工厂会回退到默认的 <code>runway_gen4</code> 适配器，提示词包的 <code>target_model</code> 也会变成 <code>runway_gen4</code>。要让自定义模型真正参与路由，需要同时提供并注册适配器。</p>
+
+<h2 id="sec-11">边界与排查</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">现象</th><th style="text-align:left">原因与处理</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>route_plan</code> 为空</td><td style="text-align:left">路由节点异常被吞掉，查看告警日志；常见原因是提示词指令为空</td></tr>
+<tr><td style="text-align:left">所有片段都落到 <code>kling_3</code></td><td style="text-align:left">没有规则命中且原模型未注册；检查规则条件与模型注册表</td></tr>
+<tr><td style="text-align:left">规则写了但没生效</td><td style="text-align:left">模型未注册会被跳过；或条件未全部满足；或优先级被更高规则截胡</td></tr>
+<tr><td style="text-align:left">片段突然变短</td><td style="text-align:left">目标模型最大时长小于片段时长，提示词包被收敛；查看 Gate 1 的时长告警</td></tr>
+<tr><td style="text-align:left">片段被阻断</td><td style="text-align:left">场景锚定无法唯一匹配，<code>status=needs_manual_fix</code> 并进入 <code>blocked_fragments</code>，需人工指定场景</td></tr>
+<tr><td style="text-align:left">关键词路由不准</td><td style="text-align:left">特征抽取是词表法，近义动作或隐含文字可能漏判；可在提示词中写明确动作与文字要求</td></tr>
+</tbody>
+</table>
+
+<h2 id="sec-12">验证与源码</h2>
+<pre class="hljs"><code>pytest tests/unit/test_route_model.py \
+       tests/unit/test_first_frame_and_usage.py -q
+</code></pre>
+
+<table>
+<thead>
+<tr><th style="text-align:left">能力</th><th style="text-align:left">源码位置</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">能力声明表</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/capability_registry.py</code></td></tr>
+<tr><td style="text-align:left">特征抽取</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/route_features.py</code></td></tr>
+<tr><td style="text-align:left">规则引擎与兜底</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/model_router.py</code></td></tr>
+<tr><td style="text-align:left">五类模型适配器</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/model_adapter.py</code></td></tr>
+<tr><td style="text-align:left">两段式判定</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/image_to_video.py</code></td></tr>
+<tr><td style="text-align:left">默认规则</td><td style="text-align:left"><code>src/penshot/config/settings.yaml</code></td></tr>
+</tbody>
+</table>
+
+<p>首帧提示词如何构建、何时阻断见<a href="first-frame.html">首帧与图生视频</a>；资产引用与回填清单见<a href="asset-handoff.html">资产计划与交接</a>；节点顺序见<a href="nodes.html">工作流节点</a>。</p>
+
+        <nav class="doc-pager" aria-label="文档翻页">
+    <a class="pager-link" href="asset-handoff.html">
+      <span class="pager-link__label">← 上一篇 · 进阶能力</span>
+      <strong>资产计划与交接</strong>
+      <small>声明式资产计划、片段引用与下游回填：角色、场景与道具在 PenShot 之外生成，再安全接回路由。</small>
+    </a>
+    <a class="pager-link pager-link--next" href="first-frame.html">
+      <span class="pager-link__label">下一篇 → · 进阶能力</span>
+      <strong>首帧与图生视频</strong>
+      <small>关键文字与高一致性片段如何拆成“静态首帧 + 动作驱动”，含场景锚点的替换与阻断。</small>
+    </a>
+  </nav>
+      </article>
+      <aside class="doc-toc" aria-label="本页目录">
+        <div class="toc-inner">
+          <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">30 秒了解</a></li><li class="toc-depth-2"><a href="#sec-2">快速上手：读取 route_plan</a></li><li class="toc-depth-2"><a href="#sec-3">五个模型的能力表</a></li><li class="toc-depth-2"><a href="#sec-4">路由特征如何抽取</a></li><li class="toc-depth-2"><a href="#sec-5">规则匹配与优先级</a></li><li class="toc-depth-2"><a href="#sec-6">兜底策略</a></li><li class="toc-depth-2"><a href="#sec-7">route_plan 结构</a></li><li class="toc-depth-2"><a href="#sec-8">同一份提示词，五种适配风格</a></li><li class="toc-depth-2"><a href="#sec-9">与图生视频的关系</a></li><li class="toc-depth-2"><a href="#sec-10">配置与扩展</a></li><li class="toc-depth-2"><a href="#sec-11">边界与排查</a></li><li class="toc-depth-2"><a href="#sec-12">验证与源码</a></li></ul>
+          <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
+          <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/model-routing.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="docs-footer">
+  <div class="docs-footer__inner">
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <div class="docs-footer__links">
+      <a href="https://shot.helpenx.com">官网</a>
+      <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/penshot/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener">问题反馈</a>
+      <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/docs.js" defer></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="../assets/js/katex-init.js"></script>
+</body>
+</html>

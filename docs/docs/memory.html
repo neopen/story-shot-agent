@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="检索与记忆">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="记忆系统 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"记忆系统","name":"记忆系统","description":"PenShot 三层记忆的职责、存储、写入与召回流程，脚本记忆门面 ScriptMemory 的组装方式，以及 Redis/Chroma 降级边界。","url":"https://shot.helpenx.com/docs/memory.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/memory.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"检索与记忆","keywords":"记忆系统, 短期记忆, 中期记忆, 长期记忆, Redis, Chroma, ScriptMemory, 上下文","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"记忆系统","name":"记忆系统","description":"PenShot 三层记忆的职责、存储、写入与召回流程，脚本记忆门面 ScriptMemory 的组装方式，以及 Redis/Chroma 降级边界。","url":"https://shot.helpenx.com/docs/memory.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/memory.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"检索与记忆","keywords":"记忆系统, 短期记忆, 中期记忆, 长期记忆, Redis, Chroma, ScriptMemory, 上下文","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -136,14 +140,14 @@
           <h1>记忆系统</h1>
           <p class="doc-deck">短期、中期、长期三层记忆的写入、召回、降级与已知边界。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 14 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 15 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/memory.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
         <p>PenShot 的记忆系统按短期、中期、长期三层保存任务上下文与历史经验：<code>MemoryManager</code> 按剧本路由到 <code>ScriptMemory</code>，后者统一负责写入分发、召回组装与提示词格式化。</p>
 <blockquote>
-<p><strong>适用范围</strong>：实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入，已接入工作流四个处理阶段。中期摘要重启后无法读回、长期库为空时检索返回空结果、Redis 运行期中断会丢失当次交互，均属于已知边界。</p>
+<p><strong>适用范围</strong>：本页对应 v0.4.4 源码。实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入，已接入工作流四个处理阶段。中期摘要重启后无法读回、长期库为空时检索返回空结果、Redis 运行期中断会丢失当次交互，均属于已知边界。</p>
 </blockquote>
 <h2 id="sec-1">架构与隔离</h2>
 <p><code>MemoryManager</code> 是多剧本容器，内部持有 <code>Dict[str, ScriptMemory]</code>；<code>ScriptMemory</code> 才真正持有三层记忆。<code>MemoryManager</code> 的职责是按 <code>script_id</code> 路由，并统一做序列化与反序列化。</p>
@@ -331,6 +335,7 @@
 </pre>
 <p>长期层是“成功样本驱动”的冷启动系统。工作流阶段完成后，<code>_is_successful_case</code> 先判定是否达标（例如 <code>parse_script</code> 要求 <code>completeness_score &gt;= 0.8</code>），通过才生成条目：格式为阶段名 + 统计 + 场景/角色/镜头摘要，单条限 2000 字符，成功模式保留最近 30 条。未达标就跳过写入。</p>
 <p>因此空库不是异常：集合文档数为 0 时，检索安静返回零条结果，依赖历史经验增强的逻辑静默退化为“没有经验可用”。长期库也没有自动过期，只能显式清理。</p>
+<p>另有一类由模板管理器写入的长期条目：质量审计通过的提示词以 <code>successful_prompt_patterns</code> 为键、按哈希去重后序列化保存，保留最近 200 条。它们只供提示词转换节点作为历史参考，<code>history_hint</code> 截取首条前 100 个字符；这些条目不会回填模板向量索引，模板召回仍以模板库为准。</p>
 <p>两个必须核对的约束：查询与写入必须使用同一套嵌入模型与维度，换模型等于换度量尺；<code>similarity_search_with_score</code> 在 Chroma 默认 L2 度量下返回距离（越小越相似），而过滤条件是 <code>score &gt;= threshold</code>，方向与“保留更相似结果”相反，使用前应打印分数分布确认。</p>
 <h2 id="sec-5">写入分发</h2>
 <p><code>ScriptMemory.add(input_text, output_text, level, metadata)</code> 的语义是一对交互，而不是键值写入。所有条目先写短期，再按级别或重要性分流：</p>
@@ -433,7 +438,7 @@
     <a class="pager-link pager-link--next" href="rag-knowledge-base.html">
       <span class="pager-link__label">下一篇 → · 检索与记忆</span>
       <strong>知识库与检索</strong>
-      <small>RAG 知识库、分块、向量检索与重排序的当前实现。</small>
+      <small>RAG 知识库、模板召回、分块、向量检索与跨剧本复用的当前实现。</small>
     </a>
   </nav>
       </article>
@@ -451,7 +456,7 @@
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

@@ -18,7 +18,7 @@
 | 连续性守护       | 基于任务池优先级排队、多层级记忆（短期/中期/长期）与 Chroma 向量检索，确保相邻分镜间角色状态、场景和情节高度一致 |
 | 高质量提示词输出 | 生成详细的中英双语画面描述、负面提示词及音频提示词，开箱即用 |
 | 多模型兼容       | 支持 OpenAI、Qwen、DeepSeek、Ollama 等主流 LLM 提供商，可插拔切换 |
-| 多协议集成       | 提供 Python SDK、REST API、LangGraph 节点、A2A 协作协议与 MCP 标准接口 |
+| 多协议集成       | 提供 Python SDK、REST API、LangGraph 节点与 MCP 标准接口，仓库含 A2A 封装示例 |
 | 健壮性与可追溯   | 内置自动重试、错误降级机制，每个分镜片段均可双向追溯至原剧本位置 |
 
 ------
@@ -180,7 +180,7 @@ status = agent.get_task_status(task_id)
 result = await agent.wait_for_result_async(task_id)
 ```
 
-完整示例：[direct_usage.py](https://github.com/neopen/story-shot-agent/blob/main/example/direct_usage.py)
+完整示例：[examples/sdk/01_sync_breakdown.py](https://github.com/neopen/story-shot-agent/blob/main/examples/sdk/01_sync_breakdown.py)
 
 ### 2. 嵌入 FastAPI Web 应用
 
@@ -199,15 +199,15 @@ async def generate(script_text: str):
     return {"task_id": task_id, "status": "PENDING"}
 ```
 
-完整示例：[web_app.py](https://github.com/neopen/story-shot-agent/blob/main/example/web_app.py)
+完整示例：[examples/integrations/fastapi_web_app.py](https://github.com/neopen/story-shot-agent/blob/main/examples/integrations/fastapi_web_app.py)
 
 ### 3. LangGraph 节点集成
 
-支持作为独立 Node 接入 LangChain/LangGraph 工作流，实现端到端自动化流水线。 完整示例：[langgraph_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/langgraph_integration.py)
+支持作为独立 Node 接入 LangChain/LangGraph 工作流，实现端到端自动化流水线。 完整示例：[examples/workflow/01_langgraph_integration.py](https://github.com/neopen/story-shot-agent/blob/main/examples/workflow/01_langgraph_integration.py)
 
 ### 4. A2A 协议协作
 
-支持与上游剧本创作 Agent、下游文生视频/剪辑 Agent 进行上下文传递与任务编排。 完整示例：[a2a_integration.py](https://github.com/neopen/story-shot-agent/blob/main/example/a2a_integration.py)
+支持与上游剧本创作 Agent、下游文生视频/剪辑 Agent 进行上下文传递与任务编排。 完整示例：[examples/integrations/a2a_integration.py](https://github.com/neopen/story-shot-agent/blob/main/examples/integrations/a2a_integration.py)
 
 ### 5. MCP (Model Context Protocol) 支持
 
@@ -217,7 +217,32 @@ async def generate(script_text: str):
 python -m penshot.mcp_server --max-concurrent 5 --queue-size 500
 ```
 
-客户端调用工具 `breakdown_script` 与 `get_task_result` 即可无缝接入支持 MCP 的 IDE 或 Agent 框架。 完整示例：[mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/example/mcp_client.py)
+客户端调用工具 `breakdown_script` 与 `get_task_result` 即可无缝接入支持 MCP 的 IDE 或 Agent 框架。 完整示例：[examples/mcp/mcp_client.py](https://github.com/neopen/story-shot-agent/blob/main/examples/mcp/mcp_client.py)
+
+### 6. 下游节点接入资产提示词
+
+PenShot 只产出声明式指令，默认不调用任何生图/生视频 API。下游可直接消费结果中的 `asset_plan` 与 `route_plan`：
+
+```python
+data = result.data
+plan = data["asset_plan"]                       # 角色三视图/道具/场景提示词
+packages = data["instructions"]["route_plan"]["adapted_packages"]
+
+for asset in plan["assets"]:
+    if asset["status"] == "pending":
+        image_ref = image_service.generate(
+            prompt=asset["image_prompt"],
+            negative_prompt=asset["negative_prompt"],
+            size=asset["size"],
+        )
+
+for package in packages:
+    first = next((r for r in package["references"] if r["as_first_frame"]), None)
+    if first:
+        video_service.image_to_video(package["prompt"], first_frame=image_ref)
+```
+
+下游生成资产后，可通过 REST / SDK / MCP 的 `asset_manifest` 参数回填真实引用，PenShot 会按规范 `asset_id` 自动解析；下游改名使用显式 `asset_id_map`。字段契约见[集成指南](https://shot.helpenx.com/docs/integration.html)，可运行示例：[examples/sdk/08_asset_handoff.py](https://github.com/neopen/story-shot-agent/blob/main/examples/sdk/08_asset_handoff.py)（无需 LLM）
 
 ------
 

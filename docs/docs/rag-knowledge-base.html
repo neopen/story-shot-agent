@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>知识库与检索 · PenShot 文档</title>
-  <meta name="description" content="PenShot RAG 知识库的索引、分块、向量检索与重排序实现，包含 LongScriptChunker、手动余弦检索和当前接线状态。">
-  <meta name="keywords" content="RAG,知识库,向量检索,LongScriptChunker,Chroma,Embedding,重排序,分块">
+  <meta name="description" content="PenShot RAG 知识库的索引、分块、向量检索与模板召回实现，包含 LongScriptChunker、跨剧本只读复用、迁移脚本和当前接线状态。">
+  <meta name="keywords" content="RAG,知识库,向量检索,模板召回,LongScriptChunker,Chroma,Embedding,重排序,分块,跨剧本复用">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="知识库与检索 · PenShot 文档">
-  <meta property="og:description" content="PenShot RAG 知识库的索引、分块、向量检索与重排序实现，包含 LongScriptChunker、手动余弦检索和当前接线状态。">
+  <meta property="og:description" content="PenShot RAG 知识库的索引、分块、向量检索与模板召回实现，包含 LongScriptChunker、跨剧本只读复用、迁移脚本和当前接线状态。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/rag-knowledge-base.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="检索与记忆">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="知识库与检索 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot RAG 知识库的索引、分块、向量检索与重排序实现，包含 LongScriptChunker、手动余弦检索和当前接线状态。">
+  <meta name="twitter:description" content="PenShot RAG 知识库的索引、分块、向量检索与模板召回实现，包含 LongScriptChunker、跨剧本只读复用、迁移脚本和当前接线状态。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"知识库与检索","name":"知识库与检索","description":"PenShot RAG 知识库的索引、分块、向量检索与重排序实现，包含 LongScriptChunker、手动余弦检索和当前接线状态。","url":"https://shot.helpenx.com/docs/rag-knowledge-base.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/rag-knowledge-base.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"检索与记忆","keywords":"RAG, 知识库, 向量检索, LongScriptChunker, Chroma, Embedding, 重排序, 分块","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"知识库与检索","name":"知识库与检索","description":"PenShot RAG 知识库的索引、分块、向量检索与模板召回实现，包含 LongScriptChunker、跨剧本只读复用、迁移脚本和当前接线状态。","url":"https://shot.helpenx.com/docs/rag-knowledge-base.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/rag-knowledge-base.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"检索与记忆","keywords":"RAG, 知识库, 向量检索, 模板召回, LongScriptChunker, Chroma, Embedding, 重排序, 分块, 跨剧本复用","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -126,25 +130,25 @@
       <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
     </div>
     <details class="toc-mobile">
-      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 17 节</summary>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">能力与接线状态</a></li><li class="toc-depth-2"><a href="#sec-2">知识库架构</a></li><li class="toc-depth-2"><a href="#sec-3">索引与分块</a></li><li class="toc-depth-3"><a href="#sec-4">入库切分</a></li><li class="toc-depth-3"><a href="#sec-5">长剧本分块：LongScriptChunker</a></li><li class="toc-depth-2"><a href="#sec-6">检索</a></li><li class="toc-depth-3"><a href="#sec-7">剧本内容检索：手动余弦</a></li><li class="toc-depth-3"><a href="#sec-8">模板检索：检索器加后置过滤</a></li><li class="toc-depth-3"><a href="#sec-9">空结果与索引自愈</a></li><li class="toc-depth-2"><a href="#sec-10">重排序</a></li><li class="toc-depth-2"><a href="#sec-11">提示词增强与工作流集成</a></li><li class="toc-depth-3"><a href="#sec-12">增强流程</a></li><li class="toc-depth-3"><a href="#sec-13">模板沉淀</a></li><li class="toc-depth-3"><a href="#sec-14">工作流调用点</a></li><li class="toc-depth-3"><a href="#sec-15">数据流</a></li><li class="toc-depth-2"><a href="#sec-16">持久化与恢复</a></li><li class="toc-depth-2"><a href="#sec-17">当前限制</a></li></ul>
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 19 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">能力与接线状态</a></li><li class="toc-depth-2"><a href="#sec-2">知识库架构</a></li><li class="toc-depth-2"><a href="#sec-3">索引与分块</a></li><li class="toc-depth-3"><a href="#sec-4">模板入库</a></li><li class="toc-depth-3"><a href="#sec-5">剧本内容入库</a></li><li class="toc-depth-3"><a href="#sec-6">长剧本分块：LongScriptChunker</a></li><li class="toc-depth-2"><a href="#sec-7">检索</a></li><li class="toc-depth-3"><a href="#sec-8">模板召回：本地优先，跨剧本补位</a></li><li class="toc-depth-3"><a href="#sec-9">剧本内容检索：手动余弦</a></li><li class="toc-depth-3"><a href="#sec-10">空结果与索引自愈</a></li><li class="toc-depth-2"><a href="#sec-11">重排序</a></li><li class="toc-depth-2"><a href="#sec-12">入库策略与提示词转换</a></li><li class="toc-depth-3"><a href="#sec-13">入库判定</a></li><li class="toc-depth-3"><a href="#sec-14">锚点召回与注入</a></li><li class="toc-depth-3"><a href="#sec-15">工作流调用点</a></li><li class="toc-depth-3"><a href="#sec-16">数据流</a></li><li class="toc-depth-2"><a href="#sec-17">持久化与恢复</a></li><li class="toc-depth-3"><a href="#sec-18">0.4.4 模板迁移</a></li><li class="toc-depth-2"><a href="#sec-19">当前限制</a></li></ul>
     </details>
     <div class="docs-layout">
       <article class="doc-body">
         <header class="doc-header">
           <span class="doc-header__cat">检索与记忆</span>
           <h1>知识库与检索</h1>
-          <p class="doc-deck">RAG 知识库、分块、向量检索与重排序的当前实现。</p>
+          <p class="doc-deck">RAG 知识库、模板召回、分块、向量检索与跨剧本复用的当前实现。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 18 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 26 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/rag-knowledge-base.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
-        <p>PenShot 的知识库与检索层把剧本解析结果、成功提示词模板与历史经验写入向量索引，并在工作流节点需要时按语义相似度取回，注入提示词或连续性修复流程。</p>
+        <p>PenShot 0.4.4 的知识库与检索层分成两条独立链路：提示词模板按角色/场景锚点召回，默认阈值 0.80、单次取 2 条、最多注入 6 条，并在本剧本名额未满时只读补位其他剧本；剧本内容索引仍由 <code>ScriptKnowledgeBase</code> 承载，用手动余弦服务连续性检查。三层记忆是第三条链路，只在工作流节点与两者交界。</p>
 
 <h2 id="sec-1">能力与接线状态</h2>
-<p>知识库挂在提示词模板管理器 <code>PromptTemplateManager</code>（<code>prompts/prompt_template_manager.py</code>）之下，由它同时持有按剧本隔离的模板索引与剧本内容索引。工作流节点只与这个中枢交互，不直接访问向量存储。下表列出各能力的实现位置与当前状态。</p>
+<p>模板链路挂在提示词模板管理器 <code>PromptTemplateManager</code>（<code>prompts/prompt_template_manager.py</code>）之下，工作流节点不直接访问向量存储。下表给出各能力的实现位置与 0.4.4 的真实状态。</p>
 <table>
 <thead>
 <tr>
@@ -155,13 +159,28 @@
 </thead>
 <tbody>
 <tr>
-<td>剧本内容索引与检索</td>
-<td><code>ScriptKnowledgeBase</code>，手动余弦</td>
+<td>模板沉淀与锚点召回</td>
+<td><code>search_similar_detailed</code>，<code>_recall_patterns_by_anchors</code></td>
 <td>已接线</td>
 </tr>
 <tr>
-<td>成功模板沉淀与提示词增强</td>
-<td><code>PromptTemplateManager</code></td>
+<td>跨剧本只读召回</td>
+<td><code>_retrieve_global</code>，<code>include_global=true</code></td>
+<td>已接线，默认开启</td>
+</tr>
+<tr>
+<td>legacy 模板隔离</td>
+<td><code>is_legacy_template</code> 与迁移脚本</td>
+<td>已接线，需手动执行迁移</td>
+</tr>
+<tr>
+<td>召回诊断</td>
+<td><code>metadata.anchor_recall</code></td>
+<td>已接线</td>
+</tr>
+<tr>
+<td>剧本内容索引与检索</td>
+<td><code>ScriptKnowledgeBase</code>，手动余弦</td>
 <td>已接线</td>
 </tr>
 <tr>
@@ -193,8 +212,8 @@
 </table>
 
 <h2 id="sec-2">知识库架构</h2>
-<p>索引层由两套相互独立的 LlamaIndex 向量索引组成，均以 <code>SimpleVectorStore</code> 为存储后端，并用 <code>script_id</code> 作为隔离键。模板索引保存质量审计通过的成功提示词；剧本内容索引由内嵌的 <code>ScriptKnowledgeBase</code>（<code>knowledge/llamaIndex/llama_index_knowledge.py</code>）承载，保存场景与角色文档。两者各有判分口径与过滤规则，不能视为同一个检索入口。</p>
-<p><code>ScriptKnowledgeBase</code> 的构造参数为 <code>(embeddings, script_id, storage_dir=None, chunk_size=512, chunk_overlap=20)</code>，第二个参数必需；内部用 <code>_indices</code>、<code>_vector_stores</code>、<code>_storage_contexts</code>、<code>_retrievers</code> 四组字典按剧本 ID 隔离数据。模板管理器同样按 <code>script_id</code> 维护索引与缓存，因此模板库不是全局共享的：真正跨剧本可见的只有长期记忆。</p>
+<p>索引层由两套相互独立的 LlamaIndex 向量索引组成，均以 <code>SimpleVectorStore</code> 为存储后端，并用 <code>script_id</code> 作为隔离键。模板索引保存通过入库策略的成功提示词，按剧本分目录；跨剧本召回不构建合并索引，而是扫描其他剧本的缓存并只读加载其持久化索引。剧本内容索引由内嵌的 <code>ScriptKnowledgeBase</code>（<code>knowledge/llamaIndex/llama_index_knowledge.py</code>）承载，保存场景与角色文档。两者判分口径与过滤规则不同，不能视为同一个检索入口。</p>
+<p><code>ScriptKnowledgeBase</code> 的构造参数为 <code>(embeddings, script_id, storage_dir=None, chunk_size=512, chunk_overlap=20)</code>，第二个参数必需；内部用 <code>_indices</code>、<code>_vector_stores</code>、<code>_storage_contexts</code>、<code>_retrievers</code> 四组字典按剧本 ID 隔离数据。模板管理器按 <code>script_id</code> 维护索引与缓存，跨剧本来源单独存放在 <code>_global_sources</code>，与本地索引分开，确保不写回、不参与重建。</p>
 <pre class="mermaid">flowchart TB
     subgraph Workflow[工作流节点层]
         W1[剧本解析]
@@ -208,14 +227,15 @@
     end
 
     subgraph Store[索引与记忆]
-        S1[模板向量索引]
-        S2[ScriptKnowledgeBase 剧本索引]
-        S3[三层记忆]
+        S1[本剧本模板索引]
+        S2[跨剧本只读召回]
+        S3[ScriptKnowledgeBase 剧本索引]
+        S4[三层记忆]
     end
 
     subgraph Disk[持久化]
         P1[(templates_cache.json 与 index_store)]
-        P2[(default__vector_store.json 与 docstore.json)]
+        P2[(default__vector_store.json docstore.json index_store.json)]
         P3[(Chroma)]
     end
 
@@ -224,26 +244,31 @@
     end
 
     W1 --&gt;|add_parsed_script| H1
-    W2 --&gt;|enhance_prompt| H1
-    W3 --&gt;|save_successful_prompt| H1
+    W2 --&gt;|search_similar_detailed| H1
+    W3 --&gt;|decide_ingestion 与 save_successful_prompt| H1
     W4 --&gt;|search_similar_scene| H1
     H1 --&gt; S1
-    H1 --&gt; S2
-    H1 -.-&gt; S3
+    S1 -.-&gt;|名额未满且 include_global| S2
+    H1 --&gt; S3
+    H1 -.-&gt; S4
     S1 --&gt; P1
-    S2 --&gt; P2
-    S3 --&gt; P3
-    K1 -.-&gt;|悬空引用| S2
+    S3 --&gt; P2
+    S4 --&gt; P3
     K1 -.-&gt;|悬空引用| S3
+    K1 -.-&gt;|悬空引用| S4
 </pre>
-<p>三层记忆是另一条链路，写入与召回机制见<a href="memory.html">记忆系统</a>。本页只说明它与知识库的交界：模板沉淀会向长期记忆写入成功模式，但不会从中回读；记忆检索也不参与向量索引的构建。</p>
+<p>模板入库同时把成功模式写入长期记忆的 <code>successful_prompt_patterns</code>（保留最近 200 条）。工作流转换节点会读取这批记忆并与召回结果合并，但记忆内容不会回填向量索引。三层记忆的写入与召回机制见<a href="memory.html">记忆系统</a>。</p>
 
 <h2 id="sec-3">索引与分块</h2>
-<p>“分块”在代码里有两个互不相关的层次：入库时的文本切分，以及尚未接线的超长剧本分块。前者决定检索粒度，后者决定单次任务处理多少场景，两者的参数与调用方都不同。</p>
+<p>“分块”在代码里有两个互不相关的层次：入库时的文本切分，以及尚未接线的超长剧本分块。前者决定检索粒度，后者决定单次任务处理多少场景。</p>
 
-<h3 id="sec-4">入库切分</h3>
-<p>调用 <code>add_parsed_script(parsed_script, script_id)</code> 时，剧本先被转成两类文档：每个场景一个 <code>type=scene</code> 文档，元数据含 <code>scene_id</code>、<code>location</code>、<code>time_of_day</code>、<code>element_count</code>；每个角色一个 <code>type=character</code> 文档，元数据含 <code>character_name</code>、<code>gender</code>、<code>role</code>。文档总数等于场景数加角色数，<code>script_id</code> 由入库方法逐文档注入。</p>
-<p>节点解析器的选择是一个条件分支：<code>chunk_size &gt; 1000</code> 时使用 <code>SentenceWindowNodeParser</code>（窗口 3），否则使用 <code>SentenceSplitter</code>。默认 512/20，因此默认路径是 <code>SentenceSplitter</code>；调大分块参数会连带切换解析器，这是调整分块参数时需要留意的一点。切分后的节点经嵌入模型向量化写入 <code>SimpleVectorStore</code>，并立即由 <code>_save_storage</code> 落盘，同时校验向量文件与 docstore 是否写盘成功。</p>
+<h3 id="sec-4">模板入库</h3>
+<p><code>save_successful_prompt(fragment_id, prompt_text, quality_score, script_id, additional_metadata, source, audit_status)</code> 要求调用方显式传入 <code>source</code> 与 <code>audit_status</code>，方法本身不再推断来源。写入经 <code>add_template</code> 完成：超过 2000 字符的模板截断为 1997 字符加省略号，按哈希与全文双重去重，并用 <code>_processing_stack</code> 防止递归重入。</p>
+<p>元数据先经 <code>MetadataPolicy.sanitize</code> 清洗，只允许白名单字段进入向量库：<code>type</code>、<code>hash</code>、<code>script_id</code>、<code>timestamp</code>、<code>quality_score</code>、<code>fragment_id</code>、<code>scene</code>、<code>style</code>、<code>shot_type</code>、<code>duration</code>、<code>task_id</code>、<code>source</code>、<code>schema_version</code>、<code>audit_status</code>；单字段超过 256 字符会被截断，提示词原文只写入 <code>Document.text</code>。缺少 <code>schema_version</code> 时写入当前契约版本 <code>0.4.4</code>，缺少 <code>audit_status</code> 时写入 <code>unknown</code>。模板用 <code>SentenceSplitter</code> 按 1024/20 切分为节点，因此接近 2000 字符的模板会占用多个节点，检索名额按节点而非模板计数。</p>
+
+<h3 id="sec-5">剧本内容入库</h3>
+<p>调用 <code>add_parsed_script(parsed_script, script_id)</code> 时，剧本先被转成两类文档：每个场景一个 <code>type=scene</code> 文档，元数据含 <code>scene_id</code>、<code>location</code>、<code>time_of_day</code>、<code>element_count</code>；每个角色一个 <code>type=character</code> 文档，元数据含 <code>character_name</code>、<code>gender</code>、<code>role</code>。文档总数等于场景数加角色数，<code>script_id</code> 由入库方法逐文档注入；未传 <code>script_id</code> 时会按时间戳生成一个。</p>
+<p>节点解析器的选择是一个条件分支：<code>chunk_size &gt; 1000</code> 时使用 <code>SentenceWindowNodeParser</code>（窗口 3），否则使用 <code>SentenceSplitter</code>。默认 512/20，因此默认路径是 <code>SentenceSplitter</code>；调大分块参数会连带切换解析器。切分后的节点经嵌入模型向量化写入 <code>SimpleVectorStore</code>，并由 <code>_save_storage</code> 立即落盘，同时校验向量文件与 docstore 是否写盘成功。</p>
 <pre class="mermaid">flowchart TD
     A[ParsedScript 场景与角色] --&gt; B[create_documents]
     B --&gt; C{chunk_size &gt; 1000}
@@ -256,8 +281,8 @@
     H --&gt; I[default__vector_store.json docstore.json index_store.json]
 </pre>
 
-<h3 id="sec-5">长剧本分块：LongScriptChunker</h3>
-<p><code>LongScriptChunker</code>（<code>continuity_guardian/long_script_chunker.py</code>）处理的是另一件事：把解析后的场景序列切成块，供逐块执行。参数为每块最多 30 个场景、单块预估时长上限 180 秒、块间重叠 3 个场景。</p>
+<h3 id="sec-6">长剧本分块：LongScriptChunker</h3>
+<p><code>LongScriptChunker</code>（<code>continuity_guardian/long_script_chunker.py</code>）把解析后的场景序列切成块，供逐块执行。参数为每块最多 30 个场景、单块预估时长上限 180 秒、块间重叠 3 个场景。</p>
 <p>切分使用“或”条件，任一条件满足即封块；判断发生在场景入块之前，因此场景不会被从中间切开，单个超长场景会成为新块的起点。封块后保留上一块末尾 3 个场景作为新块开端，并重算时长预算。场景时长按 <code>max(10.0, 元素数 × 4.0)</code> 估算：不调用模型，带 10 秒下限，精度有限。</p>
 <p>实现的策略只有“按场景切分”一种，代码中没有角色弧、情绪曲线或平衡分块的对应实现。全仓库没有生产调用方，<code>ScriptChunk</code> 的 <code>entry_character_states</code>、<code>exit_character_states</code>、<code>continuity_anchors</code> 三个字段只在数据类中声明、构建块时从不赋值，跨块状态传递尚未落地。超长剧本当前可用的做法是按叙事段落分段输入，逐段调用工作流。</p>
 <pre class="mermaid">flowchart TD
@@ -269,32 +294,124 @@
     C --&gt; F[遍历结束 结算末块]
 </pre>
 
-<h2 id="sec-6">检索</h2>
-<p>生产链路上有两条规则不同的检索路径，分别服务模板增强与场景检索。</p>
+<h2 id="sec-7">检索</h2>
+<p>生产链路上有两条规则不同的检索路径，分别服务模板召回与场景检索。</p>
 
-<h3 id="sec-7">剧本内容检索：手动余弦</h3>
-<p><code>ScriptKnowledgeBase.query()</code> 不走 LlamaIndex 检索器。它用 <code>embeddings.embed_query</code> 编码查询，遍历向量存储的 <code>embedding_dict</code>，逐个计算余弦相似度，按分数降序截断 <code>top_k</code>（默认 5），再从 docstore 取回文本与元数据。复杂度为 O(N)，没有近似索引，单剧本几十到几百个节点时开销可以接受，规模上万后查询延迟会随文档数线性上升。</p>
+<h3 id="sec-8">模板召回：本地优先，跨剧本补位</h3>
+<p><code>search_similar_detailed(query_text, script_id, top_k, min_score, include_global)</code> 先检索本剧本索引，再按四道规则过滤：分数低于阈值（取 <code>&gt;=</code>）丢弃，<code>metadata.type</code> 不是 <code>prompt_template</code> 丢弃，标记为 legacy 的节点丢弃，命中当前剧本 legacy 哈希集合的节点同样丢弃。结果截断到 <code>top_k</code>。</p>
+<p>本剧本命中数少于 <code>top_k</code>、<code>include_global=true</code> 且嵌入模型可用时，才扫描其他剧本补足剩余名额。跨剧本来源按目录读取 <code>templates_cache.json</code>，整库都是 legacy 的剧本直接跳过；持久化索引以只读方式加载，检索后按分数排序，取剩余名额。过滤规则与本地一致，结果追加在本剧本命中之后，并带 <code>source_scope=global</code> 与 <code>source_script_id</code>。跨剧本来源不会写入当前剧本的缓存或索引。</p>
+<p>生产默认值来自 <code>settings.prompt_templates</code>，由 <code>WorkflowNodes</code> 在构造管理器时注入：阈值 <code>0.80</code>、<code>top_k=2</code>、<code>include_global=true</code>、<code>max_injected_patterns=6</code>。直接构造 <code>PromptTemplateManager</code> 时类默认仍是 <code>0.5</code> 与 <code>3</code>，两条路径的默认值不同，应以配置为准。</p>
+<table>
+<thead>
+<tr>
+<th>配置项</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PENSHOT_PROMPT_TEMPLATES__MIN_SIMILARITY_SCORE</code></td>
+<td><code>0.80</code></td>
+<td>过滤阈值，按 0.4.4 实测基线校准</td>
+</tr>
+<tr>
+<td><code>PENSHOT_PROMPT_TEMPLATES__TOP_K</code></td>
+<td><code>2</code></td>
+<td>每次查询返回条数，本地优先占用</td>
+</tr>
+<tr>
+<td><code>PENSHOT_PROMPT_TEMPLATES__INCLUDE_GLOBAL</code></td>
+<td><code>true</code></td>
+<td>本剧本名额未满时只读补位其他剧本</td>
+</tr>
+<tr>
+<td><code>PENSHOT_PROMPT_TEMPLATES__MAX_INJECTED_PATTERNS</code></td>
+<td><code>6</code></td>
+<td>跨片段去重后可交给转换器的召回条数上限</td>
+</tr>
+</tbody>
+</table>
+<p>诊断结果随每次检索返回，含 <code>status</code>、<code>attempted</code>、<code>retrieved</code>、<code>hits</code>、<code>local_hits</code>、<code>global_hits</code>、<code>min_score</code>、<code>max_score</code>、<code>threshold</code>、<code>kb</code> 与 <code>last_repair</code>。状态枚举共 11 个，避免用空列表同时表示“空库”“索引不可用”“分数不达标”。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hit</code></td>
+<td>本剧本有命中</td>
+</tr>
+<tr>
+<td><code>hit_global</code></td>
+<td>本剧本无命中，跨剧本补位命中</td>
+</tr>
+<tr>
+<td><code>first_run_no_history</code></td>
+<td>完全首次运行，无历史模板也无跨剧本命中</td>
+</tr>
+<tr>
+<td><code>first_run_global_hit</code></td>
+<td>本剧本无活跃模板，但跨剧本命中</td>
+</tr>
+<tr>
+<td><code>empty_templates</code></td>
+<td>有历史缓存，但活跃模板为 0（全部 legacy）</td>
+</tr>
+<tr>
+<td><code>index_unavailable</code></td>
+<td>存在活跃模板但没有可用索引</td>
+</tr>
+<tr>
+<td><code>index_load_failed</code></td>
+<td>索引加载失败且无可用索引</td>
+</tr>
+<tr>
+<td><code>cache_index_mismatch</code></td>
+<td>缓存与索引文档数不一致，且本次无命中</td>
+</tr>
+<tr>
+<td><code>embeddings_unavailable</code></td>
+<td>嵌入模型不可用</td>
+</tr>
+<tr>
+<td><code>all_below_threshold</code></td>
+<td>检索到节点，但全部低于阈值</td>
+</tr>
+<tr>
+<td><code>retrieval_error</code></td>
+<td>检索过程抛出异常</td>
+</tr>
+</tbody>
+</table>
+
+<h3 id="sec-9">剧本内容检索：手动余弦</h3>
+<p><code>ScriptKnowledgeBase.query()</code> 不走 LlamaIndex 检索器。它用 <code>embed_query_vector</code> 编码查询，遍历向量存储的 <code>embedding_dict</code>，逐个计算余弦相似度，按分数降序截断 <code>top_k</code>（默认 5），再从 docstore 取回文本与元数据。复杂度为 O(N)，没有近似索引；单剧本几十到几百个节点时开销可以接受，规模上万后查询延迟会随文档数线性上升。</p>
 <p>这条路径不做任何分数过滤，低分结果同样会占满名额。签名中的 <code>search_type</code>、<code>use_rerank</code>、<code>rerank_model</code> 三个参数从未被读取；<code>search_similar_scene</code> 内部传了 <code>use_rerank=True</code>，同样不产生重排序行为。函数对缺参和缺索引做早退：未指定 <code>script_id</code> 时返回带 <code>error</code> 字段的空结果，索引或向量存储未就绪时同样返回结构化错误，不会跨剧本检索；模长为零时相似度按 0 处理。</p>
-
-<h3 id="sec-8">模板检索：检索器加后置过滤</h3>
-<p><code>PromptTemplateManager.search_similar</code> 走 LlamaIndex 的 <code>as_retriever</code>，取回候选后做两道后置过滤：分数低于 <code>min_similarity_score</code> 的丢弃，<code>metadata.type</code> 不是 <code>prompt_template</code> 的丢弃。<code>top_k</code> 默认 3；<code>min_similarity_score</code> 类默认 0.5，<code>WorkflowNodes</code> 注入 0.7。相似度阈值属于应用层，检索器本身没有默认阈值。参数 <code>include_global</code> 未被使用，检索只在本剧本索引内进行。</p>
-<p>两条路径的评分与过滤规则不同：模板路径先取检索器候选再按阈值与类型筛选，内容路径是无阈值的全量余弦排序，两者的分数不宜直接横向比较。</p>
+<p>两条路径的评分与过滤规则不同：模板路径先取候选再按阈值、类型与 legacy 规则筛选，内容路径是无阈值的全量余弦排序，两者的分数不宜直接横向比较。</p>
 <pre class="mermaid">flowchart LR
+    subgraph Template[模板召回 search_similar_detailed]
+        T1[查询文本] --&gt; T2[本剧本 as_retriever]
+        T2 --&gt; T3[阈值 0.80 与 type 过滤]
+        T3 --&gt; T4[排除 legacy 与 legacy 哈希]
+        T4 --&gt; T5{名额未满且 include_global}
+        T5 --&gt;|是| T6[其他剧本只读检索 按分数补位]
+        T5 --&gt;|否| T7[返回本地命中]
+        T6 --&gt; T8[本地在前 全局在后]
+    end
     subgraph Content[剧本内容检索 query]
         Q1[查询文本] --&gt; Q2[embed_query]
         Q2 --&gt; Q3[遍历 embedding_dict 计算余弦]
         Q3 --&gt; Q4[降序截断 top_k 默认 5]
         Q4 --&gt; Q5[无阈值过滤]
     end
-    subgraph Template[模板检索 search_similar]
-        T1[查询文本] --&gt; T2[as_retriever 相似度检索]
-        T2 --&gt; T3[后置过滤 min_similarity_score]
-        T3 --&gt; T4[仅保留 prompt_template 类型]
-    end
 </pre>
 
-<h3 id="sec-9">空结果与索引自愈</h3>
-<p>检索返回空通常不是阈值问题，而是索引恢复或数据本身的问题。常见原因与处理方式如下。</p>
+<h3 id="sec-10">空结果与索引自愈</h3>
+<p>检索返回空通常不是阈值问题，而是索引恢复、迁移状态或数据本身的问题。优先读 <code>anchor_recall.status</code> 与 <code>kb</code> 快照，再按下表排查。</p>
 <table>
 <thead>
 <tr>
@@ -305,9 +422,19 @@
 </thead>
 <tbody>
 <tr>
+<td>未执行 0.4.4 迁移</td>
+<td>0.4.3 缺陷模板没有 legacy 标记，仍参与召回</td>
+<td>先 dry-run 再执行 <code>migrate_prompt_templates_044.py --apply</code></td>
+</tr>
+<tr>
 <td>索引恢复不完整</td>
 <td><code>retrieve()</code> 返回 0 条；<code>from_vector_store</code> 报 <code>Cannot initialize from a vector store that does not store text</code></td>
 <td>用 <code>StorageContext.from_defaults(persist_dir=...)</code> 加载，再以 <code>VectorStoreIndex(nodes=[], storage_context=...)</code> 构造</td>
+</tr>
+<tr>
+<td>缓存与索引不一致</td>
+<td>状态为 <code>cache_index_mismatch</code></td>
+<td>写入或检索前会自动重建一次；仍有问题则检查 <code>index_store/</code></td>
 </tr>
 <tr>
 <td>docstore 文本缺失</td>
@@ -326,21 +453,22 @@
 </tr>
 <tr>
 <td>库中无数据</td>
-<td>结果为空但无异常</td>
+<td>状态为 <code>empty_templates</code> 或 <code>first_run_no_history</code></td>
 <td>确认剧本已入库；长期记忆需先积累达标样本</td>
 </tr>
 <tr>
 <td>阈值过高</td>
-<td>模板检索无命中</td>
-<td>调整 <code>min_similarity_score</code>，或用内容检索查看原始分数</td>
+<td>状态为 <code>all_below_threshold</code></td>
+<td>用内容检索查看原始分数，或下调 <code>MIN_SIMILARITY_SCORE</code></td>
 </tr>
 </tbody>
 </table>
-<p>向量文件损坏时，<code>_recreate_vector_store</code> 会把损坏文件备份为 <code>*_corrupted_{时间戳}</code>，清理 <code>docstore.json</code> 与 <code>index_store.json</code>，再重建空存储。损坏前的数据保留在备份文件中，恢复后需要重新入库。</p>
+<p>模板索引在检索或写入前由 <code>_ensure_index_ready</code> 校验：索引缺失或文档数与活跃模板数不一致时，从缓存全量重建一次，同一管理器实例内不重复重建，并把修复前后数量写入 <code>last_repair</code>。legacy 条目不参与重建。</p>
+<p>剧本内容索引的向量文件损坏时，<code>_recreate_vector_store</code> 会把损坏文件备份为 <code>*_corrupted_{时间戳}</code>，清理 <code>docstore.json</code> 与 <code>index_store.json</code>，再重建空存储。损坏前的数据保留在备份文件中，恢复后需要重新入库。</p>
 
-<h2 id="sec-10">重排序</h2>
-<p>重排序的实现只有一处：<code>create_retriever_for_script</code>。它支持 <code>similarity</code> 与 <code>mmr</code> 两种检索模式（<code>mmr_threshold=0.6</code>），在触发条件下装配 <code>SentenceTransformerRerank</code>：模型选择链为本地路径、配置名、<code>BAAI/bge-reranker-large</code>，<code>top_n</code> 取 3 与 <code>similarity_top_k</code> 的较小值，以节点后处理器方式挂到检索器上。启用重排序时会用 <code>as_retriever</code> 重建检索器且不携带查询模式，因此 mmr 会被覆盖，两者不能叠加。</p>
-<p>状态是“已装配，未生效”：触发条件为 <code>use_rerank or retriever_config.rerank_enabled</code>，而 <code>rerank_enabled</code> 默认为 <code>false</code>；唯一会装配它的 <code>KnowledgeRouter</code> 本身没有生产调用方；生产路径上的 <code>query()</code> 又不读取 <code>use_rerank</code>。仓库内的重排序对照测试脚本传入的同一参数同样不生效，其结果只能反映无重排序的基线。上述三点同时成立才会真正执行重排序。</p>
+<h2 id="sec-11">重排序</h2>
+<p>重排序的实现只有一处：<code>ScriptKnowledgeBase.create_retriever_for_script</code>。它支持 <code>similarity</code> 与 <code>mmr</code> 两种检索模式（<code>mmr_threshold=0.6</code>），在触发条件下装配 <code>SentenceTransformerRerank</code>：模型选择链为本地路径、配置名、<code>BAAI/bge-reranker-large</code>，<code>top_n</code> 取 3 与 <code>similarity_top_k</code> 的较小值，以节点后处理器方式挂到检索器上。启用重排序时会用 <code>as_retriever</code> 重建检索器且不携带查询模式，因此 mmr 会被覆盖，两者不能叠加。</p>
+<p>状态是“已装配，未生效”：触发条件为 <code>use_rerank or retriever_config.rerank_enabled</code>，而 <code>rerank_enabled</code> 默认为 <code>false</code>；唯一会调用它的 <code>KnowledgeRouter</code> 本身没有生产调用方；生产路径上的 <code>query()</code> 又不读取 <code>use_rerank</code>。上述三点同时成立才会真正执行重排序。</p>
 <table>
 <thead>
 <tr>
@@ -388,33 +516,78 @@
     H[KnowledgeRouter 未接线] -.-&gt;|唯一调用方| B
 </pre>
 
-<h2 id="sec-11">提示词增强与工作流集成</h2>
+<h2 id="sec-12">入库策略与提示词转换</h2>
 
-<h3 id="sec-12">增强流程</h3>
-<p><code>enhance_prompt(original_prompt, script_id, enhancement_mode)</code> 先处理 <code>none</code> 模式短路，再调用 <code>get_best_match</code>（即 <code>search_similar</code> 取 <code>top_k=1</code>）。命中后按模式拼接：<code>append</code> 为原始提示词在前、追加参考优秀模板段；<code>replace</code> 与 <code>hybrid</code> 走同一个 <code>_merge_prompts</code>，模板在前、原始提示词置后并标注“根据当前片段调整”。两种模式都只是字符串拼接，没有额外融合算法，消化模板的是下游 LLM。未命中时原样返回。</p>
+<h3 id="sec-13">入库判定</h3>
+<p>质量审计完成后，节点用 <code>decide_ingestion(audit_status, quality_score, active_template_count, severities)</code> 对整批片段判定一次，再对所有片段应用同一结论。判定顺序与结果如下。</p>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>结果</th>
+<th>source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>没有审计结果</td>
+<td>拒绝，<code>pre_audit</code></td>
+<td>空</td>
+</tr>
+<tr>
+<td>问题含 <code>major</code> 或 <code>critical</code></td>
+<td>拒绝，<code>severe_violations</code></td>
+<td>空</td>
+</tr>
+<tr>
+<td>本剧本活跃模板数为 0</td>
+<td>允许，<code>cold_start</code>（放宽分数门槛，但不放宽严重缺陷）</td>
+<td><code>cold_start_seed</code></td>
+</tr>
+<tr>
+<td>审计状态为 <code>passed</code></td>
+<td>允许，<code>audit_passed</code></td>
+<td><code>quality_audit_passed</code></td>
+</tr>
+<tr>
+<td>分数 ≥ 90</td>
+<td>允许，<code>score_threshold</code></td>
+<td><code>quality_audit_score</code></td>
+</tr>
+<tr>
+<td>其余</td>
+<td>拒绝，<code>below_threshold</code>；产物照常输出并标记 <code>quality_gate</code></td>
+<td>空</td>
+</tr>
+</tbody>
+</table>
+<p>审计结果的 <code>metadata.quality_gate</code> 会记录 <code>status</code>（判定原因）、<code>score</code>、<code>blocking=false</code>、<code>ingestion_allowed</code> 与 <code>audit_status</code>。未达入库门槛不等同于任务失败：产物仍会输出，只是携带“仅供预览”的标记。</p>
+
+<h3 id="sec-14">锚点召回与注入</h3>
+<p>0.4.4 的提示词转换节点不再对整段提示词调用 <code>enhance_prompt</code>，而是逐片段构建锚点查询：主角色的名称与契约外观锚点，加上所属场景的地点与时间；无契约或无角色/场景锚点的片段计入 <code>queries_skipped</code>，不发查询。每条查询调用一次 <code>search_similar_detailed</code>（<code>top_k=2</code>），命中结果跨片段去重后截断到 <code>max_injected_patterns=6</code>，再追加长期记忆中的成功模式，通过 <code>apply_historical_context</code> 交给转换器。</p>
+<p>召回统计写入 <code>instructions.metadata.anchor_recall</code>：<code>fragments</code>、<code>queries</code>、<code>queries_skipped</code>、<code>attempted</code>、<code>hits</code>、<code>injected</code>、<code>status</code>、<code>kb</code>、<code>min_score</code>、<code>max_score</code>、<code>top_k</code>、<code>error</code>，发生索引重建时另有 <code>rebuilt</code>。多片段查询的状态按“有命中优先、失败按严重度”聚合。</p>
+<p>注入规模有上限，但渲染仍保守：LLM 转换路径的 <code>history_hint</code> 当前只取首条召回文本的前 100 字符作为“参考成功模式”。因此 <code>anchor_recall.injected</code> 记录的是交给转换器的条数，不等于模型实际读到的全文条数。<code>enhance_prompt</code>、<code>get_best_match</code> 仍保留为管理器公开方法（后者等价于 <code>top_k=1</code> 的检索），但 0.4.4 生产链路没有调用方。</p>
 <pre class="mermaid">flowchart TD
-    A[原始提示词] --&gt; B{enhancement_mode}
-    B --&gt;|none| Z[原样返回]
-    B --&gt;|其他模式| C[get_best_match top_k=1]
-    C --&gt; D{分数达标且类型为 prompt_template}
-    D --&gt;|否| Z
-    D --&gt;|是| E{拼接模式}
-    E --&gt;|append| F[原始在前 追加参考模板]
-    E --&gt;|replace 或 hybrid| G[模板在前 原始置后]
-    F --&gt; H[增强后提示词]
-    G --&gt; H
+    A[片段集合与一致性契约] --&gt; B{片段有角色或场景锚点?}
+    B --&gt;|否| S[计入 queries_skipped]
+    B --&gt;|是| C[构建锚点查询]
+    C --&gt; D[search_similar_detailed top_k=2]
+    D --&gt; E[本地命中 不足则跨剧本补位]
+    E --&gt; F[跨片段去重]
+    F --&gt; G[截断到 6 条]
+    G --&gt; H[合并长期记忆成功模式]
+    H --&gt; I[apply_historical_context]
+    I --&gt; J[写入 anchor_recall 统计]
 </pre>
 
-<h3 id="sec-13">模板沉淀</h3>
-<p>质量审计状态为 <code>PASSED</code> 时，节点逐片段调用 <code>save_successful_prompt(fragment_id, prompt_text, quality_score, script_id, additional_metadata)</code>，元数据标记 <code>source=quality_audit_passed</code>。写入经 <code>add_template</code>：超过 2000 字符的模板截断为 1997 字符加省略号，入库前做哈希与全文双重去重，并由 <code>_processing_stack</code> 防止递归重入；模板写入本剧本索引与 <code>templates_cache.json</code>，默认同时写入长期记忆的 <code>successful_prompt_patterns</code>。长期记忆方向只写不读，不会回流模板索引；审计失败不产生任何知识沉淀。</p>
-
-<h3 id="sec-14">工作流调用点</h3>
-<p>四个调用点均在 <code>workflow_nodes.py</code>：剧本解析节点入库（<code>add_parsed_script</code>），提示词转换节点增强（<code>enhance_prompt</code>，<code>append</code> 模式），质量审计节点通过后沉淀（<code>save_successful_prompt</code>），连续性守护节点为每个问题检索相似场景（<code>search_similar_scene</code>，<code>top_k=2</code>），命中结果写入问题对象的 <code>historical_solutions</code>，且受 <code>hasattr</code> 守卫。属性名 <code>self.knowledge_manager</code> 的类型就是 <code>PromptTemplateManager</code>，属于历史命名。节点的完整职责见<a href="nodes.html">工作流节点</a>，连续性问题的判定逻辑见<a href="consistency.html">一致性策略</a>。</p>
+<h3 id="sec-15">工作流调用点</h3>
+<p>四个调用点均在 <code>workflow_nodes.py</code>：剧本解析节点入库（<code>add_parsed_script</code>），提示词转换节点锚点召回（<code>search_similar_detailed</code>），质量审计节点按入库策略沉淀（<code>save_successful_prompt</code>），连续性守护节点为每个问题检索相似场景（<code>search_similar_scene</code>，<code>top_k=2</code>）。场景检索前先检查 <code>is_script_kb_available()</code>（要求已有剧本入库），命中结果写入问题对象的 <code>historical_solutions</code>，并受 <code>hasattr</code> 守卫。属性名 <code>self.knowledge_manager</code> 的类型就是 <code>PromptTemplateManager</code>，属于历史命名。</p>
+<p>节点的完整职责见<a href="nodes.html">工作流节点</a>，连续性问题的判定与修复见<a href="consistency.html">一致性策略</a>。</p>
 <pre class="mermaid">flowchart LR
     N1[剧本解析] --&gt; N2[分镜生成] --&gt; N3[视频分割] --&gt; N4[提示词转换] --&gt; N5[质量审计] --&gt; N6[连续性守护] --&gt; N7[结果生成]
     N1 -.-&gt; I1[add_parsed_script]
-    N4 -.-&gt; I2[enhance_prompt]
-    N5 -.-&gt; I3[save_successful_prompt]
+    N4 -.-&gt; I2[search_similar_detailed 锚点召回]
+    N5 -.-&gt; I3[decide_ingestion 与 save_successful_prompt]
     N6 -.-&gt; I4[search_similar_scene top_k=2]
     I1 --&gt; H[PromptTemplateManager]
     I2 --&gt; H
@@ -422,44 +595,54 @@
     I4 --&gt; H
 </pre>
 
-<h3 id="sec-15">数据流</h3>
-<p>阶段执行遵循“开工读历史、执行查知识库、收工写归档”：四个处理节点开工前从三层记忆按固定键读取历史上下文（短期问题、中期统计、长期模式），收工后由 <code>WorkflowMemory.after_stage_completion</code> 分三层写入；知识库侧则是解析结果入库、模板检索与模板沉淀三条线。记忆的键名与分层规则见<a href="memory.html">记忆系统</a>，工作流整体结构见<a href="architecture.html">技术架构</a>。</p>
+<h3 id="sec-16">数据流</h3>
+<p>阶段执行遵循“开工读历史、执行查知识库、收工写归档”：四个处理节点开工前从三层记忆按固定键读取历史上下文（短期问题、中期统计、长期模式），收工后由 <code>WorkflowMemory.after_stage_completion</code> 分三层写入；知识库侧则是解析结果入库、锚点召回与模板沉淀三条线。记忆的键名与分层规则见<a href="memory.html">记忆系统</a>，工作流整体结构见<a href="architecture.html">技术架构</a>。</p>
 <pre class="mermaid">flowchart LR
     P[剧本解析] --&gt;|add_parsed_script| V[(剧本向量索引)]
     P --&gt; PR[(parsed_results JSON)]
     V --&gt;|query 手动余弦| C[连续性守护]
-    T[(模板索引)] --&gt;|get_best_match| E[提示词转换]
-    A[质量审计] --&gt;|审查通过 save_successful_prompt| T
+    T[(模板索引)] --&gt;|search_similar_detailed| E[提示词转换]
+    T2[(其他剧本模板索引 只读)] -.-&gt;|名额未满时补位| E
+    A[质量审计] --&gt;|入库策略通过 save_successful_prompt| T
     W[(三层记忆)] -.-&gt;|历史上下文| P
-    W -.-&gt;|历史上下文| E
+    W -.-&gt;|成功模式| E
     P --&gt;|阶段写入| W
     A --&gt;|阶段写入| W
     E --&gt;|阶段写入| W
 </pre>
 
-<h2 id="sec-16">持久化与恢复</h2>
-<p>剧本索引持久化为 <code>default__vector_store.json</code>（兼容读取旧名 <code>vector_store.json</code>）、<code>docstore.json</code> 与 <code>index_store.json</code>；解析结果单独存放在 <code>parsed_results/{script_id}.json</code>；模板库存放在 <code>prompt_templates/{script_id}/</code> 下的 <code>templates_cache.json</code> 与 <code>index_store/</code>。目录中的 <code>graph_store.json</code> 与 <code>image__vector_store.json</code> 是 LlamaIndex 持久化的空占位，不承载数据。</p>
-<p>加载是分层的：构造 <code>ScriptKnowledgeBase</code> 时只扫描剧本目录、把解析结果 JSON 读入内存，向量索引延迟到首次访问时由 <code>_ensure_script_index</code> 从 <code>persist_dir</code> 恢复；模板索引与缓存同样在首次访问该剧本时加载。进程重启后三类文件各自恢复，互不依赖；长期记忆中的模板不会回填模板索引。</p>
+<h2 id="sec-17">持久化与恢复</h2>
+<p>模板库存放在 <code>data/embedding/prompt_templates/{script_id}/</code> 下的 <code>templates_cache.json</code> 与 <code>index_store/</code>；剧本内容索引存放在 <code>data/embedding/script_kb/{script_id}/</code>，包含 <code>default__vector_store.json</code>（兼容读取旧名 <code>vector_store.json</code>）、<code>docstore.json</code>、<code>index_store.json</code>，解析结果单独存放在同目录的 <code>parsed_results/{script_id}.json</code>。目录中的 <code>graph_store.json</code> 与 <code>image__vector_store.json</code> 是 LlamaIndex 持久化的空占位，不承载数据。</p>
+<p>加载是分层的：构造 <code>ScriptKnowledgeBase</code> 时只扫描剧本目录、把解析结果 JSON 读入内存，向量索引延迟到首次访问时由 <code>_ensure_script_index</code> 从 <code>persist_dir</code> 恢复；模板索引与缓存在首次访问该剧本时加载。跨剧本来源同样延迟加载，且只读。进程重启后三类文件各自恢复，互不依赖；长期记忆中的模板不会回填模板索引。</p>
 <pre class="mermaid">flowchart TB
     subgraph Runtime[运行时]
-        R1[剧本向量索引]
-        R2[模板索引与缓存]
-        R3[解析结果结构]
+        R1[本剧本模板索引]
+        R2[跨剧本只读索引]
+        R3[剧本内容索引]
+        R4[解析结果结构]
     end
     subgraph Disk[磁盘 按剧本隔离]
-        D1[(default__vector_store.json docstore.json index_store.json)]
-        D2[(templates_cache.json 与 index_store)]
+        D1[(prompt_templates/script_id/templates_cache.json 与 index_store)]
+        D2[(script_kb/script_id/default__vector_store.json docstore.json index_store.json)]
         D3[(parsed_results/script_id.json)]
     end
-    R1 --&gt;|_save_storage| D1
-    R2 --&gt;|_save_cache_for_script| D2
+    R1 --&gt;|_save_index_for_script| D1
+    D1 --&gt;|首次访问加载| R1
+    D2 --&gt;|首次访问恢复| R3
+    D1 -.-&gt;|只读扫描其他剧本| R2
+    R4 --&gt;|构造时 _load_all_scripts| D3
     R3 --&gt;|_save_parsed_result| D3
-    D1 --&gt;|首次访问恢复| R1
-    D2 --&gt;|首次访问加载| R2
-    D3 --&gt;|构造时 _load_all_scripts| R3
 </pre>
 
-<h2 id="sec-17">当前限制</h2>
+<h3 id="sec-18">0.4.4 模板迁移</h3>
+<p>迁移脚本 <code>scripts/migrate_prompt_templates_044.py</code> 处理两件事：把 0.4.3 已入库的缺陷模板移入隔离清单，把缺少 <code>schema_version</code> 的旧模板标记为 legacy。默认是 dry-run，只打印统计；加 <code>--apply</code> 才写入，<code>--script-id SID</code> 可限定单个剧本。</p>
+<pre class="hljs"><code>python scripts/migrate_prompt_templates_044.py                    # 全库 dry-run
+python scripts/migrate_prompt_templates_044.py --script-id SID     # 单剧本 dry-run
+python scripts/migrate_prompt_templates_044.py --apply             # 全库写入
+</code></pre>
+<p>写入前会把 <code>templates_cache.json</code> 与 <code>index_store/</code> 备份到 <code>backups/044_{时间戳}/{script_id}/</code>；被隔离的模板完整写入 <code>quarantine_044.json</code> 而不是删除；未隔离但缺少版本的模板标记 <code>schema_version=legacy</code> 与 <code>audit_status=unknown</code>，随后按迁移结果重建索引，无活跃模板时清空索引目录。执行后生成 <code>migration_044_report.json</code>。不执行迁移时，旧模板没有 legacy 标记，仍会参与召回。</p>
+
+<h2 id="sec-19">当前限制</h2>
 <table>
 <thead>
 <tr>
@@ -474,7 +657,15 @@
 </tr>
 <tr>
 <td>两条路径口径不一致</td>
-<td>模板有阈值与类型过滤，内容检索无阈值，分数不可比</td>
+<td>模板有 0.80 阈值与类型/legacy 过滤，内容检索无阈值，分数不可比</td>
+</tr>
+<tr>
+<td>召回渲染保守</td>
+<td>最多注入 6 条，但 <code>history_hint</code> 只展示首条前 100 字符</td>
+</tr>
+<tr>
+<td>逐片段检索</td>
+<td>每个有锚点的片段各发一次查询，片段多时检索次数线性增长</td>
 </tr>
 <tr>
 <td>重排序未生效</td>
@@ -493,16 +684,20 @@
 <td>无实体抽取、图存储与图遍历</td>
 </tr>
 <tr>
-<td>剧本隔离</td>
-<td>模板与内容索引跨剧本不可见，经验复用限于长期记忆</td>
+<td>跨剧本只读</td>
+<td>只能补足本剧本未满名额，命中不会沉淀回当前剧本索引</td>
+</tr>
+<tr>
+<td>旧模板需迁移</td>
+<td>未执行 0.4.4 迁移时，缺陷模板仍以活跃状态参与召回</td>
 </tr>
 <tr>
 <td>一致性无校验</td>
 <td>嵌入模型或维度变化后不报错，分数失真</td>
 </tr>
 <tr>
-<td>空库无告警</td>
-<td>长期记忆可能为 0 文档，检索返回空结果且不提示</td>
+<td>诊断不主动告警</td>
+<td>空库与首次运行可区分，但只写入元数据，不产生告警</td>
 </tr>
 </tbody>
 </table>
@@ -520,7 +715,7 @@
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">能力与接线状态</a></li><li class="toc-depth-2"><a href="#sec-2">知识库架构</a></li><li class="toc-depth-2"><a href="#sec-3">索引与分块</a></li><li class="toc-depth-3"><a href="#sec-4">入库切分</a></li><li class="toc-depth-3"><a href="#sec-5">长剧本分块：LongScriptChunker</a></li><li class="toc-depth-2"><a href="#sec-6">检索</a></li><li class="toc-depth-3"><a href="#sec-7">剧本内容检索：手动余弦</a></li><li class="toc-depth-3"><a href="#sec-8">模板检索：检索器加后置过滤</a></li><li class="toc-depth-3"><a href="#sec-9">空结果与索引自愈</a></li><li class="toc-depth-2"><a href="#sec-10">重排序</a></li><li class="toc-depth-2"><a href="#sec-11">提示词增强与工作流集成</a></li><li class="toc-depth-3"><a href="#sec-12">增强流程</a></li><li class="toc-depth-3"><a href="#sec-13">模板沉淀</a></li><li class="toc-depth-3"><a href="#sec-14">工作流调用点</a></li><li class="toc-depth-3"><a href="#sec-15">数据流</a></li><li class="toc-depth-2"><a href="#sec-16">持久化与恢复</a></li><li class="toc-depth-2"><a href="#sec-17">当前限制</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">能力与接线状态</a></li><li class="toc-depth-2"><a href="#sec-2">知识库架构</a></li><li class="toc-depth-2"><a href="#sec-3">索引与分块</a></li><li class="toc-depth-3"><a href="#sec-4">模板入库</a></li><li class="toc-depth-3"><a href="#sec-5">剧本内容入库</a></li><li class="toc-depth-3"><a href="#sec-6">长剧本分块：LongScriptChunker</a></li><li class="toc-depth-2"><a href="#sec-7">检索</a></li><li class="toc-depth-3"><a href="#sec-8">模板召回：本地优先，跨剧本补位</a></li><li class="toc-depth-3"><a href="#sec-9">剧本内容检索：手动余弦</a></li><li class="toc-depth-3"><a href="#sec-10">空结果与索引自愈</a></li><li class="toc-depth-2"><a href="#sec-11">重排序</a></li><li class="toc-depth-2"><a href="#sec-12">入库策略与提示词转换</a></li><li class="toc-depth-3"><a href="#sec-13">入库判定</a></li><li class="toc-depth-3"><a href="#sec-14">锚点召回与注入</a></li><li class="toc-depth-3"><a href="#sec-15">工作流调用点</a></li><li class="toc-depth-3"><a href="#sec-16">数据流</a></li><li class="toc-depth-2"><a href="#sec-17">持久化与恢复</a></li><li class="toc-depth-3"><a href="#sec-18">0.4.4 模板迁移</a></li><li class="toc-depth-2"><a href="#sec-19">当前限制</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
           <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/rag-knowledge-base.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
@@ -531,7 +726,7 @@
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

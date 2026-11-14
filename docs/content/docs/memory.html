@@ -1,6 +1,6 @@
 <p>PenShot 的记忆系统按短期、中期、长期三层保存任务上下文与历史经验：<code>MemoryManager</code> 按剧本路由到 <code>ScriptMemory</code>，后者统一负责写入分发、召回组装与提示词格式化。</p>
 <blockquote>
-<p><strong>适用范围</strong>：实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入，已接入工作流四个处理阶段。中期摘要重启后无法读回、长期库为空时检索返回空结果、Redis 运行期中断会丢失当次交互，均属于已知边界。</p>
+<p><strong>适用范围</strong>：本页对应 v0.4.4 源码。实现位于 <code>knowledge/memory/</code>，配置由 <code>MemoryConfig</code> 注入，已接入工作流四个处理阶段。中期摘要重启后无法读回、长期库为空时检索返回空结果、Redis 运行期中断会丢失当次交互，均属于已知边界。</p>
 </blockquote>
 <h2>架构与隔离</h2>
 <p><code>MemoryManager</code> 是多剧本容器，内部持有 <code>Dict[str, ScriptMemory]</code>；<code>ScriptMemory</code> 才真正持有三层记忆。<code>MemoryManager</code> 的职责是按 <code>script_id</code> 路由，并统一做序列化与反序列化。</p>
@@ -188,6 +188,7 @@
 </pre>
 <p>长期层是“成功样本驱动”的冷启动系统。工作流阶段完成后，<code>_is_successful_case</code> 先判定是否达标（例如 <code>parse_script</code> 要求 <code>completeness_score &gt;= 0.8</code>），通过才生成条目：格式为阶段名 + 统计 + 场景/角色/镜头摘要，单条限 2000 字符，成功模式保留最近 30 条。未达标就跳过写入。</p>
 <p>因此空库不是异常：集合文档数为 0 时，检索安静返回零条结果，依赖历史经验增强的逻辑静默退化为“没有经验可用”。长期库也没有自动过期，只能显式清理。</p>
+<p>另有一类由模板管理器写入的长期条目：质量审计通过的提示词以 <code>successful_prompt_patterns</code> 为键、按哈希去重后序列化保存，保留最近 200 条。它们只供提示词转换节点作为历史参考，<code>history_hint</code> 截取首条前 100 个字符；这些条目不会回填模板向量索引，模板召回仍以模板库为准。</p>
 <p>两个必须核对的约束：查询与写入必须使用同一套嵌入模型与维度，换模型等于换度量尺；<code>similarity_search_with_score</code> 在 Chroma 默认 L2 度量下返回距离（越小越相似），而过滤条件是 <code>score &gt;= threshold</code>，方向与“保留更相似结果”相反，使用前应打印分数分布确认。</p>
 <h2>写入分发</h2>
 <p><code>ScriptMemory.add(input_text, output_text, level, metadata)</code> 的语义是一对交互，而不是键值写入。所有条目先写短期，再按级别或重要性分流：</p>

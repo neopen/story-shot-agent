@@ -1,6 +1,6 @@
 <p>PenShot 用 LangGraph 检查点持久化工作流状态：每个 super-step 结束后把完整状态快照写入 saver，理论上可凭同一 <code>thread_id</code> 从最近快照恢复。当前版本只接通写入侧，断点续传尚未生效。</p>
 <blockquote>
-<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.3.x 源码。检查点文件只用于状态回溯，不能替代业务结果存档。</p>
+<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.4.4 源码。检查点文件只用于状态回溯，不能替代业务结果存档。</p>
 </blockquote>
 <h2>能力边界</h2>
 <table>

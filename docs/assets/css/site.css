@@ -1016,7 +1016,7 @@ ol {
 .workflow {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1030,8 +1030,13 @@ ol {
   border-left: 1px solid var(--line);
 }
 
-.workflow-step:first-child {
+.workflow-step:first-child,
+.workflow-step:nth-child(5) {
   border-left: 0;
+}
+
+.workflow-step:nth-child(n + 5) {
+  border-top: 1px solid var(--line);
 }
 
 .workflow-step::after {
@@ -1046,7 +1051,8 @@ ol {
   z-index: 2;
 }
 
-.workflow-step:last-child::after {
+.workflow-step:last-child::after,
+.workflow-step:nth-child(4)::after {
   display: none;
 }
 
@@ -2472,23 +2478,16 @@ ol {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .workflow-step:nth-child(4) {
+  .workflow-step:nth-child(4),
+  .workflow-step:nth-child(7) {
     border-left: 0;
-    border-top: 1px solid var(--line);
   }
 
-  .workflow-step:nth-child(5),
-  .workflow-step:nth-child(6) {
+  .workflow-step:nth-child(n + 4) {
     border-top: 1px solid var(--line);
   }
 
   .workflow-step::after {
-    display: none;
-  }
-
-  .workflow-step:nth-child(4)::after,
-  .workflow-step:nth-child(5)::after,
-  .workflow-step:nth-child(6)::after {
     display: none;
   }
 

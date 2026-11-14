@@ -1,4 +1,4 @@
-<p>PenShot 是基于 LangGraph 的剧本分镜工作流：接入层接收剧本，任务层排队调度，六个业务节点顺序生成分镜提示词，四个控制节点负责循环计数、错误回退、人工干预与结果收口。</p>
+<p>PenShot（<code>story-shot-agent</code>）是基于 LangGraph 的剧本分镜工作流：接入层接收剧本，任务层排队调度，<strong>八个业务节点</strong>顺序生成分镜提示词、资产计划与模型路由结果，四个控制节点负责循环计数、错误回退、人工干预与结果收口。当前版本 <strong>v0.4.4</strong>。</p>
 
 <h2>分层架构</h2>
 <p>系统按接入、任务、工作流、智能体、记忆五层划分，各层可独立降级；输出端由 WorkflowOutputFixer 修复片段序列后以 JSON 返回。</p>
@@ -24,7 +24,8 @@
     end
 
     subgraph Agent[智能体层]
-        AG[六个业务智能体&lt;br/&gt;解析/拆分/分段/转换/审查/守护]
+        AG[八个业务智能体&lt;br/&gt;解析/资产/拆分/分段/转换/路由/审查/守护]
+        REG[模型能力注册表&lt;br/&gt;capability_registry]
         LLM[LLM 客户端&lt;br/&gt;OpenAI/Ollama/Qwen/DeepSeek]
     end
 
@@ -38,6 +39,7 @@
     Input --&gt; Task
     Task --&gt; Workflow
     Workflow --&gt; Agent
+    AG --&gt; REG
     Workflow --&gt; Memory
     SM --&gt; ST
     SM --&gt; MT
@@ -71,8 +73,8 @@
 </tr>
 <tr>
 <td style="text-align:left">智能体层</td>
-<td style="text-align:left">六个业务智能体、LLM 客户端注册表</td>
-<td style="text-align:left">内容生成与校验</td>
+<td style="text-align:left">八个业务智能体、模型能力注册表、LLM 客户端注册表</td>
+<td style="text-align:left">内容生成、资产规划、模型适配与校验</td>
 </tr>
 <tr>
 <td style="text-align:left">记忆层</td>
@@ -97,7 +99,7 @@
 </tr>
 <tr>
 <td style="text-align:left">LLM</td>
-<td style="text-align:left">OpenAI、Ollama、通义千问、DeepSeek，按 <code>base_url</code> 路由</td>
+<td style="text-align:left">OpenAI、Ollama、通义千问、DeepSeek，按 <code>base_url</code> 路由；默认 <code>gpt-4o</code>，<code>timeout=300</code></td>
 </tr>
 <tr>
 <td style="text-align:left">任务队列</td>
@@ -115,17 +117,21 @@
 <td style="text-align:left">记忆</td>
 <td style="text-align:left">ScriptMemory 三层：Redis / 磁盘 / Chroma</td>
 </tr>
+<tr>
+<td style="text-align:left">资产与路由</td>
+<td style="text-align:left">Pydantic 契约模型 + 静态能力注册表 + <code>settings.yaml</code> 路由规则</td>
+</tr>
 </tbody>
 </table>
 
 <p>各层独立降级：Redis 不可用时任务记录落进程内存，SQLite 不可写时检查点转内存模式，LLM 不可用时智能体退回规则引擎。单点故障不会直接中断工作流，但降级后的任务记录与检查点无法跨进程恢复。</p>
 
-<p><code>video_model</code>（runway_gen2 / sora / veo / pika 等）只影响提示词风格适配。PenShot 不调用视频模型，也不包含 FFmpeg 合成环节。</p>
+<p><code>video_model</code>（runway_gen2 / sora / veo / pika 等）只影响提示词风格适配。PenShot 不调用视频模型，也不包含 FFmpeg 合成环节；v0.4.3 起可选的图生视频路由只生成首帧指令与适配包，不执行真实视频生成。</p>
 
 <p>调用方可选四种入口，但四者最终都收敛到 <code>TaskFactory</code>：Python API 适合脚本内嵌，REST API 适合服务化，MCP Server 面向智能体工具调用，CLI 用于本地调试。入口层不保存状态，任务进度统一由任务层回写。</p>
 
 <h2>节点构成</h2>
-<p>核心工作流包含六个业务节点与四个控制节点。业务节点生产内容；控制节点不生成内容，只做计数、路由、兜底与收口，因此不参与质量评分。</p>
+<p>核心工作流包含八个业务节点与四个控制节点。业务节点生产内容；控制节点不生成内容，只做计数、路由、兜底与收口，因此不参与质量评分。</p>
 
 <pre class="mermaid">flowchart TD
     subgraph Input [输入层]
@@ -135,26 +141,28 @@
 
     subgraph Core [LangGraph 多智能体核心工作流]
         direction TB
-        
-        P1[剧本解析智能体] --&gt; P2[镜头拆分智能体]
-        P2 --&gt; C1[循环检查&lt;br/&gt;LOOP_CHECK]
-        C1 --&gt; P3[视频分段智能体]
-        P3 --&gt; C1
-        C1 --&gt; P4[指令转换智能体]
+
+        P1[剧本解析&lt;br/&gt;PARSE_SCRIPT] --&gt; P2[资产计划&lt;br/&gt;GENERATE_ASSETS]
+        P2 --&gt; P3[镜头拆分&lt;br/&gt;SEGMENT_SHOT]
+        P3 --&gt; C1[循环检查&lt;br/&gt;LOOP_CHECK]
+        C1 --&gt; P4[片段切割&lt;br/&gt;SPLIT_VIDEO]
         P4 --&gt; C1
-        C1 --&gt; P5[质量审计智能体]
-        P5 --&gt; P6[连续性守护智能体]
-        P6 --&gt; P7[结果生成节点]
-        
+        C1 --&gt; P5[提示词转换&lt;br/&gt;CONVERT_PROMPT]
+        P5 --&gt; P6[模型路由&lt;br/&gt;ROUTE_MODEL]
+        P6 --&gt; C1
+        C1 --&gt; P7[质量审计&lt;br/&gt;AUDIT_QUALITY]
+        P7 --&gt; P8[连续性守护&lt;br/&gt;CONTINUITY_CHECK]
+        P8 --&gt; P9[结果生成&lt;br/&gt;GENERATE_OUTPUT]
+
         subgraph Control [控制与异常节点]
             C2[错误处理&lt;br/&gt;ERROR_HANDLER]
             C3[人工干预&lt;br/&gt;HUMAN_INTERVENTION]
         end
-        
+
         C1 -.-&gt;|循环超限| C2
         C1 -.-&gt;|需要人工| C3
         P1 -.-&gt;|失败| C2
-        P5 -.-&gt;|失败| C2
+        P7 -.-&gt;|失败| C2
     end
 
     subgraph Memory [记忆层]
@@ -171,8 +179,7 @@
     M1 --&gt; Core
     M2 --&gt; Core
     M3 --&gt; Core
-    P7 --&gt; O1
-
+    P9 --&gt; O1
 </pre>
 
 <table>
@@ -186,8 +193,13 @@
 <tbody>
 <tr>
 <td style="text-align:left">PARSE_SCRIPT</td>
-<td style="text-align:left">统一剧本格式，提取场景、角色、动作、对话</td>
+<td style="text-align:left">统一剧本格式，提取场景、角色、动作、对话与风格锚点</td>
 <td style="text-align:left"><code>ParsedScript</code></td>
+</tr>
+<tr>
+<td style="text-align:left">GENERATE_ASSETS</td>
+<td style="text-align:left">生成角色三视图、道具静帧、场景锚点的资产计划与回填清单</td>
+<td style="text-align:left"><code>AssetPlanDocument</code></td>
 </tr>
 <tr>
 <td style="text-align:left">SEGMENT_SHOT</td>
@@ -205,13 +217,18 @@
 <td style="text-align:left"><code>AIVideoInstructions</code></td>
 </tr>
 <tr>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left">按能力注册表与规则选择目标模型，生成适配包</td>
+<td style="text-align:left"><code>RoutePlan</code></td>
+</tr>
+<tr>
 <td style="text-align:left">AUDIT_QUALITY</td>
-<td style="text-align:left">五项规则检查与加权评分</td>
+<td style="text-align:left">11 项规则检查、LLM 深度审查与加权评分</td>
 <td style="text-align:left"><code>QualityAuditReport</code></td>
 </tr>
 <tr>
 <td style="text-align:left">CONTINUITY_CHECK</td>
-<td style="text-align:left">六维连续性检查</td>
+<td style="text-align:left">视觉、角色、场景、动作四类连续性检查</td>
 <td style="text-align:left"><code>ContinuityCheckResult</code></td>
 </tr>
 </tbody>
@@ -227,7 +244,7 @@
 <tbody>
 <tr>
 <td style="text-align:left">LOOP_CHECK</td>
-<td style="text-align:left">计数器递增、上限检查、阶段推进</td>
+<td style="text-align:left">全局计数、上限检查、阶段推进</td>
 </tr>
 <tr>
 <td style="text-align:left">ERROR_HANDLER</td>
@@ -235,7 +252,7 @@
 </tr>
 <tr>
 <td style="text-align:left">HUMAN_INTERVENTION</td>
-<td style="text-align:left">接收人工决策</td>
+<td style="text-align:left">接收人工决策；资产提示词编辑可回到资产节点</td>
 </tr>
 <tr>
 <td style="text-align:left">GENERATE_OUTPUT</td>
@@ -244,9 +261,7 @@
 </tbody>
 </table>
 
-<p>拆分、分段、转换成功后不直接进入下一节点，而是先经过 LOOP_CHECK；它同时承担计数、超限判定与阶段推进。详细规则见<a href="nodes.html">工作流节点</a>。</p>
-
-<p>LOOP_CHECK 读取刚完成的节点标识，分别递增节点计数器与全局计数器，达到阈值即转人工或失败；未超限时按当前阶段把流程推进到下一业务节点。质量审查与连续性守护不经过 LOOP_CHECK。</p>
+<p>LangGraph 共注册 12 个节点：上述八个业务节点加四个控制节点；<code>END</code> 是终止标记，不计入注册节点。拆分、分段、转换、路由成功后先经过 LOOP_CHECK；它承担全局计数与阶段推进，节点级上限由各阶段决策函数维护。质量审计与连续性守护不经过 LOOP_CHECK。详细规则见<a href="nodes.html">工作流节点</a>。</p>
 
 <table>
 <thead>
@@ -261,6 +276,11 @@
 <td style="text-align:left">PARSE_SCRIPT</td>
 <td style="text-align:left"><code>ParsedScript</code></td>
 <td style="text-align:left">场景、角色、元素序列、<code>global_metadata</code></td>
+</tr>
+<tr>
+<td style="text-align:left">GENERATE_ASSETS</td>
+<td style="text-align:left"><code>asset_plan</code> / <code>asset_manifest</code></td>
+<td style="text-align:left">资产规格、使用范围、回填绑定</td>
 </tr>
 <tr>
 <td style="text-align:left">SEGMENT_SHOT</td>
@@ -278,6 +298,11 @@
 <td style="text-align:left">双语提示词、负面词、音频、模型标记</td>
 </tr>
 <tr>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left"><code>instructions.route_plan</code></td>
+<td style="text-align:left">目标模型、路由模式、首帧指令、阻塞片段</td>
+</tr>
+<tr>
 <td style="text-align:left">AUDIT_QUALITY</td>
 <td style="text-align:left"><code>QualityAuditReport</code></td>
 <td style="text-align:left">分数、状态、违规列表、修复建议</td>
@@ -290,57 +315,70 @@
 </tbody>
 </table>
 
-<p>节点间共享一个 <code>PipelineState</code> 状态对象：<code>task_id</code>、<code>script_id</code> 标识任务，<code>domain</code> 存放各阶段产物（<code>parsed_script</code>、<code>shot_sequence</code>、<code>fragment_sequence</code>、<code>instructions</code>、<code>audit_report</code>、<code>continuity_issues</code>），<code>repair_params</code> 与循环计数器也挂在 <code>domain</code> 下。条件边只读取顶层字段，这一约定是后文连续性路由缺口的成因。</p>
+<p>节点间共享一个 <code>PipelineState</code> 状态对象：<code>task_id</code>、<code>script_id</code> 标识任务，<code>domain</code> 存放各阶段产物（<code>parsed_script</code>、<code>asset_plan</code>、<code>asset_manifest</code>、<code>shot_sequence</code>、<code>fragment_sequence</code>、<code>instructions</code>、<code>audit_report</code>、<code>continuity_issues</code>、<code>repair_params</code>），<code>execution</code> 存放循环计数器与阶段状态。条件边读取 <code>execution</code>、<code>domain</code> 与顶层字段，路由函数显式处理各层字段。</p>
+
+<p>路由产物怎么消费见<a href="model-routing.html">模型路由</a>；资产计划与下游回填见<a href="asset-handoff.html">资产计划与交接</a>；首帧与图生视频的两段式规则见<a href="first-frame.html">首帧与图生视频</a>。</p>
 
 <h2>工作流与决策路由</h2>
-<p>每个业务节点执行后由 <code>PipelineDecision</code> 收敛为七种状态，再由 LangGraph 条件边路由。</p>
+<p>每个业务节点执行后由 <code>PipelineDecision</code> 收敛为八种状态，再由 LangGraph 条件边路由。</p>
 
 <pre class="mermaid">flowchart TD
-    Start([开始/剧本输入]) --&gt; Parse[剧本解析节点]
+    Start([开始/剧本输入]) --&gt; Parse[剧本解析]
 
     Parse --&gt; Decision1{解析结果判断}
-    Decision1 --&gt;|成功| Split[镜头拆分节点]
+    Decision1 --&gt;|成功| Assets[资产计划]
     Decision1 --&gt;|需要重试| Parse
-    Decision1 --&gt;|严重失败| Error[错误处理节点]
-    Decision1 --&gt;|需要人工干预| Human[人工干预节点]
+    Decision1 --&gt;|严重失败| Error[错误处理]
+    Decision1 --&gt;|需要人工干预| Human[人工干预]
+
+    Assets --&gt; DecisionA{资产结果判断}
+    DecisionA --&gt;|成功/部分成功| Split[镜头拆分]
+    DecisionA --&gt;|严重失败| Error
+    DecisionA --&gt;|需要人工干预| Human
 
     Split --&gt; Decision2{拆分结果判断}
-    Decision2 --&gt;|成功| Loop{循环检查节点&lt;br/&gt;LOOP_CHECK}
+    Decision2 --&gt;|成功| Loop{循环检查&lt;br/&gt;LOOP_CHECK}
     Decision2 --&gt;|需要重试/修复| Split
     Decision2 --&gt;|严重失败/超限| Error
 
-    Loop --&gt;|阶段推进| Fragment[视频分段节点]
+    Loop --&gt;|阶段推进| Fragment[片段切割]
 
     Fragment --&gt; Decision3{分段结果判断}
     Decision3 --&gt;|成功| Loop
     Decision3 --&gt;|需要重试/修复| Fragment
     Decision3 --&gt;|严重失败/超限| Error
 
-    Loop --&gt;|阶段推进| Prompt[提示词生成节点]
+    Loop --&gt;|阶段推进| Prompt[提示词转换]
 
     Prompt --&gt; DecisionP{生成结果判断}
-    DecisionP --&gt;|通过| Loop
+    DecisionP --&gt;|通过| Route[模型路由]
     DecisionP --&gt;|需要重试/修复| Prompt
     DecisionP --&gt;|严重失败| Error
 
-    Loop --&gt;|阶段推进| Audit[质量审查节点]
+    Route --&gt; DecisionR{路由结果判断}
+    DecisionR --&gt;|成功/降级| Loop
+    DecisionR --&gt;|需要重试/修复| Route
+    DecisionR --&gt;|严重失败| Error
+
+    Loop --&gt;|阶段推进| Audit[质量审计]
 
     Audit --&gt; Decision4{审查结果判断}
-    Decision4 --&gt;|通过/轻微问题| Continuity[连续性守护节点]
+    Decision4 --&gt;|通过/轻微问题| Continuity[连续性守护]
     Decision4 --&gt;|需要重试/修复| Prompt
     Decision4 --&gt;|需要人工干预| Human
     Decision4 --&gt;|失败/中止| Error
 
     Continuity --&gt; Decision5{连续性判断}
-    Decision5 --&gt;|通过| Output[生成输出节点]
-    Decision5 --&gt;|需要修复| Prompt
+    Decision5 --&gt;|通过| Output[生成输出]
+    Decision5 --&gt;|按问题来源修复| Fix[拆分/分段/转换/解析]
     Decision5 --&gt;|需要人工干预| Human
     Decision5 --&gt;|严重失败| Error
+    Fix --&gt; Loop
 
     Output --&gt; End([工作流完成])
 
     Error --&gt; DecisionE{错误处理判断}
-    DecisionE --&gt;|按错误来源回退| Node[对应阶段节点&lt;br/&gt;解析/拆分/分段/转换]
+    DecisionE --&gt;|按错误来源回退| Node[对应阶段节点]
     DecisionE --&gt;|需要人工干预| Human
     DecisionE --&gt;|中止流程| End
 
@@ -348,6 +386,7 @@
     DecisionH --&gt;|继续流程| Output
     DecisionH --&gt;|重新开始| Parse
     DecisionH --&gt;|调整提示词| Prompt
+    DecisionH --&gt;|编辑资产提示词| Assets
     DecisionH --&gt;|重试失败| Error
     DecisionH --&gt;|中止流程| End
 </pre>
@@ -387,6 +426,11 @@
 <td style="text-align:left">转人工节点</td>
 </tr>
 <tr>
+<td style="text-align:left">NEEDS_ASSET_EDIT</td>
+<td style="text-align:left">需要人工编辑资产提示词</td>
+<td style="text-align:left">回到资产计划节点</td>
+</tr>
+<tr>
 <td style="text-align:left">FAILED</td>
 <td style="text-align:left">一般失败</td>
 <td style="text-align:left">转错误处理</td>
@@ -399,7 +443,7 @@
 </tbody>
 </table>
 
-<p>SUCCESS 与 VALID 都表示放行，区别在语义：SUCCESS 视为完全合格，VALID 表示存在可接受的轻微问题，带病继续但不携带修复参数。只有 NEEDS_REPAIR 才会把修复参数交给下一轮生成；NEEDS_RETRY 只重置当前节点，不修改输入。</p>
+<p>SUCCESS 与 VALID 都表示放行，区别在语义：SUCCESS 视为完全合格，VALID 表示存在可接受的轻微问题，带病继续但不携带修复参数。只有 NEEDS_REPAIR 才会把修复参数交给下一轮生成；NEEDS_RETRY 只重置当前节点，不修改输入。NEEDS_ASSET_EDIT 由人工干预触发，只允许修改资产提示词，不改变角色身份等锁定字段。</p>
 
 <h3>决策路由表</h3>
 <table>
@@ -414,8 +458,14 @@
 <tbody>
 <tr>
 <td style="text-align:left">PARSE_SCRIPT</td>
-<td style="text-align:left">SEGMENT_SHOT</td>
+<td style="text-align:left">GENERATE_ASSETS</td>
 <td style="text-align:left">自身（RETRY）</td>
+<td style="text-align:left">HUMAN / ERROR</td>
+</tr>
+<tr>
+<td style="text-align:left">GENERATE_ASSETS</td>
+<td style="text-align:left">SEGMENT_SHOT</td>
+<td style="text-align:left">-（失败不阻断）</td>
 <td style="text-align:left">HUMAN / ERROR</td>
 </tr>
 <tr>
@@ -432,13 +482,19 @@
 </tr>
 <tr>
 <td style="text-align:left">CONVERT_PROMPT</td>
-<td style="text-align:left">LOOP_CHECK</td>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left">自身（RETRY / REPAIR）</td>
+<td style="text-align:left">HUMAN / ERROR</td>
+</tr>
+<tr>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left">LOOP_CHECK（VALID 同样推进）</td>
 <td style="text-align:left">自身（RETRY / REPAIR）</td>
 <td style="text-align:left">HUMAN / ERROR</td>
 </tr>
 <tr>
 <td style="text-align:left">LOOP_CHECK</td>
-<td style="text-align:left">按阶段推进</td>
+<td style="text-align:left">按阶段推进：拆分/分段/转换/审计</td>
 <td style="text-align:left">-</td>
 <td style="text-align:left">HUMAN / ERROR</td>
 </tr>
@@ -451,13 +507,13 @@
 <tr>
 <td style="text-align:left">CONTINUITY_CHECK</td>
 <td style="text-align:left">GENERATE_OUTPUT</td>
-<td style="text-align:left">CONVERT_PROMPT（REPAIR）</td>
+<td style="text-align:left">按来源：PARSE / SEGMENT / SPLIT / CONVERT</td>
 <td style="text-align:left">HUMAN / ERROR</td>
 </tr>
 <tr>
 <td style="text-align:left">HUMAN_INTERVENTION</td>
 <td style="text-align:left">GENERATE_OUTPUT</td>
-<td style="text-align:left">RETRY→PARSE；REPAIR→CONVERT</td>
+<td style="text-align:left">RETRY→PARSE；REPAIR→CONVERT；ASSET_EDIT→ASSETS</td>
 <td style="text-align:left">自身等待；ABORT→END</td>
 </tr>
 <tr>
@@ -469,153 +525,95 @@
 </tbody>
 </table>
 
-<p>质量审查失败不重跑审查，而是回 CONVERT_PROMPT 重新生成；连续性检查的修复目标同样收敛到 CONVERT_PROMPT。两处都遵循“问题出在被审查的提示词上”的约定。</p>
+<p>质量审查失败不重跑审查，而是回 CONVERT_PROMPT 重新生成。连续性检查则按问题来源动态路由：角色或场景问题回到解析或拆分，片段时长问题回到分段，提示词问题回到转换；无法定位来源或修复轮次耗尽时才转人工。修复目标写在 <code>domain.repair_params</code>，由对应节点读取。</p>
 
 <p>GENERATE_OUTPUT 汇总各阶段产物后，由 WorkflowOutputFixer 对片段序列做结构修复，再序列化为 JSON 返回调用方。该层只做结构修复，不重新调用模型。</p>
 
 <h3>任务时序概览</h3>
-<p>一次任务从提交、入队、六阶段执行到结果回调的时序如下。图中省略 LOOP_CHECK 的逐次介入；任务状态经 TaskRepository 写入 Redis。</p>
+<p>一次任务从提交、入队、八阶段执行到结果回调的时序如下。图中省略 LOOP_CHECK 的逐次介入；任务状态经 TaskRepository 写入 Redis。</p>
 
 <pre class="mermaid">sequenceDiagram
     autonumber
     participant User as 用户/调用方
     participant API as API/MCP接口
-    participant TF as TaskFactory&lt;br/&gt;任务工厂
-    participant Q as 任务队列&lt;br/&gt;Priority Queue
-    participant WP as AsyncTaskProcessor&lt;br/&gt;异步任务处理器
-    participant WF as Workflow&lt;br/&gt;流程编排器
-    
-    participant Parser as 剧本解析智能体
-    participant LLM as LLM服务
-    participant Shot as 镜头拆分智能体
-    participant Split as 视频分段智能体
-    participant Prompt as 指令转换智能体
-    participant QA as 质量审查智能体
-    participant CG as 连续性守护节点
-    
-    participant Redis as Redis&lt;br/&gt;状态存储
+    participant TF as TaskFactory
+    participant Q as 任务队列
+    participant WP as AsyncTaskProcessor
+    participant WF as Workflow
+
+    participant Parser as 剧本解析
+    participant Assets as 资产计划
+    participant Shot as 镜头拆分
+    participant Split as 片段切割
+    participant Prompt as 提示词转换
+    participant Router as 模型路由
+    participant QA as 质量审计
+    participant CG as 连续性守护
+
+    participant Redis as Redis
     participant Callback as 回调服务
 
-    %% 任务提交阶段
     User-&gt;&gt;API: 1. 提交剧本
     API-&gt;&gt;TF: 2. 创建任务
-    TF-&gt;&gt;Redis: 3. 保存任务状态(PENDING，Redis/内存降级)
+    TF-&gt;&gt;Redis: 3. 保存任务状态(PENDING)
     TF--&gt;&gt;API: 4. 返回task_id
     API--&gt;&gt;User: 5. 返回task_id
 
-    %% 任务入队阶段
     TF-&gt;&gt;Q: 6. 任务入队(按优先级)
     Q--&gt;&gt;TF: 7. 入队成功
     TF-&gt;&gt;Redis: 8. 更新状态(PROCESSING)
 
-    %% 工作线程调度
     loop 并发控制
         WP-&gt;&gt;Q: 9. 拉取任务
         Q--&gt;&gt;WP: 10. 返回任务
         WP-&gt;&gt;WF: 11. 启动工作流
     end
 
-    %% 阶段1: 剧本解析
     WF-&gt;&gt;Parser: 12. 解析剧本
-    Parser-&gt;&gt;LLM: 13. 调用LLM解析
-    LLM--&gt;&gt;Parser: 14. 返回结构化数据
-    
-    alt 有修复参数
-        Parser-&gt;&gt;Parser: 15. 应用修复参数
-    end
-    
-    Parser-&gt;&gt;Parser: 16. 质量评估+问题检测
-    Parser--&gt;&gt;WF: 17. 返回ParsedScript
-    WF-&gt;&gt;Redis: 18. 保存中间结果
+    Parser--&gt;&gt;WF: 13. 返回ParsedScript
+    WF-&gt;&gt;Redis: 14. 保存中间结果
 
-    %% 阶段2: 镜头拆分
-    WF-&gt;&gt;Shot: 19. 拆分镜头
-    Shot-&gt;&gt;LLM: 20. 调用LLM生成镜头
-    LLM--&gt;&gt;Shot: 21. 返回镜头序列
-    
-    alt 有修复参数
-        Shot-&gt;&gt;Shot: 22. 应用修复参数
-    end
-    
-    Shot-&gt;&gt;Shot: 23. 时长估算+增强
-    Shot-&gt;&gt;Shot: 24. 问题检测
-    Shot--&gt;&gt;WF: 25. 返回ShotSequence
-    WF-&gt;&gt;Redis: 26. 保存中间结果
+    WF-&gt;&gt;Assets: 15. 生成资产计划
+    Assets--&gt;&gt;WF: 16. 返回AssetPlanDocument
+    WF-&gt;&gt;Redis: 17. 保存asset_plan.json
 
-    %% 阶段3: 视频分段
-    WF-&gt;&gt;Split: 27. 视频分段
-    Split-&gt;&gt;LLM: 28. 调用LLM智能分割
-    LLM--&gt;&gt;Split: 29. 返回分割方案
-    
-    alt 镜头时长&gt;5秒
-        Split-&gt;&gt;Split: 30. 智能切分
-        Split-&gt;&gt;Split: 31. 连续性验证
-    end
-    
-    Split-&gt;&gt;Split: 32. 问题检测
-    Split--&gt;&gt;WF: 33. 返回FragmentSequence
-    WF-&gt;&gt;Redis: 34. 保存中间结果
+    WF-&gt;&gt;Shot: 18. 拆分镜头
+    Shot--&gt;&gt;WF: 19. 返回ShotSequence
 
-    %% 阶段4: 指令转换
-    WF-&gt;&gt;Prompt: 35. 生成提示词
-    Prompt-&gt;&gt;LLM: 36. 调用LLM生成Prompt
-    LLM--&gt;&gt;Prompt: 37. 返回提示词(视频+音频)
-    
-    alt 有修复参数
-        Prompt-&gt;&gt;Prompt: 38. 应用修复参数
-    end
-    
-    Prompt-&gt;&gt;Prompt: 39. 问题检测
-    Prompt--&gt;&gt;WF: 40. 返回AIVideoInstructions
-    WF-&gt;&gt;Redis: 41. 保存中间结果
+    WF-&gt;&gt;Split: 20. 切割片段
+    Split--&gt;&gt;WF: 21. 返回FragmentSequence
 
-    %% 阶段5: 质量审查
-    WF-&gt;&gt;QA: 42. 质量审查
-    QA-&gt;&gt;QA: 43. 规则审查
-    QA-&gt;&gt;LLM: 44. LLM深度审查
-    LLM--&gt;&gt;QA: 45. 返回审查结果
-    QA-&gt;&gt;QA: 46. 合并报告+问题分类
-    QA-&gt;&gt;QA: 47. 生成修复参数
-    QA--&gt;&gt;WF: 48. 返回AuditReport
+    WF-&gt;&gt;Prompt: 22. 生成提示词
+    Prompt--&gt;&gt;WF: 23. 返回AIVideoInstructions
+
+    WF-&gt;&gt;Router: 24. 路由目标模型
+    Router--&gt;&gt;WF: 25. 返回RoutePlan
+    WF-&gt;&gt;Redis: 26. 保存prompt_converter_result.json
+
+    WF-&gt;&gt;QA: 27. 质量审计
+    QA-&gt;&gt;QA: 28. 11 项规则检查 + LLM 审查
+    QA--&gt;&gt;WF: 29. 返回AuditReport
 
     alt 审查通过
-        WF-&gt;&gt;CG: 49. 连续性检查
+        WF-&gt;&gt;CG: 30. 连续性检查
+        CG--&gt;&gt;WF: 31. 检查通过
     else 需要修复
-        WF-&gt;&gt;WF: 50. 写入 state.repair_params
-        Note over WF,Prompt: NEEDS_REPAIR 返回指令转换阶段重新生成
+        WF-&gt;&gt;WF: 32. 写入 state.repair_params
+        Note over WF,Prompt: NEEDS_REPAIR 返回提示词转换阶段重新生成
     end
 
-    %% 阶段6: 连续性守护
-    CG-&gt;&gt;CG: 51. 角色连续性检查
-    CG-&gt;&gt;CG: 52. 场景连续性检查
-    CG-&gt;&gt;CG: 53. 动作连续性检查
-    CG-&gt;&gt;CG: 54. 风格连续性检查
-    CG-&gt;&gt;CG: 55. 时间连续性检查
-    CG-&gt;&gt;CG: 56. 道具连续性检查
+    WF-&gt;&gt;WF: 33. 组装最终结果
+    WF-&gt;&gt;Redis: 34. 保存结果(SUCCESS)
+    WF-&gt;&gt;Callback: 35. 触发回调(如有)
+    WF--&gt;&gt;WP: 36. 返回结果
+    WP--&gt;&gt;TF: 37. 任务完成
 
-    alt 发现连续性问题
-        CG-&gt;&gt;CG: 57. 问题分类(严重/中等/轻微)
-        CG-&gt;&gt;CG: 58. 生成修复参数
-        CG--&gt;&gt;WF: 59. 返回ContinuityIssues
-        Note over WF,Prompt: NEEDS_REPAIR 返回指令转换阶段修复
-    else 检查通过
-        CG--&gt;&gt;WF: 60. 检查通过
-    end
-
-    %% 结果输出阶段
-    WF-&gt;&gt;WF: 61. 组装最终结果
-    WF-&gt;&gt;Redis: 62. 保存最终结果(SUCCESS)
-    WF-&gt;&gt;Callback: 63. 触发回调(如有)
-    WF--&gt;&gt;WP: 64. 返回结果
-    WP--&gt;&gt;TF: 65. 任务完成
-
-    %% 用户查询结果
-    User-&gt;&gt;API: 66. 查询结果
-    API-&gt;&gt;TF: 67. 获取结果
-    TF-&gt;&gt;Redis: 68. 读取结果
-    Redis--&gt;&gt;TF: 69. 返回结果
-    TF--&gt;&gt;API: 70. 返回TaskResponse
-    API--&gt;&gt;User: 71. 返回分镜数据
+    User-&gt;&gt;API: 38. 查询结果
+    API-&gt;&gt;TF: 39. 获取结果
+    TF-&gt;&gt;Redis: 40. 读取结果
+    Redis--&gt;&gt;TF: 41. 返回结果
+    TF--&gt;&gt;API: 42. 返回TaskResponse
+    API--&gt;&gt;User: 43. 返回分镜数据
 </pre>
 
 <h2>三级循环防护</h2>
@@ -635,9 +633,9 @@
 <tr>
 <td style="text-align:left">节点级</td>
 <td style="text-align:left"><code>node_current_loops</code></td>
-<td style="text-align:left"><code>node_max_loops</code>（3~5）</td>
-<td style="text-align:left">LOOP_CHECK 每次经过当前节点</td>
-<td style="text-align:left">拆分 / 分段转人工，其余 FAILED</td>
+<td style="text-align:left"><code>node_max_loops</code>（2~5）</td>
+<td style="text-align:left">各阶段决策函数每次进入当前节点</td>
+<td style="text-align:left">拆分 / 分段 / 路由转人工，其余 FAILED</td>
 </tr>
 <tr>
 <td style="text-align:left">阶段级</td>
@@ -673,6 +671,12 @@
 <td style="text-align:left">FAILED</td>
 </tr>
 <tr>
+<td style="text-align:left">GENERATE_ASSETS</td>
+<td style="text-align:left">2</td>
+<td style="text-align:left">2</td>
+<td style="text-align:left">FAILED</td>
+</tr>
+<tr>
 <td style="text-align:left">SEGMENT_SHOT</td>
 <td style="text-align:left">5</td>
 <td style="text-align:left">3</td>
@@ -689,6 +693,12 @@
 <td style="text-align:left">5</td>
 <td style="text-align:left">3</td>
 <td style="text-align:left">FAILED</td>
+</tr>
+<tr>
+<td style="text-align:left">ROUTE_MODEL</td>
+<td style="text-align:left">5</td>
+<td style="text-align:left">2</td>
+<td style="text-align:left">转人工</td>
 </tr>
 <tr>
 <td style="text-align:left">AUDIT_QUALITY</td>
@@ -710,222 +720,17 @@
 </tr>
 <tr>
 <td style="text-align:left">HUMAN_INTERVENTION</td>
-<td style="text-align:left">1</td>
+<td style="text-align:left">2</td>
 <td style="text-align:left">-</td>
-<td style="text-align:left">不参与循环计数</td>
+<td style="text-align:left">等待人工输入</td>
 </tr>
 </tbody>
 </table>
 
-<p><code>node_max_loops</code> 由 LOOP_CHECK 每次经过时递增，防止节点在图内打转；<code>stage_max_retries</code> 只在该阶段质量不达标、需要携带修复参数重来时才递增。另有 <code>max_continuity_retries=3</code> 控制连续性修复循环。任一计数器达到上限 80% 时输出 Warning 日志；触顶后不再重试。</p>
-
-<pre class="mermaid">sequenceDiagram
-    autonumber
-    participant User as 用户
-    participant System as 流程编排器
-    participant Parser as 剧本解析智能体
-    participant Splitter as 镜头拆分智能体
-    participant Fragmenter as 视频分段智能体
-    participant Converter as 指令转换智能体
-    participant Auditor as 质量审查智能体
-    participant Guardian as 连续性守护节点
-    participant Error as 错误处理节点
-    participant Human as 人工干预节点
-
-    %% 正常流程
-    User-&gt;&gt;System: 提交剧本
-    System-&gt;&gt;Parser: 开始解析
-
-    %% 剧本解析 + 重试循环
-    loop 最多3次重试
-        Parser-&gt;&gt;Parser: 解析剧本
-        Parser--&gt;&gt;System: 返回结构化剧本
-        System-&gt;&gt;System: 决策:解析结果判断
-        
-        alt 解析成功
-            System-&gt;&gt;Splitter: 开始镜头拆分
-        else 需要重试/修复
-            System-&gt;&gt;Parser: 应用修复参数后重试
-        else 严重失败
-            System-&gt;&gt;Error: 进入错误处理
-        end
-    end
-
-    %% 镜头拆分 + 重试循环
-    loop 最多5次循环（质量重试上限3）
-        Splitter-&gt;&gt;Splitter: 拆分镜头
-        Splitter--&gt;&gt;System: 返回镜头序列
-        System-&gt;&gt;System: 决策:拆分结果判断
-        
-        alt 拆分成功
-            System-&gt;&gt;Fragmenter: 开始视频分段
-        else 需要重试/修复
-            System-&gt;&gt;Splitter: 应用修复参数后重试
-        else 严重失败
-            System-&gt;&gt;Error: 进入错误处理
-        end
-    end
-
-    %% 视频分段 + 重试循环
-    loop 最多5次循环（质量重试上限3）
-        Fragmenter-&gt;&gt;Fragmenter: 5秒智能分段
-        Fragmenter--&gt;&gt;System: 返回片段序列
-        System-&gt;&gt;System: 决策:分段结果判断
-        
-        alt 分段成功
-            System-&gt;&gt;Converter: 生成AI指令
-        else 需要修复(时长问题)
-            System-&gt;&gt;Fragmenter: 应用修复参数后重试
-        else 严重失败
-            System-&gt;&gt;Error: 进入错误处理
-        end
-    end
-
-    %% 指令转换 + 重试循环
-    loop 最多5次循环（质量重试上限3）
-        Converter-&gt;&gt;Converter: 生成提示词
-        Converter--&gt;&gt;System: 返回Prompt序列
-        System-&gt;&gt;System: 决策:生成结果判断
-        
-        alt 生成通过
-            System-&gt;&gt;Auditor: 开始质量审查
-        else 需要重试/修复
-            System-&gt;&gt;Converter: 应用修复参数后重试
-        else 严重失败
-            System-&gt;&gt;Error: 进入错误处理
-        end
-    end
-
-    %% 质量审查 + 修复决策
-    Auditor-&gt;&gt;Auditor: 规则审查
-    Auditor-&gt;&gt;Auditor: LLM深度审查
-    Auditor-&gt;&gt;Auditor: 问题分类+生成修复参数
-    Auditor--&gt;&gt;System: 返回审查报告
-    System-&gt;&gt;System: 决策:审查结果判断
-
-    alt 审查通过
-        System-&gt;&gt;Guardian: 开始连续性检查
-        
-    else 轻微问题(≤3个)
-        System-&gt;&gt;System: 视为有效，直接放行
-        System-&gt;&gt;Guardian: 继续连续性检查
-        
-    else 中等问题
-        System-&gt;&gt;System: 标记需要修复
-        System--&gt;&gt;Converter: 返回到指令转换修复
-        
-    else 严重问题
-        System-&gt;&gt;Error: 进入错误处理
-        
-    else 需要人工干预
-        System-&gt;&gt;Human: 请求人工决策
-        Human--&gt;&gt;System: 返回人工决策
-    end
-
-    %% 连续性检查 + 修复循环
-    loop 最多3次连续性修复
-        Guardian-&gt;&gt;Guardian: 角色连续性检查
-        Guardian-&gt;&gt;Guardian: 场景连续性检查
-        Guardian-&gt;&gt;Guardian: 动作连续性检查
-        Guardian-&gt;&gt;Guardian: 风格连续性检查
-        Guardian-&gt;&gt;Guardian: 时间连续性检查
-        Guardian-&gt;&gt;Guardian: 道具连续性检查
-        Guardian--&gt;&gt;System: 返回连续性问题列表
-        System-&gt;&gt;System: 决策:连续性判断(严重/中等/轻微)
-
-        alt 检查通过(无问题)
-            System-&gt;&gt;User: 返回完整AI指令
-            
-        else 轻微问题
-            System-&gt;&gt;User: 返回AI指令(VALID 放行)
-            
-        else 严重/中等且可重试
-            System-&gt;&gt;Converter: 返回指令转换阶段重生成提示词
-            
-        else 严重问题且不可重试
-            System-&gt;&gt;Human: 请求人工干预
-            Human--&gt;&gt;System: 返回人工决策
-            
-            alt 人工确认继续
-                System-&gt;&gt;User: 返回AI指令(带警告)
-            else 人工要求中止
-                System-&gt;&gt;User: 返回失败信息
-            end
-        end
-    end
-
-    %% 错误处理流程
-    System-&gt;&gt;Error: 进入错误处理
-    Error-&gt;&gt;Error: 错误分类(NETWORK/TIMEOUT/RATE_LIMIT/VALIDATION/CONFIG/BUSINESS/UNKNOWN)
-    Error-&gt;&gt;Error: 按错误来源节点制定恢复策略
-
-    alt 可恢复错误
-        Error-&gt;&gt;Error: 按 last_node 映射回退目标
-        Note over Error,Parser: 审查/连续性失败→指令转换；循环检查失败/未知→剧本解析
-        Error--&gt;&gt;Parser: 回退到映射出的节点重试
-        
-    else 需要人工干预
-        Error-&gt;&gt;Human: 请求人工干预
-        Human--&gt;&gt;Error: 返回人工决策
-        
-        alt 人工继续
-            Error--&gt;&gt;System: 继续执行
-        else 人工中止
-            Error-&gt;&gt;User: 返回失败信息
-        end
-        
-    else 不可恢复错误
-        Error-&gt;&gt;User: 返回失败信息(ABORT)
-    end
-</pre>
+<p><code>node_max_loops</code> 防止节点在图内打转；<code>stage_max_retries</code> 只在该阶段质量不达标、需要携带修复参数重来时才递增。另有 <code>max_continuity_retries=3</code> 控制连续性修复循环。全局计数达到上限 80% 时输出 Warning 日志；触顶后不再重试。</p>
 
 <h2>任务队列与持久化</h2>
 <p>任务按 CRITICAL &gt; HIGH &gt; NORMAL &gt; LOW 入队，AsyncTaskProcessor 按优先级拉取，并受并发信号量约束。默认 <code>max_concurrent=10</code>、<code>queue_size=1000</code>；队列为普通 <code>list</code>，入队时有序插入，<code>cancel_task</code> 按 task_id 遍历删除。</p>
-
-<pre class="mermaid">sequenceDiagram
-    autonumber
-    participant C1 as 客户端1
-    participant C2 as 客户端2
-    participant TF as TaskFactory
-    participant Q as 优先级队列
-    participant P as Processor
-    participant W1 as Worker 1
-    participant W2 as Worker 2
-    participant W3 as Worker N
-
-    C1-&gt;&gt;TF: 1. 提交任务A(优先级HIGH)
-    C2-&gt;&gt;TF: 2. 提交任务B(优先级NORMAL)
-    C1-&gt;&gt;TF: 3. 提交任务C(优先级CRITICAL)
-
-    TF-&gt;&gt;Q: 4. 任务C入队(CRITICAL)
-    TF-&gt;&gt;Q: 5. 任务A入队(HIGH)
-    TF-&gt;&gt;Q: 6. 任务B入队(NORMAL)
-
-    Note over Q: 队列按优先级排序: C → A → B
-
-    loop 并发调度
-        P-&gt;&gt;Q: 7. 获取任务
-        Q--&gt;&gt;P: 8. 返回最高优先级任务
-        
-        alt Worker空闲
-            P-&gt;&gt;W1: 9. 分配任务C
-            W1-&gt;&gt;W1: 10. 执行任务
-            
-            P-&gt;&gt;Q: 11. 获取下一个任务
-            Q--&gt;&gt;P: 12. 返回任务A
-            P-&gt;&gt;W2: 13. 分配任务A
-            W2-&gt;&gt;W2: 14. 执行任务
-        end
-    end
-
-    W1--&gt;&gt;P: 15. 任务C完成
-    P--&gt;&gt;TF: 16. 回调通知
-    TF--&gt;&gt;C1: 17. 返回结果
-
-    W2--&gt;&gt;P: 18. 任务A完成
-    P--&gt;&gt;TF: 19. 回调通知
-    TF--&gt;&gt;C1: 20. 返回结果
-</pre>
 
 <p>任务记录以 <code>task_id</code> 为主键，保存状态、当前阶段、进度、结果元信息与时间戳。状态从 PENDING 进入 PROCESSING，执行结束后写入结果；<code>recover_task(task_id)</code> 可将单个任务软重置为 PENDING、阶段置为 recovered、进度归零，用于人工重新投递。</p>
 
@@ -960,49 +765,10 @@
 
 <p>启动时 <code>recover_pending_tasks(max_age_hours=2)</code> 筛选 PENDING / PROCESSING 且 2 小时内的任务，重建为 NORMAL 优先级并追加到队尾。恢复按任务起点重跑，不接检查点续跑；超窗任务不标记、不删除，等待 TTL 过期。检查点细节见<a href="checkpoint.html">检查点与恢复</a>。</p>
 
-<pre class="mermaid">sequenceDiagram
-    autonumber
-    participant Agent as 智能体
-    participant TM as TaskManager
-    participant TR as TaskRepository
-    participant Redis as Redis
-    participant Mem as 内存字典（降级）
-
-    Agent-&gt;&gt;TM: 1. 更新任务进度
-    TM-&gt;&gt;TR: 2. write_task(task_id, record)
-    alt Redis 可用
-        TR-&gt;&gt;Redis: 3. setex(key, TTL 86400s)
-        Redis--&gt;&gt;TR: 4. 写入成功
-    else Redis 不可用/写入异常
-        TR-&gt;&gt;Mem: 3'. 更新进程内存记录
-    end
-    TR--&gt;&gt;TM: 5. 返回写入结果
-    TM--&gt;&gt;Agent: 6. 更新完成
-
-    Note over TM,Redis: 进程重启后的恢复场景
-
-    TM-&gt;&gt;TR: 7. get_pending_tasks(max_age_hours=2)
-    TR-&gt;&gt;Redis: 8. 读取任务索引集合
-    Redis--&gt;&gt;TR: 9. 返回任务列表
-    loop 逐个过滤
-        TR-&gt;&gt;TR: 10. status ∈ {PENDING, PROCESSING} 且在 2 小时内？
-        alt 符合条件
-            TR-&gt;&gt;TR: 11. 加入恢复列表
-        else 超龄或不符
-            TR-&gt;&gt;TR: 12. 静默跳过（不标记、不删除，等待 TTL 过期）
-        end
-    end
-    TR--&gt;&gt;TM: 13. 返回可恢复任务
-    loop 逐个恢复
-        TM-&gt;&gt;TM: 14. 重建 QueuedTask（优先级一律 NORMAL）
-        TM-&gt;&gt;TM: 15. 追加到进程内队列，等待再次执行
-    end
-</pre>
-
 <h2>质量修复闭环</h2>
 <p>质量保障采用“轻前置检测 + 重最终检测”：节点内处理格式、时长、空值等本地问题，AUDIT_QUALITY 集中做规则与 LLM 深度审查，并将问题转换为修复参数。</p>
 
-<p>前置检测与最终审查分工明确：节点内检测只处理本节点能修复的格式、时长与空值问题，避免明显不合格的产物进入下游；AUDIT_QUALITY 读取完整提示词包，规则检查与 LLM 深度审查并行后合并报告。修复成本高于一次生成，因此只有达到修复档位才回炉，轻微问题直接放行。</p>
+<p>前置检测与最终审查分工明确：节点内检测只处理本节点能修复的格式、时长与空值问题，避免明显不合格的产物进入下游；AUDIT_QUALITY 读取完整提示词包与路由结果，规则检查与 LLM 深度审查合并后形成报告。修复成本高于一次生成，因此只有达到修复档位才回炉，轻微问题直接放行。</p>
 
 <table>
 <thead>
@@ -1022,113 +788,27 @@
 </tr>
 <tr>
 <td style="text-align:left">统一深度检测</td>
-<td style="text-align:left">CONVERT_PROMPT 之后</td>
-<td style="text-align:left">连贯性、一致性、语义（规则 + LLM）</td>
+<td style="text-align:left">ROUTE_MODEL 之后</td>
+<td style="text-align:left">11 项规则 + LLM 连贯性/一致性/语义审查</td>
 <td style="text-align:left">生成修复参数，回 CONVERT_PROMPT</td>
 </tr>
 <tr>
 <td style="text-align:left">跨片段一致性</td>
 <td style="text-align:left">CONTINUITY_CHECK</td>
-<td style="text-align:left">角色、道具、场景、时间等</td>
-<td style="text-align:left">按严重度分类处理</td>
+<td style="text-align:left">角色、道具、场景、动作、风格、时间</td>
+<td style="text-align:left">按来源阶段与严重度处理</td>
 </tr>
 </tbody>
 </table>
 
-<pre class="mermaid">flowchart TD
-    A[剧本输入] --&gt; B[剧本解析]
-    B --&gt; C[节点内基础检测]
-    C --发现问题--&gt; B
+<p>11 项规则检查覆盖：片段时长、提示词内容、提示词长度、片段数量、模型支持、外观锚点污染、契约违规、景别与提示词一致性、镜头运动与提示词一致性、风格光照冲突、资产使用。规则报告与 LLM 报告合并后计算加权分数。</p>
 
-    C --&gt; D[镜头拆分]
-    D --&gt; E[节点内基础检测]
-    E --发现问题--&gt; D
-
-    E --&gt; F[视频分段]
-    F --&gt; G[节点内基础检测]
-    G --发现问题--&gt; F
-
-    G --&gt; H[指令转换]
-    H --&gt; I[节点内基础检测]
-    I --发现问题--&gt; H
-
-    I --&gt; J[质量审查：规则 + LLM 双层]
-    J --问题分类--&gt; K{按节点生成修复参数}
-    K --NEEDS_REPAIR/RETRY--&gt; H
-
-    J --通过/轻微问题--&gt; L[连续性守护 → 结果生成]
-</pre>
-
-<p>修复参数按 <code>PipelineNode</code> 写入 <code>state.domain.repair_params</code>，节点只读取自己的键；应用成功后调用 <code>clear_repair_params()</code> 与 <code>clear_historical_context()</code> 清理实例状态，历史记录保留到任务结束。修复重试同时计入阶段级与全局级计数器，不会无限回炉。评分分档：≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，其余 FAILED；MINOR 且违规不超过 3 个时放行，FAILED 但分数 ≥80 同样放行。</p>
+<p>修复参数按 <code>PipelineNode</code> 写入 <code>state.domain.repair_params</code>，节点只读取自己的键；应用成功后清理实例状态。修复重试同时计入阶段级与全局级计数器，不会无限回炉。评分分档：≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，其余 FAILED；MINOR 且违规不超过 3 个时放行，FAILED 但分数 ≥80 同样放行；存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>。</p>
 
 <h2>错误处理</h2>
-<p>ERROR_HANDLER 定义七类错误（NETWORK / TIMEOUT / RATE_LIMIT / VALIDATION / CONFIG / BUSINESS / UNKNOWN）、四级严重度（LOW~CRITICAL）与六种动作（RETRY / DELAY_RETRY / REPAIR / HUMAN / ABORT / IGNORE）。回退目标按错误来源映射：审查或连续性失败→CONVERT_PROMPT；循环检查失败或未知来源→PARSE_SCRIPT。</p>
+<p>ERROR_HANDLER 定义七类错误（NETWORK / TIMEOUT / RATE_LIMIT / VALIDATION / CONFIG / BUSINESS / UNKNOWN）、四级严重度（LOW~CRITICAL）与六种动作（RETRY / DELAY_RETRY / REPAIR / HUMAN / ABORT / IGNORE）。回退目标按错误来源映射：审查或连续性失败→CONVERT_PROMPT；循环检查失败或未知来源→PARSE_SCRIPT。资产与路由来源未列入映射表，默认回退到 PARSE_SCRIPT。</p>
 
 <p>恢复策略由错误来源决定回退目标，由严重度决定是否需要人工；ABORT 不进入错误处理，直接结束图执行。错误处理节点自身也有循环上限，避免在回退与再失败之间反复。</p>
-
-<pre class="mermaid">sequenceDiagram
-    autonumber
-    participant Node as 工作流节点
-    participant Decision as 决策函数
-    participant Error as 错误处理节点
-    participant Human as 人工干预节点
-    participant Retry as 重试机制
-
-    Node-&gt;&gt;Decision: 1. 节点执行完成
-    Decision-&gt;&gt;Decision: 2. 判断执行结果
-
-    alt 执行成功
-        Decision--&gt;&gt;Node: 3. 返回SUCCESS
-        Note over Node: 继续下一节点
-
-    else 需要重试
-        Decision-&gt;&gt;Decision: 4. 检查重试次数
-        alt 未超限
-            Decision-&gt;&gt;Retry: 5. 增加重试计数
-            Retry--&gt;&gt;Decision: 6. 返回NEEDS_RETRY
-            Decision--&gt;&gt;Node: 7. 返回NEEDS_RETRY
-            Note over Node: 重新执行当前节点
-        else 已超限
-            Decision-&gt;&gt;Error: 8. 返回FAILED
-        end
-
-    else 需要修复
-        Decision-&gt;&gt;Decision: 9. 生成修复参数
-        Decision--&gt;&gt;Node: 10. 返回NEEDS_REPAIR
-        Note over Node: 应用修复参数后重试
-
-    else 严重错误
-        Decision-&gt;&gt;Error: 11. 返回FAILED
-    end
-
-    Error-&gt;&gt;Error: 12. 错误分类分析
-    Error-&gt;&gt;Error: 13. 制定恢复策略
-
-    alt 可恢复错误
-        Error-&gt;&gt;Retry: 14. 重置重试计数
-        Retry--&gt;&gt;Error: 15. 返回原节点
-        Error--&gt;&gt;Node: 16. 返回NEEDS_RETRY
-
-    else 需要人工干预
-        Error-&gt;&gt;Human: 17. 请求人工干预
-        Human-&gt;&gt;Human: 18. 等待用户决策
-        
-        alt 用户选择继续
-            Human--&gt;&gt;Error: 19. 返回CONTINUE
-            Error--&gt;&gt;Node: 20. 返回SUCCESS
-        else 用户选择重试
-            Human--&gt;&gt;Error: 21. 返回NEEDS_RETRY
-            Error--&gt;&gt;Node: 22. 返回NEEDS_RETRY
-        else 用户选择中止
-            Human--&gt;&gt;Error: 23. 返回ABORT
-            Error--&gt;&gt;Node: 24. 终止流程
-        end
-
-    else 不可恢复错误
-        Error-&gt;&gt;Error: 25. 记录失败
-        Error--&gt;&gt;Node: 26. 返回ABORT
-    end
-</pre>
 
 <h3>关键默认值</h3>
 <table>
@@ -1162,8 +842,18 @@
 </tr>
 <tr>
 <td style="text-align:left">LLM <code>timeout</code></td>
-<td style="text-align:left">60 秒</td>
+<td style="text-align:left">300 秒（默认 gpt-4o 配置）</td>
 <td style="text-align:left">智能体层</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>InputState.timeout</code></td>
+<td style="text-align:left">600 秒</td>
+<td style="text-align:left">工作流层</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>workflow_timeout</code></td>
+<td style="text-align:left">1800 秒（仅在未传 timeout 时兜底）</td>
+<td style="text-align:left">工作流层</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>max_fragment_duration</code></td>
@@ -1178,6 +868,11 @@
 <tr>
 <td style="text-align:left"><code>max_total_loops × 2</code></td>
 <td style="text-align:left">40</td>
+<td style="text-align:left">工作流层</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>max_continuity_retries</code></td>
+<td style="text-align:left">3</td>
 <td style="text-align:left">工作流层</td>
 </tr>
 </tbody>
@@ -1196,27 +891,35 @@
 <tbody>
 <tr>
 <td style="text-align:left">超时保护不完整</td>
-<td style="text-align:left"><code>asyncio.wait_for</code> 包裹的是同步 <code>workflow.invoke()</code>，会阻塞事件循环，超时可能不触发；实际兜底为 LLM <code>timeout=60</code> 与循环上限，生产环境宜加进程级看门狗</td>
+<td style="text-align:left"><code>asyncio.wait_for</code> 包裹的是同步 <code>workflow.invoke()</code>，会阻塞事件循环，超时可能不触发；实际兜底为 LLM <code>timeout</code> 与循环上限，生产环境宜加进程级看门狗</td>
 </tr>
 <tr>
-<td style="text-align:left">连续性路由缺口</td>
-<td style="text-align:left"><code>decide_after_continuity</code> 读取顶层 <code>state.continuity_issues</code>，实际字段位于 <code>state.domain.continuity_issues</code>，决策恒为 SUCCESS；修复参数生成后不会回流。即使修正读取路径，其返回的 NEEDS_RETRY 也不在条件边键集合中</td>
+<td style="text-align:left">检查点不参与恢复</td>
+<td style="text-align:left">检查点会随图编译写入，但恢复流程仍从任务起点重跑，没有按 thread_id 续跑的接口</td>
 </tr>
 <tr>
 <td style="text-align:left">恢复语义有限</td>
-<td style="text-align:left">超过 2 小时的任务静默跳过；恢复后优先级统一为 NORMAL 并追加队尾；任务从起点重跑，检查点不参与恢复</td>
+<td style="text-align:left">超过 2 小时的任务静默跳过；恢复后优先级统一为 NORMAL 并追加队尾</td>
 </tr>
 <tr>
 <td style="text-align:left">循环告警口径不一</td>
-<td style="text-align:left">节点级与全局级 80% 预警共用 <code>loop_warning_issued</code>，仅先触发者报警；节点超限判定同时存在 <code>&gt;</code> 与 <code>&gt;=</code></td>
+<td style="text-align:left">节点级与全局级 80% 预警共用 <code>loop_warning_issued</code>，仅先触发者报警；节点超限判定使用 <code>&gt;=</code></td>
 </tr>
 <tr>
 <td style="text-align:left">全局上限推导偏差</td>
-<td style="text-align:left"><code>global_max_loops</code> 实为 <code>max_total_loops × 2</code>（默认 40），与“各节点上限之和”的注释不一致；八个节点上限之和为 32</td>
+<td style="text-align:left"><code>global_max_loops</code> 实为 <code>max_total_loops × 2</code>（默认 40），与“各节点上限之和”的注释不一致</td>
+</tr>
+<tr>
+<td style="text-align:left">资产失败不阻断</td>
+<td style="text-align:left">资产生成未启用或全部失败时继续主流程，只保留提示词并由首帧指令兜底；不会因资产缺失中止任务</td>
+</tr>
+<tr>
+<td style="text-align:left">能力注册表为静态</td>
+<td style="text-align:left">模型能力（时长、图生视频、镜头控制）写死在代码中，新模型需改代码或扩展注册表后重新部署</td>
 </tr>
 <tr>
 <td style="text-align:left">队列不跨进程</td>
-<td style="text-align:left"><code>AsyncTaskProcessor</code> 为进程内优先级队列，多副本部署时各进程独立调度，队列不共享，跨进程扩展能力有限</td>
+<td style="text-align:left"><code>AsyncTaskProcessor</code> 为进程内优先级队列，多副本部署时各进程独立调度，队列不共享</td>
 </tr>
 </tbody>
 </table>

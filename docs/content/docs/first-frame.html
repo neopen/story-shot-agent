@@ -1,0 +1,229 @@
+<p>当一个片段需要稳定的人物身份，或画面里必须出现清晰可读的文字，直接文生视频往往不够可控。PenShot 会把这类片段改为<strong>两段式生成</strong>：先生成一张静态首帧，再用它驱动视频。这样身份、构图和文字都在首帧阶段锁定，视频模型只负责动作。</p>
+
+<blockquote>本页对应 v0.4.4 源码。PenShot 只输出首帧提示词、动作提示词与资产引用，不调用图片或视频接口。</blockquote>
+
+<h2>30 秒了解</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">问题</th><th style="text-align:left">两段式的做法</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">人物长相容易漂移</td><td style="text-align:left">用角色三视图作身份参考，首帧再写死外观锚点</td></tr>
+<tr><td style="text-align:left">招牌、字幕、信件文字糊掉</td><td style="text-align:left">关键文字片段改走“先出图、再动起来”，让静态阶段渲染文字</td></tr>
+<tr><td style="text-align:left">首帧混入后续动作</td><td style="text-align:left">按动作线索把描述切成“静态截面”和“动作序列”，首帧只保留前者</td></tr>
+<tr><td style="text-align:left">纯音效片段首帧没内容</td><td style="text-align:left">剔除广播、画外音等非视觉子句，必要时用空镜兜底</td></tr>
+<tr><td style="text-align:left">片段场景和首帧资产对不上</td><td style="text-align:left">唯一匹配时自动替换场景资产，无法唯一匹配时阻断并转人工</td></tr>
+</tbody>
+</table>
+
+<h2>快速上手：判断并消费首帧</h2>
+<pre class="hljs"><code><span class="hljs-keyword">from</span> penshot.api <span class="hljs-keyword">import</span> create_penshot_agent
+
+result = create_penshot_agent().breakdown_script(script_text)
+route_plan = result.data[<span class="hljs-string">&quot;instructions&quot;</span>][<span class="hljs-string">&quot;route_plan&quot;</span>]
+
+<span class="hljs-keyword">for</span> package <span class="hljs-keyword">in</span> route_plan[<span class="hljs-string">&quot;adapted_packages&quot;</span>]:
+    <span class="hljs-keyword">if</span> package[<span class="hljs-string">&quot;fragment_id&quot;</span>] <span class="hljs-keyword">in</span> route_plan[<span class="hljs-string">&quot;blocked_fragments&quot;</span>]:
+        <span class="hljs-keyword">continue</span>
+
+    <span class="hljs-keyword">if</span> package[<span class="hljs-string">&quot;mode&quot;</span>] != <span class="hljs-string">&quot;image_to_video&quot;</span>:
+        video_service.text_to_video(package[<span class="hljs-string">&quot;prompt&quot;</span>], duration=package[<span class="hljs-string">&quot;duration&quot;</span>])
+        <span class="hljs-keyword">continue</span>
+
+    <span class="hljs-comment"># 只有 as_first_frame=true 的引用是首帧，角色三视图不是</span>
+    first = next(
+        (ref <span class="hljs-keyword">for</span> ref <span class="hljs-keyword">in</span> package[<span class="hljs-string">&quot;references&quot;</span>] <span class="hljs-keyword">if</span> ref[<span class="hljs-string">&quot;as_first_frame&quot;</span>]),
+        <span class="hljs-keyword">None</span>,
+    )
+    frame = generated.get(first[<span class="hljs-string">&quot;asset_id&quot;</span>]) <span class="hljs-keyword">if</span> first <span class="hljs-keyword">else</span> <span class="hljs-keyword">None</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> frame:
+        <span class="hljs-comment"># 场景首帧还没回填：按 image_prompt 现生成一张</span>
+        frame = image_service.generate(prompt=package[<span class="hljs-string">&quot;image_prompt&quot;</span>])
+
+    video_service.image_to_video(
+        prompt=package[<span class="hljs-string">&quot;motion_prompt&quot;</span>] <span class="hljs-keyword">or</span> package[<span class="hljs-string">&quot;prompt&quot;</span>],
+        first_frame=frame,
+        duration=package[<span class="hljs-string">&quot;duration&quot;</span>],
+    )
+</code></pre>
+
+<p>如果下游不自己生成首帧，也可以直接执行 <code>first_frame_instruction</code>，它已经把“先生成还是直接使用”写成了完整指令。</p>
+
+<h2>哪些片段会走两段式</h2>
+<p>路由节点在规则选型之前先做两段式判定。满足以下任一条件即可触发：</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">条件</th><th style="text-align:left">判定细节</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">关键文字</td><td style="text-align:left">提示词明确要求呈现可读文字，如招牌、字幕、书信、报纸、手写地址</td></tr>
+<tr><td style="text-align:left">角色外观锚点</td><td style="text-align:left">片段主角在全局契约中登记了 <code>appearance_anchors</code></td></tr>
+<tr><td style="text-align:left">场景锚点覆盖</td><td style="text-align:left">片段所属场景已有对应的场景资产，具备可用的首帧视觉锚点</td></tr>
+</tbody>
+</table>
+
+<p>只有外观锚点、既没有关键文字也没有场景首帧时，还要求契约中已声明该角色的三视图；否则无法兑现身份约束，片段保持文生视频。注意“已声明”不等于“已生成”，状态为 <code>pending</code> 的角色资产同样可以支撑两段式，由下游负责生成。</p>
+
+<p>文字判定使用固定词表：中文包含“文字、字迹、地址、手写、字幕、招牌、标牌、海报、书名、报纸、书信、标题”；英文按整词匹配 <code>text</code>、<code>readable</code>、<code>address</code>、<code>handwriting</code>、<code>subtitle</code>、<code>newspaper</code>、<code>poster</code>、<code>menu</code>、<code>title</code>。英文按词边界匹配，避免把 <code>texture</code>、<code>context</code> 误判成文字需求。</p>
+
+<pre class="mermaid">flowchart LR
+    F[片段提示词] --&gt; T{关键文字?}
+    T --&gt;|是| I2V[两段式生成]
+    T --&gt;|否| A{角色外观锚点?}
+    A --&gt;|是| C{有场景首帧或角色三视图?}
+    C --&gt;|是| I2V
+    C --&gt;|否| T2V[文生视频]
+    A --&gt;|否| S{场景锚点覆盖?}
+    S --&gt;|是| I2V
+    S --&gt;|否| T2V
+</pre>
+
+<h2>首帧提示词怎么拼</h2>
+<p>首帧提示词由首帧构建器按固定顺序拼装，与角色三视图的“棚拍 turnaround”结构不同，因此不会直接复用三视图提示词。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">顺序</th><th style="text-align:left">内容</th><th style="text-align:left">来源</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">1</td><td style="text-align:left">景别短语，如 <code>medium shot</code>、<code>close-up shot</code></td><td style="text-align:left">结构化相机参数优先，回退片段景别，默认中景</td></tr>
+<tr><td style="text-align:left">2</td><td style="text-align:left">角色与白名单外观锚点，如 <code>medium shot of 林然 (发型: ..., 服装: ...)</code></td><td style="text-align:left">片段主角 + 契约角色锚点</td></tr>
+<tr><td style="text-align:left">3</td><td style="text-align:left">场景地点，如 <code>at 小巷</code></td><td style="text-align:left">片段所属场景</td></tr>
+<tr><td style="text-align:left">4</td><td style="text-align:left">时间，如 <code>night lighting</code></td><td style="text-align:left">场景 <code>time_of_day</code></td></tr>
+<tr><td style="text-align:left">5</td><td style="text-align:left">天气；晴天等中性天气不重复声明</td><td style="text-align:left">场景 <code>weather</code></td></tr>
+<tr><td style="text-align:left">6</td><td style="text-align:left">动作开始前的静态截面</td><td style="text-align:left">清洗后的片段描述</td></tr>
+<tr><td style="text-align:left">7</td><td style="text-align:left">风格锚点</td><td style="text-align:left">全局契约风格</td></tr>
+</tbody>
+</table>
+
+<p>示意输出（外观值为示例）：</p>
+
+<pre class="hljs"><code>medium shot of 林然 (发型: 黑色短发, 服装: 黑色西装),
+at 小巷, night lighting, rain,
+林然站在霓虹灯下,
+neo-noir, cinematic, moody lighting
+</code></pre>
+
+<p>如果清洗后完全没有视觉内容，首帧会追加 <code>empty scene, no people</code>，避免画面只剩声音描述。纯广播、纯画外音片段通常落在这里。</p>
+
+<h2>静态截面与动作序列</h2>
+<p>首帧只能承载“动作开始之前”的画面，否则文字模型和视频模型都会收到互相矛盾的信息。构建器会把片段描述切成两段：</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">输出字段</th><th style="text-align:left">内容</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>image_prompt</code></td><td style="text-align:left">景别、角色、场景、天气与第一个动作线索之前的静态内容</td></tr>
+<tr><td style="text-align:left"><code>motion_prompt</code></td><td style="text-align:left">从第一个动作线索开始的动作序列，供图生视频驱动画面</td></tr>
+</tbody>
+</table>
+
+<p>“驶入、打开、回头、关门、转身、抬头、渐黑、随后、然后”等时间序列词会触发切分；“没有回头”这类否定表述会被识别为静止状态，不会被误切。对白引号内的内容不受标点切分影响；广播、画外音、音效等纯音频子句会被整句剔除；“固定镜头”“镜头越过肩膀”等运镜描述也会被移除，因为景别已经由第一段表达。</p>
+
+<p>示例：片段描述“林然站在霓虹灯下，雨水顺着伞沿落下，随后他转身走进小巷”。第一个动作线索是“落下”，因此静态截面只保留“林然站在霓虹灯下”，后续内容全部进入 <code>motion_prompt</code>。如果片段本身就是动作开头，静态截面为空，首帧由景别、角色与场景构成。</p>
+
+<h2>资产引用的三种角色</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">role</th><th style="text-align:left">as_first_frame</th><th style="text-align:left">required</th><th style="text-align:left">用途</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>identity_reference</code></td><td style="text-align:left"><code>false</code></td><td style="text-align:left"><code>true</code></td><td style="text-align:left">角色三视图，锁定身份，不直接作为首帧</td></tr>
+<tr><td style="text-align:left"><code>first_frame</code></td><td style="text-align:left"><code>true</code></td><td style="text-align:left"><code>true</code></td><td style="text-align:left">场景锚点，图生视频的唯一首帧来源</td></tr>
+<tr><td style="text-align:left"><code>prop</code></td><td style="text-align:left"><code>false</code></td><td style="text-align:left"><code>false</code></td><td style="text-align:left">道具静帧，带可选 <code>state</code>（如 crumpled、balled）</td></tr>
+</tbody>
+</table>
+
+<p>首帧语义有三条硬约束：</p>
+<ul>
+<li>只有 <code>as_first_frame=true</code> 的引用用于首帧，角色三视图与道具静帧不再承担首帧职责；</li>
+<li><code>references[].asset_id</code> 始终是 PenShot 规范 ID，下游改名必须走 <code>asset_id_map</code>；</li>
+<li><code>asset_ref</code> 只承载下游回填清单中的场景首帧引用，不会写入角色三视图的图片地址，也不会回退使用契约中的旧引用。</li>
+</ul>
+
+<h2>first_frame_instruction 的两种形态</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">场景</th><th style="text-align:left">指令</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">清单已回填场景首帧</td><td style="text-align:left"><code>Use reference image {asset_ref} as the first frame; animate: {动作序列}</code></td></tr>
+<tr><td style="text-align:left">场景首帧尚未回填</td><td style="text-align:left"><code>Generate first frame with prompt: {image_prompt}; then use it as the first frame and animate: {动作序列}</code></td></tr>
+<tr><td style="text-align:left">路由改判为图生视频、未经过片段级首帧构建</td><td style="text-align:left"><code>first_frame_instruction</code> 直接等于 <code>image_prompt</code>，动作序列由 <code>motion_prompt</code> 承载</td></tr>
+</tbody>
+</table>
+
+<p>第二种形态是声明式指令：PenShot 不生成图片，只把“先生成、再驱动”的完整步骤交给下游。下游若已有自己的首帧生成策略，也可以忽略这段文字，直接使用 <code>image_prompt</code> 与 <code>motion_prompt</code>。</p>
+
+<h2>场景锚定：自动替换与阻断</h2>
+<p>片段所属场景是按“片段 → 镜头 → 契约场景”解析的，但文本里可能明确写了另一个地点。首帧资产与文本场景不一致时，路由会做一次确定性校验；对白引号内的内容不参与判断，场景地点词表覆盖常见中英文别名与同义称呼。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">判定</th><th style="text-align:left">处理</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">文本提到了当前首帧场景</td><td style="text-align:left">不动作，保留原资产</td></tr>
+<tr><td style="text-align:left">只命中另一个场景资产</td><td style="text-align:left"><code>auto_replace</code>：替换首帧资产，并按新场景重建 <code>image_prompt</code>，同时写入告警</td></tr>
+<tr><td style="text-align:left">命中多个场景资产</td><td style="text-align:left"><code>ambiguous</code>：<code>status=needs_manual_fix</code>，片段进入阻断列表</td></tr>
+<tr><td style="text-align:left">出现其他场景词但没有对应资产</td><td style="text-align:left"><code>no_asset</code>：同样阻断，等待人工指定场景</td></tr>
+</tbody>
+</table>
+
+<p>自动替换时首帧提示词必须与替换后的资产同源，否则会出现“资产是教室、提示词写走廊”的自相矛盾。阻断片段会出现在 <code>route_plan.blocked_fragments</code>，下游不得将其放入渲染队列。</p>
+
+<h2>路由阶段的检查</h2>
+<p>路由完成后，Gate 1 对提示词包做结构与逻辑检查，资产约束检查再补充服装降级要求。片段级问题写入 <code>package.warnings</code> 并置位 <code>requires_special_attention</code>；跨片段问题写入 <code>route_plan.warnings</code>。这些告警默认不阻断渲染，只有场景锚定失败会把状态改为 <code>needs_manual_fix</code>。</p>
+
+<table>
+<thead>
+<tr><th style="text-align:left">检查项</th><th style="text-align:left">判定</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">首帧静态性</td><td style="text-align:left"><code>image_prompt</code> 中不得出现动作线索，否则告警“首帧提示词包含动作序列”</td></tr>
+<tr><td style="text-align:left">关键文字证据</td><td style="text-align:left">关键文字片段的首帧必须明确要求呈现可读文字</td></tr>
+<tr><td style="text-align:left">景别一致性</td><td style="text-align:left">结构化景别与来源镜头景别必须一致</td></tr>
+<tr><td style="text-align:left">时长收敛</td><td style="text-align:left">片段时长被目标模型上限收敛时如实标注</td></tr>
+<tr><td style="text-align:left">对白语言</td><td style="text-align:left">视频提示词中的对白语言应与台词语言一致</td></tr>
+<tr><td style="text-align:left">道具引用完整性</td><td style="text-align:left">引用集合与 <code>usage.fragments</code> 必须互为子集，缺失或越界都会告警</td></tr>
+<tr><td style="text-align:left">服装降级</td><td style="text-align:left">角色服装关键字段缺失时，引用片段必须降级为剪影或背影，并写入 <code>degraded_assets</code></td></tr>
+</tbody>
+</table>
+
+<h2>排查常见问题</h2>
+<table>
+<thead>
+<tr><th style="text-align:left">现象</th><th style="text-align:left">原因与处理</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left"><code>image_prompt</code> 里仍有“转身、走进”</td><td style="text-align:left">动作线索未被识别或写在否定结构里；调整片段描述，让静态画面先于动作出现</td></tr>
+<tr><td style="text-align:left">有外观锚点却仍是文生视频</td><td style="text-align:left">契约中没有该角色的三视图资产，且片段没有场景首帧；先确认资产计划包含该角色</td></tr>
+<tr><td style="text-align:left">片段被阻断</td><td style="text-align:left">文本场景与首帧资产无法唯一匹配；查看 <code>warnings</code> 中的候选场景，人工指定或补充场景资产</td></tr>
+<tr><td style="text-align:left">首帧是空镜</td><td style="text-align:left">片段只有广播、音效或画外音，没有可入画对象；这是兜底行为，补充视觉描述即可</td></tr>
+<tr><td style="text-align:left"><code>asset_ref</code> 为空</td><td style="text-align:left">清单未回填场景首帧，或清单声明了该资产但引用为空；按 <code>image_prompt</code> 生成，或提交新的 <code>asset_manifest</code></td></tr>
+<tr><td style="text-align:left">关键文字片段没有文字证据</td><td style="text-align:left">首帧提示词缺少招牌、字幕等要求；在剧本或提示词中明确写出需要呈现的文字内容</td></tr>
+</tbody>
+</table>
+
+<h2>验证与源码</h2>
+<pre class="hljs"><code>pytest tests/unit/test_image_to_video_routing.py \
+       tests/unit/test_first_frame_prompt_clean.py \
+       tests/unit/test_first_frame_and_usage.py -q
+</code></pre>
+
+<table>
+<thead>
+<tr><th style="text-align:left">能力</th><th style="text-align:left">源码位置</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align:left">两段式判定与引用挂载</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/image_to_video.py</code></td></tr>
+<tr><td style="text-align:left">首帧提示词、动作拆分、场景校验</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/first_frame_builder.py</code></td></tr>
+<tr><td style="text-align:left">Gate 1 检查</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/quality_gate.py</code></td></tr>
+<tr><td style="text-align:left">路由与模式切换</td><td style="text-align:left"><code>src/penshot/neopen/agent/model_adapter/model_router.py</code></td></tr>
+<tr><td style="text-align:left">下游交接示例</td><td style="text-align:left"><code>examples/sdk/08_asset_handoff.py</code></td></tr>
+</tbody>
+</table>
+
+<p>资产如何生成与回填见<a href="asset-handoff.html">资产计划与交接</a>；模型如何选择见<a href="model-routing.html">模型路由</a>；一致性契约中的外观锚点见<a href="consistency.html">一致性策略</a>。</p>

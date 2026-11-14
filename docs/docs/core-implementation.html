@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>核心实现 · PenShot 文档</title>
-  <meta name="description" content="PenShot 的多厂商 LLM 客户端、YAML 提示词管理、重试与循环控制、任务池与上下文窗口管理的实现要点。">
-  <meta name="keywords" content="核心实现,LLM 客户端,提示词管理,重试机制,循环控制,任务池,上下文窗口,YAML">
+  <meta name="description" content="PenShot 的多厂商 LLM 客户端、YAML 提示词管理、资产生成与模型适配、重试与循环控制、任务池与上下文窗口管理的实现要点。">
+  <meta name="keywords" content="核心实现,LLM 客户端,提示词管理,资产生成,模型适配,重试机制,循环控制,任务池,YAML">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="核心实现 · PenShot 文档">
-  <meta property="og:description" content="PenShot 的多厂商 LLM 客户端、YAML 提示词管理、重试与循环控制、任务池与上下文窗口管理的实现要点。">
+  <meta property="og:description" content="PenShot 的多厂商 LLM 客户端、YAML 提示词管理、资产生成与模型适配、重试与循环控制、任务池与上下文窗口管理的实现要点。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/core-implementation.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-10-31T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-10-31T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
   <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="核心实现 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot 的多厂商 LLM 客户端、YAML 提示词管理、重试与循环控制、任务池与上下文窗口管理的实现要点。">
+  <meta name="twitter:description" content="PenShot 的多厂商 LLM 客户端、YAML 提示词管理、资产生成与模型适配、重试与循环控制、任务池与上下文窗口管理的实现要点。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"核心实现","name":"核心实现","description":"PenShot 的多厂商 LLM 客户端、YAML 提示词管理、重试与循环控制、任务池与上下文窗口管理的实现要点。","url":"https://shot.helpenx.com/docs/core-implementation.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/core-implementation.html"},"datePublished":"2026-10-31","dateModified":"2026-10-31","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"核心实现, LLM 客户端, 提示词管理, 重试机制, 循环控制, 任务池, 上下文窗口, YAML","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"核心实现","name":"核心实现","description":"PenShot 的多厂商 LLM 客户端、YAML 提示词管理、资产生成与模型适配、重试与循环控制、任务池与上下文窗口管理的实现要点。","url":"https://shot.helpenx.com/docs/core-implementation.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/core-implementation.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"核心实现, LLM 客户端, 提示词管理, 资产生成, 模型适配, 重试机制, 循环控制, 任务池, YAML","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -97,6 +97,10 @@
         <ul class="sidebar-links"><li><a href="architecture.html">技术架构</a></li><li><a href="nodes.html">工作流节点</a></li><li><a href="consistency.html">一致性策略</a></li><li><a href="checkpoint.html">检查点与恢复</a></li><li><a href="core-implementation.html" class="is-active" aria-current="page">核心实现</a></li><li><a href="dev-guide.html">开发指南</a></li></ul>
       </div>
 <div class="sidebar-group">
+        <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v.5"/></svg>进阶能力</div>
+        <ul class="sidebar-links"><li><a href="asset-handoff.html">资产计划与交接</a></li><li><a href="model-routing.html">模型路由</a></li><li><a href="first-frame.html">首帧与图生视频</a></li></ul>
+      </div>
+<div class="sidebar-group">
         <div class="sidebar-group__title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>集成与接口</div>
         <ul class="sidebar-links"><li><a href="integration.html">集成指南</a></li><li><a href="mcp.html">MCP 服务</a></li></ul>
       </div>
@@ -111,7 +115,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.3.x<br>MIT License · 2026-10-31</div>
+    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -126,24 +130,24 @@
       <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
     </div>
     <details class="toc-mobile">
-      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 12 节</summary>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">模块划分</a></li><li class="toc-depth-2"><a href="#sec-2">LLM 客户端</a></li><li class="toc-depth-3"><a href="#sec-3">降级链</a></li><li class="toc-depth-3"><a href="#sec-4">已知副作用</a></li><li class="toc-depth-2"><a href="#sec-5">提示词管理</a></li><li class="toc-depth-3"><a href="#sec-6">模板结构</a></li><li class="toc-depth-3"><a href="#sec-7">加载与匹配</a></li><li class="toc-depth-2"><a href="#sec-8">调用重试</a></li><li class="toc-depth-2"><a href="#sec-9">循环控制</a></li><li class="toc-depth-2"><a href="#sec-10">任务池</a></li><li class="toc-depth-2"><a href="#sec-11">上下文窗口</a></li><li class="toc-depth-2"><a href="#sec-12">实现边界</a></li></ul>
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 16 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">模块划分</a></li><li class="toc-depth-2"><a href="#sec-2">LLM 客户端</a></li><li class="toc-depth-3"><a href="#sec-3">降级链</a></li><li class="toc-depth-3"><a href="#sec-4">已知副作用</a></li><li class="toc-depth-2"><a href="#sec-5">提示词管理</a></li><li class="toc-depth-3"><a href="#sec-6">模板结构</a></li><li class="toc-depth-3"><a href="#sec-7">加载与匹配</a></li><li class="toc-depth-3"><a href="#sec-8">模板召回</a></li><li class="toc-depth-2"><a href="#sec-9">资产管线</a></li><li class="toc-depth-2"><a href="#sec-10">模型路由</a></li><li class="toc-depth-2"><a href="#sec-11">调用重试</a></li><li class="toc-depth-2"><a href="#sec-12">循环控制</a></li><li class="toc-depth-2"><a href="#sec-13">任务池</a></li><li class="toc-depth-2"><a href="#sec-14">质量检查</a></li><li class="toc-depth-2"><a href="#sec-15">上下文窗口</a></li><li class="toc-depth-2"><a href="#sec-16">实现边界</a></li></ul>
     </details>
     <div class="docs-layout">
       <article class="doc-body">
         <header class="doc-header">
           <span class="doc-header__cat">核心设计</span>
           <h1>核心实现</h1>
-          <p class="doc-deck">LLM 客户端、提示词管理、循环控制与任务调度的实现要点。</p>
+          <p class="doc-deck">LLM 客户端、提示词管理、资产生成、模型适配、循环控制与任务调度的实现要点。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-10-31</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 16 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 21 分钟阅读</span>
             <a href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/core-implementation.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>在 GitHub 编辑</a>
           </div>
         </header>
-        <p>PenShot 的核心实现围绕五个基础件展开：可插拔 LLM 客户端、版本化 YAML 提示词、调用重试与循环控制、任务池调度、上下文窗口约束。它们共同决定一条剧本能否稳定跑完并产出可用的分镜提示词。</p>
+        <p>PenShot 的核心实现由七类基础件组成：可插拔 LLM 客户端、版本化 YAML 提示词、资产计划与回填、模型能力路由、调用重试与循环控制、任务池调度、上下文窗口约束。它们共同决定一条剧本能否稳定跑完并产出可用的分镜提示词。</p>
 <blockquote>
-<p><strong>事实边界</strong>：本页对应 v0.3.x 源码。三层记忆已移至 <a href="memory.html">记忆系统</a>；连续性锚点、质量修复与全局风格开关见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
+<p><strong>事实边界</strong>：本页对应 v0.4.4 源码。三层记忆见 <a href="memory.html">记忆系统</a>；一致性契约与修复回路见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
 </blockquote>
 <h2 id="sec-1">模块划分</h2>
 <table>
@@ -157,13 +161,28 @@
 <tbody>
 <tr>
 <td style="text-align:left">LLM 客户端</td>
-<td style="text-align:left"><code>clients/</code>、<code>client_factory.py</code></td>
+<td style="text-align:left"><code>client/</code>、<code>client_factory.py</code></td>
 <td style="text-align:left">统一厂商接口、模型构建、三级降级</td>
 </tr>
 <tr>
 <td style="text-align:left">提示词</td>
-<td style="text-align:left"><code>prompts/</code>、<code>prompt_load_manager.py</code></td>
-<td style="text-align:left">按版本与语言加载 YAML、缓存与匹配</td>
+<td style="text-align:left"><code>prompts/</code>、<code>prompt_load_manager.py</code>、<code>prompt_template_manager.py</code></td>
+<td style="text-align:left">按版本与语言加载 YAML、缓存与模板召回</td>
+</tr>
+<tr>
+<td style="text-align:left">资产管线</td>
+<td style="text-align:left"><code>agent/asset_generator/</code></td>
+<td style="text-align:left">资产计划、清单回填、角色/道具/场景生图</td>
+</tr>
+<tr>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left"><code>agent/model_adapter/</code>、<code>config/settings.yaml</code></td>
+<td style="text-align:left">能力注册表、规则匹配、首帧构建、Gate 1 告警</td>
+</tr>
+<tr>
+<td style="text-align:left">质量与契约</td>
+<td style="text-align:left"><code>agent/quality_auditor/</code>、<code>consistency/</code></td>
+<td style="text-align:left">11 项规则检查、外观锚点、修复参数</td>
 </tr>
 <tr>
 <td style="text-align:left">循环控制</td>
@@ -196,7 +215,7 @@
 <tr>
 <td style="text-align:left">OpenAI</td>
 <td style="text-align:left"><code>https://api.openai.com/v1</code></td>
-<td style="text-align:left"><code>timeout=60</code>、<code>max_retries=3</code>；嵌入默认 <code>text-embedding-3-small</code>、1536 维</td>
+<td style="text-align:left"><code>timeout=300</code>（settings.yaml）、<code>max_retries=3</code>；嵌入默认 <code>text-embedding-3-small</code>、1536 维</td>
 </tr>
 <tr>
 <td style="text-align:left">Ollama</td>
@@ -288,7 +307,50 @@
 </pre>
 <p>匹配顺序为“缓存 → 键名 → <code>name</code> 字段 → 去 <code>_prompt</code> 后缀”。docstring 列出了五条策略，实现层实际落地的是上述路径。另有一处历史残留：<code>get_all_prompts()</code> 中处理旧格式的 <code>elif isinstance(data, dict)</code> 分支不可达，因为前一个 <code>if</code> 已捕获所有字典。两者都不影响主流程。</p>
 <p>模板按 <code>version + language</code> 目录隔离，升级提示词不需要改代码，回滚只需切回旧目录。缓存以进程为界，多进程部署各自维护一份；模板文件更新后需要重启进程或重建管理器才会生效。</p>
-<h2 id="sec-8">调用重试</h2>
+<h3 id="sec-8">模板召回</h3>
+<p>转换阶段还会按 <code>script_id</code> 召回历史成功模板：默认相似度阈值 0.80、<code>top_k=2</code>、单次最多注入 6 条；本地命中不足时可只读召回其他剧本的模板（<code>include_global=true</code>），但不会写入对方索引。旧版缺陷模板在 0.4.4 中标记为 <code>legacy</code> 并排除在召回之外；升级后可用 <code>scripts/migrate_prompt_templates_044.py</code> 迁移存量数据，默认 dry-run，<code>--apply</code> 才写入。</p>
+<h2 id="sec-9">资产管线</h2>
+<p>资产生成把“角色、道具、场景”从提示词描述提升为可回填的显式对象。默认配置 <code>image.default.enabled=false</code>，节点只产出 <code>asset_plan</code>，不调用任何生图接口。</p>
+<pre class="mermaid">flowchart LR
+    A[解析产物&lt;br/&gt;角色/道具/场景] --&gt; B[AssetSpec 规格&lt;br/&gt;char_ / prop_ / scene_]
+    B --&gt; C[AssetPlanDocument&lt;br/&gt;assets[] + style_anchor]
+    C --&gt; D{image.default.enabled?}
+    D --&gt;|否| E[仅输出计划&lt;br/&gt;status=pending]
+    D --&gt;|是| F[调用生图 provider&lt;br/&gt;生成 asset_ref]
+    F --&gt; G[AssetGenerationReport&lt;br/&gt;generated / failed / skipped]
+    G --&gt; H[AssetManifest&lt;br/&gt;bindings + asset_id_map]
+    H --&gt; I[回填提示词&lt;br/&gt;asset_ref 替换占位]
+</pre>
+<table>
+<thead>
+<tr><th>对象</th><th>关键字段</th><th>用途</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AssetSpec</code></td><td><code>asset_id</code>、<code>asset_type</code>、<code>views</code>、<code>status</code>、<code>asset_ref</code></td><td>声明单个资产及其生成规格</td></tr>
+<tr><td><code>AssetPlanDocument</code></td><td><code>schema_version</code>、<code>style_anchor</code>、<code>assets[]</code></td><td>交付给下游的声明式计划</td></tr>
+<tr><td><code>AssetManifest</code></td><td><code>bindings[]</code>、<code>asset_id_map</code></td><td>下游回填的真实资产引用</td></tr>
+<tr><td><code>AssetGenerationReport</code></td><td><code>specs[]</code>、<code>stats</code></td><td>逐资产状态与统计</td></tr>
+</tbody>
+</table>
+<p>角色资产默认生成 <code>front</code>、<code>side</code>、<code>back</code> 三个视角；清单按规范 <code>asset_id</code> 查找绑定，优先走 <code>asset_id_map</code> 改名映射。资产生成失败不阻断主链：报告记录 <code>failed</code>，对应片段继续使用文本描述，质量审查会给出资产使用告警。</p>
+<h2 id="sec-10">模型路由</h2>
+<p>路由层把“写提示词”和“选模型”分开。能力注册表静态声明每个视频模型的时长上限、是否支持图生视频、镜头控制与一致性评分；路由规则在 <code>settings.yaml</code> 中按优先级匹配，输出 <code>RoutePlan</code> 与逐片段的 <code>AdaptedPromptPackage</code>。</p>
+<table>
+<thead>
+<tr><th>模型</th><th>最大时长</th><th>图生视频</th><th>镜头控制</th><th>文字渲染 / 一致性</th><th>审美倾向</th></tr>
+</thead>
+<tbody>
+<tr><td><code>runway_gen4</code></td><td>10.0s</td><td>支持</td><td>支持</td><td>0.5 / 0.8</td><td>电影感</td></tr>
+<tr><td><code>kling_3</code></td><td>10.0s</td><td>支持</td><td>支持</td><td>0.7 / 0.9</td><td>写实</td></tr>
+<tr><td><code>luma_dream</code></td><td>5.0s</td><td>支持</td><td>支持</td><td>0.6 / 0.7</td><td>电影感</td></tr>
+<tr><td><code>sora_2</code></td><td>60.0s</td><td>不支持</td><td>不支持</td><td>0.95 / 0.85</td><td>写实</td></tr>
+<tr><td><code>pika_2</code></td><td>4.0s</td><td>支持</td><td>支持</td><td>0.4 / 0.6</td><td>动画</td></tr>
+</tbody>
+</table>
+<p>默认规则五条，按优先级从高到低：<code>critical_text</code>（首帧需呈现可读文字）→ <code>high_consistency</code>（角色一致性要求高）→ <code>complex_motion</code>（复杂运动）→ <code>anime_style</code>（动画风格）→ <code>cinematic_long_take</code>（电影感且时长 ≥8 秒）。未命中任一规则时使用 <code>routing.default_model</code>，默认 <code>kling_3</code>。</p>
+<p>图生视频为两阶段：先用 <code>first_frame_builder</code> 生成静态首帧提示词，再由视频模型驱动。首帧提示词不得混入动作序列，Gate 1 会检查静态性；<code>critical_text</code> 路由还要求首帧明确呈现可读文字。Gate 1 只回写 <code>warnings</code>，不阻断输出；<code>blocked_fragments</code> 则记录路由后仍无法满足能力约束的片段，交给下游或人工处理。</p>
+<p>路由失败不回滚已生成的提示词：<code>route_plan</code> 置空，主链继续走审查与输出，问题以告警形式保留。适配层允许覆盖时长、风格、镜头等字段，但不允许改写资产身份，避免回填后的角色与计划脱节。</p>
+<h2 id="sec-11">调用重试</h2>
 <p>智能体通过 <code>_call_llm_chat_with_retry()</code> 调用模型：组装 system / user 两条消息，交给 <code>llm_chat_complete()</code>，后者调用 <code>llm.invoke()</code> 并返回 <code>response.content</code>。异常时 <code>sleep(1)</code> 后重试，默认 <code>max_retries=2</code>；最后一次仍失败则显式上抛，交给节点层与循环控制处理。</p>
 <pre class="mermaid">sequenceDiagram
     participant A as 智能体
@@ -303,7 +365,7 @@
     A-&gt;&gt;A: 最多 2 次，仍失败上抛
 </pre>
 <p>重试间隔写死为 1 秒，没有读取 <code>retry_delay</code> 配置；也没有区分可重试与不可重试错误，参数类 4xx 同样会重试两次。这是以延迟换实现简单的取舍。</p>
-<h2 id="sec-9">循环控制</h2>
+<h2 id="sec-12">循环控制</h2>
 <p>多阶段工作流容易在单节点自旋。PenShot 用三套计数器兜底：硬限制按节点累计、永不重置；软限制只在 <code>NEEDS_RETRY</code> 时累加、成功即归零；全局计数所有节点共享，作为最后防线。</p>
 <pre class="mermaid">graph TB
     subgraph &quot;重试控制流程&quot;
@@ -351,26 +413,26 @@
 <tr>
 <td style="text-align:left">硬限制</td>
 <td style="text-align:left"><code>node_current_loops</code></td>
-<td style="text-align:left">按节点配置，3 至 5</td>
+<td style="text-align:left">按节点配置，2 至 5</td>
 <td style="text-align:left">永不重置</td>
 </tr>
 <tr>
 <td style="text-align:left">软限制</td>
 <td style="text-align:left"><code>stage_current_retries</code></td>
-<td style="text-align:left">多为 3；审计与连续性检查为 2</td>
+<td style="text-align:left">多为 3；资产、路由、审计与连续性为 2</td>
 <td style="text-align:left">决策为 <code>SUCCESS</code> / <code>VALID</code> 时归零</td>
 </tr>
 <tr>
 <td style="text-align:left">全局上限</td>
 <td style="text-align:left"><code>global_current_loops</code></td>
-<td style="text-align:left"><code>global_max_loops=30</code></td>
+<td style="text-align:left"><code>max_total_loops × 2</code>，默认 40</td>
 <td style="text-align:left">永不重置</td>
 </tr>
 </tbody>
 </table>
-<p>节点硬限制的源码默认值：<code>PARSE_SCRIPT=3</code>、<code>SEGMENT_SHOT=5</code>、<code>SPLIT_VIDEO=5</code>、<code>AUDIT_QUALITY=3</code>、<code>HUMAN_INTERVENTION=1</code>。全局上限在工作流启动时按“所有节点最大循环次数之和 × 2”推导，配置中的 30 只是兜底默认值。全局计数达到 80% 时发出一次 warning，由 <code>loop_warning_issued</code> 保证不重复。</p>
+<p>节点硬限制的源码默认值：<code>PARSE_SCRIPT=3</code>、<code>GENERATE_ASSETS=2</code>、<code>SEGMENT_SHOT=5</code>、<code>SPLIT_VIDEO=5</code>、<code>CONVERT_PROMPT=5</code>、<code>ROUTE_MODEL=5</code>、<code>AUDIT_QUALITY=3</code>、<code>CONTINUITY_CHECK=5</code>、<code>ERROR_HANDLER=5</code>、<code>HUMAN_INTERVENTION=2</code>。全局上限在工作流启动时按 <code>config.max_total_loops × 2</code> 计算，配置未传时 <code>ShotConfig</code> 默认 20，因此实际为 40；<code>WorkflowState</code> 中的 30 只是独立的兜底默认值。全局计数达到 80% 时发出一次 warning，由 <code>loop_warning_issued</code> 保证不重复。</p>
 <p>软限制超限后降级为 <code>NEEDS_REPAIR</code> 而不是直接失败，修复参数随状态传递，节点带参重跑。无法恢复的错误才进入 <code>NEEDS_HUMAN</code> 或 <code>FAILED</code>。</p>
-<p>修复参数由质量审计生成，经 <code>apply_repair_params()</code> 在节点下一次执行前注入，智能体再把它渲染成 <code>{repair_hint}</code>。审计未覆盖的问题不会产生修复建议，因此重试只能收敛到审计规则的覆盖范围之内。</p>
+<p>修复参数由质量审计与连续性检查生成，经 <code>apply_repair_params()</code> 在节点下一次执行前注入，智能体再把它渲染成 <code>{repair_hint}</code>。连续性检查的修复路由已接通，可按问题来源回到解析、拆分、分段或转换；修复轮次受节点上限约束，不会无限回炉。</p>
 <pre class="mermaid">stateDiagram-v2
     [*] --&gt; 节点执行
     
@@ -384,6 +446,7 @@
     决策函数 --&gt; VALID: 轻微问题，可接受
     决策函数 --&gt; NEEDS_RETRY: 有问题，可重试
     决策函数 --&gt; NEEDS_REPAIR: 需修复后重试
+    决策函数 --&gt; NEEDS_ASSET_EDIT: 需修改资产提示词
     决策函数 --&gt; NEEDS_HUMAN: 需人工干预
     决策函数 --&gt; FAILED: 严重失败
     
@@ -396,6 +459,7 @@
     
     SUCCESS --&gt; [*]: 重置软限制，继续流程
     VALID --&gt; [*]: 重置软限制，继续流程
+    NEEDS_ASSET_EDIT --&gt; [*]: 人工编辑资产提示词后重跑
     NEEDS_HUMAN --&gt; [*]: 等待人工决策
     FAILED --&gt; [*]: 进入错误处理
     
@@ -404,7 +468,7 @@
     错误处理 --&gt; [*]: 中止流程
 </pre>
 <p>排查瓶颈时应优先看软限制，因为硬限制与全局计数只在失控时触发；软限制反映的是质量重试频率。</p>
-<h2 id="sec-10">任务池</h2>
+<h2 id="sec-13">任务池</h2>
 <p>接入层（REST、MCP、Python SDK）统一经 <code>TaskFactory</code> 进入队列，<code>AsyncTaskProcessor</code> 按并发度调度 Worker，<code>TaskManager</code> 负责状态持久化。</p>
 <pre class="mermaid">flowchart TB
     subgraph Client[客户端层]
@@ -499,7 +563,28 @@ status = agent.get_queue_status()
 #  &quot;max_concurrent&quot;, &quot;queue_max_size&quot;, &quot;queue_usage_percent&quot;}
 agent.cancel_task(task_id)
 </code></pre>
-<h2 id="sec-11">上下文窗口</h2>
+<h2 id="sec-14">质量检查</h2>
+<p>规则版审查在提示词包上执行 11 项检查，全部为确定性判定，不调用 LLM。</p>
+<table>
+<thead>
+<tr><th>检查</th><th>判定对象</th></tr>
+</thead>
+<tbody>
+<tr><td>片段时长</td><td>单片段超过 5.5 秒或低于 1.0 秒</td></tr>
+<tr><td>提示词内容</td><td>提示词为空</td></tr>
+<tr><td>提示词长度</td><td>超出 <code>max_prompt_length</code> 或低于 <code>min_prompt_length</code></td></tr>
+<tr><td>片段数量</td><td>没有任何片段</td></tr>
+<tr><td>模型支持</td><td>模型不在支持列表</td></tr>
+<tr><td>外观锚点污染</td><td>片段提示词改写了契约中的外观锚点</td></tr>
+<tr><td>契约违规</td><td>违反全局一致性契约的约束</td></tr>
+<tr><td>景别一致性</td><td>结构化景别与提示词描述不一致</td></tr>
+<tr><td>运镜一致性</td><td>结构化运镜与提示词描述不一致</td></tr>
+<tr><td>风格光照冲突</td><td>风格与光照描述互相矛盾</td></tr>
+<tr><td>资产使用</td><td>计划中的资产未被片段引用</td></tr>
+</tbody>
+</table>
+<p>扣分从 100 起算：warning 5、moderate 10、major 25、critical 40、error 60，下限 0。存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；修复参数写入 <code>state.domain.repair_params</code>，由下一轮转换节点消费。连续性检查提供六项交叉校验，并在问题出现时按来源阶段路由修复；审查与守护的具体阈值见 <a href="consistency.html">一致性策略</a>。</p>
+<h2 id="sec-15">上下文窗口</h2>
 <p>PenShot 没有独立的 <code>ContextWindowManager</code>，也不做重要度评分或相似度去重。实际落地的是四条确定性规则：</p>
 <table>
 <thead>
@@ -552,8 +637,8 @@ agent.cancel_task(task_id)
 </pre>
 <p>截断用字符估算而非精确分词：这里只需要一个不超窗的安全上界，引入分词器会给每次组装增加依赖与计算。截断点优先回退到最近的句号或换行，若落在后 30% 之外则保持硬截断，并追加 <code>[上下文已截断]</code> 标记。</p>
 <p>字符估算对中文偏保守：一个汉字通常折合一个以上 token，而实现按两个字符折一个 token，因此 2000 token 的实际中文容量可能低于预期。需要精确计费或硬限流时应替换为分词器。</p>
-<p>跨场景一致性靠提示词的 <code>global_context</code> 占位符，而不是把完整剧本塞进每次调用。长剧本的分块发生在场景与镜头拆分阶段：<code>shot_segmenter</code> 逐场景处理，<code>video_splitter</code> 逐镜头处理，每个单元只携带本场景信息与全局约束。全剧摘要压缩属于后续方向，当前没有对应实现。</p>
-<h2 id="sec-12">实现边界</h2>
+<p>跨场景一致性靠一致性契约与提示词的 <code>global_context</code> 占位符，而不是把完整剧本塞进每次调用。长剧本的分块发生在场景与镜头拆分阶段：<code>shot_segmenter</code> 逐场景处理，<code>video_splitter</code> 逐镜头处理，每个单元只携带本场景信息与全局约束。全剧摘要压缩属于后续方向，当前没有对应实现。</p>
+<h2 id="sec-16">实现边界</h2>
 <table>
 <thead>
 <tr>
@@ -583,6 +668,14 @@ agent.cancel_task(task_id)
 <td style="text-align:left">仅恢复两小时内任务，优先级退化为 <code>NORMAL</code></td>
 </tr>
 <tr>
+<td style="text-align:left">资产生成</td>
+<td style="text-align:left">默认关闭，只输出计划；失败不阻断主链</td>
+</tr>
+<tr>
+<td style="text-align:left">模型路由</td>
+<td style="text-align:left">静态能力注册表，规则匹配，无在线评测或回退重训</td>
+</tr>
+<tr>
 <td style="text-align:left">上下文管理</td>
 <td style="text-align:left">窗口 + 截断 + 长度审计，无动态淘汰</td>
 </tr>
@@ -606,7 +699,7 @@ agent.cancel_task(task_id)
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">模块划分</a></li><li class="toc-depth-2"><a href="#sec-2">LLM 客户端</a></li><li class="toc-depth-3"><a href="#sec-3">降级链</a></li><li class="toc-depth-3"><a href="#sec-4">已知副作用</a></li><li class="toc-depth-2"><a href="#sec-5">提示词管理</a></li><li class="toc-depth-3"><a href="#sec-6">模板结构</a></li><li class="toc-depth-3"><a href="#sec-7">加载与匹配</a></li><li class="toc-depth-2"><a href="#sec-8">调用重试</a></li><li class="toc-depth-2"><a href="#sec-9">循环控制</a></li><li class="toc-depth-2"><a href="#sec-10">任务池</a></li><li class="toc-depth-2"><a href="#sec-11">上下文窗口</a></li><li class="toc-depth-2"><a href="#sec-12">实现边界</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">模块划分</a></li><li class="toc-depth-2"><a href="#sec-2">LLM 客户端</a></li><li class="toc-depth-3"><a href="#sec-3">降级链</a></li><li class="toc-depth-3"><a href="#sec-4">已知副作用</a></li><li class="toc-depth-2"><a href="#sec-5">提示词管理</a></li><li class="toc-depth-3"><a href="#sec-6">模板结构</a></li><li class="toc-depth-3"><a href="#sec-7">加载与匹配</a></li><li class="toc-depth-3"><a href="#sec-8">模板召回</a></li><li class="toc-depth-2"><a href="#sec-9">资产管线</a></li><li class="toc-depth-2"><a href="#sec-10">模型路由</a></li><li class="toc-depth-2"><a href="#sec-11">调用重试</a></li><li class="toc-depth-2"><a href="#sec-12">循环控制</a></li><li class="toc-depth-2"><a href="#sec-13">任务池</a></li><li class="toc-depth-2"><a href="#sec-14">质量检查</a></li><li class="toc-depth-2"><a href="#sec-15">上下文窗口</a></li><li class="toc-depth-2"><a href="#sec-16">实现边界</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
           <a class="toc-edit" href="https://github.com/neopen/story-shot-agent/edit/gh-pages/docs/content/docs/core-implementation.html" target="_blank" rel="noopener">在 GitHub 编辑此页 →</a>
         </div>
@@ -617,7 +710,7 @@ agent.cancel_task(task_id)
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.3.x · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="https://github.com/neopen/story-shot-agent" target="_blank" rel="noopener">GitHub</a>

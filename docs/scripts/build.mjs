@@ -424,12 +424,14 @@ function renderHub() {
   const canonical = `${site.url}/docs/`;
   const title = 'PenShot 文档 · 剧本分镜智能体';
   const description =
-    'PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、MCP / REST / SDK 集成，以及记忆与检索实现。';
+    'PenShot 官方文档：快速开始、技术架构、工作流节点、一致性策略、资产计划与模型路由、MCP / REST / SDK 集成，以及记忆与检索实现。';
   const keywords = [
     'PenShot 文档',
     '剧本分镜',
     '快速开始',
     '技术架构',
+    '资产计划',
+    '模型路由',
     'MCP',
     'REST API',
     'Python SDK',
@@ -486,7 +488,7 @@ ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
             </button>
             <div class="docs-hero__meta">
               <span class="meta-chip"><b>${Object.keys(docs).length}</b> 篇文档</span>
-              <span class="meta-chip"><b>6</b> 个智能体节点</span>
+              <span class="meta-chip"><b>8</b> 个业务节点</span>
               <span class="meta-chip"><b>3</b> 种接入方式</span>
               <span class="meta-chip"><b>MIT</b> 开源协议</span>
             </div>

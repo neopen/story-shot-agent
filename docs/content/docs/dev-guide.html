@@ -1,4 +1,4 @@
-<p>面向需要修改 PenShot 源码的开发者，覆盖本地环境、项目结构、两级状态机、启动路径，以及新增智能体与提示词模板的扩展方法。</p>
+<p>面向需要修改 PenShot 源码的开发者，覆盖本地环境、项目结构、两级状态机、工作流装配，以及新增智能体、提示词模板与资产/路由模块的扩展方法。</p>
 <p>首次安装与运行见 <a href="quick-start.html">快速开始</a>；SDK、REST 与 MCP 的调用方式见 <a href="integration.html">集成指南</a>。</p>
 <h2>本地开发环境</h2>
 <p>PenShot 需要 Python 3.10 及以上版本和可用的 OpenAI 兼容 LLM 密钥。Redis 不是本地开发的硬依赖，只在多进程部署时用于共享任务记录。</p>
@@ -10,7 +10,7 @@ pip install -e <span class="hljs-string">&quot;.[dev]&quot;</span>
 <span class="hljs-built_in">cp</span> .env.example .env
 python -m pytest tests/ -x -q
 </code></pre>
-<p>依赖由 <code>pyproject.toml</code> 管理，仓库没有 <code>requirements.txt</code>。<code>[dev]</code> 附加组包含 pytest、ruff、mypy 等工具；只运行服务时 <code>pip install -e .</code> 即可。配置从 <code>.env</code> 自动加载，最少需要填写 <code>PENSHOT_LLM__DEFAULT__BASE_URL</code>、<code>API_KEY</code> 与 <code>MODEL_NAME</code>，使用 RAG 或记忆功能时再补 <code>PENSHOT_EMBED__DEFAULT__*</code>。</p>
+<p>依赖由 <code>pyproject.toml</code> 管理，仓库没有 <code>requirements.txt</code>。<code>[dev]</code> 附加组包含 pytest、ruff、mypy 以及 DashScope 与 Ollama 厂商 SDK；<code>[full]</code> 面向运行环境，包含厂商 SDK 与本地重排序依赖。配置从 <code>.env</code> 自动加载，最少需要填写 <code>PENSHOT_LLM__DEFAULT__BASE_URL</code>、<code>API_KEY</code> 与 <code>MODEL_NAME</code>，使用 RAG 或记忆功能时再补 <code>PENSHOT_EMBED__DEFAULT__*</code>。</p>
 <table>
 <thead>
 <tr><th>变量组</th><th>用途</th></tr>
@@ -19,6 +19,7 @@ python -m pytest tests/ -x -q
 <tr><td><code>PENSHOT_LLM__DEFAULT__*</code></td><td>主模型的 BASE_URL、API_KEY、MODEL_NAME、TEMPERATURE、TIMEOUT</td></tr>
 <tr><td><code>PENSHOT_LLM__FALLBACK__*</code></td><td>主模型不可用或重试耗尽后的备用厂商</td></tr>
 <tr><td><code>PENSHOT_EMBED__DEFAULT__*</code></td><td>嵌入模型，模板默认 <code>text-embedding-v4</code>、1536 维</td></tr>
+<tr><td><code>PENSHOT_PROMPT_TEMPLATES__*</code></td><td>模板召回阈值、top_k、注入上限与跨剧本只读召回</td></tr>
 <tr><td><code>PENSHOT_REDIS_*</code></td><td>多进程任务记录共享，单进程可省略</td></tr>
 </tbody>
 </table>
@@ -30,7 +31,11 @@ python -m pytest tests/ -x -q
 │   ├── app/                    FastAPI 组装、生命周期、全局异常处理
 │   ├── config/                 config_loader / config_models / logging.yaml / settings.yaml
 │   ├── neopen/
-│   │   ├── agent/              五个智能体与 workflow/（编排、节点、状态、决策、检查点）
+│   │   ├── agent/
+│   │   │   ├── script_parser/  镜头拆分/分段/转换/审查/守护等 8 个业务智能体
+│   │   │   ├── asset_generator/资产计划、清单回填、角色/道具/场景生图
+│   │   │   ├── model_adapter/  能力注册表、路由规则、提示词适配、质量门
+│   │   │   └── workflow/       编排、节点、状态、决策、检查点、输出修复
 │   │   ├── task/               TaskFactory / TaskManager / AsyncTaskProcessor
 │   │   ├── prompts/v1.x/       zh/ 与 en/ 的 YAML 模板；v2.x 为空占位
 │   │   ├── client/             LLM 客户端与 AIConfig
@@ -42,8 +47,8 @@ python -m pytest tests/ -x -q
 │   ├── mcp_http_server.py      MCP HTTP 联调服务
 │   └── logger.py               日志封装，级别由 config/logging.yaml 决定
 ├── main.py                     服务入口
-├── scripts/                    Docker 入口 entrypoint.py 与运维脚本
-├── examples/                   SDK、REST、MCP、workflow 示例
+├── scripts/                    entrypoint、模板迁移、召回阈值标定与运维脚本
+├── examples/                   SDK、REST、MCP、workflow 示例（08 为资产回填）
 └── tests/                      unit / integration / e2e / benchmarks
 </code></pre>
 <table>
@@ -51,7 +56,9 @@ python -m pytest tests/ -x -q
 <tr><th>改动目标</th><th>位置</th></tr>
 </thead>
 <tbody>
-<tr><td>新增智能体或节点</td><td><code>neopen/agent/</code> 与 <code>workflow/workflow_nodes.py</code></td></tr>
+<tr><td>新增智能体或节点</td><td><code>neopen/agent/</code> 与 <code>workflow/workflow_pipeline.py</code>、<code>workflow_nodes.py</code></td></tr>
+<tr><td>资产计划与回填</td><td><code>neopen/agent/asset_generator/</code>、<code>scripts/asset_manifest_tool.py</code></td></tr>
+<tr><td>模型能力与路由规则</td><td><code>neopen/agent/model_adapter/</code>、<code>config/settings.yaml</code></td></tr>
 <tr><td>调整提示词</td><td><code>neopen/prompts/v1.x/zh/</code>、<code>v1.x/en/</code></td></tr>
 <tr><td>对外接口</td><td><code>api/function_calls.py</code>、<code>api/rest_api.py</code></td></tr>
 <tr><td>任务与状态</td><td><code>neopen/task/task_models.py</code>、<code>task_factory.py</code></td></tr>
@@ -81,12 +88,12 @@ python -m pytest tests/ -x -q
     A5 --&gt; B
     B --&gt; C[&quot;FastAPI lifespan&lt;br/&gt;startup_with_recovery&quot;]
     C --&gt; D[&quot;TaskFactory&lt;br/&gt;进程内队列&quot;]
-    D --&gt; E[&quot;MultiAgentPipeline&lt;br/&gt;10 节点图&quot;]
+    D --&gt; E[&quot;MultiAgentPipeline&lt;br/&gt;12 节点图&quot;]
     E --&gt; F[&quot;WorkflowOrchestrator&lt;br/&gt;LangGraph&quot;]
     F --&gt; G[&quot;SQLite / 内存检查点&quot;]
 </pre>
-<p>任务队列、并发计数与回调都是进程内状态。使用多个 worker 且未配置 Redis 时，提交到进程 A 的任务在进程 B 查询会得到 <code>not_found</code>；启动日志会给出警告。需要横向扩展时配置 <code>PENSHOT_REDIS_URL</code> 或 <code>PENSHOT_REDIS_HOST</code> 等分键。容器同样是单进程模型，多副本部署需共享 Redis 与检查点，详见<a href="docker.html">Docker 部署</a>。</p>
-<p>应用启动时，FastAPI lifespan 调用 <code>startup_with_recovery</code>，创建数据目录并尝试恢复未完成任务。检查点由 <code>checkpoint_mode</code> 选择：<code>auto</code> 按环境决定，<code>memory</code> 仅进程内有效，<code>sqlite</code> 与 <code>postgres</code> 支持跨进程恢复。多进程部署除了 Redis，还应固定使用可共享的检查点后端。</p>
+<p>任务队列、并发计数与回调都是进程内状态。使用多个 worker 且未配置 Redis 时，提交到进程 A 的任务在进程 B 查询会得到 <code>not_found</code>；启动日志会给出警告。需要横向扩展时配置 <code>PENSHOT_REDIS_URL</code> 或 <code>PENSHOT_REDIS_HOST</code> 等分键。容器同样是单进程模型，多副本部署需共享 Redis，详见<a href="docker.html">Docker 部署</a>。</p>
+<p>应用启动时，FastAPI lifespan 调用 <code>startup_with_recovery</code>，创建数据目录并尝试恢复未完成任务。检查点由 <code>checkpoint_mode</code> 选择：<code>auto</code> 按环境决定，<code>memory</code> 仅进程内有效，<code>sqlite</code> 写入 <code>data/checkpoints/</code>。当前实现是写入型留痕，不会按检查点断点续跑；<code>postgres</code> 只有配置字段，没有对应后端。</p>
 <p>CLI 共 8 个子命令：<code>breakdown</code>、<code>batch</code>、<code>status</code>、<code>result</code>、<code>cancel</code>、<code>queue-status</code>、<code>serve</code>、<code>serve-rest</code>。其中 <code>serve</code> 启动 MCP stdio 服务，<code>serve-rest</code> 启动 REST 服务；其余命令直接创建 SDK 实例，适合本地验证单个任务。</p>
 <h2>两级状态机</h2>
 <p>任务生命周期由两层状态共同描述：<code>TaskStatus</code> 管理任务生死，共 8 个值；<code>TaskStage</code> 管理阶段进度，共 24 个带权重的中文阶段。任一处理环节失败都会进入 <code>FAILED</code>，不会把半成品当作成功结果返回。</p>
@@ -117,7 +124,7 @@ python -m pytest tests/ -x -q
     CANCELLED --&gt; [*]
 </pre>
 <p>成功终态的字面量是 <code>success</code>，不存在 <code>COMPLETED</code>。<code>completed</code> 只出现在阶段明细 <code>stages_progress[*].status</code> 中，表示某个阶段完成，不能用于判断任务终态。</p>
-<p><code>TaskStage</code> 每个阶段包含 code、中文名与 0–100 的权重，权重用于估算总进度。<code>init</code>、<code>processing</code>、<code>error_handling</code> 的权重为 0，其余阶段按处理顺序递增。</p>
+<p><code>TaskStage</code> 每个阶段包含 code、中文名与 0–100 的权重，权重用于估算总进度。<code>init</code>、<code>processing</code>、<code>error_handling</code> 的权重为 0，其余阶段按处理顺序递增。资产生成与模型路由没有独立阶段，耗时并入解析与转换区间。</p>
 <table>
 <thead>
 <tr><th>阶段组</th><th>阶段代码</th><th>权重</th></tr>
@@ -147,31 +154,32 @@ python -m pytest tests/ -x -q
 <p>提交任务时，<code>TaskFactory.submit</code> 先创建任务记录并置为 <code>PENDING</code>，再异步入队；工作线程取出后改为 <code>PROCESSING</code>，各节点在执行前后写入阶段明细。取消接口只对未进入终态的任务生效，对已结束任务返回 400。等待超时只影响调用方，不会自动终止后台工作流，因此 <code>wait_for_result</code> 可能返回 <code>None</code>，而任务仍在继续执行。</p>
 <p>阶段权重是进度估算值，不是耗时比例。一个 10 权重单位的阶段可能很快完成，也可能长时间停在某个中间百分比；<code>progress</code> 只能用于展示，不能用作剩余时间预测。</p>
 <h2>工作流装配</h2>
-<p>核心流水线由 <code>MultiAgentPipeline</code> 构建，LangGraph 图中注册了 10 个节点：<code>parse_script</code>、<code>segment_shot</code>、<code>split_video</code>、<code>convert_prompt</code>、<code>audit_quality</code>、<code>continuity_check</code>、<code>loop_check</code>、<code>human_intervention</code>、<code>error_handler</code>、<code>generate_output</code>。</p>
+<p>核心流水线由 <code>MultiAgentPipeline</code> 构建，LangGraph 图中注册了 12 个节点：8 个业务节点 <code>parse_script</code>、<code>generate_assets</code>、<code>segment_shot</code>、<code>split_video</code>、<code>convert_prompt</code>、<code>route_model</code>、<code>audit_quality</code>、<code>continuity_check</code>，以及 4 个控制节点 <code>loop_check</code>、<code>human_intervention</code>、<code>error_handler</code>、<code>generate_output</code>。终态使用 LangGraph 的 <code>END</code>，它不是注册节点。</p>
 <p><code>WorkflowOrchestrator</code> 只负责结构定义：<code>add_node(name, node)</code> 注册接收并返回 <code>WorkflowState</code> 的 callable，<code>add_edge</code> 定义固定流转，<code>add_conditional_edge(source, condition, mapping)</code> 按决策函数返回值选择目标。装配顺序为 <code>build(state_schema=WorkflowState)</code>、<code>validate()</code>、<code>compile(checkpointer=saver)</code>；入口固定为 <code>parse_script</code>，终点为 <code>END</code>。</p>
-<p>条件边使用 7 个决策状态：<code>success</code>、<code>valid</code>、<code>needs_repair</code>、<code>needs_retry</code>、<code>needs_human</code>、<code>failed</code>、<code>abort</code>。例如质量审查失败会回到 <code>convert_prompt</code> 修复，连续失败则转入 <code>human_intervention</code> 或 <code>error_handler</code>。</p>
-<p><code>loop_check</code> 是统一的重入闸门：拆分、分段、转换成功后先进入循环检查，再按决策结果跳回拆分、分段、转换、审查或继续输出。<code>ShotConfig.max_total_loops</code> 默认 20，按节点最大循环次数之和计算；超限后不再回退上游，转入错误处理或人工干预，避免无限重试。</p>
-<p>检查点按 <code>script_id</code> 与 <code>task_id</code> 隔离，保存的是 LangGraph 状态而非最终结果。修改 <code>WorkflowState</code> 结构后，旧检查点可能无法反序列化；开发阶段可切换 <code>checkpoint_mode=&quot;memory&quot;</code> 或清理对应检查点目录。多进程部署除 Redis 外，还应确认 <code>checkpoint_mode</code> 指向各进程都能访问的存储。</p>
+<p>条件边使用 8 个决策状态：<code>success</code>、<code>valid</code>、<code>needs_retry</code>、<code>needs_repair</code>、<code>needs_human</code>、<code>needs_asset_edit</code>、<code>failed</code>、<code>abort</code>。质量审查不通过时回到 <code>convert_prompt</code> 修复；连续性检查按问题来源路由到解析、分段或转换；资产问题进入 <code>needs_asset_edit</code>，由人工干预收集资产提示词修改后重跑资产生成。</p>
+<p><code>loop_check</code> 是统一的重入闸门：拆分、分段、转换、路由成功后先进入循环检查，再按决策结果跳回上游或继续审查。节点级上限为 2–5 次，阶段级为 2–3 次；全局上限取 <code>ShotConfig.max_total_loops × 2</code>，默认 20 × 2 = 40。超限后不再回退，转入错误处理或人工干预，避免无限重试。</p>
+<p>检查点按 <code>script_id</code> 与 <code>task_id</code> 隔离，保存的是 LangGraph 状态而非最终结果。当前没有“从检查点继续执行”的入口，检查点只用于写入留痕与诊断；修改 <code>WorkflowState</code> 结构后，旧检查点可能无法反序列化，开发阶段可切换 <code>checkpoint_mode=&quot;memory&quot;</code> 或清理对应目录。</p>
 <pre class="mermaid">graph TD
     subgraph &quot;智能体协作图&quot;
-        A[剧本解析智能体&lt;br/&gt;ScriptParserAgent]
-        B[镜头分割智能体&lt;br/&gt;ShotSegmenterAgent]
-        C[视频分割智能体&lt;br/&gt;VideoSplitterAgent]
-        D[提示词转换智能体&lt;br/&gt;PromptConverterAgent]
-        E[质量审查智能体&lt;br/&gt;QualityAuditorAgent]
+        A[剧本解析&lt;br/&gt;ScriptParserAgent]
+        B[资产生成&lt;br/&gt;AssetGeneratorAgent]
+        C[镜头拆分&lt;br/&gt;ShotSegmenterAgent]
+        D[视频分段&lt;br/&gt;VideoSplitterAgent]
+        E[提示词转换&lt;br/&gt;PromptConverterAgent]
+        F[模型路由&lt;br/&gt;ModelRouter]
+        G[质量审查&lt;br/&gt;QualityAuditorAgent]
+        H[连续性守护&lt;br/&gt;ContinuityGuardian]
 
-        A --&gt;|结构化数据| B
-        B --&gt;|镜头序列| C
-        C --&gt;|片段序列| D
-        D --&gt;|提示词数据| E
-
-        A -.-&gt;|降级| A1[规则解析器]
-        B -.-&gt;|降级| B1[规则镜头分割器]
-        C -.-&gt;|降级| C1[规则视频分割器]
-        D -.-&gt;|降级| D1[模板转换器]
+        A --&gt;|结构化剧本| B
+        B --&gt;|资产计划| C
+        C --&gt;|镜头序列| D
+        D --&gt;|片段序列| E
+        E --&gt;|双语提示词| F
+        F --&gt;|路由与适配| G
+        G --&gt;|11 项检查| H
     end
 </pre>
-<p>每个智能体采用“抽象基类 + LLM 实现 + 规则实现 + 工厂”的结构，对外包装类位于 <code>neopen/agent/*_agent.py</code>。当前运行期真正接线了两条降级路径：提示词转换在单片段粒度失败时回退模板转换器，视频分割异常时整镜头回退规则分割。剧本解析的规则校验路径已实现但调用被注释，<code>use_local_rules</code> 属于预留开关，不能当作现成能力。</p>
+<p>每个智能体采用“抽象基类 + LLM 实现 + 规则实现 + 工厂”的结构，对外包装类位于 <code>neopen/agent/*_agent.py</code>。当前运行期接线了两条降级路径：提示词转换在单片段粒度失败时回退模板转换器，视频分割异常时整镜头回退规则分割。剧本解析的规则校验路径已实现但调用被注释，<code>use_local_rules</code> 属于预留开关，不能当作现成能力。资产生成在 <code>image.default.enabled=false</code> 时只产出计划，不调用生图接口。</p>
 <h2>新增智能体</h2>
 <p>推荐沿用现有结构，分三步接入。</p>
 <p><strong>建立子包。</strong> 在 <code>neopen/agent/</code> 下新增 <code>my_agent/</code>，包含抽象基类、LLM 实现、规则实现、工厂与 Pydantic 模型。基类继承 <code>BaseAgent</code>（纯规则）或 <code>BaseLLMAgent</code>（带 LLM 重试与缓存接口）。</p>
@@ -186,7 +194,7 @@ python -m pytest tests/ -x -q
     state.domain.my_results = self.my_agent.process(state.domain.parsed_script)
     <span class="hljs-keyword">return</span> state
 </code></pre>
-<p><strong>注册到编排图。</strong> 在 <code>_init_agents</code> 中构造智能体并传入 <code>WorkflowNodes</code>，再在 <code>_build_workflow</code> 中挂节点与条件边。</p>
+<p><strong>注册到编排图。</strong> 在 <code>_init_agents</code> 中构造智能体并传入 <code>WorkflowNodes</code>，再在 <code>_build_workflow</code> 或 <code>_build_workflow_structure</code> 中挂节点与条件边。</p>
 <pre class="hljs"><code>orchestrator.add_node(
     <span class="hljs-string">&quot;my_node&quot;</span>,
     <span class="hljs-keyword">lambda</span> graph_state: self.workflow_nodes.my_node(graph_state)
@@ -225,6 +233,11 @@ orchestrator.add_conditional_edge(
 </span></code></pre>
 <p>模板渲染走 Python <code>.format()</code>：占位符使用单大括号，字面量大括号必须双写 <code>{{ }}</code>。读取入口是 <code>PromptManager.get_prompt(name)</code> 与 <code>get_name_prompt(name)</code>，内部按“版本 + 语言”定位文件，支持剥离 <code>_prompt</code> 后缀匹配，并带最多 1024 条的进程内缓存。全局管理器默认 <code>version=&quot;v1.x&quot;</code>；<code>v2.x</code> 目录存在但为空，不能视为已启用的模板体系。</p>
 <p>匹配顺序是：缓存键名、<code>name</code> 字段、去掉 <code>_prompt</code> 后缀后的名称。模板名不存在时抛出 <code>KeyError</code>，不会静默返回空字符串。模板按语言目录分别查找，不存在跨语言回退；新增模板后应同时补中文与英文两份，否则切换 <code>ShotLanguage</code> 时会因找不到模板而抛出 <code>KeyError</code>。</p>
+<p>0.4.4 调整了模板召回口径，旧模板需要迁移时执行一次脚本。默认 dry-run 只打印统计，确认后加 <code>--apply</code> 才会备份并改写：</p>
+<pre class="hljs"><code>python scripts/migrate_prompt_templates_044.py
+python scripts/migrate_prompt_templates_044.py --script-id SID
+python scripts/migrate_prompt_templates_044.py --apply
+</code></pre>
 <p>新增智能体时通常需要同步三处：智能体构造函数、<code>WorkflowNodes</code> 的依赖注入、以及 YAML 中对应的模板键。只加模板不加调用代码不会生效；只加代码不补模板，第一次 LLM 调用就会因找不到模板失败。</p>
 <h2>调试</h2>
 <p>日志级别与格式在 <code>config/logging.yaml</code> 中配置。业务代码直接导入模块级函数，不需要也不存在 <code>set_level</code> 这个模块函数。</p>
@@ -254,9 +267,11 @@ result = <span class="hljs-keyword">await</span> pipeline.run_process(raw_script
 <tr><td>多 worker 下查询 <code>not_found</code></td><td>未配置 Redis，任务记录没有跨进程共享</td></tr>
 <tr><td>提示词被截断</td><td><code>ShotConfig.max_prompt_length</code> 默认 200；触发判断与截断动作的计数口径不一致</td></tr>
 <tr><td>道具信息丢失</td><td>检查 <code>GlobalMetadata.key_props</code> 及解析、拆分、转换各阶段的传递</td></tr>
-<tr><td>模型切换无效</td><td>同时核对 <code>BASE_URL</code>、<code>API_KEY</code> 与 <code>MODEL_NAME</code> 是否属于同一厂商</td></tr>
+<tr><td>模型切换无效</td><td>同时核对 <code>BASE_URL</code>、<code>API_KEY</code> 与 <code>MODEL_NAME</code> 是否属于同一厂商；路由目标由 <code>settings.yaml</code> 决定</td></tr>
+<tr><td>路由结果为空</td><td>检查 <code>routing.enabled</code> 与能力注册表，路由失败不阻断主流程但 <code>route_plan</code> 为 <code>null</code></td></tr>
+<tr><td>资产计划未生成</td><td>确认解析产物含角色/道具/场景实体；<code>image.default.enabled=false</code> 时只输出计划</td></tr>
 </tbody>
 </table>
-<p>不依赖 LLM 的调试优先使用 <code>tests/unit</code> 下的单元测试与 mock；需要可运行场景时，从 <code>examples/sdk/01</code> 至 <code>07</code> 中选择最小示例。仓库没有 <code>penshot.agent.mock_data</code> 一类的模拟数据模块。</p>
+<p>不依赖 LLM 的调试优先使用 <code>tests/unit</code> 下的单元测试与 mock；需要可运行场景时，从 <code>examples/sdk/01</code> 至 <code>08</code> 中选择最小示例，资产回填参考 <code>08_asset_handoff.py</code>。仓库没有 <code>penshot.agent.mock_data</code> 一类的模拟数据模块。</p>
 <h2>延伸阅读</h2>
 <p>工作流各节点的输入输出与失败处理见 <a href="nodes.html">工作流节点</a>；检查点与恢复见 <a href="checkpoint.html">检查点与恢复</a>；接口调用与部署参数见 <a href="integration.html">集成指南</a> 与 <a href="docker.html">Docker 部署</a>。源码与版本记录以 <a href="https://github.com/neopen/story-shot-agent">GitHub 仓库</a> 为准。</p>
