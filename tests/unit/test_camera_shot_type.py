@@ -1,8 +1,8 @@
-"""景别一致性单元测试（0.4.4 T-401~T-404）。
+"""景别一致性单元测试（0.4.4 T-401~T-404，0.4.5 景别映射修正）。
 
-覆盖 ShotType 全值别名、长词优先匹配、探测顺序（最终 prompt > 来源景别 >
+覆盖 ShotType 全值别名、长词优先匹配、探测顺序（来源景别 > 最终 prompt >
 默认值）、扩展景别保留、未知景别告警、来源景别溯源字段，以及两个转换器
-均以最终提示词文本构建 camera。
+均优先采用来源镜头景别。
 """
 
 import pytest
@@ -12,6 +12,7 @@ from penshot.neopen.agent.prompt_converter.camera_builder import (
     build_camera_control,
     check_motion_consistency,
     detect_motion_from_text,
+    detect_shot_type_from_text,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import CameraMotion
 from penshot.neopen.agent.prompt_converter.template_prompt_converter import (
@@ -67,11 +68,11 @@ def test_longest_alias_wins_for_extreme_close_up():
     assert camera.shot_type == "extreme_close_up"
 
 
-def test_prompt_text_wins_over_source_shot_type():
-    """FR-031：探测顺序以最终提示词文本为准"""
+def test_source_shot_type_wins_over_prompt_text():
+    """0.4.5：来源景别是镜头计划事实源，提示词短语不得把结构化景别升级/降级"""
     camera = build_camera_control("wide shot of the empty street", "close_up")
 
-    assert camera.shot_type == "wide_shot"
+    assert camera.shot_type == "close_up"
 
 
 def test_source_shot_type_used_when_prompt_has_no_marker():
@@ -121,11 +122,11 @@ def test_source_shot_type_tracks_normalized_and_raw_values():
     assert camera.shot_type_raw == "过肩"
 
 
-def test_source_fields_stay_recorded_when_prompt_overrides():
-    """FR-034：提示词优先时仍保留来源景别用于溯源"""
-    camera = build_camera_control("wide shot of the empty street", "close_up")
+def test_source_fields_stay_recorded_when_prompt_text_differs():
+    """FR-034：结构化景别与来源一致，提示词差异只体现在文本中"""
+    camera = build_camera_control("extreme close-up on the pocket watch", "close_up")
 
-    assert camera.shot_type == "wide_shot"
+    assert camera.shot_type == "close_up"
     assert camera.source_shot_type == "close_up"
     assert camera.shot_type_raw == "close_up"
 
@@ -139,8 +140,8 @@ def test_source_fields_empty_without_source_shot_type():
     assert camera.shot_type_raw == ""
 
 
-def test_template_converter_builds_camera_from_final_prompt():
-    """FR-031/AC-032：模板转换器以最终提示词文本探测景别"""
+def test_template_converter_keeps_source_shot_type():
+    """0.4.5：模板转换器保留来源镜头景别，不被推断模板改写"""
     converter = TemplatePromptConverter(ShotConfig())
     fragment = VideoFragment(
         id="frag_001",
@@ -153,13 +154,13 @@ def test_template_converter_builds_camera_from_final_prompt():
     prompt = converter.convert_fragment(fragment)
 
     assert "Medium shot" in prompt.prompt
-    assert prompt.camera.shot_type == "medium_shot"
+    assert prompt.camera.shot_type == "over_shoulder"
     assert prompt.camera.source_shot_type == "over_shoulder"
     assert prompt.camera.shot_type_raw == "over_shoulder"
 
 
-def test_llm_converter_builds_camera_from_final_prompt(monkeypatch):
-    """FR-031/AC-032：LLM 转换器以最终提示词文本探测景别"""
+def test_llm_converter_keeps_source_shot_type(monkeypatch):
+    """0.4.5：LLM 转换器保留来源镜头景别，提示词措辞漂移不改结构化字段"""
     from penshot.neopen.agent.prompt_converter.llm_prompt_converter import (
         LLMPromptConverter,
     )
@@ -202,9 +203,33 @@ def test_llm_converter_builds_camera_from_final_prompt(monkeypatch):
     prompt = converter._convert_fragment_with_llm(fragment, None)
 
     assert "over-the-shoulder" in prompt.prompt
-    assert prompt.camera.shot_type == "over_shoulder"
+    assert prompt.camera.shot_type == "close_up"
     assert prompt.camera.source_shot_type == "close_up"
     assert prompt.camera.shot_type_raw == "close_up"
+
+
+# ======================== 0.4.5 景别映射修正：POV 与位置优先 ========================
+
+
+def test_text_detection_prefers_earliest_shot_marker():
+    """靠后的 close-up 不能截胡开头的 POV（frag_007 根因）"""
+    prompt = (
+        "POV tracking shot, low angle, walking forward to bypass the sofa, "
+        "then a close-up on the trembling hands"
+    )
+
+    assert detect_shot_type_from_text(prompt) == "pov"
+
+
+def test_pov_source_is_not_collapsed_into_close_up():
+    """来源为 pov 时结构化景别保持 pov，不因提示词含 close-up 被吞掉"""
+    camera = build_camera_control(
+        "POV tracking shot, low angle, then a close-up on the trembling hands",
+        "pov",
+    )
+
+    assert camera.shot_type == "pov"
+    assert camera.source_shot_type == "pov"
 
 
 # ======================== 0.4.5 任务 5：运镜一致性 ========================

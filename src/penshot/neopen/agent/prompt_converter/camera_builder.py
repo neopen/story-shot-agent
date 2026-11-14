@@ -1,7 +1,10 @@
 """结构化相机控制构建（M0.4.3 / 0.4.4 景别一致性）。
 
 由来源镜头景别与片段描述推导相机参数，供支持运镜的目标模型直出。
-景别探测顺序为「最终提示词文本 > 来源镜头景别 > 默认值」（FR-031），
+景别探测顺序为「来源镜头景别 > 最终提示词文本 > 默认值」：来源景别是镜头
+计划的事实源，提示词文本只在其缺失时兜底，避免 LLM 改写把中景升级为特写、
+把 POV 主观视角吞成 close_up；文本兜底按短语出现位置取最靠前者，保留
+POV、极特写等特殊视角（FR-031）。
 别名表覆盖 ``ShotType`` 全部值并按长词优先匹配（FR-030）。
 """
 
@@ -192,15 +195,23 @@ def _keyword_specificity(keyword: str) -> Tuple[int, int]:
 def detect_shot_type_from_text(text: Optional[str]) -> str:
     """从最终提示词文本探测景别；无法识别返回空串（FR-031/FR-032）
 
+    按短语出现位置优先：只有开头的景别表述才是构图主体，靠后的
+    ``close-up`` 不能截胡开头的 ``POV``/``extreme close-up``；
+    同一位置按别名长度取更长者。
     质量审查（FR-061）复用同一份别名表与匹配顺序，保证审计口径与构建口径一致。
     """
     lowered = str(text or "").lower()
     if not lowered:
         return ""
-    for alias, normalized in _TEXT_ALIASES:
-        if alias in lowered:
-            return normalized
-    return ""
+    detected = ""
+    first_index = -1
+    for alias, normalized in _TEXT_ALIASES:  # 已按长度倒序
+        index = lowered.find(alias)
+        if index < 0:
+            continue
+        if first_index < 0 or index < first_index:
+            detected, first_index = normalized, index
+    return detected
 
 
 def _normalize_source(shot_type: Optional[str]) -> str:
@@ -222,8 +233,10 @@ def _resolve_source(source: str) -> str:
 def _normalize_shot_type(
     shot_type: Optional[str], description: str
 ) -> Tuple[str, str, str]:
-    """按「提示词文本 > 来源景别 > 默认值」归一化景别（FR-031~034）
+    """按「来源景别 > 提示词文本 > 默认值」归一化景别（FR-031~034）
 
+    来源景别是镜头计划的事实源，优先直接采用，避免 LLM 提示词里的
+    景别短语把结构化字段升级/降级；仅当来源缺失时才退回提示词文本探测。
     返回 ``(shot_type, source_shot_type, shot_type_raw)``；
     来源景别为已知扩展值时原样输出，完全未知时保留原始值并告警，
     不静默降级为默认景别。
@@ -231,14 +244,14 @@ def _normalize_shot_type(
     source_raw = str(shot_type or "").strip()
     source_normalized = _resolve_source(source_raw) if source_raw else ""
 
-    detected = detect_shot_type_from_text(description)
-    if detected:
-        return detected, source_normalized, source_raw
-
     if source_normalized:
         return source_normalized, source_normalized, source_raw
 
-    return DEFAULT_SHOT_TYPE, source_normalized, source_raw
+    detected = detect_shot_type_from_text(description)
+    if detected:
+        return detected, "", source_raw
+
+    return DEFAULT_SHOT_TYPE, "", source_raw
 
 
 def _warn_static_motion_mismatch(lowered: str) -> None:

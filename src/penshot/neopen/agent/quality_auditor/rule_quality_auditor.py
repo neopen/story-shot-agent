@@ -343,7 +343,11 @@ class RuleQualityAuditor(BaseQualityAuditor):
         )
 
     def _check_shot_type_prompt_consistency(self, instructions: AIVideoInstructions, report: QualityAuditReport) -> None:
-        """检查 camera.shot_type 与最终提示词景别表述是否一致（FR-061/FR-064）"""
+        """检查 camera.shot_type 与最终提示词景别表述是否一致（FR-061/FR-064）
+
+        结构化景别以镜头计划（source_shot_type）为准，提示词里的景别短语只作
+        构图提示；两者不同时按 WARNING 记录，避免把措辞漂移升级为修复项。
+        """
         check_name = "景别与提示词一致性检查"
         mismatch_count = 0
 
@@ -366,9 +370,9 @@ class RuleQualityAuditor(BaseQualityAuditor):
                 source_node=PipelineNode.CONVERT_PROMPT,
                 issue_value={"camera_shot_type": expected, "prompt_shot_type": detected},
                 standard_value=expected,
-                severity=SeverityLevel.MAJOR,
+                severity=SeverityLevel.WARNING,
                 fragment_id=fragment.fragment_id,
-                suggestion=f"统一景别表述：camera.shot_type={expected}，提示词应使用同一景别"
+                suggestion=f"下游以镜头计划景别 {expected} 为准；提示词景别表述可保留构图细节"
             )
 
         if mismatch_count == 0:

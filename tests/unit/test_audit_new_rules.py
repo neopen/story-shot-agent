@@ -166,10 +166,13 @@ def test_appearance_anchor_pollution_detected_with_asset_locator():
 
 
 def test_shot_type_prompt_mismatch_detected_with_fragment_id():
-    """FR-061/FR-064：camera 景别与提示词景别表述冲突时命中并带 fragment_id"""
+    """FR-061/FR-064：提示词景别与镜头计划不同时命中并带 fragment_id
+
+    结构化景别以来源镜头计划为准，提示词措辞漂移按 WARNING 记录，不触发修复。
+    """
     fragment = _fragment(
         prompt="wide shot of the city street at dusk while rain falls softly",
-        camera=CameraControl(shot_type="close_up"),
+        camera=CameraControl(shot_type="close_up", source_shot_type="close_up"),
     )
 
     report = _auditor().audit(_instructions(fragments=[fragment]))
@@ -181,7 +184,7 @@ def test_shot_type_prompt_mismatch_detected_with_fragment_id():
 
     assert len(violations) == 1
     violation = violations[0]
-    assert violation.severity == SeverityLevel.MAJOR
+    assert violation.severity == SeverityLevel.WARNING
     assert violation.fragment_id == "frag_001"
     assert violation.issue_value == {
         "camera_shot_type": "close_up",
