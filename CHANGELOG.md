@@ -31,6 +31,21 @@
 * 迁移会先备份各剧本的 `templates_cache.json` 与 `index_store/` 到带时间戳的备份目录；缺陷模板只做隔离标记，不删除底层数据；迁移完成后从活跃缓存全量重建索引。
 * 召回阈值默认 `min_similarity_score = 0.80`、`top_k = 2`、`max_injected_patterns = 6`，跨剧本召回默认开启；可通过 `PENSHOT_PROMPT_TEMPLATES__*` 覆盖。
 
+
+## [0.4.3](https://github.com/neopen/story-shot-agent/compare/v0.4.2...v0.4.3) (2026-11-09)
+
+
+### ✨ Features (新功能)
+
+* **routing:** 新增模型路由与结构化相机控制（M0.4.3） ([4927378](https://github.com/neopen/story-shot-agent/commit/4927378e44962e0dd200c03353912f6a06d8b1cc))
+* 新增模型路由与结构化相机控制（0.4.3） ([#90](https://github.com/neopen/story-shot-agent/issues/90)) ([8c12840](https://github.com/neopen/story-shot-agent/commit/8c128409650543f7c2f0d680904ef1f8826b8a7f))
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* **continuity:** 修复 time_gap 反复重试与连续性节点崩溃 ([dcbd097](https://github.com/neopen/story-shot-agent/commit/dcbd097764030822aa0edc1f6ccf926abc87f8fc))
+
+
 ## [0.4.2](https://github.com/neopen/story-shot-agent/compare/v0.4.1...v0.4.2) (2026-11-06)
 
 
