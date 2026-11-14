@@ -159,8 +159,9 @@ const header = ({ prefix = '', active = '', searchIndex }) => {
       <a href="${prefix}index.html#workflow">工作流程</a>
       <a href="${prefix}index.html#integrations">集成</a>
       <a href="${docsHome}"${active === 'docs' ? ' class="is-active"' : ''}>文档</a>
-      <a href="${site.hub}" target="_blank" rel="noopener" title="HelpEnx Hub · 星阵工坊">星阵工坊</a>
-      <a href="${site.blog}" target="_blank" rel="noopener">博客</a>
+      <span class="site-nav__sep" aria-hidden="true"></span>
+      <a class="is-external" href="${site.hub}" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）${icon('arrowUpRight', 11)}</a>
+      <a class="is-external" href="${site.blog}" target="_blank" rel="noopener">博客${icon('arrowUpRight', 11)}</a>
     </nav>
     <div class="header-actions">
       <button class="icon-btn search-trigger" type="button" data-search-open aria-label="搜索文档">
@@ -181,7 +182,7 @@ const header = ({ prefix = '', active = '', searchIndex }) => {
   <a href="${prefix}index.html#workflow">工作流程</a>
   <a href="${prefix}index.html#integrations">集成方式</a>
   <a href="${docsHome}">文档</a>
-  <a href="${site.hub}" target="_blank" rel="noopener">星阵工坊 · HelpEnx Hub</a>
+  <a href="${site.hub}" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
   <a href="${site.blog}" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="${quickStartHref}">快速开始</a>
