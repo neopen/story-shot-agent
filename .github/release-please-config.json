@@ -7,6 +7,7 @@
       "default-bump-level": "patch",
       "bump-patch-for-minor-pre-major": true,
       "include-component-in-tag": false,
+      "pull-request-footer": "\n### ✅ 合并前确认\n\n- required checks 全部通过（合并面板显示 `Checks 6/6`）\n- 已获得 1 个 approving review（PR 作者不能自审）\n- `CHANGELOG.md` 中本版本段落已核对\n- 使用 **Squash and merge** 合并，标题保持 `chore(main): release x.y.z`\n- 详细变更与 FR/AC 证据见 `docs/plans/` 下对应版本的 release notes\n\nThis PR was generated with [Release Please](https://github.com/googleapis/release-please). See [documentation](https://github.com/googleapis/release-please#release-please).\n",
 
       "changelog-sections": [
         { "type": "feat", "section": "✨ Features (新功能)", "hidden": false },

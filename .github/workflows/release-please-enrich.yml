@@ -1,0 +1,113 @@
+name: release-please PR enrich
+
+# 为 release-please 生成的发布 PR 自动补齐「本版变更明细」。
+#
+# 说明：
+#   - 明细来源优先级：docs/plans/<version>-release-notes.md > CHANGELOG.md 对应版本段落；
+#   - release-please 每次更新发布分支都会重写 PR 正文，因此这里用 marker 做幂等替换；
+#   - 触发类型包含 edited，覆盖仅改写正文（未更新分支）的情况；
+#   - 使用默认 GITHUB_TOKEN 修改正文不会再次触发本工作流，不会形成循环；
+#   - 固定的合并前检查项由 release-please-config.json 的 pull-request-footer 提供。
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  enrich:
+    # 只处理本仓库的 release-please 分支；fork 分支的 token 没有写权限
+    if: |
+      startsWith(github.event.pull_request.head.ref, 'release-please--') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出发布 PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: 生成并写入变更明细
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          title=$(gh pr view "$PR_NUMBER" --json title --jq .title)
+          version=$(printf '%s' "$title" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
+          if [ -z "$version" ]; then
+            echo "标题中未找到版本号，跳过：$title"
+            exit 0
+          fi
+
+          notes="docs/plans/${version}-release-notes.md"
+          if [ -f "$notes" ]; then
+            source_line="来源：\`${notes}\`"
+            # 跳过文档标题与草稿状态说明，只内联正文小节
+            awk 'found || /^## / { found = 1; print }' "$notes" > /tmp/notes-body.md
+            if [ ! -s /tmp/notes-body.md ]; then
+              printf '_发布说明文档不含二级标题小节，请手工补充。_\n' > /tmp/notes-body.md
+            fi
+            {
+              printf '<details>\n<summary>展开查看 %s 发布说明</summary>\n\n' "$version"
+              head -n 400 /tmp/notes-body.md
+              if [ "$(wc -l < /tmp/notes-body.md)" -gt 400 ]; then
+                printf '\n\n> 内容过长已截断，完整版本见 `%s`。\n' "$notes"
+              fi
+              printf '\n</details>\n'
+            } > /tmp/detail.md
+          else
+            source_line="未找到 \`${notes}\`，以下为 \`CHANGELOG.md\` 中该版本段落。"
+            awk -v ver="$version" '
+              index($0, "## [" ver "]") == 1 {flag = 1; print; next}
+              flag && index($0, "## [") == 1 {flag = 0}
+              flag {print}
+            ' CHANGELOG.md > /tmp/detail.md
+            if [ ! -s /tmp/detail.md ]; then
+              printf '_未找到可用的变更说明，请手工补充。_\n' > /tmp/detail.md
+            fi
+          fi
+
+          {
+            printf '<!-- release-please-enrich:start -->\n\n'
+            printf '### 📋 本版变更明细（自动生成）\n\n'
+            printf '%s\n\n' "$source_line"
+            cat /tmp/detail.md
+            printf '\n<!-- release-please-enrich:end -->\n'
+          } > /tmp/enrich.md
+
+          gh pr view "$PR_NUMBER" --json body --jq .body > /tmp/body.md
+
+          # 先移除上一轮的自动生成段落，保证重复触发时结果一致
+          awk '
+            /<!-- release-please-enrich:start -->/ {skip = 1; next}
+            /<!-- release-please-enrich:end -->/ {skip = 0; next}
+            !skip {print}
+          ' /tmp/body.md | cat -s > /tmp/body-clean.md
+
+          # 插到 release-please 页脚之前；没有页脚时追加到末尾
+          awk -v block=/tmp/enrich.md '
+            !inserted && /^This PR was generated with \[Release Please\]/ {
+              while ((getline line < block) > 0) print line
+              close(block)
+              inserted = 1
+            }
+            {print}
+            END {
+              if (!inserted) {
+                while ((getline line < block) > 0) print line
+                close(block)
+              }
+            }
+          ' /tmp/body-clean.md > /tmp/body-new.md
+
+          if cmp -s /tmp/body.md /tmp/body-new.md; then
+            echo "正文已包含最新明细，跳过更新"
+            exit 0
+          fi
+          gh pr edit "$PR_NUMBER" --body-file /tmp/body-new.md
