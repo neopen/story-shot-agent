@@ -7,6 +7,12 @@
 import pytest
 
 from penshot.config.config import settings
+from penshot.neopen.agent.asset_generator.asset_models import (
+    AssetPlanDocument,
+    AssetSpec,
+    AssetStatus,
+    AssetType,
+)
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     AssetContract,
     GlobalConsistencyContract,
@@ -317,6 +323,60 @@ def test_route_plan_keeps_blocked_package_status():
 
     assert plan.decisions[0].status == "needs_manual_fix"
     assert packages[0].status == "needs_manual_fix"
+
+
+def test_route_model_node_writes_silhouette_constraint():
+    """服装关键字段缺失的角色资产：路由计划给出降级为剪影/背影的明确指令（P0-6）"""
+    nodes = object.__new__(WorkflowNodes)
+    nodes.storage = _FakeStorage()
+
+    state = WorkflowState.from_raw_script(
+        "测试剧本", task_id="task_004", script_id="script_004"
+    )
+    contract = GlobalConsistencyContract(script_id="s1", task_id="t1")
+    contract.register_character("沙发人影", 1, "黑色连帽外套")
+    contract.register_asset(
+        AssetContract(
+            asset_id="char_002",
+            asset_type="character_sheet",
+            owner_name="沙发人影",
+            asset_ref="",
+            image_prompt="a looming human silhouette in an armchair",
+            status="pending",
+        )
+    )
+    state.domain.contract = contract
+    state.domain.instructions = _instructions(
+        _prompt(
+            "a dark human silhouette sinks into the sofa", main_character="沙发人影"
+        )
+    )
+    state.domain.asset_plan = AssetPlanDocument(
+        assets=[
+            AssetSpec(
+                asset_id="char_002",
+                asset_type=AssetType.CHARACTER_SHEET,
+                owner_name="沙发人影",
+                image_prompt="a looming human silhouette in an armchair",
+                status=AssetStatus.PENDING,
+                metadata={
+                    "requires_special_attention": True,
+                    "outfit_missing_fields": ["类型", "颜色", "材质"],
+                    "attention_reason": "剧本与片段均未提供",
+                },
+            )
+        ]
+    ).to_dict()
+
+    nodes.route_model_node(state)
+
+    plan = state.domain.instructions.route_plan
+    assert plan is not None
+    decision = plan["decisions"][0]
+    assert decision["degraded_assets"][0]["asset_id"] == "char_002"
+    assert decision["degraded_assets"][0]["constraint"] == "silhouette / back view"
+    assert any("剪影/背影" in warning for warning in decision["warnings"])
+    assert any("剪影/背影" in warning for warning in plan["warnings"])
 
 
 def test_route_model_node_does_not_block_on_failure():

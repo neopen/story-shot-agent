@@ -218,6 +218,10 @@ class RouteDecision(BaseModel):
         default="ready",
         description="片段可执行状态：ready=可进入下游渲染，needs_manual_fix=已阻断待人工处理",
     )
+    degraded_assets: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="需降级生成的资产约束：asset_id/owner_name/missing_fields/constraint",
+    )
 
 
 class RoutePlan(BaseModel):

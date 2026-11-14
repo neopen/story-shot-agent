@@ -11,7 +11,7 @@ See LICENSE File For Details.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from penshot.neopen.agent.asset_generator.asset_models import (
     AssetPlanDocument,
@@ -264,3 +264,71 @@ def apply_quality_gate(
         *_global_warnings(instructions),
         *_prop_reference_warnings(packages, plan, fragments, prompts),
     ]
+
+
+# 服装关键字段：缺失时角色外形不可靠，画面必须降级为剪影/背影
+_OUTFIT_KEY_FIELDS = ("类型", "颜色", "材质")
+SILHOUETTE_CONSTRAINT = "silhouette / back view"
+
+
+def apply_asset_attention_constraints(
+    packages: Sequence[AdaptedPromptPackage],
+    asset_plan: Any = None,
+) -> Tuple[List[str], Dict[str, List[Dict[str, Any]]]]:
+    """服装关键字段缺失的角色资产：引用片段必须降级为剪影/背影
+
+    仅处理 ``requires_special_attention=True`` 且 ``outfit_missing_fields``
+    命中类型/颜色/材质之一的角色资产。引用该资产的片段追加可执行约束告警，
+    避免下游按完整正脸生成而破坏悬疑感。
+
+    Returns:
+        ``(跨片段告警列表, {fragment_id: 降级资产指令列表})``
+    """
+    plan = _plan_model(asset_plan)
+    if plan is None:
+        return [], {}
+
+    degraded: Dict[str, List[Dict[str, Any]]] = {}
+    for asset in plan.assets:
+        if asset.asset_type != AssetType.CHARACTER_SHEET:
+            continue
+        metadata = asset.metadata or {}
+        if not metadata.get("requires_special_attention"):
+            continue
+        missing_fields = [
+            str(field)
+            for field in metadata.get("outfit_missing_fields") or []
+            if str(field) in _OUTFIT_KEY_FIELDS
+        ]
+        if not missing_fields:
+            continue
+
+        entry = {
+            "asset_id": asset.asset_id,
+            "owner_name": asset.owner_name,
+            "missing_fields": missing_fields,
+            "constraint": SILHOUETTE_CONSTRAINT,
+        }
+        for package in packages:
+            if not any(
+                reference.asset_id == asset.asset_id for reference in package.references
+            ):
+                continue
+            _append(
+                package,
+                f"资产 {asset.asset_id}（{asset.owner_name}）服装关键字段缺失"
+                f"（{'、'.join(missing_fields)}），本片段须降级为剪影/背影"
+                f"（{SILHOUETTE_CONSTRAINT}），不得生成正脸与服装细节",
+            )
+            degraded.setdefault(package.fragment_id, []).append(entry)
+
+    if not degraded:
+        return [], {}
+
+    global_warnings = [
+        f"{fragment_id} 引用的 "
+        + "、".join(f"{item['owner_name']}（{item['asset_id']}）" for item in items)
+        + f" 服装关键字段缺失，已要求降级为剪影/背影（{SILHOUETTE_CONSTRAINT}）"
+        for fragment_id, items in degraded.items()
+    ]
+    return global_warnings, degraded

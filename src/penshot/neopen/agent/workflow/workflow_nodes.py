@@ -86,7 +86,10 @@ from penshot.neopen.agent.model_adapter import (
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
-from penshot.neopen.agent.model_adapter.quality_gate import apply_quality_gate
+from penshot.neopen.agent.model_adapter.quality_gate import (
+    apply_asset_attention_constraints,
+    apply_quality_gate,
+)
 from penshot.neopen.agent.asset_generator import (
     AssetGeneratorAgent,
     backfill_outfits,
@@ -1068,11 +1071,18 @@ class WorkflowNodes:
             )
 
             # P0-4 Gate 1：结构/逻辑问题回写 warnings，避免生成层自评全绿
-            plan.warnings = apply_quality_gate(
-                adapted_packages,
-                instructions,
-                asset_plan=asset_plan,
-                fragments=fragments,
+            # P0-6：服装关键信息不足的角色资产，引用片段必须带剪影/背影降级约束
+            attention_warnings, degraded_assets = apply_asset_attention_constraints(
+                adapted_packages, asset_plan
+            )
+            plan.warnings = (
+                apply_quality_gate(
+                    adapted_packages,
+                    instructions,
+                    asset_plan=asset_plan,
+                    fragments=fragments,
+                )
+                + attention_warnings
             )
             package_warnings = {
                 package.fragment_id: package.warnings for package in adapted_packages
@@ -1083,6 +1093,14 @@ class WorkflowNodes:
             for decision in plan.decisions:
                 decision.warnings = list(package_warnings.get(decision.fragment_id, []))
                 decision.status = package_status.get(decision.fragment_id, "ready")
+                decision.degraded_assets = list(
+                    degraded_assets.get(decision.fragment_id, [])
+                )
+            if degraded_assets:
+                info(
+                    f"服装关键信息不足，已要求降级为剪影/背影: "
+                    f"{', '.join(degraded_assets)}"
+                )
             # P0-1：场景锚定无法唯一匹配的片段必须阻断，不进入下游渲染队列
             plan.blocked_fragments = [
                 fragment_id
