@@ -289,7 +289,7 @@ def _quality_inputs() -> tuple[list[AdaptedPromptPackage], AIVideoInstructions]:
         fragments=[prompt],
         metadata={
             "duration_report": {
-                "total_duration": 37.0,
+                "total_duration": 30.0,
                 "shot_duration": 37.35,
                 "element_duration": 37.08,
             },
@@ -330,7 +330,7 @@ def test_quality_gate_reports_structural_issues() -> None:
     assert instructions.fragments[0].requires_special_attention is True
 
     global_joined = "\n".join(global_warnings)
-    assert "时长口径不一致" in global_joined
+    assert "交付时长偏离镜头计划" in global_joined
     assert "打光证据来源=audio_atmosphere" in global_joined
 
 
@@ -368,3 +368,28 @@ def test_quality_gate_clean_package_stays_empty() -> None:
     assert package.warnings == []
     assert global_warnings == []
     assert prompt.requires_special_attention is False
+
+
+def test_quality_gate_accepts_normal_duration_semantic_gap() -> None:
+    """三套时长口径语义不同：正常重算差异与元素推算值不产生交付偏差告警"""
+    prompt = AIVideoPrompt(fragment_id="frag_004", prompt="a woman waits", duration=3.0)
+    instructions = AIVideoInstructions(
+        fragments=[prompt],
+        metadata={
+            "duration_report": {
+                "total_duration": 34.7,
+                "shot_duration": 37.2,
+                "element_duration": 36.9,
+            }
+        },
+    )
+    package = AdaptedPromptPackage(
+        fragment_id="frag_004",
+        target_model="runway_gen4",
+        prompt="adapted",
+        duration=3.0,
+    )
+
+    global_warnings = apply_quality_gate([package], instructions)
+
+    assert global_warnings == []

@@ -963,8 +963,11 @@ class WorkflowNodes:
     ) -> Dict[str, Any]:
         """构造总时长报告（FR-078/079）
 
-        总时长按实际片段求和；解析元素推算值、目标时长与时长来源取自
-        镜头序列统计。目标时长缺失时为 None，且不产生“总时长不足”告警。
+        三个时长字段语义不同，报告内附 ``semantics`` 说明，避免被当成同一口径
+        互相比对：``total_duration`` 是切片器按文本重算后的实际交付总时长，
+        ``shot_duration`` 是切分前的镜头计划总时长，``element_duration`` 是
+        切分前的解析元素推算总时长。目标时长缺失时为 None，且不产生
+        “总时长不足”告警。
 
         Args:
             fragment_sequence: 分割后的片段序列
@@ -977,20 +980,35 @@ class WorkflowNodes:
         stats = getattr(shot_sequence, "stats", None) or {}
 
         total_duration = round(sum(fragment.duration for fragment in fragments), 2)
+        shot_duration = stats.get("total_duration")
         target_duration = stats.get("target_duration")
         duration_delta = (
             None
             if target_duration is None
             else round(target_duration - total_duration, 2)
         )
+        delivery_deviation = (
+            round(total_duration - shot_duration, 2)
+            if isinstance(shot_duration, (int, float))
+            else None
+        )
 
         report = {
             "total_duration": total_duration,
-            "shot_duration": stats.get("total_duration"),
+            "shot_duration": shot_duration,
             "element_duration": stats.get("element_duration"),
             "target_duration": target_duration,
             "duration_delta": duration_delta,
+            "delivery_deviation": delivery_deviation,
             "duration_source": stats.get("duration_source"),
+            "semantics": {
+                "total_duration": "实际交付：片段时长求和（切片器按文本重算）",
+                "shot_duration": "切分前的镜头计划总时长",
+                "element_duration": "切分前的解析元素推算总时长",
+                "target_duration": "剧本声明的目标总时长",
+                "duration_delta": "目标总时长 - 实际交付总时长",
+                "delivery_deviation": "实际交付总时长 - 镜头计划总时长",
+            },
         }
 
         if duration_delta is not None and duration_delta > 0:

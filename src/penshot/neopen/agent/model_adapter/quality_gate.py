@@ -73,7 +73,10 @@ _READABLE_TEXT_MARKERS = (
 
 _EN_DIALOGUE_RE = re.compile(r"['\"][A-Za-z][^'\"]{8,}['\"]")
 _ZH_DIALOGUE_RE = re.compile(r"[“\"][\u4e00-\u9fff][^”\"]{4,}[”\"]")
-_DURATION_KEYS = ("total_duration", "shot_duration", "element_duration")
+
+# 交付时长与镜头计划的容差：1s 或 10% 取大者，避免口径重算的正常差异误报
+_DURATION_TOLERANCE_SECONDS = 1.0
+_DURATION_TOLERANCE_RATIO = 0.1
 
 
 def _canonical_shot(value: Any) -> str:
@@ -211,21 +214,26 @@ def _prop_reference_warnings(
 
 
 def _global_warnings(instructions: AIVideoInstructions) -> List[str]:
-    """跨片段口径告警：时长三值、打光证据来源（P1-2/P1-5 的检测口径）"""
+    """跨片段口径告警：交付偏差、打光证据来源（P1-2/P1-5 的检测口径）
+
+    三个时长字段语义不同（实际交付 / 镜头计划 / 元素推算），不能互相比对；
+    只在交付总时长实质性偏离镜头计划时告警。
+    """
     warnings: List[str] = []
     metadata = getattr(instructions, "metadata", None) or {}
 
     report = metadata.get("duration_report") or {}
-    values: dict[str, float] = {}
-    for key in _DURATION_KEYS:
-        value = report.get(key)
-        if isinstance(value, (int, float)):
-            values[key] = float(value)
-    if len(values) == len(_DURATION_KEYS):
-        spread = max(values.values()) - min(values.values())
-        if spread > 0.05:
-            rendered = ", ".join(f"{key}={value}" for key, value in values.items())
-            warnings.append(f"时长口径不一致：{rendered}")
+    delivered = report.get("total_duration")
+    planned = report.get("shot_duration")
+    if isinstance(delivered, (int, float)) and isinstance(planned, (int, float)):
+        tolerance = max(
+            _DURATION_TOLERANCE_SECONDS, abs(float(planned)) * _DURATION_TOLERANCE_RATIO
+        )
+        if abs(float(delivered) - float(planned)) > tolerance:
+            warnings.append(
+                f"交付时长偏离镜头计划：计划={planned}s，实际={delivered}s，"
+                f"偏差={float(delivered) - float(planned):+.1f}s"
+            )
 
     provenance = metadata.get("style_anchor_provenance") or {}
     lighting_source = str(provenance.get("lighting_source") or "")
@@ -248,7 +256,7 @@ def apply_quality_gate(
 
     检查项：首帧静态性、景别一致性、道具引用完整性、单片段时长收敛、
     critical_text 首帧文字证据、视频提示词与台词语言一致性；跨片段检查
-    时长三值口径与打光证据来源。片段级告警写入 ``package.warnings`` 并置位
+    交付时长偏差与打光证据来源。片段级告警写入 ``package.warnings`` 并置位
     ``requires_special_attention``，跨片段告警作为返回值写入 ``RoutePlan``。
 
     Returns:

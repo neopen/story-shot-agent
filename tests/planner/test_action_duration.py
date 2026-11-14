@@ -503,7 +503,16 @@ def test_generate_prompts_writes_duration_report(monkeypatch):
         "element_duration": 9.9,
         "target_duration": 12.0,
         "duration_delta": 6.5,
+        "delivery_deviation": 0.5,
         "duration_source": "action_nodes",
+        "semantics": {
+            "total_duration": "实际交付：片段时长求和（切片器按文本重算）",
+            "shot_duration": "切分前的镜头计划总时长",
+            "element_duration": "切分前的解析元素推算总时长",
+            "target_duration": "剧本声明的目标总时长",
+            "duration_delta": "目标总时长 - 实际交付总时长",
+            "delivery_deviation": "实际交付总时长 - 镜头计划总时长",
+        },
     }
     assert any("总时长不足" in message and "6.5" in message for message in messages)
 
