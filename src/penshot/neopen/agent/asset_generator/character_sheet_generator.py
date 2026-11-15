@@ -10,18 +10,27 @@ See LICENSE File For Details.
 @Time: 2026/11/05
 """
 
-from typing import Any, Dict, List, Sequence
+import re
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from penshot.neopen.agent.asset_generator.asset_models import (
     AssetConsistency,
+    AssetPlanDocument,
     AssetSpec,
+    AssetStatus,
     AssetType,
     AssetUsage,
 )
 from penshot.neopen.agent.continuity_guardian.appearance_anchors import (
     APPEARANCE_FIELDS,
+    contains_keyword,
     extract_appearance_anchors,
     truncate_at_clause_boundary,
+)
+from penshot.neopen.constants.appearance import (
+    COLOR_KEYWORDS,
+    GARMENT_NOUNS,
+    MATERIAL_KEYWORDS,
 )
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
@@ -48,6 +57,342 @@ CHARACTER_NEGATIVE_PROMPT = (
     "inconsistent outfit, different identity, text, watermark, low quality"
 )
 
+# 服装歧义标记：A 或 B / 可能 A（0.4.5 服装完整性）
+_ALTERNATIVE_SPLIT_RE = re.compile(r"(?:或者|或是|或|\beither\b|\bor\b)", re.IGNORECASE)
+_UNCERTAINTY_RE = re.compile(
+    r"(?:可能(?:是)?|也许(?:是)?|待定|之类(?:的)?|\bmaybe\b|\bpossibly\b|"
+    r"\bperhaps\b|\bunclear\b)",
+    re.IGNORECASE,
+)
+_CLAUSE_TOKEN_RE = re.compile(r"([，,；;。])")
+
+
+def _choose_alternative(segments: Sequence[str], style: str) -> Tuple[str, str]:
+    """按 style > 服装名词唯一命中 > 阅读顺序选择备选"""
+    style_text = str(style or "").strip().lower()
+    if style_text:
+        style_hits = [
+            segment
+            for segment in segments
+            if style_text in segment.lower() or segment.lower() in style_text
+        ]
+        if len(style_hits) == 1:
+            return style_hits[0], "style_match"
+
+    garment_hits = [
+        segment for segment in segments if contains_keyword(segment, GARMENT_NOUNS)
+    ]
+    if len(garment_hits) == 1:
+        return garment_hits[0], "garment_match"
+    return segments[0], "first_alternative"
+
+
+def _has_garment(text: str) -> bool:
+    """服装文本是否包含明确服装名词"""
+    return contains_keyword(str(text or ""), GARMENT_NOUNS)
+
+
+def _missing_outfit_fields(text: str) -> List[str]:
+    """服装描述缺失的要素（类型 / 颜色 / 材质），按固定顺序返回
+
+    0.4.5 把“信息不足”纳入人工复核：只有服装名词但没有颜色或材质时，
+    三视图会退化成“高中校服”这类无法约束外观的短标签。
+    """
+    value = str(text or "")
+    missing: List[str] = []
+    if not contains_keyword(value, GARMENT_NOUNS):
+        missing.append("类型")
+    if not contains_keyword(value, COLOR_KEYWORDS):
+        missing.append("颜色")
+    if not contains_keyword(value, MATERIAL_KEYWORDS):
+        missing.append("材质")
+    return missing
+
+
+def _missing_reason(fields: Sequence[str]) -> str:
+    """把缺失要素拼成可读原因；三种全缺时用顿号分隔"""
+    if fields == ["类型"]:
+        return "缺少明确服装类型"
+    if len(fields) == 1:
+        return f"服装描述缺少{fields[0]}"
+    if len(fields) == 2:
+        return f"服装描述缺少{fields[0]}和{fields[1]}"
+    return f"服装描述缺少{'、'.join(fields[:-1])}和{fields[-1]}"
+
+
+# 从片段提示词截取服装短语时，去掉后续动作/状态子句（避免把“额头有汗”拼进服装）
+_TRAILING_ACTION_RE = re.compile(
+    r"\s+(?:with|holding|smiling|looking|turning|standing|sitting|running|"
+    r"walking|grabbing|waving|leaning|reaching|glancing|wearing)\b.*$",
+    re.IGNORECASE,
+)
+_CLAUSE_SPLIT_RE = re.compile(r"[，,。；;！!？?\n]+")
+_PERSON_OUTFIT_PREFIX_RE = re.compile(
+    r"^(?:[A-Z][A-Za-z'’-]*(?:\s+[A-Z][A-Za-z'’-]*){0,2}\s+)?"
+    r"(?:wearing|dressed\s+in|clad\s+in|in|穿着|身穿|身着|着)\s*",
+    re.IGNORECASE,
+)
+
+# 片段提示词的角色服装标注：同一片段可能同时描述多个角色，正文服装子句
+# 无法区分归属，标注是唯一可信的角色级来源
+_CHARACTER_CLOTHING_RE = re.compile(
+    r"\[\s*character\s+consistency\s*:\s*([^,\]]+?)\s*,\s*clothing\s*:\s*([^\]]+?)\s*\]",
+    re.IGNORECASE,
+)
+
+
+def _strip_person_prefix(clause: str, character_name: str = "") -> str:
+    """去掉“张晨穿着 / Zhang Chen wearing”等主语前缀，只保留服装短语"""
+    text = str(clause or "").strip()
+    name = str(character_name or "").strip()
+    if name and text.startswith(name):
+        text = text[len(name) :].lstrip(" ，,的着")
+    return _PERSON_OUTFIT_PREFIX_RE.sub("", text).strip()
+
+
+def _annotation_outfit_phrases(text: str, character_name: str) -> List[str]:
+    """提取片段提示词中属于该角色的服装标注"""
+    name = str(character_name or "").strip()
+    if not name:
+        return []
+    phrases: List[str] = []
+    for match in _CHARACTER_CLOTHING_RE.finditer(str(text or "")):
+        if match.group(1).strip() != name:
+            continue
+        phrase = match.group(2).strip(" ，,；;。")
+        if phrase and phrase not in phrases:
+            phrases.append(phrase)
+    return phrases
+
+
+def _outfit_clauses(text: str, character_name: str = "") -> List[Tuple[str, str]]:
+    """从片段文本提取服装子句，返回 (子句, 服装短语) 列表
+
+    片段带角色服装标注时只采信标注：正文可能同时出现其他角色的着装，
+    按“缺失字段最少 + 短语最长”挑选会把别人的制服写进本角色资产。
+    """
+    annotated = _annotation_outfit_phrases(text, character_name)
+    if annotated:
+        return [(phrase, phrase) for phrase in annotated]
+
+    results: List[Tuple[str, str]] = []
+    for raw in _CLAUSE_SPLIT_RE.split(str(text or "")):
+        clause = _strip_person_prefix(raw, character_name)
+        if not clause or not _has_garment(clause):
+            continue
+        phrase = _TRAILING_ACTION_RE.sub("", clause).strip(" ，,；;。")
+        if phrase and _has_garment(phrase):
+            results.append((raw.strip(), phrase))
+    return results
+
+
+def _outfit_from_prompt(image_prompt: str) -> str:
+    """兼容 0.4.4 产物：metadata 未记录 outfit_text 时从三视图提示词反查服装段"""
+    for clause in str(image_prompt or "").split(", "):
+        if _has_garment(clause):
+            return clause.strip()
+    return ""
+
+
+# 剧本材质回填的来源字段：写入 outfit_backfill_source 便于追溯
+SCRIPT_MATERIAL_SOURCE = "global_metadata.character_outfits.material"
+SCRIPT_OUTFIT_SOURCE = "global_metadata.character_outfits.description"
+
+# 解析阶段对“无信息”的显式结论，不能当作服装文本回填
+_UNKNOWN_OUTFIT_VALUES = {"", "未知", "不详", "无", "none", "unknown", "n/a"}
+
+# attention_reason 中属于“缺失项/回填说明”的片段，重算时需要丢弃
+_REASON_MISSING_TOKENS = ("缺少", "仍缺", "均未提供", "已从")
+
+_UNRESOLVED_SOURCE_NOTE = "剧本与片段均未提供"
+
+
+def _normalize_outfit_value(value: Any) -> str:
+    """取结构化服装字段文本；“未知/不详”等占位结论返回空串"""
+    text = str(value or "").strip()
+    return "" if text.lower() in _UNKNOWN_OUTFIT_VALUES else text
+
+
+def _merge_outfit_texts(current: str, extra: str) -> str:
+    """按子句合并服装文本并去重，避免重复拼入同一段描述"""
+    parts: List[str] = []
+    for text in (current, extra):
+        for clause in _CLAUSE_SPLIT_RE.split(str(text or "")):
+            clause = clause.strip(" ，,；;。")
+            if clause and clause not in parts:
+                parts.append(clause)
+    return "，".join(parts)
+
+
+def _script_outfit_candidate(current: str, outfit: Any) -> Optional[Tuple[str, str]]:
+    """用剧本结构化服装补全缺失要素（优先于片段提示词）
+
+    ``global_metadata.character_outfits`` 是解析阶段的确定性结论：``material``
+    只补材质；``description`` 承载完整着装，材质为“未知”时仍是可信来源，
+    可避免回退到片段正文里其他角色的服装子句。
+    """
+    if not outfit:
+        return None
+    current_missing = len(_missing_outfit_fields(current))
+
+    if isinstance(outfit, str):
+        material, description = _normalize_outfit_value(outfit), ""
+    else:
+        material = _normalize_outfit_value(
+            outfit.get("material") if isinstance(outfit, Mapping) else None
+        )
+        description = _normalize_outfit_value(
+            outfit.get("description") if isinstance(outfit, Mapping) else None
+        )
+
+    if material and contains_keyword(material, MATERIAL_KEYWORDS):
+        merged = f"{current}，{material}" if current else material
+        if len(_missing_outfit_fields(merged)) < current_missing:
+            return merged, SCRIPT_MATERIAL_SOURCE
+    if description:
+        merged = _merge_outfit_texts(current, description)
+        if len(_missing_outfit_fields(merged)) < current_missing:
+            return merged, SCRIPT_OUTFIT_SOURCE
+    return None
+
+
+def _missing_reason_parts(reason: str) -> List[str]:
+    """拆分 attention_reason，丢弃缺失项与回填说明，只保留其他复核原因"""
+    parts = [part.strip() for part in str(reason or "").split("；")]
+    return [
+        part
+        for part in parts
+        if part and not any(token in part for token in _REASON_MISSING_TOKENS)
+    ]
+
+
+def _apply_outfit_metadata(spec: AssetSpec, phrase: str) -> None:
+    """按回填结果重算缺失字段与人工复核标记（FR-094/FR-095）
+
+    已解决的缺失项移除；全部解决且无其他复核原因时清除标记；仍有缺失时
+    保留标记并写明“剧本与片段均未提供”的结论。
+    """
+    remaining = _missing_outfit_fields(phrase)
+    if remaining:
+        spec.metadata["outfit_missing_fields"] = remaining
+    else:
+        spec.metadata.pop("outfit_missing_fields", None)
+
+    kept = _missing_reason_parts(str(spec.metadata.get("attention_reason") or ""))
+    if remaining:
+        kept.append(_missing_reason(remaining))
+        kept.append(_UNRESOLVED_SOURCE_NOTE)
+    if kept:
+        spec.metadata["requires_special_attention"] = True
+        spec.metadata["attention_reason"] = "；".join(kept)
+    else:
+        spec.metadata.pop("requires_special_attention", None)
+        spec.metadata.pop("attention_reason", None)
+
+
+def _best_outfit_candidate(
+    current: str, character_name: str, texts: Sequence[Tuple[str, str]]
+) -> Optional[Tuple[str, str]]:
+    """在片段提示词中挑选信息量最大的服装短语
+
+    只在比当前描述更完整时返回，避免用同等信息量的片段文本覆盖原始锚点。
+    """
+    current_missing = len(_missing_outfit_fields(current))
+    if current_missing == 0:
+        return None
+
+    best: Optional[Tuple[str, str]] = None
+    best_key: Optional[Tuple[int, int]] = None
+    for fragment_id, text in texts:
+        for _, phrase in _outfit_clauses(text, character_name):
+            missing = len(_missing_outfit_fields(phrase))
+            if missing >= current_missing:
+                continue
+            key = (-missing, len(phrase))
+            if best_key is None or key > best_key:
+                best_key = key
+                best = (fragment_id, phrase)
+    return best
+
+
+def _resolve_clothing_ambiguity(
+    clothing: str, style: str = ""
+) -> Tuple[str, str, List[str], bool]:
+    """消解服装描述中的“A 或 B / 可能 A”，返回最终文本与消解依据
+
+    歧义来自剧本解析结果时无法凭空判定，按确定性顺序选择并交给 metadata
+    标记人工复核；不修改结构化服装的来源字段本身。
+    """
+    text = str(clothing or "").strip()
+    if not text:
+        return "", "none", [], False
+
+    resolution = "none"
+    alternatives: List[str] = []
+    uncertain = False
+    parts: List[str] = []
+
+    for token in _CLAUSE_TOKEN_RE.split(text):
+        if not token:
+            continue
+        if _CLAUSE_TOKEN_RE.fullmatch(token):
+            parts.append(token)
+            continue
+
+        clause = _UNCERTAINTY_RE.sub("", token).strip()
+        if clause != token.strip():
+            uncertain = True
+
+        segments = [
+            segment.strip(" ，,；;。")
+            for segment in _ALTERNATIVE_SPLIT_RE.split(clause)
+        ]
+        segments = [segment for segment in segments if segment]
+        if len(segments) >= 2:
+            chosen, label = _choose_alternative(segments, style)
+            alternatives.extend(segments)
+            if resolution in ("none", "uncertainty_stripped"):
+                resolution = label
+            parts.append(chosen)
+            continue
+        parts.append(clause)
+
+    resolved = re.sub(r"[，,；;]\s*(?=[，,；;。]|$)", "", "".join(parts)).strip(
+        " ，,；;。"
+    )
+    if not alternatives and uncertain and resolution == "none":
+        resolution = "uncertainty_stripped"
+    return resolved, resolution, alternatives, uncertain
+
+
+def _appearance_metadata(
+    clothing: str, resolution: str, alternatives: Sequence[str], uncertain: bool
+) -> Dict[str, Any]:
+    """生成服装完整性的审阅标记"""
+    metadata: Dict[str, Any] = {}
+    if alternatives or uncertain:
+        metadata["outfit_resolution"] = resolution
+    if alternatives:
+        metadata["outfit_alternatives"] = list(dict.fromkeys(alternatives))
+
+    missing = _missing_outfit_fields(clothing)
+    if missing:
+        metadata["outfit_missing_fields"] = missing
+    if clothing:
+        metadata["outfit_text"] = clothing
+
+    reasons: List[str] = []
+    if alternatives:
+        reasons.append("服装描述存在多个备选")
+    if uncertain:
+        reasons.append("服装描述含不确定词")
+    if missing:
+        reasons.append(_missing_reason(missing))
+    if reasons:
+        metadata["requires_special_attention"] = True
+        metadata["attention_reason"] = "；".join(reasons)
+    return metadata
+
 
 def _joined_length(parts: Sequence[str]) -> int:
     """计算以 ", " 拼接后的长度"""
@@ -68,8 +413,8 @@ def _outfit_record(parsed_script: Any, character_name: str) -> Dict[str, str]:
     return {}
 
 
-def _appearance_values(parsed_script: Any, contract: Any, name: str) -> List[str]:
-    """按白名单固定顺序输出外观值；契约为空时用同一规则从解析结果兜底"""
+def _appearance_anchors(parsed_script: Any, contract: Any, name: str) -> Dict[str, Any]:
+    """读取角色外观锚点；契约为空时用同一规则从解析结果兜底"""
     anchors: Dict[str, Any] = {}
     char_contract = (
         getattr(contract, "characters", {}).get(name) if contract is not None else None
@@ -88,7 +433,11 @@ def _appearance_values(parsed_script: Any, contract: Any, name: str) -> List[str
         anchors = extract_appearance_anchors(
             description, _outfit_record(parsed_script, name)
         )
+    return dict(anchors)
 
+
+def _appearance_values(anchors: Dict[str, Any]) -> List[str]:
+    """按白名单固定顺序输出外观值"""
     return [
         value
         for field_name in APPEARANCE_FIELDS
@@ -168,7 +517,21 @@ def build_character_sheet_specs(
 
     specs: List[AssetSpec] = []
     for index, name in enumerate(names, start=1):
-        appearance = _dedupe_values(_appearance_values(parsed_script, contract, name))
+        anchors = _appearance_anchors(parsed_script, contract, name)
+        outfit = _outfit_record(parsed_script, name)
+        clothing = str(anchors.get("clothing") or "").strip()
+        resolved, resolution, alternatives, uncertain = _resolve_clothing_ambiguity(
+            clothing, outfit.get("style", "")
+        )
+        if resolved:
+            anchors["clothing"] = resolved
+        appearance = _dedupe_values(_appearance_values(anchors))
+        metadata: Dict[str, Any] = {"role": "identity_anchor"}
+        metadata.update(
+            _appearance_metadata(
+                resolved or clothing, resolution, alternatives, uncertain
+            )
+        )
         specs.append(
             AssetSpec(
                 asset_id=f"char_{index:03d}",
@@ -182,7 +545,98 @@ def build_character_sheet_specs(
                     identity_lock=True,
                     preferred_view=CHARACTER_SHEET_VIEWS[0],
                 ),
-                metadata={"role": "identity_anchor"},
+                metadata=metadata,
             )
         )
     return specs
+
+
+def backfill_character_outfits(
+    plan: Any,
+    texts_by_character: Mapping[str, Sequence[Tuple[str, str]]],
+    script_outfits: Optional[Mapping[str, Any]] = None,
+    asset_revisions: Optional[Mapping[str, int]] = None,
+) -> List[str]:
+    """回填角色服装缺失要素：剧本结构化服装优先，其次片段提示词（0.4.5 T-016/T-017）
+
+    ASSETS 节点早于提示词生成，此时只能依据剧本锚点标记“信息不足”；路由阶段
+    按“剧本 ``character_outfits`` > 该角色片段提示词”的顺序补全三视图。
+    剧本来源先尝试 ``material``，再尝试 ``description``；片段来源只采信该角色的
+    ``[Character consistency: 角色, clothing: …]`` 标注。
+    回填后重算缺失字段：全部解决时清除 ``outfit_missing_fields`` 与
+    ``requires_special_attention``；仍缺失时保留标记并写明“剧本与片段均未提供”。
+
+    已生成、已有 ``asset_ref``、被人工编辑或清单 ``revision > 0`` 的资产不回填，
+    避免覆盖下游产物（FR-096）。
+
+    Args:
+        plan: 资产计划文档（``AssetPlanDocument`` 或字典），原地修改
+        texts_by_character: 角色名 -> [(片段ID, 片段文本)]，片段文本含描述与提示词
+        script_outfits: 角色名 -> 剧本结构化服装（材质字符串或
+            ``{description, material}`` 记录，来自 ``global_metadata``）
+        asset_revisions: asset_id -> 清单修订号；缺省或 0 视为未编辑
+
+    Returns:
+        实际回填的 asset_id 列表
+    """
+    document = (
+        plan
+        if isinstance(plan, AssetPlanDocument)
+        else AssetPlanDocument.model_validate(plan)
+    )
+    revisions = asset_revisions or {}
+    changed: List[str] = []
+    for spec in document.assets:
+        if spec.asset_type != AssetType.CHARACTER_SHEET:
+            continue
+        if spec.asset_ref or spec.metadata.get("human_edited"):
+            continue
+        if spec.status == AssetStatus.GENERATED:
+            continue
+        if revisions.get(spec.asset_id, 0) > 0:
+            continue
+        current = str(spec.metadata.get("outfit_text") or "").strip() or (
+            _outfit_from_prompt(spec.image_prompt)
+        )
+        if not _missing_outfit_fields(current):
+            # 旧产物可能残留已失效的缺失标记（如材质词表扩展后），按当前文本重算
+            if spec.metadata.get("outfit_missing_fields"):
+                _apply_outfit_metadata(spec, current)
+            continue
+
+        phrase: Optional[str] = None
+        source: Optional[str] = None
+        script_candidate = _script_outfit_candidate(
+            current, (script_outfits or {}).get(spec.owner_name)
+        )
+        if script_candidate is not None:
+            phrase, source = script_candidate
+        else:
+            candidate = _best_outfit_candidate(
+                current, spec.owner_name, texts_by_character.get(spec.owner_name, [])
+            )
+            if candidate is not None:
+                source, phrase = candidate
+
+        if phrase is None or source is None:
+            # 无可用来源：只更新结论，写明剧本与片段均未提供
+            _apply_outfit_metadata(spec, current)
+            continue
+        if current:
+            if current not in spec.image_prompt:
+                # 提示词已截断或服装未拼入时不做替换，避免破坏提示词结构
+                continue
+            spec.image_prompt = spec.image_prompt.replace(current, phrase, 1)
+        elif CHARACTER_SHEET_TAIL in spec.image_prompt:
+            # 锚点未产出服装时插在固定结尾之前，保持三视图提示词结构
+            spec.image_prompt = spec.image_prompt.replace(
+                CHARACTER_SHEET_TAIL, f"{phrase}, {CHARACTER_SHEET_TAIL}", 1
+            )
+        else:
+            spec.image_prompt = f"{spec.image_prompt}, {phrase}"
+
+        spec.metadata["outfit_text"] = phrase
+        spec.metadata["outfit_backfill_source"] = source
+        _apply_outfit_metadata(spec, phrase)
+        changed.append(spec.asset_id)
+    return changed

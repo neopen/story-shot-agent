@@ -1,10 +1,11 @@
-version: "1.5"
+version: "1.6"
 changelog: |
   - 2026-03-18: 规范化提示词、增加视觉风格参数、完整示例
   - 2026-03-15: 优化情感枚举
   - 2026-03-10: 修复音频参数
   - 2026-03-28: 添加修复参数，通过修复建议和问题修复问题
   - 2026-03-30: 添加 history_hint 参数，支持记忆功能的 历史上下文提示
+  - 2026-11-13: 增加 dialogue_language 输出与台词/音色语言约束，中文对照只进注释段
 
 prompt_converter_system:
   name: "prompt_converter_system"
@@ -33,6 +34,9 @@ prompt_converter_system:
       - 基于提供的角色信息、音频上下文和片段时长，生成完整的音频参数
       - 所有参数必须符合给定的模型定义
       - 确保音频时长与视频时长严格一致
+      - 台词语言跟随剧本语言：中文剧本的台词原文与 voice_description 必须使用中文，英文仅允许出现在 negative_prompt、audio_style 等非台词字段
+      - 英文剧本的台词描述段必须使用英文，中文对照只能放在 \n\n 之后的注释段
+      - 必须输出 dialogue_language 字段，取值为 zh 或 en，与台词语言一致
     
     【视觉风格参数】
       - color_grading: "Fujifilm ETERNA（冷调低饱和）/Kodak Portra（暖调柔和）"
@@ -108,6 +112,9 @@ prompt_converter_user:
     【重要提示】
       - 视频提示词必须完整保留所有台词和视觉元素
       - 音频提示词必须基于角色信息生成合适的音色参数，确保音频时长与视频时长严格一致
+      - 中文剧本（语言为 zh）的台词原文与 voice_description 必须为中文；英文只允许出现在 negative_prompt、audio_style 等非台词字段
+      - 英文剧本（语言为 en）的台词描述段必须为英文，中文对照只能放在 \n\n 之后的注释段，不得进入台词描述段
+      - 必须输出 dialogue_language 字段（zh 或 en），与台词语言一致
       - 确保音频时长严格等于 {duration}秒
       - 提示词内容必须在两种语言中完全一致，表达相同的视觉元素、动作和情感
       - 提示词中不得包含任何敏感词汇或不适当内容
@@ -123,14 +130,15 @@ prompt_converter_user:
         "negative_prompt": "视频负面提示词",
         "style_hint": "视频风格提示",
         "audio": {{
-          "prompt": "音频提示词文本，必须基于合适的模型",
+          "prompt": "音频提示词文本，必须基于合适的模型；中文剧本不得包含英文台词原文",
           "original_prompt": "{original_language}音频提示词",
           "negative_prompt": "音频负面提示词",
           "model_type": "XTTSv2/AudioLDM_3/Bark/ElevenLabs/Azure_TTS/OpenAI_TTS",
           "voice_type": "character_dialogue/narration/announcer/creative",
+          "dialogue_language": "zh/en，与台词语言一致",
           "audio_style": "cinematic/realistic/anime/commercial",
           "voice_character": "说话角色（可选）",
-          "voice_description": "音色文字描述（英文）",
+          "voice_description": "音色文字描述（中文剧本用中文，英文剧本用英文）",
           "speed": 1,
           "pitch_shift": 0,
           "emotion": "neutral/happy/sad/angry/fear/tense/melancholic",
@@ -160,6 +168,7 @@ prompt_converter_user:
             "original_prompt": "轻柔连绵的细雨，远处车辆的嗡鸣声，遮阳篷上的水滴，湿石板上轻柔的脚步声",
             "model_type": "AudioLDM_3",
             "voice_type": "narration",
+            "dialogue_language": "zh",
             "duration_seconds": 3.0,
             "emotion": "melancholic"
           }}

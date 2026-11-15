@@ -14,6 +14,10 @@ from typing import Any, Dict, List, Tuple, Union
 
 from langgraph.graph import END
 
+from penshot.neopen.agent.character_names import normalize_character_name
+from penshot.neopen.agent.continuity_guardian.consistency_contract import (
+    CharacterContract,
+)
 from penshot.neopen.agent.continuity_guardian.contract_repair import (
     build_contract_repair_params,
     merge_repair_params,
@@ -226,6 +230,12 @@ class PipelineDecision:
         # 契约校验（Validator）：镜头主角色必须属于一致性契约
         contract_issues = validate_shot_sequence(shot_sequence, state.domain.contract)
         if contract_issues:
+            # 剧本真实角色直接补登记进契约并复检，避免重跑 LLM 无法消除的空转
+            self._register_missing_contract_characters(state, contract_issues)
+            contract_issues = validate_shot_sequence(
+                shot_sequence, state.domain.contract
+            )
+        if contract_issues:
             # 契约违规项同时转换为 Repairer 修复参数，供下次切镜消费
             self._attach_contract_repair_params(
                 state, contract_issues, PipelineNode.SEGMENT_SHOT, shot_sequence
@@ -309,6 +319,12 @@ class PipelineDecision:
         contract_issues = validate_fragment_sequence(
             fragment_sequence, state.domain.shot_sequence, state.domain.contract
         )
+        if contract_issues:
+            # 剧本真实角色直接补登记进契约并复检，避免重跑 LLM 无法消除的空转
+            self._register_missing_contract_characters(state, contract_issues)
+            contract_issues = validate_fragment_sequence(
+                fragment_sequence, state.domain.shot_sequence, state.domain.contract
+            )
         if contract_issues:
             # 契约违规项同时转换为 Repairer 修复参数，供下次切片消费
             self._attach_contract_repair_params(
@@ -1055,6 +1071,52 @@ class PipelineDecision:
 
         return state
 
+    def _register_missing_contract_characters(
+        self, state: WorkflowState, violations: List[Dict[str, Any]]
+    ) -> None:
+        """把违规项中的契约外角色与剧本角色表比对，剧本真实角色直接补登记进契约
+
+        分镜 LLM 忠实保留的剧本角色（如悬念角色）不属于分镜错误，重跑生成无法消除，
+        只会空转消耗调用；契约角色集以剧本角色表为准，补登记后校验即可确定性收敛。
+        剧本角色表中不存在的名字属于生成幻觉，留给修复器按建议清除。
+
+        Args:
+            state: 工作流状态
+            violations: Validator 产出的违规项字典列表
+        """
+        contract = state.domain.contract
+        parsed_script = state.domain.parsed_script
+        if contract is None or parsed_script is None:
+            return
+
+        known_names = {
+            normalize_character_name(name) for name in contract.characters
+        }
+        parsed_by_name: Dict[str, Any] = {}
+        for char in getattr(parsed_script, "characters", []) or []:
+            raw_name = getattr(char, "name", None)
+            name = normalize_character_name(raw_name)
+            if name:
+                parsed_by_name.setdefault(name, char)
+
+        for violation in violations or []:
+            if str(violation.get("type") or "").strip() != "unknown_character":
+                continue
+            character = normalize_character_name(violation.get("character"))
+            if not character or character in known_names:
+                continue
+            parsed_char = parsed_by_name.get(character)
+            if parsed_char is None:
+                continue
+            raw_name = str(getattr(parsed_char, "name", "") or "").strip() or character
+            char_contract = CharacterContract(name=raw_name)
+            description = str(getattr(parsed_char, "description", "") or "").strip()
+            if description:
+                char_contract._extract_appearance_features(description)
+            contract.characters[raw_name] = char_contract
+            known_names.add(normalize_character_name(raw_name))
+            info(f"契约补登记剧本角色「{raw_name}」，unknown_character 违规确定性收敛")
+
     def _attach_contract_repair_params(
         self,
         state: WorkflowState,
@@ -1083,7 +1145,11 @@ class PipelineDecision:
             warning(issue.get("message", ""))
 
         params = build_contract_repair_params(
-            violations, stage, state.domain.contract, shot_sequence
+            violations,
+            stage,
+            state.domain.contract,
+            shot_sequence,
+            state.domain.parsed_script,
         )
         if params is None:
             return

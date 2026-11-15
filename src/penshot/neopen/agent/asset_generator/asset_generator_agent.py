@@ -10,8 +10,9 @@ See LICENSE File For Details.
 @Time: 2026/11/05
 """
 
+import copy
 import os
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from penshot.logger import debug, info, warning
 from penshot.neopen.agent.asset_generator.asset_models import (
@@ -22,8 +23,14 @@ from penshot.neopen.agent.asset_generator.asset_models import (
     AssetSpec,
     AssetStatus,
     AssetType,
+    PropStateVariant,
+)
+from penshot.neopen.agent.asset_generator.asset_ref_validation import (
+    split_ref_warnings,
+    validate_asset_ref,
 )
 from penshot.neopen.agent.asset_generator.character_sheet_generator import (
+    backfill_character_outfits,
     build_character_sheet_specs,
 )
 from penshot.neopen.agent.asset_generator.execution_adapter import (
@@ -36,6 +43,11 @@ from penshot.neopen.agent.asset_generator.prop_scene_asset_generator import (
 )
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
+)
+from penshot.neopen.agent.continuity_guardian.style_anchors import build_style_text
+from penshot.neopen.agent.prop_usage import (
+    advance_prop_state,
+    should_reference_prop,
 )
 from penshot.neopen.client.image_generation import (
     BaseImageGenerationClient,
@@ -53,8 +65,15 @@ def _field(source: Any, name: str, default: Any = None) -> Any:
     return default if value is None else value
 
 
-def _fragment_rows(fragments: Sequence[Any], shots: Any) -> List[Dict[str, str]]:
-    """把片段序列归一为「片段 -> 镜头 -> 场景」扁平行"""
+def _fragment_rows(
+    fragments: Sequence[Any],
+    shots: Any,
+    prompts: Optional[Mapping[str, str]] = None,
+) -> List[Dict[str, str]]:
+    """把片段序列归一为「片段 -> 镜头 -> 场景」扁平行
+
+    ``text`` 汇总片段描述与提示词正文，供道具“文本提及”判定使用。
+    """
     if isinstance(shots, Mapping):
         shot_index = {str(key): value for key, value in shots.items()}
     else:
@@ -64,6 +83,7 @@ def _fragment_rows(fragments: Sequence[Any], shots: Any) -> List[Dict[str, str]]
             if _field(shot, "id", "")
         }
 
+    prompts = prompts or {}
     rows: List[Dict[str, str]] = []
     for fragment in fragments or []:
         fragment_id = str(
@@ -78,15 +98,35 @@ def _fragment_rows(fragments: Sequence[Any], shots: Any) -> List[Dict[str, str]]
         )
         if not main_character and isinstance(notes, Mapping):
             main_character = notes.get("main_character")
+        description = str(_field(fragment, "description", "") or "")
+        prompt_text = str(prompts.get(fragment_id, "") or "")
+        shot_type = str(
+            _field(fragment, "shot_type", "") or _field(shot, "shot_type", "") or ""
+        )
         rows.append(
             {
                 "id": fragment_id,
                 "scene_id": str(_field(shot, "scene_id", "") or ""),
                 "location": str(_field(shot, "location", "") or ""),
                 "main_character": str(main_character or "").strip(),
+                "shot_type": shot_type,
+                "text": f"{description} {prompt_text}".strip(),
             }
         )
     return rows
+
+
+def _prompt_texts(instructions: Any) -> Dict[str, str]:
+    """收集片段ID -> 提示词正文，用于道具文本提及判定"""
+    result: Dict[str, str] = {}
+    for item in getattr(instructions, "fragments", None) or []:
+        fragment_id = str(
+            _field(item, "fragment_id", "") or _field(item, "id", "") or ""
+        )
+        text = str(_field(item, "prompt", "") or "").strip()
+        if fragment_id and text:
+            result[fragment_id] = text
+    return result
 
 
 def _scene_locations(contract: Any, parsed_script: Any) -> Dict[str, str]:
@@ -142,6 +182,62 @@ def _references_by_asset(route_plan: Any) -> Dict[str, List[str]]:
     return result
 
 
+def _character_match_key(name: str, names: Sequence[str], texts: Sequence[str]) -> str:
+    """角色正文匹配键：整名逐字出现用整名，否则描述型长名退化到尾部名词
+
+    解析层常用“方位/特征 + 人物”描述角色（如“门口黑影”），正文里通常只出现
+    尾部名词，导致三视图 usage 为空、资产链断裂。尾部名词仅在整名从未逐字
+    出现、且不被其他角色共享时启用，避免把“门口”这类方位词误判成角色出场。
+
+    Args:
+        name: 角色名
+        names: 全部角色名（用于别名唯一性判断）
+        texts: 片段文本集合（描述 + 提示词）
+
+    Returns:
+        可用于正文匹配的键；都不可用时返回空串
+    """
+    name = str(name or "").strip()
+    if not name:
+        return ""
+    if any(name in text for text in texts):
+        return name
+    if len(name) < 4:
+        return ""
+    alias = name[-2:]
+    if not alias or alias == name:
+        return ""
+    if any(
+        alias in str(other or "") for other in names if str(other or "").strip() != name
+    ):
+        return ""
+    return alias
+
+
+def _prop_state_variants(
+    owner_name: str, rows: List[Dict[str, str]]
+) -> List[PropStateVariant]:
+    """按片段顺序推导道具状态分组；不足两种状态时不产出变体
+
+    只有被使用范围覆盖的片段参与推导，且状态只允许单向推进：frag_007 揉成团
+    之后，后续片段里残留的“皱巴巴”不再把状态回退成 crumpled。
+    """
+    grouped: Dict[str, List[str]] = {}
+    order: List[str] = []
+    current = ""
+    for row in rows:
+        current = advance_prop_state(current, row["text"], owner_name)
+        if not current:
+            continue
+        if current not in grouped:
+            grouped[current] = []
+            order.append(current)
+        grouped[current].append(row["id"])
+    if len(order) < 2:
+        return []
+    return [PropStateVariant(state=state, fragments=grouped[state]) for state in order]
+
+
 def backfill_usage(
     plan: Any,
     fragments: Optional[Sequence[Any]] = None,
@@ -149,14 +245,18 @@ def backfill_usage(
     contract: Optional[GlobalConsistencyContract] = None,
     route_plan: Any = None,
     parsed_script: Any = None,
+    instructions: Any = None,
 ) -> AssetPlanDocument:
     """回填资产计划的使用范围（FR-012/013、AC-012..016）
 
-    - 角色三视图：所有以该角色为主角的片段；
+    - 角色三视图：所有以该角色为主角的片段；描述型角色名（正文无整词命中）
+      按尾部名词别名补关联，避免“门口黑影”这类资产 usage 为空；
     - 场景锚点：所有位于该场景地点下的片段；
-    - 道具静帧：所有位于该道具 ``appears_in`` 场景下的片段；
-    - ``route_plan`` 中显式引用的片段强制并入使用范围（引用集合必须是
-      使用范围的子集）。
+    - 道具静帧：所有位于该道具 ``appears_in`` 场景下、**且片段文本提及该道具**
+      的片段；仅按场景整批回填会把同场景内未出现的道具算进使用范围。围巾/饰品
+      等著装类道具只在特写聚焦于它时才计入，避免服装描述扩成整场引用；
+    - ``route_plan`` 中显式引用的片段并入使用范围（引用集合必须是使用范围的
+      子集）；道具引用还要通过同一文本提及判定，过时的引用被丢弃。
 
     Args:
         plan: 资产计划文档；字典输入会先校验为 ``AssetPlanDocument``
@@ -165,6 +265,7 @@ def backfill_usage(
         contract: 全局一致性契约；提供场景地点
         route_plan: 路由计划；提供每片段的资产引用
         parsed_script: 剧本解析结果；提供场景地点与道具 ``appears_in``
+        instructions: 提示词指令；提供片段提示词正文（道具文本提及判定）
 
     Returns:
         原地回填后的资产计划文档
@@ -175,18 +276,35 @@ def backfill_usage(
         else AssetPlanDocument.model_validate(plan)
     )
 
-    rows = _fragment_rows(fragments or [], shots)
+    rows = _fragment_rows(fragments or [], shots, _prompt_texts(instructions))
     scene_locations = _scene_locations(contract, parsed_script)
     for row in rows:
         row["location"] = scene_locations.get(row["scene_id"], "")
     fragment_order = {row["id"]: index for index, row in enumerate(rows)}
+    rows_by_id = {row["id"]: row for row in rows}
     prop_scenes = _prop_scene_map(parsed_script)
     referenced = _references_by_asset(route_plan)
 
+    character_names: List[str] = [
+        spec.owner_name
+        for spec in document.assets
+        if spec.asset_type == AssetType.CHARACTER_SHEET
+    ]
+    for character in getattr(parsed_script, "characters", None) or []:
+        name = str(_field(character, "name", "") or "").strip()
+        if name and name not in character_names:
+            character_names.append(name)
+    row_texts = [row["text"] for row in rows]
+
     for spec in document.assets:
+        scene_ids: set[str] = set()
         if spec.asset_type == AssetType.CHARACTER_SHEET:
+            key = _character_match_key(spec.owner_name, character_names, row_texts)
             used = [
-                row["id"] for row in rows if row["main_character"] == spec.owner_name
+                row["id"]
+                for row in rows
+                if row["main_character"] == spec.owner_name
+                or (key and key in row["text"])
             ]
         elif spec.asset_type == AssetType.SCENE:
             used = [
@@ -196,13 +314,30 @@ def backfill_usage(
             ]
         elif spec.asset_type == AssetType.PROP:
             scene_ids = prop_scenes.get(spec.owner_name, set())
-            used = [row["id"] for row in rows if row["scene_id"] in scene_ids]
+            used = [
+                row["id"]
+                for row in rows
+                if row["scene_id"] in scene_ids
+                and should_reference_prop(
+                    row["text"], spec.owner_name, row["shot_type"]
+                )
+            ]
         else:
             used = []
 
         for fragment_id in referenced.get(spec.asset_id, []):
-            if fragment_id in fragment_order and fragment_id not in used:
-                used.append(fragment_id)
+            ref_row = rows_by_id.get(fragment_id)
+            if ref_row is None or fragment_id in used:
+                continue
+            if spec.asset_type == AssetType.PROP and (
+                ref_row["scene_id"] not in scene_ids
+                or not should_reference_prop(
+                    ref_row["text"], spec.owner_name, ref_row["shot_type"]
+                )
+            ):
+                # 过时引用：同场景但片段未真正需要该道具参考，不并入使用范围
+                continue
+            used.append(fragment_id)
 
         spec.usage.fragments = sorted(
             dict.fromkeys(used),
@@ -210,6 +345,11 @@ def backfill_usage(
                 fragment_id, len(fragment_order)
             ),
         )
+        if spec.asset_type == AssetType.PROP:
+            used_set = set(spec.usage.fragments)
+            spec.state_variants = _prop_state_variants(
+                spec.owner_name, [row for row in rows if row["id"] in used_set]
+            )
 
     debug(
         "资产使用范围回填完成: "
@@ -218,6 +358,95 @@ def backfill_usage(
         )
     )
     return document
+
+
+def _script_outfits(parsed_script: Any) -> Dict[str, Dict[str, str]]:
+    """提取剧本结构化服装：角色名 -> {description, material}"""
+    metadata = _field(parsed_script, "global_metadata")
+    outfits: Dict[str, Dict[str, str]] = {}
+    for outfit in _field(metadata, "character_outfits", []) or []:
+        character = str(_field(outfit, "character", "") or "").strip()
+        if not character:
+            continue
+        record = {
+            field_name: value
+            for field_name in ("description", "material")
+            if (value := str(_field(outfit, field_name, "") or "").strip())
+        }
+        if record:
+            outfits[character] = record
+    return outfits
+
+
+def _manifest_revisions(manifest: Any) -> Dict[str, int]:
+    """提取清单中的 asset_id -> revision；兼容改名映射与字典输入"""
+    if not manifest:
+        return {}
+    model = (
+        manifest
+        if isinstance(manifest, AssetManifest)
+        else AssetManifest.model_validate(manifest)
+    )
+    revisions: Dict[str, int] = {}
+    for binding in model.bindings:
+        revisions[binding.asset_id] = max(
+            revisions.get(binding.asset_id, 0), binding.revision
+        )
+    for canonical, actual in model.asset_id_map.items():
+        if actual in revisions:
+            revisions[canonical] = max(revisions.get(canonical, 0), revisions[actual])
+    return revisions
+
+
+def backfill_outfits(
+    plan: Any,
+    fragments: Optional[Sequence[Any]] = None,
+    shots: Any = None,
+    instructions: Any = None,
+    parsed_script: Any = None,
+    manifest: Any = None,
+) -> List[str]:
+    """路由阶段回填角色服装缺失要素：剧本服装优先，其次片段提示词（0.4.5 T-016/T-017）
+
+    ASSETS 节点早于提示词生成，只能标记服装信息不足；路由节点拿到最终提示词后
+    按主角色归属回填，避免三视图停留在“高中校服”这类无颜色/材质的短标签。
+    剧本 ``global_metadata.character_outfits`` 的 ``material`` 与 ``description``
+    都比片段正文可信；片段正文只采信该角色的服装标注，避免混入同片段的他人着装。
+    清单 ``revision > 0`` 的资产不回填；无清单时按未编辑处理并记录降级日志（FR-096）。
+    """
+    if manifest is None:
+        info("资产回填缺少 asset_manifest，无 revision 信息，按未编辑处理")
+    rows = _fragment_rows(fragments or [], shots, _prompt_texts(instructions))
+    texts: Dict[str, List[Tuple[str, str]]] = {}
+    for row in rows:
+        if row["main_character"] and row["text"]:
+            texts.setdefault(row["main_character"], []).append((row["id"], row["text"]))
+    return backfill_character_outfits(
+        plan,
+        texts,
+        script_outfits=_script_outfits(parsed_script),
+        asset_revisions=_manifest_revisions(manifest),
+    )
+
+
+def _resolve_plan_style_anchor(contract: Any) -> Dict[str, Any]:
+    """生成与片段同源的风格锚点，消解旧 description 与已决议维度的冲突
+
+    片段风格由 ``build_style_text`` 在渲染时消解冲突，但契约本身不会被回写；
+    资产计划若直接透传原始 ``style_anchor``，会残留已被丢弃的氛围短语。
+    """
+    anchor = dict(getattr(contract, "style_anchor", None) or {})
+    if not anchor:
+        return anchor
+
+    # build_style_text 会把被丢弃短语写入 provenance，复制后再传入避免污染契约
+    provenance = copy.deepcopy(getattr(contract, "style_anchor_provenance", None) or {})
+    resolved = build_style_text(anchor, provenance)
+    if resolved:
+        anchor["description"] = resolved
+    else:
+        anchor.pop("description", None)
+    return anchor
 
 
 class AssetGeneratorAgent:
@@ -236,11 +465,14 @@ class AssetGeneratorAgent:
         image_client: Optional[BaseImageGenerationClient] = None,
         output_dir: Optional[str] = None,
         execution_adapter: Optional[AssetExecutionAdapter] = None,
+        enable_execution: bool = False,
     ):
         self._image_client = image_client
         self._output_dir = output_dir
         self._client_resolved = image_client is not None
         self._execution_adapter = execution_adapter
+        # 默认路径只声明资产；真实生成能力必须由调用方显式开启或注入
+        self._enable_execution = enable_execution
 
     @property
     def image_client(self) -> Optional[BaseImageGenerationClient]:
@@ -254,9 +486,17 @@ class AssetGeneratorAgent:
 
     @property
     def execution_adapter(self) -> Optional[AssetExecutionAdapter]:
-        """解析执行器：显式注入优先，其次按配置启用内置文生图执行器"""
+        """解析执行器：显式注入优先；默认路径不解析任何文生图客户端"""
         if self._execution_adapter is not None:
             return self._execution_adapter
+        if self._image_client is not None:
+            return (
+                ImageClientExecutionAdapter(self._image_client)
+                if self._image_client.is_configured()
+                else None
+            )
+        if not self._enable_execution:
+            return None
         client = self.image_client
         if client and client.is_configured():
             return ImageClientExecutionAdapter(client)
@@ -292,7 +532,7 @@ class AssetGeneratorAgent:
         return AssetPlanDocument(
             task_id=str(task_id or getattr(contract, "task_id", "") or ""),
             script_id=str(script_id or getattr(contract, "script_id", "") or ""),
-            style_anchor=dict(getattr(contract, "style_anchor", {}) or {}),
+            style_anchor=_resolve_plan_style_anchor(contract),
             assets=specs,
         )
 
@@ -498,9 +738,18 @@ class AssetGeneratorAgent:
     def _apply_manifest(
         self, specs: List[AssetSpec], manifest: AssetManifest
     ) -> tuple[int, List[str]]:
-        """把回填清单中的绑定写回资产规格，返回应用数与失败原因"""
+        """把回填清单中的绑定写回资产规格，返回应用数与失败原因
+
+        引用不可用（``file://`` 缺失、校验和不匹配）时保持 pending 并记录错误，
+        避免把坏引用挂进契约后让路由误判为可用的首帧资产。
+        """
         applied = 0
         errors: List[str] = []
+        known_ids = {spec.asset_id for spec in specs}
+        for item in manifest.bindings:
+            if self._canonical_asset_id(item.asset_id, manifest, known_ids) is None:
+                errors.append(f"{item.asset_id}: asset_id 不在资产计划中")
+
         for spec in specs:
             if spec.status == AssetStatus.SKIPPED:
                 continue
@@ -508,6 +757,13 @@ class AssetGeneratorAgent:
             if binding is None:
                 continue
             if binding.asset_ref:
+                ref_errors = validate_asset_ref(binding.asset_ref, binding.checksum)
+                for message in ref_errors:
+                    errors.append(f"{spec.asset_id}: {message}")
+                if ref_errors:
+                    continue
+                for message in split_ref_warnings(binding.asset_ref, binding.checksum):
+                    debug(f"{spec.asset_id}: {message}")
                 spec.status = AssetStatus.GENERATED
                 spec.asset_ref = binding.asset_ref
                 spec.metadata.update(
@@ -517,6 +773,7 @@ class AssetGeneratorAgent:
                         "checksum": binding.checksum,
                         "seed": binding.seed,
                         "revision": binding.revision,
+                        "generated_at": binding.generated_at,
                     }
                 )
                 applied += 1
@@ -525,9 +782,20 @@ class AssetGeneratorAgent:
                 errors.append(f"{spec.asset_id}: {binding.error}")
         return applied, errors
 
+    def _canonical_asset_id(
+        self, asset_id: str, manifest: AssetManifest, known_ids: set[str]
+    ) -> Optional[str]:
+        """把下游实际 ID 还原为计划内 asset_id；无法匹配返回 None"""
+        if asset_id in known_ids:
+            return asset_id
+        for canonical, alias in manifest.asset_id_map.items():
+            if alias == asset_id and canonical in known_ids:
+                return canonical
+        return None
+
     def _provider(self, manifest: Optional[AssetManifest]) -> str:
-        """解析报告中的供应商标识"""
-        client = self.image_client
+        """解析报告中的供应商标识；默认路径不触发客户端解析"""
+        client = self._image_client
         if client is not None:
             return client.provider
         if manifest is not None:

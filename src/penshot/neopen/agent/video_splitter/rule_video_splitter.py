@@ -85,7 +85,7 @@ class RuleVideoSplitter(BaseVideoSplitter):
 
         info(f"分割统计: 总镜头{len(shot_sequence.shots)}个, 实际分割{actual_split_shots}个, 输出片段{fragment_count}个")
 
-        return self.post_process(fragment_sequence)
+        return self.post_process(fragment_sequence, shot_sequence, parsed_script)
 
     def split_shot(self, shot: ShotInfo, start_time: float, fragment_offset: int) -> List[VideoFragment]:
         """分割单个镜头（修复版）"""

@@ -23,13 +23,16 @@ from penshot.neopen.agent.model_adapter.model_adapter_factory import (
 )
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     build_first_frame_prompt,
+    build_motion_prompt,
     build_package_references,
+    split_static_motion,
 )
 from penshot.neopen.agent.model_adapter.image_to_video import (
     apply_image_to_video_routing,
     has_critical_text,
     should_use_image_to_video,
 )
+from penshot.neopen.agent.model_adapter.quality_gate import apply_quality_gate
 from penshot.neopen.agent.model_adapter.model_models import (
     AdaptedPromptPackage,
     AestheticBias,
@@ -62,7 +65,10 @@ __all__ = [
     "resolve_model_name",
     "adapt_instructions",
     "build_first_frame_prompt",
+    "build_motion_prompt",
     "build_package_references",
+    "split_static_motion",
+    "apply_quality_gate",
     "apply_image_to_video_routing",
     "has_critical_text",
     "should_use_image_to_video",

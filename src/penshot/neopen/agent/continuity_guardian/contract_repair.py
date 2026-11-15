@@ -12,6 +12,7 @@ See LICENSE File For Details.
 
 from typing import Any, Dict, List, Optional
 
+from penshot.neopen.agent.character_names import normalize_character_name
 from penshot.neopen.agent.continuity_guardian.anchor_recall import (
     _scene_num_from_id,
 )
@@ -201,7 +202,10 @@ def _suggestion_key(violation: Dict[str, Any]) -> str:
 
 
 def _build_suggestion(
-    violation: Dict[str, Any], contract: Any, shot_sequence: Any
+    violation: Dict[str, Any],
+    contract: Any,
+    shot_sequence: Any,
+    parsed_script: Any = None,
 ) -> str:
     """针对单条契约违规项构建可执行的修复建议"""
     violation_type = _text(violation.get("type"))
@@ -218,7 +222,20 @@ def _build_suggestion(
         anchor = describe_character_anchors(contract, character)
         if anchor:
             parts.append(anchor)
-        parts.append("如需保留该角色，应先补充契约角色登记与外观锚点")
+        if parsed_script is not None:
+            parsed_names = {
+                normalize_character_name(getattr(char, "name", None))
+                for char in getattr(parsed_script, "characters", []) or []
+            }
+            if character in parsed_names:
+                parts.append("该角色已在剧本角色表中，将补登记进契约并保留")
+            else:
+                parts.append(
+                    "该角色不在剧本角色表中，属分镜生成幻觉；修复时将清除其主角色"
+                    "标注，画面描述中的形象予以保留"
+                )
+        else:
+            parts.append("如需保留该角色，应先补充契约角色登记与外观锚点")
         return "；".join(parts)
 
     if violation_type == "orphan_fragment":
@@ -242,6 +259,7 @@ def build_contract_repair_params(
     stage: PipelineNode,
     contract: Any = None,
     shot_sequence: Any = None,
+    parsed_script: Any = None,
 ) -> Optional[QualityRepairParams]:
     """把契约违规项转换为 Repairer 可直接消费的修复参数
 
@@ -250,6 +268,7 @@ def build_contract_repair_params(
         stage: 目标修复阶段
         contract: 全局一致性契约（用于补充角色/场景/风格锚点）
         shot_sequence: 镜头序列（用于列举有效镜头，修复孤立片段）
+        parsed_script: 结构化剧本（用于区分剧本真实角色与生成幻觉，给出准确建议）
 
     Returns:
         修复参数；无违规项时返回 None
@@ -271,7 +290,9 @@ def build_contract_repair_params(
         if fragment_id and fragment_id not in fragments:
             fragments.append(fragment_id)
 
-        suggestion = _build_suggestion(violation, contract, shot_sequence)
+        suggestion = _build_suggestion(
+            violation, contract, shot_sequence, parsed_script
+        )
         bucket = suggestions.setdefault(key, [])
         if suggestion and suggestion not in bucket:
             if len(bucket) < _MAX_SUGGESTIONS_PER_KEY:

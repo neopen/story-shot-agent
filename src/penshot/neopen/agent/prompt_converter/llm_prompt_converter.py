@@ -10,7 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/1/26 23:36
 """
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 
 from penshot.logger import info, error, warning
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
@@ -24,6 +24,11 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     AudioModelType,
     AudioVoiceType,
     VideoStyle
+)
+from penshot.neopen.agent.prompt_converter.script_language import (
+    detect_script_language,
+    normalize_audio_language,
+    normalize_video_prompt_language,
 )
 from penshot.neopen.agent.prompt_converter.template_prompt_converter import TemplatePromptConverter
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
@@ -44,6 +49,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         self.llm_client = llm_client
         self.parsed_script = None
         self.global_metadata = None
+        self.script_language: Literal["zh", "en"] = "zh"
         self.last_audio_id = None
         self.element_map = {}  # 元素ID到原始内容的映射
         #
@@ -75,6 +81,8 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         # 保存ParsedScript供后续使用
         self.parsed_script = parsed_script
         self.global_metadata = parsed_script.global_metadata
+        self.script_language = detect_script_language(parsed_script)
+        info(f"剧本语言推断: {self.script_language}")
 
         # === 构建全局元素映射 ===
         self._build_element_map()
@@ -229,11 +237,17 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         for prompt in instructions.fragments:
             if not prompt.audio:
                 # 创建默认音频提示词
+                default_prompt = (
+                    f"Audio fragment, {prompt.duration} seconds"
+                    if self.script_language == "en"
+                    else f"音频片段，时长{prompt.duration}秒"
+                )
                 prompt.audio = AIAudioPrompt(
                     audio_id=f"audio{prompt.fragment_id[4:]}",
-                    prompt=f"音频片段，时长{prompt.duration}秒",
+                    prompt=default_prompt,
                     model_type=AudioModelType.XTTSv2,
                     voice_type=AudioVoiceType.CHARACTER_DIALOGUE,
+                    dialogue_language=self.script_language,
                     duration_seconds=prompt.duration
                 )
                 info(f"创建默认音频提示词: {prompt.fragment_id}")
@@ -359,6 +373,10 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         # 获取生成的视频提示词
         english_prompt = result.get("prompt", "")
         original_prompt = result.get("original_prompt", "")
+        # 中文剧本的英文描述段不得残留英文台词（FR-086 延伸），中文对照段保留
+        english_prompt = normalize_video_prompt_language(
+            english_prompt, self.script_language
+        )
         combined_prompt = f"{english_prompt}\n\n{original_prompt}"
 
         # 解析LLM返回的音频提示词
@@ -490,13 +508,19 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
             original_prompt = audio_data.get("original_prompt", "")
             combined_prompt = f"{english_prompt}\n\n{original_prompt}"
 
+            # 语言字段以LLM声明为准，缺失时用剧本推断值（FR-084/FR-085）
+            dialogue_language = self._resolve_dialogue_language(
+                audio_data.get("dialogue_language")
+            )
+
             # 创建音频提示词对象
-            return AIAudioPrompt(
+            audio = AIAudioPrompt(
                 audio_id=f"audio{fragment.id[4:]}",
                 prompt=combined_prompt,
                 negative_prompt=audio_data.get("negative_prompt", "noisy, low quality, distorted, robotic, bad audio"),
                 model_type=model_type,
                 voice_type=voice_type,
+                dialogue_language=dialogue_language,
                 audio_style=audio_style,
                 voice_character=audio_data.get("voice_character"),
                 voice_description=audio_data.get("voice_description"),
@@ -512,6 +536,17 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
                 scene_context=audio_data.get("scene_context"),
                 previous_audio_id=self.last_audio_id
             )
+            # 确定性归一为准，不依赖LLM自行遵守台词语言约束（FR-086/FR-087）
+            return normalize_audio_language(audio, dialogue_language)
+
+    def _resolve_dialogue_language(self, declared: Any) -> Literal["zh", "en"]:
+        """确定台词语言：LLM声明合法时优先，否则采用剧本推断值"""
+        language = str(declared or "").strip().lower()
+        if language == "en":
+            return "en"
+        if language == "zh":
+            return "zh"
+        return self.script_language
 
     def _get_scene_info_for_fragment(self, fragment: VideoFragment) -> str:
         """获取片段对应的场景信息"""

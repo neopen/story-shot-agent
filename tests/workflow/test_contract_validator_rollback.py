@@ -4,6 +4,8 @@
 并确认违规项被写入 DomainState.contract_violations 供审计。
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
@@ -136,6 +138,46 @@ class TestContractValidatorRollback:
         decision.decide_after_splitting(state)
 
         assert len(state.domain.contract_violations) == 1
+
+    def test_parsed_character_registered_without_retry(self, decision):
+        """契约缺少剧本真实角色时补登记并直接通过，不再空转重试"""
+        contract = _contract(["陈默"])
+        state = _state(contract)
+        state.domain.parsed_script = SimpleNamespace(
+            characters=[
+                SimpleNamespace(name="门口黑影", description="门缝外模糊的黑影"),
+            ],
+            scenes=[],
+            global_metadata=None,
+            title=None,
+        )
+        state.domain.shot_sequence = ShotSequence(shots=[_shot("shot_001", "门口黑影")])
+
+        result = decision.decide_after_splitting(state)
+
+        assert result == PipelineState.SUCCESS
+        assert "门口黑影" in state.domain.contract.characters
+        assert state.domain.contract_violations == []
+
+    def test_hallucinated_character_suggestion_is_actionable(self, decision):
+        """剧本角色表外的名字属生成幻觉，建议清除主角色标注而非保留"""
+        contract = _contract(["陈默"])
+        state = _state(contract)
+        state.domain.parsed_script = SimpleNamespace(
+            characters=[SimpleNamespace(name="陈默", description="青年男子")],
+            scenes=[],
+            global_metadata=None,
+            title=None,
+        )
+        state.domain.shot_sequence = ShotSequence(shots=[_shot("shot_001", "神秘人")])
+
+        result = decision.decide_after_splitting(state)
+
+        assert result == PipelineState.NEEDS_RETRY
+        params = state.domain.repair_params[PipelineNode.SEGMENT_SHOT]
+        suggestion = params.suggestions["shot_001"][0]
+        assert "属分镜生成幻觉" in suggestion
+        assert "清除其主角色标注" in suggestion
 
     def test_fragment_all_valid_passes(self, decision):
         """片段全部合规时返回 SUCCESS"""

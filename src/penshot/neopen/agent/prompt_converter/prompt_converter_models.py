@@ -12,7 +12,7 @@ See LICENSE File For Details.
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Literal, Optional
 
 from pydantic import Field, BaseModel
 from pydantic.v1 import validator
@@ -45,6 +45,12 @@ class AIAudioPrompt(BaseModel):
     negative_prompt: Optional[str] = Field(
         default="noisy, low quality, distorted, robotic, bad audio",
         description="负面提示词。不想要的声音特性。不同模型有不同默认值",
+    )
+
+    # 台词语言（FR-084）：0.4.5 兼容字段，0.5 迁移为 dialogue_cues.language
+    dialogue_language: Literal["zh", "en"] = Field(
+        default="zh",
+        description="台词语言。默认由剧本语言推断，中文剧本为zh，英文剧本为en",
     )
 
     # === 模型与任务配置 ===

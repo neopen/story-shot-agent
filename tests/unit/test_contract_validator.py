@@ -9,6 +9,7 @@ from penshot.neopen.agent.continuity_guardian.contract_validator import (
     validate_fragment_sequence,
     validate_shot_sequence,
 )
+from penshot.neopen.agent.script_parser_agent import build_contract_from_parsed
 
 
 def _contract(character_names):
@@ -89,3 +90,30 @@ def test_fragment_orphan_and_unknown():
     issue_types = {issue["type"] for issue in issues}
     assert "unknown_character" in issue_types
     assert "orphan_fragment" in issue_types
+
+
+def test_contract_from_parsed_registers_scene_absent_characters():
+    """剧本角色表中有、场景元素无的角色也必须登记，避免误判契约外角色"""
+    parsed = SimpleNamespace(
+        scenes=[
+            SimpleNamespace(
+                id="scene_001",
+                location="客厅",
+                time_of_day="night",
+                elements=[SimpleNamespace(character="陈默")],
+            )
+        ],
+        characters=[
+            SimpleNamespace(name="陈默", description="青年男子"),
+            SimpleNamespace(name="门口黑影", description="门缝外模糊的黑影"),
+        ],
+        global_metadata=None,
+        title="门外的影子",
+    )
+    contract = build_contract_from_parsed(parsed, script_id="s1")
+
+    assert "门口黑影" in contract.characters
+    shot_sequence = SimpleNamespace(
+        shots=[SimpleNamespace(id="shot_001", main_character="门口黑影")]
+    )
+    assert validate_shot_sequence(shot_sequence, contract) == []

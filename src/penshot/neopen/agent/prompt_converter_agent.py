@@ -11,7 +11,7 @@ See LICENSE File For Details.
 """
 
 import time
-from typing import Optional, List, Dict
+from typing import Any, Dict, List, Optional
 
 from penshot.logger import debug, error, info
 from penshot.neopen.agent.base_models import AgentMode
@@ -22,6 +22,9 @@ from penshot.neopen.agent.continuity_guardian.consistency_contract import (
 from penshot.neopen.agent.continuity_guardian.style_anchors import (
     build_style_prefix,
     build_style_text,
+)
+from penshot.neopen.agent.prompt_converter.camera_builder import (
+    repair_motion_conflict,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_factory import (
     PromptConverterFactory,
@@ -36,12 +39,36 @@ from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
     RuleType,
     IssueType,
 )
+from penshot.neopen.agent.repair_outcome import record_repair_outcome
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.shot_config import ShotConfig
 from penshot.utils.log_utils import print_log_exception
 from penshot.utils.str_count_utils import only_count_en
+
+
+# 提示词修复器可自动处理的 issue_code；其余问题必须标记为人工处理
+_PROMPT_REPAIR_AUTO_CODES = frozenset(
+    {
+        "prompt_empty",
+        "prompt_missing",
+        "prompt_too_long",
+        "prompt_too_short",
+        "prompt_truncated",
+        "prompt_incomplete",
+        "text_truncated",
+        "style_inconsistent",
+        "style_missing",
+        "style_invalid",
+        "negative_prompt_missing",
+        "negative_prompt_insufficient",
+        "audio_prompt_missing",
+        "audio_missing",
+        "audio_duration_mismatch",
+        RuleType.CAMERA_MOTION_PROMPT_MISMATCH.code,
+    }
+)
 
 
 class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequence]):
@@ -798,7 +825,29 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                             f"修复音频时长: {fragment_id} -> {prompt.duration}s"
                         )
 
-        # ========== 7. 更新统计信息 ==========
+        # ========== 7. 修复运镜冲突（按提示词具体短语收敛 camera.motion） ==========
+        unresolved_motion: List[Any] = []
+        motion_issues = [
+            i
+            for i in issues
+            if i.issue_code == RuleType.CAMERA_MOTION_PROMPT_MISMATCH.code
+        ]
+        for issue in motion_issues:
+            fragment_id = issue.fragment_id
+            prompt = (
+                self._find_prompt(instructions, fragment_id) if fragment_id else None
+            )
+            if prompt is None or prompt.camera is None:
+                unresolved_motion.append(issue)
+                continue
+            repaired = repair_motion_conflict(prompt.prompt, prompt.camera.motion)
+            if repaired is None:
+                unresolved_motion.append(issue)
+                continue
+            prompt.camera.motion, detail = repaired
+            repair_actions.append(f"{fragment_id} {detail}")
+
+        # ========== 8. 更新统计信息 ==========
         new_stats = {
             "prompt_count": len(instructions.fragments),
             "avg_prompt_length": sum(len(p.prompt) for p in instructions.fragments)
@@ -828,6 +877,14 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         info(f"提示词修复完成，执行了{len(repair_actions)}个修复操作")
         if repair_actions:
             debug(f"修复操作详情: {repair_actions[:10]}")
+        record_repair_outcome(
+            instructions.metadata,
+            "提示词转换",
+            issues,
+            repair_actions,
+            auto_codes=_PROMPT_REPAIR_AUTO_CODES,
+            manual_issues=unresolved_motion,
+        )
 
         return instructions
 
