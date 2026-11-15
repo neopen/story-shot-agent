@@ -4,7 +4,7 @@ Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: config_models.py
-@Description: 
+@Description:
 @Author: neopen
 @GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/31 12:46
@@ -14,7 +14,7 @@ from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
-from penshot.config.security.env_resolver import resolve_api_key_value, trusted_env_expansion
+from penshot.config.security.env_resolver import resolve_api_key_value
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.constants.rag import (
     PROMPT_TEMPLATE_MIN_SIMILARITY,
@@ -27,7 +27,7 @@ class LLMBaseConfig(BaseModel):
     """LLM提供商配置"""
     base_url: str = Field(default="")  # https://api.openai.com/v1
     api_key: Optional[SecretStr] = Field(default=SecretStr(""))
-    model_name: str = Field(default="") # gpt-4o
+    model_name: str = Field(default="")  # gpt-4o
     timeout: int = Field(default=60, ge=1)
     seed: int = Field(default=random.randint(1000000, 99999999999), ge=1)
     response_format: str = Field(default="json_object")

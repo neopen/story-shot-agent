@@ -146,6 +146,25 @@ def _parse_and_validate_callback_parts(
     return cleaned, parsed, scheme, explicit_port, hostname, is_literal_ip
 
 
+def _extract_unique_public_ips(
+    addr_infos: List[Any],
+    hostname: str,
+    ip_validator: Callable[[str], None],
+) -> List[str]:
+    """校验全部 DNS 记录均为公网 IP 并按顺序去重。"""
+    if not addr_infos:
+        raise ValueError(f"No DNS records resolved for callback_url hostname '{hostname}'")
+
+    validated_ips: List[str] = []
+    for info_item in addr_infos:
+        resolved_ip = info_item[4][0]
+        ip_validator(resolved_ip)
+        normalized_ip = str(ipaddress.ip_address(resolved_ip))
+        if normalized_ip not in validated_ips:
+            validated_ips.append(normalized_ip)
+    return validated_ips
+
+
 def _resolve_public_ips_with_guard(
     hostname: str,
     port: int,
@@ -178,18 +197,7 @@ def _resolve_public_ips_with_guard(
     except socket.gaierror as e:
         raise ValueError(f"Failed to resolve callback_url hostname '{hostname}': {e}") from e
 
-    if not addr_infos:
-        raise ValueError(f"No DNS records resolved for callback_url hostname '{hostname}'")
-
-    validated_ips: List[str] = []
-    for info_item in addr_infos:
-        resolved_ip = info_item[4][0]
-        ip_validator(resolved_ip)
-        normalized_ip = str(ipaddress.ip_address(resolved_ip))
-        if normalized_ip not in validated_ips:
-            validated_ips.append(normalized_ip)
-
-    return validated_ips
+    return _extract_unique_public_ips(addr_infos, hostname, ip_validator)
 
 
 def _format_netloc_host(host_str: str) -> str:
