@@ -13,6 +13,7 @@ See LICENSE File For Details.
 import asyncio
 import datetime
 import json
+import pathlib
 import socket
 import ssl
 import tempfile
@@ -38,10 +39,10 @@ from penshot.config.config_models import (
     ImageBaseConfig,
     LLMBaseConfig,
 )
-from penshot.config.security import trusted_env_expansion
 from penshot.neopen.shot_config import ShotConfig
-from penshot.neopen.task.task_lifecycle_service import (
-    TaskLifecycleService,
+from penshot.neopen.task.task_lifecycle_service import TaskLifecycleService
+from penshot.security.env_refs import trusted_env_expansion
+from penshot.security.ssrf import (
     resolve_and_pin_callback_target,
     validate_callback_url,
 )
@@ -76,7 +77,9 @@ def test_trusted_env_expansion_resolves_env_var_and_default(monkeypatch):
     with trusted_env_expansion():
         llm_cfg = LLMBaseConfig(api_key="${PENSHOT_TEST_SECRET_88}")
         embed_cfg = EmbeddingBaseConfig(api_key="$PENSHOT_TEST_SECRET_88")
-        image_cfg = ImageBaseConfig(api_key="${PENSHOT_MISSING_SECRET_88:default-img-key}")
+        image_cfg = ImageBaseConfig(
+            api_key="${PENSHOT_MISSING_SECRET_88:default-img-key}"
+        )
 
     assert llm_cfg.api_key.get_secret_value() == "resolved-local-secret"
     assert embed_cfg.api_key.get_secret_value() == "resolved-local-secret"
@@ -154,14 +157,28 @@ def test_validate_callback_url_allows_public_https():
         # 混合公网 IPv4 与 IPv4-mapped IPv6 私网/元数据地址记录
         [
             (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
-            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::ffff:127.0.0.1", 443, 0, 0)),
+            (
+                socket.AF_INET6,
+                socket.SOCK_STREAM,
+                6,
+                "",
+                ("::ffff:127.0.0.1", 443, 0, 0),
+            ),
         ],
         [
-            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", (f"::ffff:{_LINK_LOCAL_METADATA_HOST}", 443, 0, 0)),
+            (
+                socket.AF_INET6,
+                socket.SOCK_STREAM,
+                6,
+                "",
+                (f"::ffff:{_LINK_LOCAL_METADATA_HOST}", 443, 0, 0),
+            ),
         ],
     ],
 )
-def test_validate_callback_url_dns_resolution_blocks_private_and_mixed_records(fake_addrinfo):
+def test_validate_callback_url_dns_resolution_blocks_private_and_mixed_records(
+    fake_addrinfo,
+):
     """resolve_dns=True 时若 DNS 返回私网、混合公私网或 IPv4-mapped IPv6 内网记录应拒绝"""
     with patch("socket.getaddrinfo", return_value=fake_addrinfo):
         with pytest.raises(ValueError, match="not a public routable address"):
@@ -171,13 +188,24 @@ def test_validate_callback_url_dns_resolution_blocks_private_and_mixed_records(f
 def test_resolve_and_pin_callback_target_ipv4_and_ipv6_formatting():
     """resolve_and_pin_callback_target 应固定目标 IP 并保留原始 Host 与 HTTPS SNI"""
     ipv6_addrinfo = [
-        (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2606:2800:220:1:248:1893:25c8:1946", 8443, 0, 0)),
+        (
+            socket.AF_INET6,
+            socket.SOCK_STREAM,
+            6,
+            "",
+            ("2606:2800:220:1:248:1893:25c8:1946", 8443, 0, 0),
+        ),
     ]
     with patch("socket.getaddrinfo", return_value=ipv6_addrinfo):
-        pinned = resolve_and_pin_callback_target("https://webhook.example.com:8443/v1/hook?ok=1")
+        pinned = resolve_and_pin_callback_target(
+            "https://webhook.example.com:8443/v1/hook?ok=1"
+        )
 
     assert pinned.pinned_ip == "2606:2800:220:1:248:1893:25c8:1946"
-    assert pinned.pinned_url == "https://[2606:2800:220:1:248:1893:25c8:1946]:8443/v1/hook?ok=1"
+    assert (
+        pinned.pinned_url
+        == "https://[2606:2800:220:1:248:1893:25c8:1946]:8443/v1/hook?ok=1"
+    )
     assert pinned.headers == {"Host": "webhook.example.com:8443"}
     assert pinned.extensions == {"sni_hostname": "webhook.example.com"}
 
@@ -219,7 +247,10 @@ def test_dns_resolution_timeout_and_concurrency_limit():
 def test_process_request_and_set_callback_reject_ssrf_url():
     """ProcessRequest 与 TaskLifecycleService.set_callback 均应拦截 SSRF 回调地址"""
     with pytest.raises(ValueError):
-        ProcessRequest(script="测试剧本", callback_url=f"http://{_LINK_LOCAL_METADATA_HOST}/latest/meta-data/")
+        ProcessRequest(
+            script="测试剧本",
+            callback_url=f"http://{_LINK_LOCAL_METADATA_HOST}/latest/meta-data/",
+        )
 
     repository = TaskRepository(task_ttl_seconds=3600)
     registry = WorkflowRegistry(max_cache_size=4)
@@ -246,9 +277,12 @@ def test_trigger_callback_async_disables_redirects_and_pins_resolved_ip():
     mock_client_cm.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client_cm.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("socket.getaddrinfo", return_value=public_addrinfo), patch(
-        "httpx.AsyncClient", return_value=mock_client_cm
-    ) as mock_async_client_cls:
+    with (
+        patch("socket.getaddrinfo", return_value=public_addrinfo),
+        patch(
+            "httpx.AsyncClient", return_value=mock_client_cm
+        ) as mock_async_client_cls,
+    ):
         asyncio.run(
             service._trigger_callback_async(
                 "TSK_TEST_88",
@@ -257,7 +291,9 @@ def test_trigger_callback_async_disables_redirects_and_pins_resolved_ip():
             )
         )
 
-    mock_async_client_cls.assert_called_once_with(follow_redirects=False, trust_env=False)
+    mock_async_client_cls.assert_called_once_with(
+        follow_redirects=False, trust_env=False
+    )
     mock_client.post.assert_awaited_once_with(
         "https://93.184.216.34/webhook?src=penshot",
         json={"task_id": "TSK_TEST_88", "success": True},
@@ -275,7 +311,9 @@ def _generate_self_signed_tls_pem(dns_name: str):
     from cryptography.x509.oid import NameOID
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = issuer = crypto_x509.Name([crypto_x509.NameAttribute(NameOID.COMMON_NAME, dns_name)])
+    subject = issuer = crypto_x509.Name(
+        [crypto_x509.NameAttribute(NameOID.COMMON_NAME, dns_name)]
+    )
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (
         crypto_x509.CertificateBuilder()
@@ -285,7 +323,10 @@ def _generate_self_signed_tls_pem(dns_name: str):
         .serial_number(crypto_x509.random_serial_number())
         .not_valid_before(now - datetime.timedelta(minutes=5))
         .not_valid_after(now + datetime.timedelta(hours=1))
-        .add_extension(crypto_x509.SubjectAlternativeName([crypto_x509.DNSName(dns_name)]), critical=False)
+        .add_extension(
+            crypto_x509.SubjectAlternativeName([crypto_x509.DNSName(dns_name)]),
+            critical=False,
+        )
         .sign(key, hashes.SHA256())
     )
     cert_pem = cert.public_bytes(serialization.Encoding.PEM)
@@ -307,33 +348,35 @@ def test_real_network_https_ip_pinning_prevents_dns_rebinding_and_verifies_tls_s
 
     async def _run_integration() -> None:
         cert_pem, key_pem = _generate_self_signed_tls_pem("webhook.example.com")
-        bad_cert_pem, bad_key_pem = _generate_self_signed_tls_pem("attacker-mismatch.example.com")
+        bad_cert_pem, bad_key_pem = _generate_self_signed_tls_pem(
+            "attacker-mismatch.example.com"
+        )
 
-        with (
-            tempfile.NamedTemporaryFile(suffix=".pem") as cf,
-            tempfile.NamedTemporaryFile(suffix=".pem") as kf,
-            tempfile.NamedTemporaryFile(suffix=".pem") as bad_cf,
-            tempfile.NamedTemporaryFile(suffix=".pem") as bad_kf,
-        ):
-            cf.write(cert_pem)
-            cf.flush()
-            kf.write(key_pem)
-            kf.flush()
-            bad_cf.write(bad_cert_pem)
-            bad_cf.flush()
-            bad_kf.write(bad_key_pem)
-            bad_kf.flush()
+        # 用临时目录 + 显式路径落盘，避免 Windows 上 NamedTemporaryFile 独占锁导致
+        # ssl.load_cert_chain 二次打开同名文件时报 PermissionError。
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp = pathlib.Path(tmp_dir)
+            cf = tmp / "cert.pem"
+            kf = tmp / "key.pem"
+            bad_cf = tmp / "bad_cert.pem"
+            bad_kf = tmp / "bad_key.pem"
+            cf.write_bytes(cert_pem)
+            kf.write_bytes(key_pem)
+            bad_cf.write_bytes(bad_cert_pem)
+            bad_kf.write_bytes(bad_key_pem)
 
             observed: Dict[str, object] = {"requests": 0}
             server_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            server_ctx.load_cert_chain(cf.name, kf.name)
+            server_ctx.load_cert_chain(str(cf), str(kf))
 
             def _sni_cb(_ssl_sock, server_name, _ctx):
                 observed["sni"] = server_name
 
             server_ctx.sni_callback = _sni_cb
 
-            async def _handle_tls(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+            async def _handle_tls(
+                reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+            ) -> None:
                 raw_head = await reader.readuntil(b"\r\n\r\n")
                 header_text = raw_head.decode("latin1")
                 headers_map: Dict[str, str] = {}
@@ -342,30 +385,46 @@ def test_real_network_https_ip_pinning_prevents_dns_rebinding_and_verifies_tls_s
                         k, val = line.split(":", 1)
                         headers_map[k.strip().lower()] = val.strip()
                 content_len = int(headers_map.get("content-length", "0"))
-                body_bytes = await reader.readexactly(content_len) if content_len else b""
+                body_bytes = (
+                    await reader.readexactly(content_len) if content_len else b""
+                )
                 observed["requests"] = int(observed["requests"]) + 1
                 observed["host_header"] = headers_map.get("host")
                 observed["local_addr"] = writer.get_extra_info("sockname")
                 observed["payload"] = json.loads(body_bytes.decode("utf-8"))
-                writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
+                writer.write(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK"
+                )
                 await writer.drain()
                 writer.close()
 
             real_getaddrinfo = socket.getaddrinfo
             dns_lookup_count = {"domain_queries": 0}
 
-            server = await asyncio.start_server(_handle_tls, "127.0.0.1", 0, ssl=server_ctx)
+            server = await asyncio.start_server(
+                _handle_tls, "127.0.0.1", 0, ssl=server_ctx
+            )
             port = server.sockets[0].getsockname()[1]
 
             def _rebinding_getaddrinfo(host, srv_port, *args, **kwargs):
                 if host == "webhook.example.com":
                     dns_lookup_count["domain_queries"] += 1
                     if dns_lookup_count["domain_queries"] > 1:
-                        raise AssertionError("DNS rebinding vulnerability: unexpected second DNS resolution!")
-                    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", srv_port))]
+                        raise AssertionError(
+                            "DNS rebinding vulnerability: unexpected second DNS resolution!"
+                        )
+                    return [
+                        (
+                            socket.AF_INET,
+                            socket.SOCK_STREAM,
+                            6,
+                            "",
+                            ("127.0.0.1", srv_port),
+                        )
+                    ]
                 return real_getaddrinfo(host, srv_port, *args, **kwargs)
 
-            client_ssl_ctx = ssl.create_default_context(cafile=cf.name)
+            client_ssl_ctx = ssl.create_default_context(cafile=str(cf))
             repository = TaskRepository(task_ttl_seconds=3600)
             registry = WorkflowRegistry(max_cache_size=4)
             service = TaskLifecycleService(repository, registry)
@@ -385,26 +444,41 @@ def test_real_network_https_ip_pinning_prevents_dns_rebinding_and_verifies_tls_s
             assert observed["sni"] == "webhook.example.com"
             assert observed["host_header"] == f"webhook.example.com:{port}"
             assert observed["local_addr"][0] == "127.0.0.1"
-            assert observed["payload"] == {"task_id": "TSK_REAL_NET_89", "success": True}
+            assert observed["payload"] == {
+                "task_id": "TSK_REAL_NET_89",
+                "success": True,
+            }
 
             # 验证证书主机名不匹配时真实 TLS 握手被严格阻断
             mismatch_received = {"count": 0}
             bad_server_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            bad_server_ctx.load_cert_chain(bad_cf.name, bad_kf.name)
+            bad_server_ctx.load_cert_chain(str(bad_cf), str(bad_kf))
 
-            async def _handle_bad_tls(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+            async def _handle_bad_tls(
+                reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+            ) -> None:
                 await reader.read(1024)
                 mismatch_received["count"] += 1
                 writer.close()
 
-            bad_server = await asyncio.start_server(_handle_bad_tls, "127.0.0.1", 0, ssl=bad_server_ctx)
+            bad_server = await asyncio.start_server(
+                _handle_bad_tls, "127.0.0.1", 0, ssl=bad_server_ctx
+            )
             bad_port = bad_server.sockets[0].getsockname()[1]
-            bad_client_ctx = ssl.create_default_context(cafile=bad_cf.name)
+            bad_client_ctx = ssl.create_default_context(cafile=str(bad_cf))
 
             async with bad_server:
                 with patch(
                     "socket.getaddrinfo",
-                    return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", bad_port))],
+                    return_value=[
+                        (
+                            socket.AF_INET,
+                            socket.SOCK_STREAM,
+                            6,
+                            "",
+                            ("127.0.0.1", bad_port),
+                        )
+                    ],
                 ):
                     pinned_bad = resolve_and_pin_callback_target(
                         f"https://webhook.example.com:{bad_port}/callback",
@@ -504,7 +578,9 @@ def test_request_config_sanitizes_checkpoint_dir_and_postgres_uri():
         {"image": {"default": {"api_key": "0" * 12}, "api_key": "${HIDDEN_TOP_KEY}"}},
     ],
 )
-def test_batch_process_request_blocks_env_expansion_across_llm_embed_and_image(untrusted_batch_cfg):
+def test_batch_process_request_blocks_env_expansion_across_llm_embed_and_image(
+    untrusted_batch_cfg,
+):
     """BatchProcessRequest 应对 llm、embed、image 的平铺及 default/fallback 配置统一阻断环境变量展开"""
     with pytest.raises(ValueError, match="trusted local configuration"):
         BatchProcessRequest(scripts=["测试剧本"], config=untrusted_batch_cfg)
