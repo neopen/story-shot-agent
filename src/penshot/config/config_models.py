@@ -4,12 +4,11 @@ Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: config_models.py
-@Description: 
+@Description:
 @Author: neopen
 @GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/31 12:46
 """
-import os
 import random
 from typing import Any, List, Literal, Optional
 
@@ -21,13 +20,14 @@ from penshot.neopen.constants.rag import (
     PROMPT_TEMPLATE_RECALL_MAX_INJECTED,
     PROMPT_TEMPLATE_RECALL_TOP_K,
 )
+from penshot.security.env_refs import resolve_api_key_value
 
 
 class LLMBaseConfig(BaseModel):
     """LLM提供商配置"""
     base_url: str = Field(default="")  # https://api.openai.com/v1
     api_key: Optional[SecretStr] = Field(default=SecretStr(""))
-    model_name: str = Field(default="") # gpt-4o
+    model_name: str = Field(default="")  # gpt-4o
     timeout: int = Field(default=60, ge=1)
     seed: int = Field(default=random.randint(1000000, 99999999999), ge=1)
     response_format: str = Field(default="json_object")
@@ -46,11 +46,8 @@ class LLMBaseConfig(BaseModel):
     @field_validator("api_key", mode="before")
     @classmethod
     def validate_api_key(cls, v):
-        """API密钥验证"""
-        if isinstance(v, str) and v.startswith("$"):
-            env_var = v[2:-1] if v.startswith("${") else v[1:]
-            return os.getenv(env_var, "")
-        return v
+        """API密钥验证（仅在受信本地配置加载时允许 ${ENV_VAR} 引用）"""
+        return resolve_api_key_value(v)
 
 
 class ImageBaseConfig(BaseModel):
@@ -74,11 +71,8 @@ class ImageBaseConfig(BaseModel):
     @field_validator("api_key", mode="before")
     @classmethod
     def validate_api_key(cls, v):
-        """API密钥验证（支持 ${ENV_VAR} 引用）"""
-        if isinstance(v, str) and v.startswith("$"):
-            env_var = v[2:-1] if v.startswith("${") else v[1:]
-            return os.getenv(env_var, "")
-        return v
+        """API密钥验证（仅在受信本地配置加载时允许 ${ENV_VAR} 引用）"""
+        return resolve_api_key_value(v)
 
 
 class ImageConfig(BaseModel):
@@ -107,11 +101,8 @@ class EmbeddingBaseConfig(BaseModel):
     @field_validator("api_key", mode="before")
     @classmethod
     def validate_api_key(cls, v):
-        """API密钥验证"""
-        if isinstance(v, str) and v.startswith("$"):
-            env_var = v[2:-1] if v.startswith("${") else v[1:]
-            return os.getenv(env_var, "")
-        return v
+        """API密钥验证（仅在受信本地配置加载时允许 ${ENV_VAR} 引用）"""
+        return resolve_api_key_value(v)
 
 
 class LLMConfig(BaseModel):

@@ -19,13 +19,18 @@ from dataclasses import is_dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from threading import RLock
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from penshot.logger import info, error, warning, debug
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.agent.workflow.workflow_pipeline import MultiAgentPipeline
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.task.task_models import TaskStatus, TaskStage
+from penshot.security.ssrf import (
+    IpValidator,
+    post_json_pinned,
+    validate_callback_url,
+)
 from penshot.utils.hash_utils import text_to_id
 from penshot.utils.obj_utils import obj_to_dict
 from .task_repository import TaskRepository
@@ -395,17 +400,27 @@ class TaskLifecycleService:
         self._callback_tasks.add(task_ref)
         task_ref.add_done_callback(self._callback_tasks.discard)
 
-    async def _trigger_callback_async(self, task_id: str, callback_url: str, result: Dict[str, Any]) -> None:
-        """异步触发HTTP回调"""
+    async def _trigger_callback_async(
+        self,
+        task_id: str,
+        callback_url: str,
+        result: Dict[str, Any],
+        *,
+        ssl_verify: Any = True,
+        ip_validator: Optional[IpValidator] = None,
+    ) -> None:
+        """异步触发HTTP回调（将实际TCP连接固定到已验证IP，保留原始Host请求头与HTTPS SNI）"""
         try:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    callback_url,
-                    json={"task_id": task_id, **result},
-                    timeout=30
-                )
-                debug(f"回调触发成功: {task_id} -> {callback_url}")
+            pinned_target = await post_json_pinned(
+                callback_url,
+                {"task_id": task_id, **result},
+                ssl_verify=ssl_verify,
+                ip_validator=ip_validator,
+            )
+            debug(
+                f"回调触发成功: {task_id} -> {pinned_target.original_url} "
+                f"(pinned_ip={pinned_target.pinned_ip})"
+            )
         except Exception as e:
             error(f"回调触发失败: {task_id}, error={e}")
 
@@ -591,6 +606,7 @@ class TaskLifecycleService:
 
     def set_callback(self, task_id: str, callback_url: str) -> bool:
         """设置任务回调URL"""
+        callback_url = validate_callback_url(callback_url)
 
         def updater(rec: Dict[str, Any]) -> None:
             rec.setdefault("callbacks", [])
