@@ -10,6 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/1/28 12:25
 """
 from dataclasses import dataclass
+from typing import Optional
 
 from penshot.config.config import settings
 from penshot.neopen.agent.base_models import VideoStyle, VideoModelType, AudioModelType
@@ -70,8 +71,8 @@ class ShotConfig(AIConfig):
 
     # ======================检查点配置
     checkpoint_mode: str = "auto"   # 检查点模式: auto, memory, sqlite, postgres
-    checkpoint_dir: str = settings.get_data_paths().get('data_checkpoint')
-    postgres_uri: str = None    # PostgreSQL URI
+    checkpoint_dir: Optional[str] = settings.get_data_paths().get('data_checkpoint')
+    postgres_uri: Optional[str] = None    # PostgreSQL URI
     max_checkpoints_per_script: int = 10    # 每脚本最多保存的检查点数量
     checkpoint_max_connections: int = 5     # 检查点最大连接数
     checkpoint_idle_timeout: int = 600      # 检查点空闲超时时间（秒）

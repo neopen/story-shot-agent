@@ -4,7 +4,7 @@ Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: test_env_resolver.py
-@Description: 配置安全工具模块 penshot.config.security.env_resolver 独立单元测试
+@Description: 安全工具模块 penshot.security.env_refs 独立单元测试
 """
 
 import os
@@ -17,7 +17,7 @@ from penshot.config.config_models import (
     ImageBaseConfig,
     LLMBaseConfig,
 )
-from penshot.config.security import (
+from penshot.security.env_refs import (
     is_trusted_env_expansion_active,
     parse_env_reference,
     resolve_api_key_value,
@@ -81,7 +81,10 @@ def test_validate_env_var_name_rejects_illegal_names(invalid_name):
 
 def test_parse_env_reference_supported_syntaxes():
     assert parse_env_reference("${OPENAI_API_KEY}") == ("OPENAI_API_KEY", "")
-    assert parse_env_reference("${OPENAI_API_KEY:sk-fallback:123}") == ("OPENAI_API_KEY", "sk-fallback:123")
+    assert parse_env_reference("${OPENAI_API_KEY:sk-fallback:123}") == (
+        "OPENAI_API_KEY",
+        "sk-fallback:123",
+    )
     assert parse_env_reference("$DEEPSEEK_API_KEY") == ("DEEPSEEK_API_KEY", "")
 
 
@@ -115,14 +118,21 @@ def test_resolve_api_key_value_handles_secretstr_and_untrusted_rejection(monkeyp
         resolve_api_key_value(SecretStr("${PENSHOT_ENV_RESOLVER_KEY}"))
 
     with trusted_env_expansion():
-        assert resolve_api_key_value(SecretStr("${PENSHOT_ENV_RESOLVER_KEY}")) == "secret-val-99"
+        assert (
+            resolve_api_key_value(SecretStr("${PENSHOT_ENV_RESOLVER_KEY}"))
+            == "secret-val-99"
+        )
         with pytest.raises(ValueError, match="Invalid environment variable name"):
             resolve_api_key_value("${123_ILLEGAL}")
-        with pytest.raises(ValueError, match="Malformed environment variable reference"):
+        with pytest.raises(
+            ValueError, match="Malformed environment variable reference"
+        ):
             resolve_api_key_value("${UNCLOSED_VAR")
 
 
-@pytest.mark.parametrize("model_cls", [LLMBaseConfig, EmbeddingBaseConfig, ImageBaseConfig])
+@pytest.mark.parametrize(
+    "model_cls", [LLMBaseConfig, EmbeddingBaseConfig, ImageBaseConfig]
+)
 def test_all_provider_models_share_unified_security_policy(monkeypatch, model_cls):
     """LLMBaseConfig、EmbeddingBaseConfig、ImageBaseConfig 应统一遵循 env_resolver 安全策略"""
     monkeypatch.setenv("PENSHOT_SHARED_MODEL_KEY", "shared-secret")
@@ -158,5 +168,7 @@ def test_settings_preserves_yaml_and_env_override_priority(monkeypatch):
 
     loaded_from_env = Settings()
     assert loaded_from_env.llm.default.model_name == "gpt-4.1-mini-from-env"
-    assert loaded_from_env.llm.default.api_key.get_secret_value() == "env-expanded-secret"
+    assert (
+        loaded_from_env.llm.default.api_key.get_secret_value() == "env-expanded-secret"
+    )
     assert os.getenv("PENSHOT_RESOLVER_TEST_KEY") == "env-expanded-secret"

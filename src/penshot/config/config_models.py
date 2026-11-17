@@ -14,13 +14,13 @@ from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
-from penshot.config.security.env_resolver import resolve_api_key_value
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.constants.rag import (
     PROMPT_TEMPLATE_MIN_SIMILARITY,
     PROMPT_TEMPLATE_RECALL_MAX_INJECTED,
     PROMPT_TEMPLATE_RECALL_TOP_K,
 )
+from penshot.security.env_refs import resolve_api_key_value
 
 
 class LLMBaseConfig(BaseModel):

@@ -3,8 +3,8 @@ Copyright (c) 2025 HiPeng (NeoPen)
 Licensed under the MIT License.
 See LICENSE File For Details.
 
-@FileName: env_resolver.py
-@Description: 配置安全工具模块 - 统一管理受信任配置加载上下文与环境变量引用安全解析
+@FileName: env_refs.py
+@Description: 环境变量引用安全解析 - 统一管理受信任配置加载上下文与 `${VAR}` 引用展开边界
 @Author: NeoPen
 @Time: 2026/11/09
 """
@@ -17,7 +17,9 @@ from typing import Any, Iterator, Optional, Tuple
 
 from pydantic import SecretStr
 
-_ALLOW_ENV_EXPANSION: ContextVar[bool] = ContextVar("_ALLOW_ENV_EXPANSION", default=False)
+_ALLOW_ENV_EXPANSION: ContextVar[bool] = ContextVar(
+    "_ALLOW_ENV_EXPANSION", default=False
+)
 _ENV_VAR_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -38,8 +40,14 @@ def trusted_env_expansion() -> Iterator[None]:
 
 def validate_env_var_name(env_var: str) -> str:
     """校验环境变量名称合法性（严格匹配标准 POSIX 标识符 ^[A-Za-z_][A-Za-z0-9_]*$，拒绝首尾空白）。"""
-    if not isinstance(env_var, str) or not env_var or not _ENV_VAR_NAME_PATTERN.fullmatch(env_var):
-        raise ValueError(f"Invalid environment variable name in configuration reference: {env_var!r}")
+    if (
+        not isinstance(env_var, str)
+        or not env_var
+        or not _ENV_VAR_NAME_PATTERN.fullmatch(env_var)
+    ):
+        raise ValueError(
+            f"Invalid environment variable name in configuration reference: {env_var!r}"
+        )
     return env_var
 
 
@@ -61,7 +69,9 @@ def parse_env_reference(raw: str) -> Tuple[str, str]:
 
     if expr.startswith("${"):
         if not expr.endswith("}"):
-            raise ValueError(f"Malformed environment variable reference syntax (unclosed '${{'): {raw!r}")
+            raise ValueError(
+                f"Malformed environment variable reference syntax (unclosed '${{'): {raw!r}"
+            )
         inner = expr[2:-1]
         if not inner:
             raise ValueError(f"Empty environment variable reference: {raw!r}")

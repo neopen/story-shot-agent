@@ -18,55 +18,23 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from penshot.config.config import settings
-from penshot.config.config_models import (
-    EmbeddingBaseConfig,
-    EmbeddingConfig,
-    ImageBaseConfig,
-    ImageConfig,
-    LLMBaseConfig,
-    LLMConfig,
-)
 from penshot.logger import info, error, log_with_context
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_context import script_id_ctx
 from penshot.neopen.shot_language import set_language, ShotLanguage
 from penshot.neopen.task.task_init import get_task_factory
-from penshot.neopen.task.task_lifecycle_service import validate_callback_url
 from penshot.neopen.task.task_models import (
     ProcessingStatus, TaskStatus, TaskResponse, TaskStage
 )
+from penshot.security.request_config import (
+    sanitize_batch_config as sanitize_request_batch_config,
+)
+from penshot.security.request_config import (
+    sanitize_shot_config as sanitize_request_shot_config,
+)
+from penshot.security.ssrf import validate_callback_url
 from penshot.utils.log_utils import print_log_exception
-
-
-def _sanitize_request_shot_config(cfg: Optional[ShotConfig]) -> Optional[ShotConfig]:
-    """重置请求传入的宿主机路径与数据库连接配置，防止外部请求覆盖服务端基础设施路径。"""
-    if cfg is not None:
-        cfg.checkpoint_dir = settings.get_data_paths().get("data_checkpoint")
-        cfg.postgres_uri = None
-    return cfg
-
-
-def _validate_batch_provider_section(
-    section: Any,
-    base_cls: type[BaseModel],
-    group_cls: type[BaseModel],
-) -> None:
-    """校验批量请求配置中的模型提供商子项（同时覆盖平铺配置与 default/fallback 嵌套结构）。"""
-    if section is None:
-        return
-    if isinstance(section, BaseModel):
-        section = section.model_dump()
-    if not isinstance(section, dict):
-        raise ValueError(f"Provider configuration must be a mapping, got {type(section).__name__}")
-    if "default" in section or "fallback" in section:
-        nested = {k: section[k] for k in ("default", "fallback") if k in section}
-        group_cls(**nested)
-        if "api_key" in section:
-            base_cls(api_key=section["api_key"])
-        return
-    base_cls(**section)
 
 
 # ============================================================================
@@ -103,7 +71,7 @@ class SyncProcessRequest(BaseModel):
     @field_validator("config", mode="after")
     @classmethod
     def sanitize_config(cls, v: Optional[ShotConfig]) -> Optional[ShotConfig]:
-        return _sanitize_request_shot_config(v)
+        return sanitize_request_shot_config(v)
 
 
 class ProcessRequest(BaseModel):
@@ -139,7 +107,7 @@ class ProcessRequest(BaseModel):
     @field_validator("config", mode="after")
     @classmethod
     def sanitize_config(cls, v: Optional[ShotConfig]) -> Optional[ShotConfig]:
-        return _sanitize_request_shot_config(v)
+        return sanitize_request_shot_config(v)
 
 
 class ProcessResult(BaseModel):
@@ -181,15 +149,7 @@ class BatchProcessRequest(BaseModel):
     @field_validator("config", mode="after")
     @classmethod
     def sanitize_batch_config(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        if isinstance(v, dict):
-            cleaned = dict(v)
-            cleaned.pop("checkpoint_dir", None)
-            cleaned.pop("postgres_uri", None)
-            _validate_batch_provider_section(cleaned.get("llm"), LLMBaseConfig, LLMConfig)
-            _validate_batch_provider_section(cleaned.get("embed"), EmbeddingBaseConfig, EmbeddingConfig)
-            _validate_batch_provider_section(cleaned.get("image"), ImageBaseConfig, ImageConfig)
-            return cleaned
-        return v
+        return sanitize_request_batch_config(v)
 
     @field_validator("asset_manifests")
     def validate_asset_manifests(cls, v, info):

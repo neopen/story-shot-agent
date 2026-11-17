@@ -32,8 +32,8 @@ from penshot.config.config_models import (
     RoutingConfig,
     StoryboardConfig,
 )
-from penshot.config.security import trusted_env_expansion
 from penshot.logger import info, warning
+from penshot.security.env_refs import trusted_env_expansion
 from penshot.utils.dotenv_loader import DotEnvLoader
 from penshot.utils.path_utils import PathResolver
 
