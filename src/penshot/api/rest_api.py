@@ -18,16 +18,55 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
+from penshot.config.config import settings
+from penshot.config.config_models import (
+    EmbeddingBaseConfig,
+    EmbeddingConfig,
+    ImageBaseConfig,
+    ImageConfig,
+    LLMBaseConfig,
+    LLMConfig,
+)
 from penshot.logger import info, error, log_with_context
 from penshot.neopen.agent.base_models import VideoStyle
 from penshot.neopen.shot_config import ShotConfig
 from penshot.neopen.shot_context import script_id_ctx
 from penshot.neopen.shot_language import set_language, ShotLanguage
 from penshot.neopen.task.task_init import get_task_factory
+from penshot.neopen.task.task_lifecycle_service import validate_callback_url
 from penshot.neopen.task.task_models import (
     ProcessingStatus, TaskStatus, TaskResponse, TaskStage
 )
 from penshot.utils.log_utils import print_log_exception
+
+
+def _sanitize_request_shot_config(cfg: Optional[ShotConfig]) -> Optional[ShotConfig]:
+    """重置请求传入的宿主机路径与数据库连接配置，防止外部请求覆盖服务端基础设施路径。"""
+    if cfg is not None:
+        cfg.checkpoint_dir = settings.get_data_paths().get("data_checkpoint")
+        cfg.postgres_uri = None
+    return cfg
+
+
+def _validate_batch_provider_section(
+    section: Any,
+    base_cls: type[BaseModel],
+    group_cls: type[BaseModel],
+) -> None:
+    """校验批量请求配置中的模型提供商子项（同时覆盖平铺配置与 default/fallback 嵌套结构）。"""
+    if section is None:
+        return
+    if isinstance(section, BaseModel):
+        section = section.model_dump()
+    if not isinstance(section, dict):
+        raise ValueError(f"Provider configuration must be a mapping, got {type(section).__name__}")
+    if "default" in section or "fallback" in section:
+        nested = {k: section[k] for k in ("default", "fallback") if k in section}
+        group_cls(**nested)
+        if "api_key" in section:
+            base_cls(api_key=section["api_key"])
+        return
+    base_cls(**section)
 
 
 # ============================================================================
@@ -61,6 +100,11 @@ class SyncProcessRequest(BaseModel):
         default=None, description="下游回填的资产清单（asset_id -> asset_ref），可选"
     )
 
+    @field_validator("config", mode="after")
+    @classmethod
+    def sanitize_config(cls, v: Optional[ShotConfig]) -> Optional[ShotConfig]:
+        return _sanitize_request_shot_config(v)
+
 
 class ProcessRequest(BaseModel):
     """处理请求数据模型（用于 API 输入）
@@ -84,6 +128,18 @@ class ProcessRequest(BaseModel):
         if v not in {ShotLanguage.ZH, ShotLanguage.EN}:
             raise ValueError("language must be one of: 'zh', 'en'")
         return v
+
+    @field_validator("callback_url")
+    @classmethod
+    def validate_callback(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            return validate_callback_url(v)
+        return v
+
+    @field_validator("config", mode="after")
+    @classmethod
+    def sanitize_config(cls, v: Optional[ShotConfig]) -> Optional[ShotConfig]:
+        return _sanitize_request_shot_config(v)
 
 
 class ProcessResult(BaseModel):
@@ -121,6 +177,19 @@ class BatchProcessRequest(BaseModel):
         default=None,
         description="与 scripts 按下标对应的资产回填清单，可选（允许某条为 null）",
     )
+
+    @field_validator("config", mode="after")
+    @classmethod
+    def sanitize_batch_config(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if isinstance(v, dict):
+            cleaned = dict(v)
+            cleaned.pop("checkpoint_dir", None)
+            cleaned.pop("postgres_uri", None)
+            _validate_batch_provider_section(cleaned.get("llm"), LLMBaseConfig, LLMConfig)
+            _validate_batch_provider_section(cleaned.get("embed"), EmbeddingBaseConfig, EmbeddingConfig)
+            _validate_batch_provider_section(cleaned.get("image"), ImageBaseConfig, ImageConfig)
+            return cleaned
+        return v
 
     @field_validator("asset_manifests")
     def validate_asset_manifests(cls, v, info):
@@ -814,10 +883,59 @@ async def recover_tasks(max_age_hours: int = 2):
 # 配置接口
 # ============================================================================
 
-@router.get("/config", response_model=ShotConfig)
-def get_default_config():
-    """获取默认配置"""
-    return ShotConfig()
+class PublicConfigResponse(BaseModel):
+    """对外公开的脱敏默认配置响应（排除本地路径、数据库连接串与内部客户端密钥对象）"""
+    enable_llm: bool = True
+    max_total_loops: int = 20
+    loop_warning_issued: bool = False
+    global_loop_exceeded: bool = False
+    use_local_rules: bool = False
+    max_shot_duration: float = 60.0
+    min_shot_duration: float = 1.0
+    default_shot_duration: float = 3.0
+    llm_confidence: float = 0.6
+    always_enhance: bool = True
+    enable_enhance: bool = True
+    duration_split_threshold: float = 5.5
+    max_fragment_duration: float = 5.0
+    min_fragment_duration: float = 1.0
+    split_strategy: str = "simple"
+    ai_splitter_enabled: bool = True
+    video_model: str = ""
+    audio_model: str = ""
+    default_negative_prompt: str = ""
+    default_style: str = ""
+    max_prompt_length: int = 200
+    min_prompt_length: int = 20
+    prompt_length_max_threshold: int = 220
+    prompt_length_min_threshold: int = 10
+    auto_continue_on_human_intervention: bool = False
+    human_intervention_mode: str = "interactive"
+    human_intervention_timeout: int = 300
+    workflow_timeout: int = 1800
+    checkpoint_mode: str = "auto"
+    max_checkpoints_per_script: int = 10
+    checkpoint_max_connections: int = 5
+    checkpoint_idle_timeout: int = 600
+    enable_llm_cache: bool = False
+    cache_ttl_seconds: int = 300
+    cache_mode: str = "strict"
+    cache_only_for: Optional[List[str]] = None
+
+    @classmethod
+    def from_shot_config(cls, cfg: ShotConfig) -> "PublicConfigResponse":
+        data = {
+            name: getattr(cfg, name)
+            for name in cls.model_fields
+            if hasattr(cfg, name)
+        }
+        return cls(**data)
+
+
+@router.get("/config", response_model=PublicConfigResponse)
+def get_default_config() -> PublicConfigResponse:
+    """获取默认配置（脱敏后公开配置）"""
+    return PublicConfigResponse.from_shot_config(ShotConfig())
 
 
 @router.get("/languages")
