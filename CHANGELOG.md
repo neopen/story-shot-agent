@@ -7,6 +7,13 @@
 
 ---
 
+## [0.4.6](https://github.com/neopen/story-shot-agent/compare/v0.4.5...v0.4.6) (2026-11-17)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* **security:** harden config env expansion, callback_url SSRF, and public config exposure ([#88](https://github.com/neopen/story-shot-agent/issues/88)) ([#89](https://github.com/neopen/story-shot-agent/issues/89)) ([e445f0d](https://github.com/neopen/story-shot-agent/commit/e445f0d7a4b67690a0f43acec59d1ba5c446d401))
+
 ## [0.4.5](https://github.com/neopen/story-shot-agent/compare/v0.4.4...v0.4.5) (2026-11-14)
 
 
