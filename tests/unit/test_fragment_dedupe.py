@@ -589,6 +589,98 @@ def test_post_process_skips_cross_shot_candidates():
     assert result.stats["fragments_split"] == 0
 
 
+def test_truncate_records_dropped_duration_for_manual_review():
+    """T-117：截断丢弃的尾部时长写入片段元数据并标记需人工复核"""
+    text = (
+        "全景镜头：深夜的地铁站台笼罩在冷白色灯光中，空旷而寂静，"
+        "隧道口只有信号灯微弱闪烁。"
+    )
+    previous, current, shot = make_pair(text)
+
+    outcome = resplit_duplicate_pair(previous, current, shot=shot)
+
+    fragment = outcome.fragments[0]
+    assert outcome.action == ACTION_TRUNCATE
+    assert fragment.metadata["dropped_duration"] == outcome.dropped_duration
+    assert fragment.metadata["manual_review_required"] is True
+    assert fragment.metadata["truncated_from"] == round(
+        previous.duration + current.duration, 2
+    )
+    assert fragment.requires_special_attention is True
+
+
+def test_post_process_exposes_truncation_report():
+    """T-117：截断结果按重编号后的片段 ID 写入输出元数据与去重摘要"""
+    # 无句读边界的长镜头：两段时长之和超过上限且无法重切，只能截断
+    text = "林晚低头凝视远处列车灯光"
+    fragments = [
+        make_fragment(
+            "frag_001",
+            "shot_001",
+            text,
+            duration=3.0,
+            metadata={"original_shot": "shot_001"},
+        ),
+        make_fragment(
+            "frag_002",
+            "shot_001",
+            text,
+            duration=3.0,
+            metadata={"original_shot": "shot_001"},
+        ),
+    ]
+    shots = [make_shot("shot_001", "scene_001", description=text)]
+
+    result = SPLITTER.post_process(
+        make_sequence(fragments, shot_count=1), ShotSequence(shots=shots)
+    )
+
+    summary = result.metadata["dedupe_report"]["summary"]
+    assert summary["truncated"] == 1
+    assert summary["manual_review_required"] is True
+    assert summary["dropped_duration_total"] > 0
+    assert summary["truncated_fragments"][0]["fragment_id"].startswith("frag_")
+
+    truncation = result.metadata["truncation_report"]
+    assert truncation["dropped_duration_total"] == summary["dropped_duration_total"]
+    assert [item["fragment_id"] for item in truncation["fragments"]] == [
+        fragment.id for fragment in result.fragments
+    ]
+    for fragment in result.fragments:
+        assert fragment.metadata["dropped_duration"] > 0
+        assert fragment.metadata["manual_review_required"] is True
+        assert fragment.requires_special_attention is True
+
+
+def test_post_process_without_truncation_has_no_truncation_report():
+    """T-117：正常合并/重切不产生截断报告"""
+    fragments = [
+        make_fragment(
+            "frag_001",
+            "shot_001",
+            EIGHT_NODE_TEXT,
+            duration=1.0,
+            metadata={"original_shot": "shot_001"},
+        ),
+        make_fragment(
+            "frag_002",
+            "shot_001",
+            EIGHT_NODE_TEXT,
+            duration=1.0,
+            metadata={"original_shot": "shot_001"},
+        ),
+    ]
+    shots = [make_shot("shot_001", "scene_001", description=EIGHT_NODE_TEXT)]
+
+    result = SPLITTER.post_process(
+        make_sequence(fragments, shot_count=1), ShotSequence(shots=shots)
+    )
+
+    assert result.metadata["dedupe_report"]["summary"]["truncated"] == 0
+    assert result.metadata["dedupe_report"]["summary"]["dropped_duration_total"] == 0
+    assert "truncation_report" not in result.metadata
+
+
 def test_post_process_normalizes_durations_without_shot_sequence():
     """无镜头序列时仍按动作复杂度统一时长，且不改写内容"""
     fragment = make_fragment(
