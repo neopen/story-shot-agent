@@ -13,7 +13,7 @@ See LICENSE File For Details.
 import time
 from typing import Any, Dict, List, Optional
 
-from penshot.logger import debug, error, info
+from penshot.logger import debug, error, info, warning
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
@@ -44,6 +44,11 @@ from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
 from penshot.neopen.agent.prompt_converter.scene_prompt_realign import (
     apply_scene_prompt_realignment,
 )
+from penshot.neopen.agent.prompt_converter.style_prompt_repair import (
+    is_style_issue,
+    repair_prompt_styles,
+    repair_style_from_codes,
+)
 from penshot.neopen.agent.repair_outcome import record_repair_outcome
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence
@@ -63,9 +68,7 @@ _PROMPT_REPAIR_AUTO_CODES = frozenset(
         "prompt_truncated",
         "prompt_incomplete",
         "text_truncated",
-        "style_inconsistent",
-        "style_missing",
-        "style_invalid",
+        # 风格问题由确定性收敛处理：未收敛时转人工，不计入自动修复覆盖率
         "negative_prompt_missing",
         "negative_prompt_insufficient",
         "audio_prompt_missing",
@@ -361,6 +364,18 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                 instructions, fragment_sequence.fragments, parsed_script
             )
 
+            # 风格确定性收敛（T-115）：修复参数含风格问题码时，以契约风格统一
+            # 提示词前缀并移除冲突风格短语，不再只依赖再次调用 LLM 收敛
+            if repair_params and repair_params.fix_needed:
+                style_result = repair_style_from_codes(
+                    instructions, repair_params.issue_codes or []
+                )
+                if style_result.actions:
+                    info(
+                        f"确定性风格收敛: 目标风格={style_result.target_style}，"
+                        f"调整片段数={len(style_result.actions)}"
+                    )
+
             # 记录修复历史
             if repair_params and repair_params.fix_needed:
                 if not hasattr(instructions, "metadata"):
@@ -637,7 +652,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             or i.issue_code
             in ["prompt_truncated", "prompt_incomplete", "text_truncated"]
         ]
-        style_issues = [i for i in issues if i.issue_type == IssueType.STYLE]
+        style_issues = [i for i in issues if is_style_issue(i)]
         negative_issues = [
             i
             for i in issues
@@ -771,23 +786,22 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                     }
                 )
 
-        # ========== 4. 修复风格不一致 ==========
+        # ========== 4. 修复风格不一致（确定性收敛，不依赖再次调用 LLM） ==========
+        style_resolved: List[Any] = []
         if style_issues:
-            # 与风格前缀同源（FR-025）：保留既有风格来源，不再用默认风格覆盖一套
-            style_counts: Dict[str, int] = {}
-            for prompt in instructions.fragments:
-                if prompt.style:
-                    style_counts[prompt.style] = style_counts.get(prompt.style, 0) + 1
-
-            if len(style_counts) > 1:
-                target_style = max(style_counts, key=lambda value: style_counts[value])
-                for prompt in instructions.fragments:
-                    if prompt.style and prompt.style != target_style:
-                        old_style = prompt.style
-                        prompt.style = target_style
-                        repair_actions.append(
-                            f"统一风格: {prompt.fragment_id} {old_style} -> {target_style}"
-                        )
+            # 与风格前缀同源（FR-025）：以多数片段的契约风格为目标，
+            # 统一 [Style: ...] 前缀并移除冲突风格短语
+            style_result = repair_prompt_styles(instructions, style_issues)
+            repair_actions.extend(style_result.actions)
+            style_resolved = style_result.resolved
+            if not style_result.target_style:
+                warning("未找到可用风格来源，风格问题直接转人工处理，不再重试")
+            else:
+                info(
+                    f"确定性风格收敛: 目标风格={style_result.target_style}，"
+                    f"收敛问题={len(style_result.resolved)}个，"
+                    f"未收敛问题={len(style_result.unresolved)}个"
+                )
 
         # ========== 5. 修复负面提示词 ==========
         if negative_issues:
@@ -940,6 +954,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             repair_actions,
             auto_codes=_PROMPT_REPAIR_AUTO_CODES,
             manual_issues=unresolved_motion,
+            resolved_issues=style_resolved,
         )
 
         return instructions
