@@ -326,6 +326,11 @@ def apply_image_to_video_routing(
     }
     prop_scene_map = _props_by_scene(parsed_script)
     prop_state_maps = _prop_state_maps(prompts, fragments, parsed_script)
+    scene_prompt_conflicts = (
+        instructions.metadata.get("scene_prompt_conflicts") or {}
+        if isinstance(instructions.metadata, dict)
+        else {}
+    )
 
     triggered = 0
     for package in packages:
@@ -422,6 +427,28 @@ def apply_image_to_video_routing(
         elif not plan_scene_asset_id:
             package.warnings.append(
                 _plan_scene_downgrade_warning(package.fragment_id, scene)
+            )
+
+        # 0.4.7 T-102：地点冲突未消除的片段不得以 ready 状态进入下游
+        conflict_entries = scene_prompt_conflicts.get(package.fragment_id) or []
+        if conflict_entries:
+            package.status = "needs_manual_fix"
+            terms = ", ".join(
+                sorted(
+                    {
+                        str(entry.get("term", ""))
+                        for entry in conflict_entries
+                        if isinstance(entry, dict) and entry.get("term")
+                    }
+                )
+            )
+            package.warnings.append(
+                f"地点冲突未解决，片段已阻断: {package.fragment_id}"
+                f"（{terms or '地点冲突'}）"
+            )
+            warning(
+                f"地点冲突未解决，片段已阻断: {package.fragment_id}"
+                f"（{terms or '地点冲突'}）"
             )
 
         scene_asset_ref = (

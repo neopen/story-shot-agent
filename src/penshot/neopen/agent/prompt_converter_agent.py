@@ -41,6 +41,9 @@ from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
     RuleType,
     IssueType,
 )
+from penshot.neopen.agent.prompt_converter.scene_prompt_realign import (
+    apply_scene_prompt_realignment,
+)
 from penshot.neopen.agent.repair_outcome import record_repair_outcome
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.video_splitter.video_splitter_models import FragmentSequence
@@ -107,6 +110,9 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         self._focus_on_audio_quality: bool = False
         self._focus_on_style_consistency: bool = False
         self._need_extra_validation: bool = False
+
+        # 修复阶段复用的剧本场景来源（T-102 地点重写需要计划地点）
+        self.parsed_script: Optional[ParsedScript] = None
 
     def process(
         self, fragment_sequence: FragmentSequence, parsed_script: ParsedScript
@@ -321,6 +327,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         # 记录转换尝试
         attempt = len(self.convert_history) + 1
         self.convert_history.append({"attempt": attempt, "timestamp": time.time()})
+        self.parsed_script = parsed_script
 
         try:
             # 调用转换器 - 传递历史上下文
@@ -347,6 +354,17 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             # 记录音频提示词统计
             audio_count = sum(1 for f in instructions.fragments if f.audio)
             debug(f"音频提示词生成: {audio_count}/{len(instructions.fragments)}个片段")
+
+            # 地点重写（FR-098）：以镜头计划场景为准收敛提示词地点短语
+            scene_stats = apply_scene_prompt_realignment(
+                instructions, fragment_sequence.fragments, parsed_script
+            )
+            if scene_stats["realigned"] or scene_stats["conflicts"]:
+                info(
+                    f"地点重写: 改写{scene_stats['realigned']}个片段，"
+                    f"冲突{scene_stats['conflicts']}个片段，"
+                    f"跳过{scene_stats['skipped']}个片段"
+                )
 
             # 记录修复历史
             if repair_params and repair_params.fix_needed:
@@ -877,6 +895,17 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             repair_actions.append(
                 f"归一景别表述: {change['fragment_id']} -> {change['applied_phrase']}"
                 f"（camera.shot_type={change['shot_type']}）"
+            )
+
+        # ========== 10. 地点重写（以镜头计划场景为准） ==========
+        apply_scene_prompt_realignment(
+            instructions,
+            fragment_sequence.fragments,
+            getattr(self, "parsed_script", None),
+        )
+        for record in instructions.metadata.get("scene_prompt_realigned") or []:
+            repair_actions.append(
+                f"地点重写: {record['fragment_id']} {record['from']} -> {record['to']}"
             )
 
         # ========== 11. 更新统计信息 ==========
