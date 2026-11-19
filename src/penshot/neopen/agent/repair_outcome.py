@@ -10,6 +10,7 @@
 ``requires_manual_fix``，供最终输出声明真实修复结果。
 """
 
+import time
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from penshot.logger import error, warning
@@ -20,16 +21,52 @@ REPAIR_STATUS_PARTIAL = "partial"
 REPAIR_STATUS_NO_ACTION = "no_action_taken"
 REPAIR_STATUS_MANUAL = "manual_required"
 
+# 数值越大越需要暴露：同一轮多次记录时保留最严重状态，避免后者覆盖前者
+REPAIR_STATUS_PRIORITY = {
+    REPAIR_STATUS_NO_ISSUES: 0,
+    REPAIR_STATUS_REPAIRED: 1,
+    REPAIR_STATUS_PARTIAL: 2,
+    REPAIR_STATUS_MANUAL: 3,
+    REPAIR_STATUS_NO_ACTION: 4,
+}
 
-def _manual_entry(stage: str, issue: Any) -> Dict[str, Any]:
-    """把一条未修复问题转换为可序列化的人工处理项"""
+
+def select_repair_status(statuses: Iterable[str]) -> str:
+    """按严重程度聚合修复状态
+
+    优先级：``no_action_taken > manual_required > partial > repaired > no_issues``。
+    空输入返回空字符串，表示本轮没有可用结论。
+    """
+    candidates = [str(status) for status in statuses if status]
+    if not candidates:
+        return ""
+    return max(
+        candidates, key=lambda status: REPAIR_STATUS_PRIORITY.get(status, -1)
+    )
+
+
+def _issue_field(issue: Any, *names: str) -> Any:
+    """从对象或字典中读取问题字段，兼容两种问题表示"""
+    for name in names:
+        value = issue.get(name) if isinstance(issue, dict) else getattr(issue, name, None)
+        if value:
+            return value
+    return None
+
+
+def _enum_value(value: Any) -> str:
+    """取枚举的 value，普通值原样转字符串"""
+    return str(getattr(value, "value", value) or "")
+
+
+def manual_fix_entry(stage: str, issue: Any) -> Dict[str, Any]:
+    """把一条未修复问题转换为可序列化的人工处理项（兼容对象与字典）"""
     return {
         "stage": stage,
-        "issue_code": str(getattr(issue, "issue_code", "") or ""),
-        "fragment_id": str(getattr(issue, "fragment_id", "") or ""),
+        "issue_code": str(_issue_field(issue, "issue_code", "code") or ""),
+        "fragment_id": str(_issue_field(issue, "fragment_id") or ""),
         "reason": str(
-            getattr(issue, "suggestion", "")
-            or getattr(issue, "issue_desc", "")
+            _issue_field(issue, "suggestion", "issue_desc", "description", "message")
             or "修复器无对应策略"
         ),
     }
@@ -74,13 +111,12 @@ def record_repair_outcome(
     covered_types: set[str] = set(auto_types or ())
 
     def is_auto(issue: Any) -> bool:
-        code = str(getattr(issue, "issue_code", "") or "")
-        issue_type = getattr(issue, "issue_type", None)
-        type_value = str(getattr(issue_type, "value", issue_type) or "")
+        code = str(_issue_field(issue, "issue_code", "code") or "")
+        type_value = _enum_value(_issue_field(issue, "issue_type", "type"))
         return code in covered_codes or type_value in covered_types
 
     if issue_list and not actions:
-        entries = [_manual_entry(stage, issue) for issue in issue_list]
+        entries = [manual_fix_entry(stage, issue) for issue in issue_list]
         auto_hits = [issue for issue in issue_list if is_auto(issue)]
         if auto_hits:
             status = REPAIR_STATUS_NO_ACTION
@@ -97,10 +133,10 @@ def record_repair_outcome(
             )
     else:
         forced_ids = {id(issue) for issue in (manual_issues or ())}
-        entries = [_manual_entry(stage, issue) for issue in (manual_issues or ())]
+        entries = [manual_fix_entry(stage, issue) for issue in (manual_issues or ())]
         if auto_codes is not None or auto_types is not None:
             entries.extend(
-                _manual_entry(stage, issue)
+                manual_fix_entry(stage, issue)
                 for issue in issue_list
                 if id(issue) not in forced_ids and not is_auto(issue)
             )
@@ -111,7 +147,13 @@ def record_repair_outcome(
         else:
             status = REPAIR_STATUS_REPAIRED
 
-    metadata["repair_status"] = status
+    # 保留本轮状态序列；单值字段按优先级取值，后记录的状态不得覆盖更严重的结论
+    metadata.setdefault("repair_status_history", []).append(
+        {"stage": stage, "status": status, "timestamp": time.time()}
+    )
+    metadata["repair_status"] = select_repair_status(
+        [str(metadata.get("repair_status") or ""), status]
+    )
     if entries:
         existing: List[Dict[str, Any]] = list(metadata.get("requires_manual_fix") or [])
         existing.extend(entries)
