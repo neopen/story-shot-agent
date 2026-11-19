@@ -278,13 +278,23 @@ def test_motion_static_for_pure_stillness():
 
 
 def test_motion_conflict_logs_warning(monkeypatch):
-    """命中多个运动族时保留最具体者并告警"""
+    """命中不同运动族时保留最具体者并告警；同族不告警由专项用例覆盖"""
+    messages = []
+    monkeypatch.setattr(camera_builder, "warning", messages.append)
+
+    build_camera_control("slow pull-back，同时向左摇镜", None)
+
+    assert any("运镜关键词冲突" in message for message in messages)
+
+
+def test_same_family_motion_conflict_not_logged(monkeypatch):
+    """pull-back 与拉远同属 dolly 族，不得再误报冲突"""
     messages = []
     monkeypatch.setattr(camera_builder, "warning", messages.append)
 
     build_camera_control("slow pull-back，缓慢拉远镜头", None)
 
-    assert any("运镜关键词冲突" in message for message in messages)
+    assert not any("运镜关键词冲突" in message for message in messages)
 
 
 def test_static_with_camera_verb_logs_warning(monkeypatch):

@@ -155,10 +155,16 @@ _MOTION_KEYWORDS = {
         "pull-back",
         "tracking shot",
         "tracking",
+        "camera follow",
+        "camera track",
+        "camera push",
+        "camera pull",
+        "follow shot",
         "dolly",
         "推镜",
         "拉镜",
         "跟拍",
+        "镜头跟随",
     ),
     CameraMotion.ZOOM: ("zoom", "变焦", "推近", "拉远"),
     # “手持”单独出现多指“手里拿着道具”，仅保留明确的运镜表述
@@ -441,7 +447,7 @@ def _detect_motion(description: str) -> tuple[CameraMotion, float]:
     """从描述推断运镜方式与强度
 
     同一文本命中多个运动族时，按“多词短语 > 单词、长词 > 短词”取最具体者，
-    并对冲突词告警，避免 ``slow pull-back`` 被 ``拉远`` 之类的短词截胡。
+    并仅对跨运动族的冲突词告警；同族（如 pull-back 与 zoom）不构成冲突。
     """
     lowered = (description or "").lower()
     candidates: List[Tuple[CameraMotion, str]] = [
@@ -459,7 +465,13 @@ def _detect_motion(description: str) -> tuple[CameraMotion, float]:
         if _keyword_specificity(candidate_keyword) > _keyword_specificity(keyword):
             motion, keyword = candidate_motion, candidate_keyword
 
-    conflicting = sorted({item.value for item, _ in candidates if item != motion})
+    conflicting = sorted(
+        {
+            item.value
+            for item, _ in candidates
+            if _MOTION_FAMILIES.get(item) != _MOTION_FAMILIES.get(motion)
+        }
+    )
     if conflicting:
         warning(
             f"运镜关键词冲突: 按具体短语取 {motion.value}"
