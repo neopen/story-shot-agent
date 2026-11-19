@@ -1,11 +1,12 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: env_refs.py
 @Description: 环境变量引用安全解析 - 统一管理受信任配置加载上下文与 `${VAR}` 引用展开边界
-@Author: NeoPen
+@Author: neopen
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/09
 """
 

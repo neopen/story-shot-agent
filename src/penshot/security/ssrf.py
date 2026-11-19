@@ -1,5 +1,5 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
@@ -9,7 +9,8 @@ See LICENSE File For Details.
   2. 在超时与并发控制下解析 DNS 并校验全部记录均为公网地址；
   3. 将实际 TCP 连接固定到已验证 IP（防 DNS Rebinding），保留原始 Host 与 HTTPS SNI。
 本模块仅依赖标准库（httpx 在发送函数内惰性导入），可独立复用；通过 SsrfPolicy 扩展放行策略。
-@Author: NeoPen
+@Author: neopen
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/17
 """
 
