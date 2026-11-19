@@ -26,6 +26,7 @@ from penshot.neopen.agent.continuity_guardian.contract_repair import (
     group_violations_by_stage,
     merge_repair_params,
     merge_violations,
+    resolve_script_character_violations,
 )
 from penshot.neopen.agent.continuity_guardian.contract_validator import (
     validate_fragment_sequence,
@@ -1887,6 +1888,15 @@ class WorkflowNodes:
                     )
                     # 契约违规项与连续性问题合并，保证 Repairer 按契约修复
                     violations = contract_violations_by_stage.get(stage) or []
+                    if violations:
+                        # T-114：剧本真实角色补登记后即收敛，只向修复器下发幻觉角色
+                        remaining = resolve_script_character_violations(
+                            violations,
+                            state.domain.contract,
+                            state.domain.parsed_script,
+                        )
+                        contract_violations_by_stage[stage] = remaining
+                        violations = remaining
                     if violations:
                         contract_params = build_contract_repair_params(
                             violations,

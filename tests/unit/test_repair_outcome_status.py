@@ -285,3 +285,55 @@ def test_round_aggregation_ignores_previous_round_status():
     assert report.metadata["stage_repair_statuses"] == [REPAIR_STATUS_REPAIRED]
     assert report.metadata["repair_status"] == REPAIR_STATUS_REPAIRED
     assert report.metadata["repair_action_count"] == 2
+
+
+def test_resolved_issues_are_excluded_from_manual_entries():
+    """T-114：上游已收敛的问题不计入人工项，也不触发 no_action_taken"""
+    metadata = {}
+    violation = {
+        "type": "unknown_character",
+        "shot_id": "shot_001",
+        "character": "门口黑影",
+    }
+
+    record_repair_outcome(
+        metadata,
+        "分镜生成",
+        [violation],
+        [],
+        auto_codes={"shot_repetitive"},
+        resolved_issues=[violation],
+    )
+
+    assert metadata["repair_status"] == "no_issues"
+    assert "requires_manual_fix" not in metadata
+
+
+def test_partially_resolved_issues_keep_only_unresolved_manual_entries():
+    """T-114：仅未收敛的问题进入人工项，已清理问题不再重复暴露"""
+    metadata = {}
+    resolved = {
+        "type": "unknown_character",
+        "shot_id": "shot_001",
+        "character": "神秘人",
+    }
+    unresolved = {
+        "type": "unknown_character",
+        "shot_id": "shot_002",
+        "character": "黑影甲",
+    }
+
+    status = record_repair_outcome(
+        metadata,
+        "分镜生成",
+        [resolved, unresolved],
+        ["清除契约外角色主角色标注: shot_001「神秘人」"],
+        auto_codes={"shot_repetitive"},
+        resolved_issues=[resolved],
+    )
+
+    assert status == "partial"
+    assert [
+        (entry["fragment_id"], entry["reason"])
+        for entry in metadata["requires_manual_fix"]
+    ] == [("", "修复器无对应策略")]

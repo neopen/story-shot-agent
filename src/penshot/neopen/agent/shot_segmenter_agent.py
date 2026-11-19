@@ -436,12 +436,14 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         basic_issues = [i for i in issues if not isinstance(i, dict)]
 
         # 审计回路传来的契约违规以 BasicViolation 包装（issue_value 保留原始字典），
-        # 一并按契约违规处理，避免修复器再次空转
+        # 一并按契约违规处理，避免修复器再次空转；保留包装对象以便同步剔除人工项
+        contract_issue_wrappers: Dict[int, Any] = {}
         for issue in basic_issues:
             if (issue.issue_code or "") == "unknown_character" and isinstance(
                 issue.issue_value, dict
             ):
                 contract_violations.append(issue.issue_value)
+                contract_issue_wrappers[id(issue.issue_value)] = issue
 
         # 问题分类 - 使用 issue_type 进行主分类，更精确和类型安全
         duration_issues = [
@@ -581,6 +583,15 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                             break
 
         # ========== 6. 修复契约外角色（unknown_character 违规项） ==========
+        resolved_issues: List[Any] = []
+
+        def mark_resolved(violation: Dict[str, Any]) -> None:
+            """确定性收敛的违规项不再计入人工项（含审计包装对象）"""
+            resolved_issues.append(violation)
+            wrapper = contract_issue_wrappers.get(id(violation))
+            if wrapper is not None:
+                resolved_issues.append(wrapper)
+
         if contract_violations:
             parsed_names = {
                 normalize_character_name(c.name)
@@ -594,13 +605,14 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                     continue
                 shot_id = contract_issue.get("shot_id")
                 shot = self._find_shot(shot_sequence, shot_id) if shot_id else None
-                if not shot:
-                    continue
                 character = normalize_character_name(contract_issue.get("character"))
                 if not character:
                     continue
                 if character in parsed_names:
-                    # 剧本真实角色由契约补登记解决，不在镜头层改动
+                    # 剧本真实角色由契约补登记解决，不在镜头层改动，登记即收敛
+                    mark_resolved(contract_issue)
+                    continue
+                if not shot:
                     continue
                 if normalize_character_name(shot.main_character) != character:
                     continue
@@ -609,6 +621,7 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                 repair_actions.append(
                     f"清除契约外角色主角色标注: {shot_id}「{character}」"
                 )
+                mark_resolved(contract_issue)
 
         # ========== 7. 更新统计信息 ==========
         new_stats = {
@@ -652,6 +665,8 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                 IssueType.DURATION.value,
                 IssueType.PROMPT.value,
             },
+            # T-114：补登记的真实角色与已清除的幻觉角色不再计入人工项
+            resolved_issues=resolved_issues,
         )
 
         return shot_sequence

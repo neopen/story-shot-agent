@@ -14,14 +14,11 @@ from typing import Any, Dict, List, Tuple, Union
 
 from langgraph.graph import END
 
-from penshot.neopen.agent.character_names import normalize_character_name
-from penshot.neopen.agent.continuity_guardian.consistency_contract import (
-    CharacterContract,
-)
 from penshot.neopen.agent.continuity_guardian.contract_repair import (
     build_contract_repair_params,
     merge_repair_params,
     merge_violations,
+    register_script_characters,
 )
 from penshot.neopen.agent.continuity_guardian.contract_validator import (
     validate_fragment_sequence,
@@ -1084,38 +1081,11 @@ class PipelineDecision:
             state: 工作流状态
             violations: Validator 产出的违规项字典列表
         """
-        contract = state.domain.contract
-        parsed_script = state.domain.parsed_script
-        if contract is None or parsed_script is None:
-            return
-
-        known_names = {
-            normalize_character_name(name) for name in contract.characters
-        }
-        parsed_by_name: Dict[str, Any] = {}
-        for char in getattr(parsed_script, "characters", []) or []:
-            raw_name = getattr(char, "name", None)
-            name = normalize_character_name(raw_name)
-            if name:
-                parsed_by_name.setdefault(name, char)
-
-        for violation in violations or []:
-            if str(violation.get("type") or "").strip() != "unknown_character":
-                continue
-            character = normalize_character_name(violation.get("character"))
-            if not character or character in known_names:
-                continue
-            parsed_char = parsed_by_name.get(character)
-            if parsed_char is None:
-                continue
-            raw_name = str(getattr(parsed_char, "name", "") or "").strip() or character
-            char_contract = CharacterContract(name=raw_name)
-            description = str(getattr(parsed_char, "description", "") or "").strip()
-            if description:
-                char_contract._extract_appearance_features(description)
-            contract.characters[raw_name] = char_contract
-            known_names.add(normalize_character_name(raw_name))
-            info(f"契约补登记剧本角色「{raw_name}」，unknown_character 违规确定性收敛")
+        registered = register_script_characters(
+            state.domain.contract, state.domain.parsed_script, violations
+        )
+        for name in registered:
+            info(f"契约补登记剧本角色「{name}」，unknown_character 违规确定性收敛")
 
     def _attach_contract_repair_params(
         self,

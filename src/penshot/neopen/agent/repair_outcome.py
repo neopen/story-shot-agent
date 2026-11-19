@@ -40,15 +40,15 @@ def select_repair_status(statuses: Iterable[str]) -> str:
     candidates = [str(status) for status in statuses if status]
     if not candidates:
         return ""
-    return max(
-        candidates, key=lambda status: REPAIR_STATUS_PRIORITY.get(status, -1)
-    )
+    return max(candidates, key=lambda status: REPAIR_STATUS_PRIORITY.get(status, -1))
 
 
 def _issue_field(issue: Any, *names: str) -> Any:
     """从对象或字典中读取问题字段，兼容两种问题表示"""
     for name in names:
-        value = issue.get(name) if isinstance(issue, dict) else getattr(issue, name, None)
+        value = (
+            issue.get(name) if isinstance(issue, dict) else getattr(issue, name, None)
+        )
         if value:
             return value
     return None
@@ -80,6 +80,7 @@ def record_repair_outcome(
     auto_codes: Optional[Iterable[str]] = None,
     auto_types: Optional[Iterable[str]] = None,
     manual_issues: Optional[Sequence[Any]] = None,
+    resolved_issues: Optional[Sequence[Any]] = None,
 ) -> str:
     """记录一次修复的真实结果
 
@@ -100,11 +101,15 @@ def record_repair_outcome(
         auto_codes: 可自动修复的 issue_code 集合
         auto_types: 可自动修复的 issue_type 集合；与 ``auto_codes`` 任一命中即可
         manual_issues: 即使命中了自动集合也确认未修复的问题，强制转人工处理
+        resolved_issues: 已在上游确定性收敛的问题（如实现在契约补登记、已清理
+            的幻觉角色），不计入人工项，也不参与 ``no_action_taken`` 判定
 
     Returns:
         修复状态字符串
     """
     issue_list = list(issues)
+    resolved_ids = {id(issue) for issue in (resolved_issues or ())}
+    pending_issues = [issue for issue in issue_list if id(issue) not in resolved_ids]
     metadata.setdefault("repair_history", [])
 
     covered_codes: set[str] = set(auto_codes or ())
@@ -116,9 +121,11 @@ def record_repair_outcome(
         return code in covered_codes or type_value in covered_types
 
     if issue_list and not actions:
-        entries = [manual_fix_entry(stage, issue) for issue in issue_list]
-        auto_hits = [issue for issue in issue_list if is_auto(issue)]
-        if auto_hits:
+        entries = [manual_fix_entry(stage, issue) for issue in pending_issues]
+        auto_hits = [issue for issue in pending_issues if is_auto(issue)]
+        if not pending_issues:
+            status = REPAIR_STATUS_NO_ISSUES
+        elif auto_hits:
             status = REPAIR_STATUS_NO_ACTION
             error(
                 f"{stage}修复未执行任何操作：发现{len(issue_list)}个问题，"
@@ -137,7 +144,7 @@ def record_repair_outcome(
         if auto_codes is not None or auto_types is not None:
             entries.extend(
                 manual_fix_entry(stage, issue)
-                for issue in issue_list
+                for issue in pending_issues
                 if id(issue) not in forced_ids and not is_auto(issue)
             )
         if not issue_list:
