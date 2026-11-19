@@ -578,6 +578,9 @@ def _truncate_outcome(
             "truncated_from": total_duration,
             "truncated_to": kept_duration,
             "truncate_reason": reason,
+            # T-117：丢弃的尾部画面无法自动还原，落盘供下游与人工复核
+            "dropped_duration": dropped_duration,
+            "manual_review_required": dropped_duration > 0,
         }
     )
 
@@ -592,7 +595,9 @@ def _truncate_outcome(
         shot_type=previous.shot_type or current.shot_type,
         continuity_notes=_merge_context_notes(previous, current),
         requires_special_attention=(
-            previous.requires_special_attention or current.requires_special_attention
+            previous.requires_special_attention
+            or current.requires_special_attention
+            or dropped_duration > 0
         ),
     )
     warning(message)

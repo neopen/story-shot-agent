@@ -5,6 +5,7 @@
 """
 
 import base64
+import logging
 from types import SimpleNamespace
 
 from penshot.config.config_models import ImageBaseConfig
@@ -873,6 +874,40 @@ def test_manifest_accepts_v3_assets_alias(tmp_path):
     assert report.errors == []
     spec = next(item for item in report.assets if item.asset_id == "char_001")
     assert spec.metadata["generated_at"] == "2026-11-12T15:00:00Z"
+
+
+def test_plan_mode_logs_pending_as_info_not_warning(caplog):
+    """T-116：计划模式保留 pending 是正常降级，只记 INFO 并带数量"""
+    caplog.set_level(logging.INFO)
+    agent = AssetGeneratorAgent(
+        image_client=_FakeImageClient(_config("", enabled=False))
+    )
+
+    report = agent.generate_assets(_parsed_script(), _contract())
+
+    assert report.pending == 3
+    pending_logs = [
+        record for record in caplog.records if "pending" in record.getMessage()
+    ]
+    assert pending_logs, "计划模式应记录一条 pending 汇总"
+    assert all(record.levelno == logging.INFO for record in pending_logs)
+    assert "3项资产" in pending_logs[-1].getMessage()
+
+
+def test_plan_mode_without_pending_skips_pending_log(tmp_path, caplog):
+    """T-116：资产已全部就绪时不再输出 pending 文案，避免误导"""
+    contract = _contract()
+    AssetGeneratorAgent(
+        image_client=_FakeImageClient(_config(tmp_path))
+    ).generate_assets(_parsed_script(), contract)
+    caplog.clear()
+    caplog.set_level(logging.INFO)
+
+    report = AssetGeneratorAgent().generate_assets(_parsed_script(), contract)
+
+    assert report.pending == 0
+    assert report.skipped == 3
+    assert not [record for record in caplog.records if "pending" in record.getMessage()]
 
 
 def test_manifest_unknown_asset_id_is_reported():

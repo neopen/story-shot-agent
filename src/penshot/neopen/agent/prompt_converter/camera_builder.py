@@ -1,4 +1,4 @@
-"""结构化相机控制构建（M0.4.3 / 0.4.4 景别一致性）。
+"""结构化相机控制构建（M0.4.3 / 0.4.4 景别一致性 / 0.4.7 景别归一）。
 
 由来源镜头景别与片段描述推导相机参数，供支持运镜的目标模型直出。
 景别探测顺序为「来源镜头景别 > 最终提示词文本 > 默认值」：来源景别是镜头
@@ -6,6 +6,11 @@
 把 POV 主观视角吞成 close_up；文本兜底按短语出现位置取最靠前者，保留
 POV、极特写等特殊视角（FR-031）。
 别名表覆盖 ``ShotType`` 全部值并按长词优先匹配（FR-030）。
+
+0.4.7：``detect_shot_type_from_text`` 与提示词归一共用同一份别名表，
+运镜词（``zoom``/``变焦``/``推拉``）不再被识别为景别（FR-106）；
+``normalize_prompt_shot_phrase`` 按 ``SHOT_PHRASE_MAP`` 确定性收敛提示词
+开头的景别短语，只改景别措辞、不动构图与运动描述（FR-104/105）。
 """
 
 import re
@@ -19,6 +24,22 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 from penshot.neopen.agent.shot_segmenter.shot_segmenter_models import ShotType
 
 DEFAULT_SHOT_TYPE = ShotType.MEDIUM_SHOT.value
+
+# 规范景别短语（FR-105）：值为 (英文短语, 中文短语)，审计与归一共用同一张表
+SHOT_PHRASE_MAP: Dict[str, Tuple[str, str]] = {
+    "close_up": ("close-up shot", "特写镜头"),
+    "extreme_close_up": ("extreme close-up shot", "极特写镜头"),
+    "medium_shot": ("medium shot", "中景镜头"),
+    "wide_shot": ("wide shot", "全景镜头"),
+    "long_shot": ("long shot", "远景镜头"),
+    "two_shot": ("two-shot", "双人中景镜头"),
+    "over_shoulder": ("over-the-shoulder shot", "过肩镜头"),
+    "pov": ("POV shot", "主观镜头"),
+}
+
+# ``[Style: ...]`` 前缀由风格链路独立渲染，景别归一不得改动其内容
+_STYLE_PREFIX_PATTERN = re.compile(r"^\[Style:[^\]]*\]\s*", re.IGNORECASE)
+_CJK_PATTERN = re.compile(r"[\u4e00-\u9fff]")
 
 # 来源景别精确别名：归一化（小写、空格/连字符转下划线）后精确匹配
 _EXACT_ALIASES: Dict[str, str] = {
@@ -113,10 +134,6 @@ _TEXT_ALIASES: List[Tuple[str, str]] = sorted(
         ("panorama", ShotType.PANORAMA.value),
         ("摇摄", ShotType.PANORAMA.value),
         ("全景移动", ShotType.PANORAMA.value),
-        ("zoom shot", ShotType.ZOOM.value),
-        ("zoom", ShotType.ZOOM.value),
-        ("变焦", ShotType.ZOOM.value),
-        ("推拉", ShotType.ZOOM.value),
         ("action shot", ShotType.ACTION.value),
         ("动作镜头", ShotType.ACTION.value),
         ("moving shot", ShotType.MOVING.value),
@@ -138,10 +155,16 @@ _MOTION_KEYWORDS = {
         "pull-back",
         "tracking shot",
         "tracking",
+        "camera follow",
+        "camera track",
+        "camera push",
+        "camera pull",
+        "follow shot",
         "dolly",
         "推镜",
         "拉镜",
         "跟拍",
+        "镜头跟随",
     ),
     CameraMotion.ZOOM: ("zoom", "变焦", "推近", "拉远"),
     # “手持”单独出现多指“手里拿着道具”，仅保留明确的运镜表述
@@ -192,26 +215,183 @@ def _keyword_specificity(keyword: str) -> Tuple[int, int]:
     return len(tokens), len(keyword)
 
 
+def _is_cjk_text(text: str) -> bool:
+    """判断文本是否包含中文（用于区分英文段与中英对照段）"""
+    return bool(_CJK_PATTERN.search(text or ""))
+
+
+def _build_phrase_pattern(
+    aliases: List[Tuple[str, str]], cjk: bool
+) -> "re.Pattern[str]":
+    """按长词优先把别名编译为正则，英文短语加 ASCII 词边界"""
+    phrases = sorted(
+        {alias for alias, _ in aliases if _is_cjk_text(alias) == cjk},
+        key=len,
+        reverse=True,
+    )
+    if not phrases:
+        return re.compile(r"(?!)")
+    alternation = "|".join(re.escape(phrase) for phrase in phrases)
+    if cjk:
+        return re.compile(alternation, re.IGNORECASE)
+    return re.compile(rf"(?<![A-Za-z])(?:{alternation})(?![A-Za-z])", re.IGNORECASE)
+
+
+# 景别别名 -> 归一化景别值；探测与归一共用
+_SHOT_ALIAS_TO_TYPE: Dict[str, str] = {
+    alias: normalized for alias, normalized in _TEXT_ALIASES
+}
+_EN_SHOT_PATTERN = _build_phrase_pattern(_TEXT_ALIASES, cjk=False)
+_ZH_SHOT_PATTERN = _build_phrase_pattern(_TEXT_ALIASES, cjk=True)
+
+
 def detect_shot_type_from_text(text: Optional[str]) -> str:
     """从最终提示词文本探测景别；无法识别返回空串（FR-031/FR-032）
 
     按短语出现位置优先：只有开头的景别表述才是构图主体，靠后的
     ``close-up`` 不能截胡开头的 ``POV``/``extreme close-up``；
     同一位置按别名长度取更长者。
-    质量审查（FR-061）复用同一份别名表与匹配顺序，保证审计口径与构建口径一致。
+    质量审查（FR-061）与景别归一（FR-104）复用同一份别名表与匹配顺序，
+    保证审计口径与构建口径一致；运镜词不再参与景别判定（FR-106）。
     """
     lowered = str(text or "").lower()
     if not lowered:
         return ""
-    detected = ""
-    first_index = -1
-    for alias, normalized in _TEXT_ALIASES:  # 已按长度倒序
-        index = lowered.find(alias)
-        if index < 0:
+    style_prefix = _STYLE_PREFIX_PATTERN.match(lowered)
+    if style_prefix:
+        lowered = lowered[style_prefix.end() :]
+    best: Optional["re.Match[str]"] = None
+    for pattern in (_EN_SHOT_PATTERN, _ZH_SHOT_PATTERN):
+        match = pattern.search(lowered)
+        if match is not None and (best is None or match.start() < best.start()):
+            best = match
+    if best is None:
+        return ""
+    return _SHOT_ALIAS_TO_TYPE.get(best.group(0).lower(), "")
+
+
+def _normalize_paragraph_shot(
+    paragraph: str, shot_type: str, en_phrase: str, zh_phrase: str
+) -> Tuple[str, Optional[str]]:
+    """归一单个段落开头的景别短语。
+
+    段落含中文时使用中文短语与中文别名，否则使用英文短语与英文别名；
+    已有景别短语与目标一致时保持原样，避免把 ``POV tracking shot``
+    压平成 ``POV shot``。缺景别短语时在段首插入。
+
+    Returns:
+        ``(处理后的段落, 实际应用的短语)``；未改动时短语为 None
+    """
+    if not paragraph.strip():
+        return paragraph, None
+
+    is_cjk = _is_cjk_text(paragraph)
+    target_phrase = zh_phrase if is_cjk else en_phrase
+    pattern = _ZH_SHOT_PATTERN if is_cjk else _EN_SHOT_PATTERN
+    match = pattern.search(paragraph)
+
+    if match is None:
+        separator = "，" if is_cjk else ", "
+        return f"{target_phrase}{separator}{paragraph.lstrip()}", target_phrase
+
+    existing = match.group(0)
+    if _SHOT_ALIAS_TO_TYPE.get(existing.lower(), "") == shot_type:
+        return paragraph, None
+
+    end = match.end()
+    if is_cjk:
+        if not existing.endswith("镜头"):
+            suffix = re.match(r"镜头", paragraph[end:])
+            if suffix:
+                end += suffix.end()
+    elif not existing.lower().endswith("shot"):
+        suffix = re.match(r"[\s-]+shot\b", paragraph[end:], re.IGNORECASE)
+        if suffix:
+            end += suffix.end()
+
+    return paragraph[: match.start()] + target_phrase + paragraph[end:], target_phrase
+
+
+def normalize_prompt_shot_phrase(
+    prompt: str, shot_type: str
+) -> Tuple[str, Optional[str]]:
+    """把提示词开头的景别短语确定性归一为目标景别（FR-104/FR-105）
+
+    - 跳过 ``[Style: ...]`` 前缀，只改第一个段落的开头景别短语；
+    - 存在 ``\\n\\n`` 之后的对照段且含中文时，同步归一其中文景别短语；
+    - 英文段只插入/替换英文短语，中文段只用中文短语；
+    - 目标景别不在 ``SHOT_PHRASE_MAP`` 或为空时跳过，不改写、不告警（FR-106a）。
+
+    Returns:
+        ``(归一后的提示词, 实际应用的短语)``；未改动时短语为 None
+    """
+    target = SHOT_PHRASE_MAP.get(str(shot_type or "").strip())
+    if target is None or not prompt:
+        return prompt, None
+
+    en_phrase, zh_phrase = target
+    prefix = ""
+    body = prompt
+    prefix_match = _STYLE_PREFIX_PATTERN.match(body)
+    if prefix_match:
+        prefix = body[: prefix_match.end()]
+        body = body[prefix_match.end() :]
+
+    parts = body.split("\n\n")
+    applied: Optional[str] = None
+
+    first, applied_phrase = _normalize_paragraph_shot(
+        parts[0], str(shot_type).strip(), en_phrase, zh_phrase
+    )
+    if applied_phrase is not None:
+        parts[0] = first
+        applied = applied_phrase
+
+    for index in range(1, len(parts)):
+        if not _is_cjk_text(parts[index]):
             continue
-        if first_index < 0 or index < first_index:
-            detected, first_index = normalized, index
-    return detected
+        normalized, applied_phrase = _normalize_paragraph_shot(
+            parts[index], str(shot_type).strip(), en_phrase, zh_phrase
+        )
+        if applied_phrase is None:
+            continue
+        parts[index] = normalized
+        if applied is None:
+            applied = applied_phrase
+
+    if applied is None:
+        return prompt, None
+    return prefix + "\n\n".join(parts), applied
+
+
+def normalize_instructions_shot_phrases(instructions: Any) -> List[Dict[str, str]]:
+    """对指令集内全部片段执行景别归一，返回实际发生改动的片段清单"""
+    changes: List[Dict[str, str]] = []
+    for prompt in getattr(instructions, "fragments", None) or []:
+        camera = getattr(prompt, "camera", None)
+        if camera is None:
+            continue
+        shot_type = str(
+            getattr(camera, "source_shot_type", "")
+            or getattr(camera, "shot_type", "")
+            or ""
+        ).strip()
+        if not shot_type:
+            continue
+
+        updated, applied = normalize_prompt_shot_phrase(prompt.prompt, shot_type)
+        if applied is None or updated == prompt.prompt:
+            continue
+
+        prompt.prompt = updated
+        changes.append(
+            {
+                "fragment_id": str(getattr(prompt, "fragment_id", "")),
+                "shot_type": shot_type,
+                "applied_phrase": applied,
+            }
+        )
+    return changes
 
 
 def _normalize_source(shot_type: Optional[str]) -> str:
@@ -267,7 +447,7 @@ def _detect_motion(description: str) -> tuple[CameraMotion, float]:
     """从描述推断运镜方式与强度
 
     同一文本命中多个运动族时，按“多词短语 > 单词、长词 > 短词”取最具体者，
-    并对冲突词告警，避免 ``slow pull-back`` 被 ``拉远`` 之类的短词截胡。
+    并仅对跨运动族的冲突词告警；同族（如 pull-back 与 zoom）不构成冲突。
     """
     lowered = (description or "").lower()
     candidates: List[Tuple[CameraMotion, str]] = [
@@ -285,7 +465,13 @@ def _detect_motion(description: str) -> tuple[CameraMotion, float]:
         if _keyword_specificity(candidate_keyword) > _keyword_specificity(keyword):
             motion, keyword = candidate_motion, candidate_keyword
 
-    conflicting = sorted({item.value for item, _ in candidates if item != motion})
+    conflicting = sorted(
+        {
+            item.value
+            for item, _ in candidates
+            if _MOTION_FAMILIES.get(item) != _MOTION_FAMILIES.get(motion)
+        }
+    )
     if conflicting:
         warning(
             f"运镜关键词冲突: 按具体短语取 {motion.value}"

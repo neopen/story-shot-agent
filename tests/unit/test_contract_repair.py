@@ -28,6 +28,9 @@ from penshot.neopen.agent.continuity_guardian.contract_repair import (
     group_violations_by_stage,
     merge_repair_params,
     merge_violations,
+    register_script_characters,
+    resolve_script_character_violations,
+    split_script_character_violations,
 )
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
     QualityRepairParams,
@@ -371,3 +374,68 @@ class TestRepairerContractDriven:
         )
 
         assert params.suggestions["frag_004"][0].startswith("按一致性契约修复该问题")
+
+
+class TestScriptCharacterRouting:
+    """T-114：剧本真实角色补登记，幻觉角色才下发修复"""
+
+    def _violation(self, character: str) -> dict:
+        return {
+            "type": "unknown_character",
+            "stage": "segment_shot",
+            "shot_id": "shot_002",
+            "character": character,
+            "message": f"镜头 shot_002 的角色 {character} 不在一致性契约中",
+        }
+
+    def test_split_keeps_only_hallucinated_characters(self):
+        """剧本真实角色与幻觉角色分离"""
+        parsed = SimpleNamespace(characters=[SimpleNamespace(name="门口黑影")])
+
+        real, remaining = split_script_character_violations(
+            [self._violation("门口黑影"), self._violation("神秘人")], parsed
+        )
+
+        assert [item["character"] for item in real] == ["门口黑影"]
+        assert [item["character"] for item in remaining] == ["神秘人"]
+
+    def test_split_without_parsed_script_keeps_all(self):
+        """缺少剧本角色表时不拆分"""
+        real, remaining = split_script_character_violations(
+            [self._violation("门口黑影")], None
+        )
+
+        assert real == []
+        assert len(remaining) == 1
+
+    def test_register_script_characters_adds_contract_entry(self):
+        """补登记后契约角色集包含剧本真实角色，重复登记无副作用"""
+        contract = _contract(["小明"])
+        parsed = SimpleNamespace(
+            characters=[SimpleNamespace(name="门口黑影", description="黑色长外套")]
+        )
+
+        registered = register_script_characters(
+            contract, parsed, [self._violation("门口黑影")]
+        )
+        again = register_script_characters(
+            contract, parsed, [self._violation("门口黑影")]
+        )
+
+        assert registered == ["门口黑影"]
+        assert again == []
+        assert "门口黑影" in contract.characters
+
+    def test_resolve_returns_only_hallucinations(self):
+        """补登记与过滤合并：返回的违规项只剩幻觉角色"""
+        contract = _contract(["小明"])
+        parsed = SimpleNamespace(characters=[SimpleNamespace(name="门口黑影")])
+
+        remaining = resolve_script_character_violations(
+            [self._violation("门口黑影"), self._violation("神秘人")],
+            contract,
+            parsed,
+        )
+
+        assert [item["character"] for item in remaining] == ["神秘人"]
+        assert "门口黑影" in contract.characters

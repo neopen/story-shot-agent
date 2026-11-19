@@ -700,10 +700,18 @@ class AssetGeneratorAgent:
                 )
                 applied, errors = self._apply_manifest(specs, coerced_manifest)
             else:
-                warning(
-                    "未提供下游资产回填清单且未启用生成执行器，"
-                    "资产仅保留提示词（pending），不阻断主流程"
+                # 计划模式是显式支持的降级路径，不属于异常场景：
+                # 仅在确有 pending 资产时用 INFO 记录数量，避免每轮回炉刷 WARNING
+                pending_count = sum(
+                    1 for spec in specs if spec.status == AssetStatus.PENDING
                 )
+                if pending_count:
+                    info(
+                        f"未启用生成执行器，{pending_count}项资产仅保留提示词"
+                        "（pending），不阻断主流程"
+                    )
+                else:
+                    debug("未启用生成执行器，资产均已就绪，无需生成")
 
         self._attach_to_contract(contract, specs)
         report = AssetGenerationReport.from_specs(

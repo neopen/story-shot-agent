@@ -86,6 +86,25 @@ class BaseVideoSplitter(ABC):
             fragments
         )
 
+        # T-117：截断丢弃的尾部画面写入输出元数据（重编号后的片段 ID），
+        # 供下游与人工按片段复核
+        truncated = [
+            {
+                "fragment_id": fragment.id,
+                "dropped_duration": fragment.metadata.get("dropped_duration", 0.0),
+                "truncate_reason": fragment.metadata.get("truncate_reason", ""),
+            }
+            for fragment in fragments
+            if float(fragment.metadata.get("dropped_duration") or 0.0) > 0
+        ]
+        if truncated:
+            fragment_sequence.metadata["truncation_report"] = {
+                "dropped_duration_total": round(
+                    sum(item["dropped_duration"] for item in truncated), 2
+                ),
+                "fragments": truncated,
+            }
+
         total_duration = sum(frag.duration for frag in fragments)
 
         fragment_sequence.stats.update(
@@ -211,6 +230,12 @@ class BaseVideoSplitter(ABC):
             operations.append(record)
             index += 2
 
+        truncated_operations = [
+            op for op in operations if op["action"] == ACTION_TRUNCATE
+        ]
+        dropped_duration_total = round(
+            sum(float(op.get("dropped_duration", 0.0) or 0.0) for op in operations), 2
+        )
         summary = {
             "candidate_count": len(candidates),
             "same_shot_count": len(eligible),
@@ -219,9 +244,18 @@ class BaseVideoSplitter(ABC):
             "resplit": sum(
                 1 for op in operations if op["action"] == ACTION_RESPLIT
             ),
-            "truncated": sum(
-                1 for op in operations if op["action"] == ACTION_TRUNCATE
-            ),
+            "truncated": len(truncated_operations),
+            # T-117：合并不可行而截断时，丢弃时长与片段必须可追溯
+            "dropped_duration_total": dropped_duration_total,
+            "truncated_fragments": [
+                {
+                    "fragment_id": op.get("prev_id", ""),
+                    "dropped_duration": op.get("dropped_duration", 0.0),
+                    "reason": op.get("reason", ""),
+                }
+                for op in truncated_operations
+            ],
+            "manual_review_required": bool(truncated_operations),
             "split_shots": len(
                 {
                     op["shot_id"]

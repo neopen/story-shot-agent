@@ -13,6 +13,7 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
     CameraMotion,
 )
 from penshot.neopen.agent.repair_outcome import (
+    REPAIR_STATUS_MANUAL,
     REPAIR_STATUS_NO_ACTION,
     REPAIR_STATUS_NO_ISSUES,
     REPAIR_STATUS_PARTIAL,
@@ -46,6 +47,23 @@ def test_zero_actions_with_issues_marks_no_action_and_manual_items():
     manual = metadata["requires_manual_fix"]
     assert len(manual) == 2
     assert {item["issue_code"] for item in manual} == {"prompt_empty", "style_missing"}
+
+
+def test_zero_actions_without_auto_strategy_marks_manual_required():
+    """零动作且无可自动修复的问题只标记人工处理，不算修复器空转"""
+    metadata = {}
+
+    status = record_repair_outcome(
+        metadata,
+        "提示词转换",
+        [_issue("character_outfit_missing"), _issue("prop_color_missing")],
+        [],
+        auto_codes={"prompt_empty"},
+    )
+
+    assert status == REPAIR_STATUS_MANUAL
+    assert metadata["repair_status"] == REPAIR_STATUS_MANUAL
+    assert len(metadata["requires_manual_fix"]) == 2
 
 
 def test_actions_with_full_coverage_marks_repaired():

@@ -13,7 +13,7 @@ See LICENSE File For Details.
 import time
 from typing import Any, Dict, List, Optional
 
-from penshot.logger import debug, error, info
+from penshot.logger import debug, error, info, warning
 from penshot.neopen.agent.base_models import AgentMode
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
@@ -24,6 +24,8 @@ from penshot.neopen.agent.continuity_guardian.style_anchors import (
     build_style_text,
 )
 from penshot.neopen.agent.prompt_converter.camera_builder import (
+    normalize_instructions_shot_phrases,
+    normalize_prompt_shot_phrase,
     repair_motion_conflict,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_factory import (
@@ -38,6 +40,14 @@ from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
     SeverityLevel,
     RuleType,
     IssueType,
+)
+from penshot.neopen.agent.prompt_converter.scene_prompt_realign import (
+    apply_scene_prompt_realignment,
+)
+from penshot.neopen.agent.prompt_converter.style_prompt_repair import (
+    is_style_issue,
+    repair_prompt_styles,
+    repair_style_from_codes,
 )
 from penshot.neopen.agent.repair_outcome import record_repair_outcome
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
@@ -58,15 +68,14 @@ _PROMPT_REPAIR_AUTO_CODES = frozenset(
         "prompt_truncated",
         "prompt_incomplete",
         "text_truncated",
-        "style_inconsistent",
-        "style_missing",
-        "style_invalid",
+        # 风格问题由确定性收敛处理：未收敛时转人工，不计入自动修复覆盖率
         "negative_prompt_missing",
         "negative_prompt_insufficient",
         "audio_prompt_missing",
         "audio_missing",
         "audio_duration_mismatch",
         RuleType.CAMERA_MOTION_PROMPT_MISMATCH.code,
+        RuleType.SHOT_TYPE_PROMPT_MISMATCH.code,
     }
 )
 
@@ -104,6 +113,9 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         self._focus_on_audio_quality: bool = False
         self._focus_on_style_consistency: bool = False
         self._need_extra_validation: bool = False
+
+        # 修复阶段复用的剧本场景来源（T-102 地点重写需要计划地点）
+        self.parsed_script: Optional[ParsedScript] = None
 
     def process(
         self, fragment_sequence: FragmentSequence, parsed_script: ParsedScript
@@ -318,6 +330,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
         # 记录转换尝试
         attempt = len(self.convert_history) + 1
         self.convert_history.append({"attempt": attempt, "timestamp": time.time()})
+        self.parsed_script = parsed_script
 
         try:
             # 调用转换器 - 传递历史上下文
@@ -344,6 +357,24 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             # 记录音频提示词统计
             audio_count = sum(1 for f in instructions.fragments if f.audio)
             debug(f"音频提示词生成: {audio_count}/{len(instructions.fragments)}个片段")
+
+            # 地点重写（FR-098）：以镜头计划场景为准收敛提示词地点短语；
+            # 汇总与跳过明细由 apply_scene_prompt_realignment 统一输出
+            apply_scene_prompt_realignment(
+                instructions, fragment_sequence.fragments, parsed_script
+            )
+
+            # 风格确定性收敛（T-115）：修复参数含风格问题码时，以契约风格统一
+            # 提示词前缀并移除冲突风格短语，不再只依赖再次调用 LLM 收敛
+            if repair_params and repair_params.fix_needed:
+                style_result = repair_style_from_codes(
+                    instructions, repair_params.issue_codes or []
+                )
+                if style_result.actions:
+                    info(
+                        f"确定性风格收敛: 目标风格={style_result.target_style}，"
+                        f"调整片段数={len(style_result.actions)}"
+                    )
 
             # 记录修复历史
             if repair_params and repair_params.fix_needed:
@@ -621,7 +652,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             or i.issue_code
             in ["prompt_truncated", "prompt_incomplete", "text_truncated"]
         ]
-        style_issues = [i for i in issues if i.issue_type == IssueType.STYLE]
+        style_issues = [i for i in issues if is_style_issue(i)]
         negative_issues = [
             i
             for i in issues
@@ -755,23 +786,22 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                     }
                 )
 
-        # ========== 4. 修复风格不一致 ==========
+        # ========== 4. 修复风格不一致（确定性收敛，不依赖再次调用 LLM） ==========
+        style_resolved: List[Any] = []
         if style_issues:
-            # 与风格前缀同源（FR-025）：保留既有风格来源，不再用默认风格覆盖一套
-            style_counts: Dict[str, int] = {}
-            for prompt in instructions.fragments:
-                if prompt.style:
-                    style_counts[prompt.style] = style_counts.get(prompt.style, 0) + 1
-
-            if len(style_counts) > 1:
-                target_style = max(style_counts, key=lambda value: style_counts[value])
-                for prompt in instructions.fragments:
-                    if prompt.style and prompt.style != target_style:
-                        old_style = prompt.style
-                        prompt.style = target_style
-                        repair_actions.append(
-                            f"统一风格: {prompt.fragment_id} {old_style} -> {target_style}"
-                        )
+            # 与风格前缀同源（FR-025）：以多数片段的契约风格为目标，
+            # 统一 [Style: ...] 前缀并移除冲突风格短语
+            style_result = repair_prompt_styles(instructions, style_issues)
+            repair_actions.extend(style_result.actions)
+            style_resolved = style_result.resolved
+            if not style_result.target_style:
+                warning("未找到可用风格来源，风格问题直接转人工处理，不再重试")
+            else:
+                info(
+                    f"确定性风格收敛: 目标风格={style_result.target_style}，"
+                    f"收敛问题={len(style_result.resolved)}个，"
+                    f"未收敛问题={len(style_result.unresolved)}个"
+                )
 
         # ========== 5. 修复负面提示词 ==========
         if negative_issues:
@@ -847,7 +877,47 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             prompt.camera.motion, detail = repaired
             repair_actions.append(f"{fragment_id} {detail}")
 
-        # ========== 8. 更新统计信息 ==========
+        # ========== 8. 修复景别表述（确定性归一，与审计共用映射表） ==========
+        shot_type_issues = [
+            i for i in issues if i.issue_code == RuleType.SHOT_TYPE_PROMPT_MISMATCH.code
+        ]
+        for issue in shot_type_issues:
+            fragment_id = issue.fragment_id
+            prompt = (
+                self._find_prompt(instructions, fragment_id) if fragment_id else None
+            )
+            if prompt is None or prompt.camera is None:
+                continue
+            shot_type = (
+                prompt.camera.source_shot_type or prompt.camera.shot_type or ""
+            ).strip()
+            updated, applied = normalize_prompt_shot_phrase(prompt.prompt, shot_type)
+            if applied is None or updated == prompt.prompt:
+                continue
+            prompt.prompt = updated
+            repair_actions.append(
+                f"归一景别表述: {fragment_id} -> {applied}（camera.shot_type={shot_type}）"
+            )
+
+        # ========== 9. 全局景别兜底归一（长度截断等修复可能删除开头景别） ==========
+        for change in normalize_instructions_shot_phrases(instructions):
+            repair_actions.append(
+                f"归一景别表述: {change['fragment_id']} -> {change['applied_phrase']}"
+                f"（camera.shot_type={change['shot_type']}）"
+            )
+
+        # ========== 10. 地点重写（以镜头计划场景为准） ==========
+        apply_scene_prompt_realignment(
+            instructions,
+            fragment_sequence.fragments,
+            getattr(self, "parsed_script", None),
+        )
+        for record in instructions.metadata.get("scene_prompt_realigned") or []:
+            repair_actions.append(
+                f"地点重写: {record['fragment_id']} {record['from']} -> {record['to']}"
+            )
+
+        # ========== 11. 更新统计信息 ==========
         new_stats = {
             "prompt_count": len(instructions.fragments),
             "avg_prompt_length": sum(len(p.prompt) for p in instructions.fragments)
@@ -884,6 +954,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             repair_actions,
             auto_codes=_PROMPT_REPAIR_AUTO_CODES,
             manual_issues=unresolved_motion,
+            resolved_issues=style_resolved,
         )
 
         return instructions

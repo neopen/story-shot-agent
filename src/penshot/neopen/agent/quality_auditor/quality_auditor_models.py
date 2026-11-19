@@ -127,6 +127,11 @@ class QualityRepairParams(BaseModel):
         description="修复类型"
     )
 
+    issue_codes: List[str] = Field(
+        default_factory=list,
+        description="确定性问题码，供确定性修复分支精确匹配"
+    )
+
     issues: List[Any] = Field(
         default_factory=list,
         description="完整问题列表（可以是 BasicViolation 或 ContinuityIssue）"
@@ -156,6 +161,12 @@ class QualityRepairParams(BaseModel):
 
         if type_str not in self.issue_types:
             self.issue_types.append(type_str)
+
+    def add_issue_code(self, issue_code: Any) -> None:
+        """添加确定性问题码（自动转换为字符串并去重）"""
+        code_str = str(getattr(issue_code, "value", issue_code) or "").strip()
+        if code_str and code_str not in self.issue_codes:
+            self.issue_codes.append(code_str)
 
     def add_suggestion(self, key: str, suggestion: str) -> None:
         """添加修复建议"""

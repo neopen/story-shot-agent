@@ -1,12 +1,13 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: request_config.py
 @Description: 请求侧配置安全处理 - 阻止外部请求覆盖服务端基础设施配置，
 并统一校验批量请求中的模型提供商子项（覆盖平铺与 default/fallback 嵌套结构）。
-@Author: NeoPen
+@Author: neopen
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/17
 """
 

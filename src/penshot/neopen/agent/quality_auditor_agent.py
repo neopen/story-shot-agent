@@ -348,6 +348,13 @@ class QualityAuditorAgent:
 
         def add_violation(violation, source_node=None):
             """添加问题（带去重）"""
+            # 过滤既无问题码又无描述的空违规，避免污染修复契约
+            issue_code_text = str(getattr(violation, "issue_code", "") or "").strip()
+            issue_desc_text = str(getattr(violation, "issue_desc", "") or "").strip()
+            if not issue_code_text and not issue_desc_text:
+                debug(f"跳过空违规记录: {type(violation).__name__}")
+                return False
+
             # 生成唯一签名
             fragment_id = getattr(violation, 'fragment_id', None) or ''
             description = getattr(violation, 'issue_desc', '')[:150] if getattr(violation, 'issue_desc', '') else ''
@@ -538,6 +545,19 @@ class QualityAuditorAgent:
         if "needs_human_review" in report.stats:
             del report.stats["needs_human_review"]
 
+        # 检查项统计：无违规但有未通过检查时，状态与分数必须体现真实通过率，
+        # 不能因为“没有违规”就判 PASSED/满分
+        checks = list(report.checks or [])
+        failed_check_names = [
+            str(check.get("name") or "").strip()
+            for check in checks
+            if check.get("status") != AuditStatus.PASSED
+        ]
+        failed_check_names = [name for name in failed_check_names if name]
+        pass_rate = (
+            (len(checks) - len(failed_check_names)) / len(checks) if checks else 1.0
+        )
+
         # 计算质量分数（使用统一的权重计算）
         base_score = 100.0
         for violation in report.violations:
@@ -545,6 +565,9 @@ class QualityAuditorAgent:
             severity_str = severity.value if hasattr(severity, 'value') else str(severity)
             penalty = self.severity_weights.get(severity_str, 5)
             base_score -= penalty
+        if checks and not report.violations:
+            # 无违规时按检查通过率计分，与“检查通过=N/M”口径一致
+            base_score = 100.0 * pass_rate
         report.score = max(0.0, min(100.0, base_score))
         # 检测分与修复后分分列：此处只写检测分，修复后由审计节点回填
         report.detection_score = report.score
@@ -567,6 +590,8 @@ class QualityAuditorAgent:
         elif moderate_count > 0:
             report.status = AuditStatus.MODERATE_ISSUES
         elif warning_count > 0:
+            report.status = AuditStatus.MINOR_ISSUES
+        elif pass_rate < 0.9:
             report.status = AuditStatus.MINOR_ISSUES
         else:
             report.status = AuditStatus.PASSED
@@ -594,6 +619,21 @@ class QualityAuditorAgent:
 
         if issues_summary:
             return f"发现{', '.join(issues_summary)}，请根据建议修复"
+
+        failed_check_names = [
+            str(check.get("name") or "").strip()
+            for check in (report.checks or [])
+            if check.get("status") != AuditStatus.PASSED
+        ]
+        failed_check_names = [name for name in failed_check_names if name]
+        if failed_check_names:
+            shown = "、".join(failed_check_names[:3])
+            if len(failed_check_names) > 3:
+                shown += "等"
+            return (
+                f"有{len(failed_check_names)}项检查未通过（{shown}），"
+                "请根据检查详情优化"
+            )
 
         if report.score < 60:
             return f"质量分数较低({report.score:.1f}%)，建议修复后重试"
@@ -672,6 +712,11 @@ class QualityAuditorAgent:
                     fix_needed=True,
                     issue_count=len(issues),
                     issue_types=list(set([i.issue_type.value for i in issues if i.issue_type])),
+                    issue_codes=list(dict.fromkeys(
+                        code for code in (
+                            str(getattr(i, "issue_code", "") or "").strip() for i in issues
+                        ) if code
+                    )),
                     fragments=list(set([i.fragment_id for i in issues if i.fragment_id])),
                     suggestions=self._collect_suggestions(issues),
                     severity_summary=self._get_severity_summary(issues),

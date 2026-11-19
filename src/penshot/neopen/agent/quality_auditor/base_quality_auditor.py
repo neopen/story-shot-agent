@@ -79,16 +79,27 @@ class BaseQualityAuditor(ABC):
         })
 
         report.status = status
+        # 报告分数与“检查通过=N/M”同口径，避免报告体仍保留默认 100 分
+        report.score = round(quality_score * 100, 1)
+        report.detection_score = report.score
+        if report.post_repair_score is None:
+            report.post_repair_score = report.score
 
-        # 6. 生成结论和建议
-        report.conclusion = self._generate_conclusion(status, violation_counts)
+        # 6. 生成结论和建议（失败检查名一并传入，避免出现“0 个警告问题”式结论）
+        report.conclusion = self._generate_conclusion(
+            status, violation_counts, check_stats.get("failed_check_names")
+        )
         report.detailed_analysis = self._generate_detailed_analysis(report)
 
+        failed_check_names = check_stats.get("failed_check_names") or []
+        failed_suffix = (
+            f", 未通过检查={','.join(failed_check_names)}" if failed_check_names else ""
+        )
         info(
             f"审查完成: 状态={status.value}, "
             f"检查通过={check_stats['passed_checks']}/{check_stats['total_checks']}, "
             f"违规={len(report.violations)}个, "
-            f"评分={quality_score:.1%}"
+            f"评分={quality_score:.1%}{failed_suffix}"
         )
 
         return report
@@ -111,16 +122,22 @@ class BaseQualityAuditor(ABC):
 
         return counts
 
-    def _calculate_check_stats(self, checks: List[Dict[str, Any]]) -> Dict[str, int]:
-        """计算检查项统计"""
+    def _calculate_check_stats(self, checks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """计算检查项统计（含未通过检查名，保证失败项可追溯）"""
         total_checks = len(checks)
         passed_checks = sum(1 for check in checks if check.get("status") == AuditStatus.PASSED)
         failed_checks = total_checks - passed_checks
+        failed_check_names = [
+            str(check.get("name") or "").strip()
+            for check in checks
+            if check.get("status") != AuditStatus.PASSED
+        ]
 
         return {
             "total_checks": total_checks,
             "passed_checks": passed_checks,
             "failed_checks": failed_checks,
+            "failed_check_names": [name for name in failed_check_names if name],
             "pass_rate": round(passed_checks / total_checks, 2) if total_checks > 0 else 1.0
         }
 
@@ -200,15 +217,33 @@ class BaseQualityAuditor(ABC):
 
         return final_score
 
-    def _generate_conclusion(self, status: AuditStatus, violation_counts: Dict[SeverityLevel, int]) -> str:
-        """生成审查结论"""
+    def _generate_conclusion(self,
+                             status: AuditStatus,
+                             violation_counts: Dict[SeverityLevel, int],
+                             failed_check_names: Optional[List[str]] = None) -> str:
+        """生成审查结论
+
+        ``MINOR_ISSUES`` 可能来自“有警告违规”或“检查通过率不足”，
+        结论必须按实际原因生成，不能固定输出警告违规数。
+        """
+
+        failed_names = [name for name in (failed_check_names or []) if name]
+        if status == AuditStatus.MINOR_ISSUES:
+            reasons: List[str] = []
+            warning_count = violation_counts[SeverityLevel.WARNING]
+            if warning_count > 0:
+                reasons.append(f"有{warning_count}个警告问题")
+            if failed_names:
+                shown = "、".join(failed_names[:3])
+                if len(failed_names) > 3:
+                    shown += "等"
+                reasons.append(f"{len(failed_names)}项检查未通过（{shown}）")
+            if not reasons:
+                reasons.append("存在轻微问题")
+            return f"{'，'.join(reasons)}，建议优化后继续"
 
         conclusions = {
             AuditStatus.PASSED: "审查通过，可以开始视频生成",
-
-            AuditStatus.MINOR_ISSUES: (
-                f"有{violation_counts[SeverityLevel.WARNING]}个警告问题，建议优化后继续"
-            ),
 
             AuditStatus.MODERATE_ISSUES: (
                 f"发现{violation_counts[SeverityLevel.MODERATE]}个中度问题，需要调整后再继续"

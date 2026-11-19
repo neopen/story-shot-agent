@@ -253,12 +253,15 @@ class ScriptParserAgent(BaseRepairableAgent[ParsedScript, str]):
         if not self.current_repair_params:
             return
 
-        info(f"应用修复参数: {self.current_repair_params.issue_types}")
+        info(
+            f"应用修复参数: {self.current_repair_params.issue_codes or self.current_repair_params.issue_types}"
+        )
 
         # 可根据修复参数调整解析策略
-        if "scene_insufficient" in self.current_repair_params.issue_types:
+        issue_codes = set(self.current_repair_params.issue_codes or [])
+        if "scene_insufficient" in issue_codes:
             self._focus_on_scene_detection = True
-        if "character_missing" in self.current_repair_params.issue_types:
+        if "character_missing" in issue_codes:
             self._focus_on_character_detection = True
 
     def parser_process(self, script_text: str) -> Optional[ParsedScript]:

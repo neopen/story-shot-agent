@@ -10,11 +10,14 @@ See LICENSE File For Details.
 @Time: 2026/11/3
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from penshot.neopen.agent.character_names import normalize_character_name
 from penshot.neopen.agent.continuity_guardian.anchor_recall import (
     _scene_num_from_id,
+)
+from penshot.neopen.agent.continuity_guardian.consistency_contract import (
+    CharacterContract,
 )
 from penshot.neopen.agent.continuity_guardian.style_anchors import build_style_prefix
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import SeverityLevel
@@ -192,6 +195,93 @@ def group_violations_by_stage(
     return grouped
 
 
+def _parsed_characters_by_name(parsed_script: Any) -> Dict[str, Any]:
+    """剧本角色表按规范化名字索引"""
+    parsed: Dict[str, Any] = {}
+    for char in getattr(parsed_script, "characters", []) or []:
+        name = normalize_character_name(getattr(char, "name", None))
+        if name:
+            parsed.setdefault(name, char)
+    return parsed
+
+
+def split_script_character_violations(
+    violations: Optional[List[Dict[str, Any]]],
+    parsed_script: Any,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """把 unknown_character 违规拆成（剧本真实角色，其余违规）
+
+    剧本真实角色重跑生成无法消除，应由契约补登记收敛，不进入分镜修复参数
+    与人工项；只有剧本角色表之外的幻觉角色才需要修复器处理。``parsed_script``
+    缺失时不拆分，全部视为待处理违规。
+    """
+    parsed_by_name = _parsed_characters_by_name(parsed_script)
+    if not parsed_by_name:
+        return [], list(violations or [])
+
+    real_characters: List[Dict[str, Any]] = []
+    remaining: List[Dict[str, Any]] = []
+    for violation in violations or []:
+        character = normalize_character_name(violation.get("character"))
+        if _text(violation.get("type")) == "unknown_character" and (
+            character in parsed_by_name
+        ):
+            real_characters.append(violation)
+        else:
+            remaining.append(violation)
+    return real_characters, remaining
+
+
+def register_script_characters(
+    contract: Any,
+    parsed_script: Any,
+    violations: Optional[List[Dict[str, Any]]],
+) -> List[str]:
+    """把违规项中属于剧本角色表的角色补登记进契约
+
+    Returns:
+        本次补登记的角色名列表
+    """
+    if contract is None or parsed_script is None:
+        return []
+    characters = getattr(contract, "characters", None)
+    if not isinstance(characters, dict):
+        return []
+
+    registered: List[str] = []
+    known_names = {normalize_character_name(name) for name in characters}
+    parsed_by_name = _parsed_characters_by_name(parsed_script)
+    for violation in violations or []:
+        if _text(violation.get("type")) != "unknown_character":
+            continue
+        character = normalize_character_name(violation.get("character"))
+        if not character or character in known_names:
+            continue
+        parsed_char = parsed_by_name.get(character)
+        if parsed_char is None:
+            continue
+        raw_name = str(getattr(parsed_char, "name", "") or "").strip() or character
+        char_contract = CharacterContract(name=raw_name)
+        description = str(getattr(parsed_char, "description", "") or "").strip()
+        if description:
+            char_contract._extract_appearance_features(description)
+        characters[raw_name] = char_contract
+        known_names.add(normalize_character_name(raw_name))
+        registered.append(raw_name)
+    return registered
+
+
+def resolve_script_character_violations(
+    violations: Optional[List[Dict[str, Any]]],
+    contract: Any,
+    parsed_script: Any,
+) -> List[Dict[str, Any]]:
+    """补登记剧本真实角色后，返回只含幻觉角色的违规项"""
+    register_script_characters(contract, parsed_script, violations)
+    _, remaining = split_script_character_violations(violations, parsed_script)
+    return remaining
+
+
 def _suggestion_key(violation: Dict[str, Any]) -> str:
     """修复建议的键：优先片段 ID，其次镜头 ID，否则 global"""
     return (
@@ -223,11 +313,8 @@ def _build_suggestion(
         if anchor:
             parts.append(anchor)
         if parsed_script is not None:
-            parsed_names = {
-                normalize_character_name(getattr(char, "name", None))
-                for char in getattr(parsed_script, "characters", []) or []
-            }
-            if character in parsed_names:
+            parsed_by_name = _parsed_characters_by_name(parsed_script)
+            if normalize_character_name(character) in parsed_by_name:
                 parts.append("该角色已在剧本角色表中，将补登记进契约并保留")
             else:
                 parts.append(
@@ -302,6 +389,7 @@ def build_contract_repair_params(
         fix_needed=True,
         issue_count=len(violations),
         issue_types=issue_types,
+        issue_codes=issue_types,
         issues=list(violations),
         fragments=fragments,
         suggestions=suggestions,
@@ -336,6 +424,9 @@ def merge_repair_params(
         issue_count=(base.issue_count or 0) + (extra.issue_count or 0),
         issue_types=list(
             dict.fromkeys([*(base.issue_types or []), *(extra.issue_types or [])])
+        ),
+        issue_codes=list(
+            dict.fromkeys([*(base.issue_codes or []), *(extra.issue_codes or [])])
         ),
         issues=list(base.issues or []) + list(extra.issues or []),
         fragments=list(

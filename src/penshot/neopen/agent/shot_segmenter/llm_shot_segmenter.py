@@ -385,16 +385,18 @@ class LLMShotSegmenter(BaseShotSegmenter, BaseLLMAgent):
         if not self.current_repair_params:
             return shot_sequence
 
-        info(f"应用修复参数调整分镜，问题类型: {self.current_repair_params.issue_types}")
+        info(
+            f"应用修复参数调整分镜，问题码: {self.current_repair_params.issue_codes}"
+        )
 
-        # 根据问题类型进行调整
-        issue_types = set(self.current_repair_params.issue_types)
+        # 根据问题码进行确定性调整
+        issue_types = set(self.current_repair_params.issue_codes or [])
 
         if "shot_insufficient" in issue_types:
             # 镜头不足：增加更多镜头
             shot_sequence = self._add_more_shots(shot_sequence, parsed_script)
 
-        if "shot_duration_too_long" in issue_types or "duration" in str(issue_types):
+        if "shot_duration_too_long" in issue_types:
             # 时长过长：拆分长镜头
             shot_sequence = self._split_long_shots(shot_sequence)
 

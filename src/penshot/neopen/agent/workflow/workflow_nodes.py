@@ -26,6 +26,7 @@ from penshot.neopen.agent.continuity_guardian.contract_repair import (
     group_violations_by_stage,
     merge_repair_params,
     merge_violations,
+    resolve_script_character_violations,
 )
 from penshot.neopen.agent.continuity_guardian.contract_validator import (
     validate_fragment_sequence,
@@ -67,9 +68,11 @@ from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
 from penshot.neopen.agent.repair_outcome import (
+    REPAIR_STATUS_MANUAL,
     REPAIR_STATUS_NO_ACTION,
     REPAIR_STATUS_PARTIAL,
     REPAIR_STATUS_REPAIRED,
+    manual_fix_entry,
 )
 from penshot.neopen.prompts.ingestion_policy import (
     REASON_BELOW_THRESHOLD,
@@ -83,6 +86,7 @@ from penshot.utils.log_utils import print_log_exception
 from penshot.neopen.agent.model_adapter import (
     adapt_instructions,
     apply_image_to_video_routing,
+    collect_plan_scene_violations,
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
@@ -1382,8 +1386,16 @@ class WorkflowNodes:
                 state.domain.shot_sequence,
                 state.domain.contract,
             )
+            # T-103：路由阶段首帧资产与计划场景不一致同样计入契约违规
+            plan_scene_violations = collect_plan_scene_violations(
+                getattr(state.domain.instructions, "route_plan", None),
+                getattr(state.domain.fragment_sequence, "fragments", None),
+                getattr(state.domain.shot_sequence, "shots", None),
+                state.domain.contract,
+            )
             contract_violations = merge_violations(
-                state.domain.contract_violations, fresh_contract_violations
+                state.domain.contract_violations,
+                fresh_contract_violations + plan_scene_violations,
             )
 
             # 执行质量审查
@@ -1519,14 +1531,15 @@ class WorkflowNodes:
             # 调用各阶段修复器
             repair_issue_count = 0
             repair_actions_total = 0
-            history_before: Dict[str, int] = {}
+            # 修复前快照：动作数与状态序列都只统计本轮新增，避免历史轮次重复聚合
+            history_before = self._repair_history_sizes(state)
+            status_history_before = self._repair_status_history_sizes(state)
             if result.repair_params:
                 repair_issue_count = sum(
                     params.issue_count
                     for params in result.repair_params.values()
                     if getattr(params, "fix_needed", False)
                 )
-                history_before = self._repair_history_sizes(state)
                 for node, params in result.repair_params.items():
                     if not params.fix_needed:
                         continue
@@ -1587,19 +1600,55 @@ class WorkflowNodes:
 
             # P0-2：修复结论必须可核对——问题数与实际动作数分列，
             # 零动作不得提升分数，未覆盖问题进入最终输出的人工项
+            round_statuses = self._collect_round_repair_statuses(
+                state, history_before, status_history_before
+            )
             manual_items = self._collect_manual_fix_items(state)
+            if (
+                REPAIR_STATUS_MANUAL in round_statuses
+                and not manual_items
+            ):
+                # 状态与人工项同源：人工状态必须有对应人工项，缺失时从修复参数补全
+                manual_items = self._collect_repair_param_manual_items(result)
+                if manual_items:
+                    warning(
+                        f"repair_status={REPAIR_STATUS_MANUAL} 缺少人工处理项，"
+                        f"已从修复参数补全{len(manual_items)}项"
+                    )
             result.metadata["repair_issue_count"] = repair_issue_count
             result.metadata["repair_action_count"] = repair_actions_total
+            result.metadata["stage_repair_statuses"] = round_statuses
             if manual_items:
                 result.metadata["requires_manual_fix"] = manual_items
 
-            if repair_issue_count > 0 and repair_actions_total == 0:
+            # 聚合优先级：no_action_taken > manual_required > partial/repaired
+            if REPAIR_STATUS_NO_ACTION in round_statuses:
                 result.metadata["repair_status"] = REPAIR_STATUS_NO_ACTION
                 error(
-                    f"修复环节空转：发现{repair_issue_count}个问题，执行0个修复操作；"
+                    f"修复环节空转：发现{repair_issue_count}个问题，"
+                    f"执行{repair_actions_total}个修复操作；存在具备自动策略却未执行的阶段，"
                     f"已标记 repair_status={REPAIR_STATUS_NO_ACTION}，"
                     f"post_repair_score 保持 detection_score={result.detection_score}"
                 )
+                result.post_repair_score = result.detection_score
+            elif repair_issue_count > 0 and repair_actions_total == 0:
+                if REPAIR_STATUS_MANUAL in round_statuses and manual_items:
+                    result.metadata["repair_status"] = REPAIR_STATUS_MANUAL
+                    warning(
+                        f"修复环节无自动策略可用：发现{repair_issue_count}个问题，"
+                        f"人工项={len(manual_items)}，"
+                        f"已标记 repair_status={REPAIR_STATUS_MANUAL}，"
+                        f"post_repair_score 保持 detection_score={result.detection_score}"
+                    )
+                else:
+                    # 没有人工项就不能声明 manual_required，按空转如实暴露
+                    result.metadata["repair_status"] = REPAIR_STATUS_NO_ACTION
+                    error(
+                        f"修复环节空转：发现{repair_issue_count}个问题，执行0个修复操作；"
+                        f"repair_status={REPAIR_STATUS_MANUAL} 缺少人工处理项，"
+                        f"已降级为 repair_status={REPAIR_STATUS_NO_ACTION}，"
+                        f"post_repair_score 保持 detection_score={result.detection_score}"
+                    )
                 result.post_repair_score = result.detection_score
             elif repair_actions_total > 0:
                 # 覆盖全部问题时为 repaired，仍有未覆盖问题则如实标记 partial
@@ -1839,6 +1888,15 @@ class WorkflowNodes:
                     )
                     # 契约违规项与连续性问题合并，保证 Repairer 按契约修复
                     violations = contract_violations_by_stage.get(stage) or []
+                    if violations:
+                        # T-114：剧本真实角色补登记后即收敛，只向修复器下发幻觉角色
+                        remaining = resolve_script_character_violations(
+                            violations,
+                            state.domain.contract,
+                            state.domain.parsed_script,
+                        )
+                        contract_violations_by_stage[stage] = remaining
+                        violations = remaining
                     if violations:
                         contract_params = build_contract_repair_params(
                             violations,
@@ -2707,6 +2765,13 @@ class WorkflowNodes:
             for name, metadata in self._artifact_metadata(state).items()
         }
 
+    def _repair_status_history_sizes(self, state: WorkflowState) -> Dict[str, int]:
+        """记录各产物 repair_status_history 的当前长度，用于按轮切片"""
+        return {
+            name: len(metadata.get("repair_status_history") or [])
+            for name, metadata in self._artifact_metadata(state).items()
+        }
+
     def _count_new_repair_actions(
         self, state: WorkflowState, history_before: Dict[str, int]
     ) -> int:
@@ -2720,6 +2785,50 @@ class WorkflowNodes:
                 except (AttributeError, TypeError, ValueError):
                     continue
         return total
+
+    def _collect_round_repair_statuses(
+        self,
+        state: WorkflowState,
+        history_before: Dict[str, int],
+        status_history_before: Optional[Dict[str, int]] = None,
+    ) -> List[str]:
+        """收集本轮新增的修复状态序列
+
+        同轮多次记录时保留全部状态，交由聚合按优先级取最严重结论；
+        兼容只写 ``repair_status`` 未写状态序列的旧路径。
+        """
+        status_history_before = status_history_before or {}
+        statuses: List[str] = []
+        for name, metadata in self._artifact_metadata(state).items():
+            history_entries = metadata.get("repair_status_history") or []
+            new_statuses = [
+                str(entry.get("status") or "")
+                for entry in history_entries[status_history_before.get(name, 0) :]
+                if isinstance(entry, dict)
+            ]
+            if (
+                not new_statuses
+                and len(metadata.get("repair_history") or [])
+                > history_before.get(name, 0)
+            ):
+                legacy_status = str(metadata.get("repair_status") or "")
+                if legacy_status:
+                    new_statuses = [legacy_status]
+            statuses.extend(status for status in new_statuses if status)
+        return statuses
+
+    @staticmethod
+    def _collect_repair_param_manual_items(report: Any) -> List[Dict[str, Any]]:
+        """从修复参数重建人工项，用于 manual_required 缺少人工项时兜底"""
+        items: List[Dict[str, Any]] = []
+        for node, params in (report.repair_params or {}).items():
+            if not getattr(params, "fix_needed", False):
+                continue
+            for issue in getattr(params, "issues", []) or []:
+                entry = manual_fix_entry(node.value, issue)
+                if entry not in items:
+                    items.append(entry)
+        return items
 
     def _collect_manual_fix_items(self, state: WorkflowState) -> List[Dict[str, Any]]:
         """汇总各产物中不可自动修复、需人工处理的问题项"""

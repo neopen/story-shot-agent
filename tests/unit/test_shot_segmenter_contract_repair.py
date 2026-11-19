@@ -86,3 +86,56 @@ def test_repair_shots_tolerates_dict_and_basic_mixed_issues():
 
     assert repaired.shots[0].main_character == ""
     assert repaired.metadata["repair_history"][-1]["fixed_issues"] == 1
+
+
+def test_real_character_violation_not_in_manual_list():
+    """T-114：剧本真实角色补登记即收敛，不进入人工项"""
+    shot_sequence = ShotSequence(shots=[_shot("shot_001", "门口黑影")])
+    structured_script = SimpleNamespace(characters=[SimpleNamespace(name="门口黑影")])
+
+    repaired = _segmenter().repair_shots(
+        shot_sequence, [_violation("shot_001", "门口黑影")], structured_script
+    )
+
+    assert repaired.metadata["repair_status"] == "no_issues"
+    assert "requires_manual_fix" not in repaired.metadata
+
+
+def test_cleared_hallucination_not_in_manual_list():
+    """T-114：已清除的幻觉角色不再计入人工项，未清除的仍保留人工项"""
+    shot_sequence = ShotSequence(
+        shots=[_shot("shot_001", "神秘人"), _shot("shot_002", "黑衣人")]
+    )
+    structured_script = SimpleNamespace(characters=[SimpleNamespace(name="陈默")])
+
+    repaired = _segmenter().repair_shots(
+        shot_sequence,
+        [_violation("shot_001", "神秘人"), _violation("shot_002", "黑影甲")],
+        structured_script,
+    )
+
+    assert repaired.shots[0].main_character == ""
+    assert repaired.shots[1].main_character == "黑衣人"
+    assert repaired.metadata["repair_status"] == "partial"
+    assert len(repaired.metadata["requires_manual_fix"]) == 1
+
+
+def test_basic_violation_wrapper_is_also_excluded_from_manual_list():
+    """T-114：审计包装的同一违规项随清理结果一并从人工项剔除"""
+    shot_sequence = ShotSequence(shots=[_shot("shot_001", "神秘人")])
+    structured_script = SimpleNamespace(characters=[SimpleNamespace(name="陈默")])
+    violation = _violation("shot_001", "神秘人")
+    wrapper = SimpleNamespace(
+        issue_type="continuity",
+        issue_code="unknown_character",
+        issue_desc=violation["message"],
+        fragment_id="shot_001",
+        issue_value=violation,
+        suggestion="清除主角色标注",
+    )
+
+    repaired = _segmenter().repair_shots(shot_sequence, [wrapper], structured_script)
+
+    assert repaired.shots[0].main_character == ""
+    assert repaired.metadata["repair_status"] == "repaired"
+    assert "requires_manual_fix" not in repaired.metadata

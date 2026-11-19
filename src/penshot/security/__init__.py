@@ -1,12 +1,13 @@
 """
-Copyright (c) 2025 HiPeng (NeoPen)
+Copyright (c) 2025 neopen
 Licensed under the MIT License.
 See LICENSE File For Details.
 
 @FileName: __init__.py
 @Description: 统一安全工具包 - 汇总 SSRF/回调防护、环境变量引用解析与请求配置脱敏。
 ``request_config`` 依赖配置模型，故通过 PEP 562 惰性导出，避免 config 与 security 循环导入。
-@Author: NeoPen
+@Author: neopen
+@Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/11/17
 """
 

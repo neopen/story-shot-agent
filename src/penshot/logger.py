@@ -13,6 +13,7 @@ See LICENSE File For Details.
 """
 
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +28,21 @@ from penshot.utils.path_utils import PathResolver
 
 # 初始化控制台颜色支持
 init_console_colors()
+
+
+def _file_logging_enabled() -> bool:
+    """文件日志开关；PENSHOT_LOG_TO_FILE=0/false/no/off 时只保留控制台输出
+
+    测试运行会复用同一份 logging.yaml，若不关闭文件日志，pytest 输出会
+    持续写进 ``logs/penshot_<date>.log``，真实运行的诊断信息无法分辨。
+    """
+    value = os.getenv("PENSHOT_LOG_TO_FILE", "1").strip().lower()
+    return value not in {"0", "false", "no", "off"}
+
+
+def _file_log_override() -> Optional[str]:
+    """文件日志路径覆盖（PENSHOT_LOG_FILE），用于测试重定向到临时目录"""
+    return os.getenv("PENSHOT_LOG_FILE", "").strip() or None
 
 
 class DailyRotatingFileHandler(logging.Handler):
@@ -190,7 +206,11 @@ class LoggingConfigManager:
             "encoding": "utf8"
         }
 
-        return {**default_config, **file_config}
+        merged = {**default_config, **file_config}
+        override = _file_log_override()
+        if override:
+            merged["filename"] = override
+        return merged
 
     def get_console_handler_config(self) -> Dict[str, Any]:
         """获取控制台处理器配置"""
@@ -225,19 +245,27 @@ class LoggingConfigManager:
             "loggers": {}
         }
 
+        file_enabled = _file_logging_enabled()
+
         # 添加handlers
         if "console" in config:
             logging_dict["handlers"]["console"] = self.get_console_handler_config()
 
-        if "file" in config:
+        if "file" in config and file_enabled:
             logging_dict["handlers"]["file"] = self.get_file_handler_config()
 
         # 添加loggers
         levels = config.get("levels", {})
         handlers_map = config.get("handlers", {})
 
+        def enabled_handlers(names: List[str]) -> List[str]:
+            """过滤掉被环境变量关闭的 file handler"""
+            if file_enabled:
+                return list(names)
+            return [name for name in names if name != "file"]
+
         # 根logger
-        root_handlers = handlers_map.get("root", ["console"])
+        root_handlers = enabled_handlers(handlers_map.get("root", ["console"]))
         logging_dict["loggers"][""] = {
             "level": levels.get("root", "INFO"),
             "handlers": root_handlers,
@@ -250,7 +278,7 @@ class LoggingConfigManager:
             if name in handlers_map:
                 logging_dict["loggers"][name] = {
                     "level": levels.get(name, "INFO"),
-                    "handlers": handlers_map[name],
+                    "handlers": enabled_handlers(handlers_map[name]),
                     "propagate": False
                 }
 

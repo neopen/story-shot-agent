@@ -242,8 +242,8 @@ def test_route_model_node_rebuilds_route_plan():
     assert nodes.storage.saved[0][0] == "prompt_converter_result.json"
 
 
-def test_route_model_node_marks_scene_anchor_replacement():
-    """路由节点把场景锚定的自动替换与阻断结果写回 decisions/blocked_fragments"""
+def test_route_model_node_keeps_plan_scene_over_prompt_location():
+    """计划场景与提示词地点冲突时，路由节点保留计划场景锚定（T-101）"""
     nodes = object.__new__(WorkflowNodes)
     nodes.storage = _FakeStorage()
 
@@ -271,11 +271,12 @@ def test_route_model_node_marks_scene_anchor_replacement():
     plan = state.domain.instructions.route_plan
     decision = plan["decisions"][0]
     assert decision["status"] == "ready"
-    assert "已自动替换" in decision["warnings"][0]
+    # 计划场景 scene_002 已有资产，提示词里的教室描述不得改写场景权威
+    assert decision["warnings"] == []
     first_frame = next(
         ref for ref in decision["references"] if ref["role"] == "first_frame"
     )
-    assert first_frame["asset_id"] == "scene_001"
+    assert first_frame["asset_id"] == "scene_002"
     assert plan["blocked_fragments"] == []
 
 

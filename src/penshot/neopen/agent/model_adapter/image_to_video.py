@@ -200,6 +200,12 @@ def _scene_for_asset(contract: Any, asset_id: str) -> Optional[Any]:
     return None
 
 
+def _plan_scene_downgrade_warning(fragment_id: str, scene: Any) -> str:
+    """计划场景无法提供首帧资产时的降级说明（FR-099）"""
+    reason = "计划场景缺失" if scene is None else "计划场景无对应资产"
+    return f"{fragment_id} {reason}，场景权威降级"
+
+
 def _props_by_scene(parsed_script: Any) -> Dict[str, set[str]]:
     """道具引用约束：场景ID -> 该场景允许引用的道具名集合
 
@@ -320,6 +326,11 @@ def apply_image_to_video_routing(
     }
     prop_scene_map = _props_by_scene(parsed_script)
     prop_state_maps = _prop_state_maps(prompts, fragments, parsed_script)
+    scene_prompt_conflicts = (
+        instructions.metadata.get("scene_prompt_conflicts") or {}
+        if isinstance(instructions.metadata, dict)
+        else {}
+    )
 
     triggered = 0
     for package in packages:
@@ -329,6 +340,10 @@ def apply_image_to_video_routing(
 
         fragment = fragment_index.get(package.fragment_id)
         scene = _resolve_scene(contract, fragment, shot_index)
+        plan_scene_asset = _find_scene_asset(contract, scene)
+        plan_scene_asset_id = str(
+            getattr(plan_scene_asset, "asset_id", "") or ""
+        ).strip()
 
         critical = has_critical_text(prompt.prompt)
         anchors = _character_has_anchors(prompt, contract)
@@ -349,6 +364,10 @@ def apply_image_to_video_routing(
                 allowed_props = sorted(prop_scene_map.get(scene_id, set()))
 
         package.mode = RouteMode.IMAGE_TO_VIDEO
+        # 场景权威来源：计划场景有对应资产时以计划为准，否则降级为提示词推断
+        package.model_params["scene_anchor_source"] = (
+            "plan" if plan_scene_asset_id else "plan_missing"
+        )
         prop_states = {
             name: states[package.fragment_id]
             for name, states in prop_state_maps.items()
@@ -376,7 +395,7 @@ def apply_image_to_video_routing(
             ),
             None,
         )
-        # 0.4.5 任务 7：片段场景与首帧场景资产不一致时自动替换或阻断
+        # 0.4.7 T-101：计划场景有资产时以其为准，仅计划缺失/无资产才允许替换
         if scene_reference is not None:
             resolution = resolve_scene_anchor(
                 prompt,
@@ -384,6 +403,7 @@ def apply_image_to_video_routing(
                 scene=scene,
                 fragment=fragment,
                 first_frame_asset_id=scene_reference.asset_id,
+                plan_scene_asset_id=plan_scene_asset_id,
             )
             if resolution is not None:
                 package.warnings.append(resolution.message)
@@ -400,6 +420,51 @@ def apply_image_to_video_routing(
                 else:
                     package.status = "needs_manual_fix"
                     warning(f"场景锚定已阻断: {resolution.message}")
+            elif not plan_scene_asset_id:
+                package.warnings.append(
+                    _plan_scene_downgrade_warning(package.fragment_id, scene)
+                )
+        elif not plan_scene_asset_id:
+            package.warnings.append(
+                _plan_scene_downgrade_warning(package.fragment_id, scene)
+            )
+
+        # 0.4.7 T-102：地点冲突未消除的片段不得以 ready 状态进入下游
+        conflict_entries = scene_prompt_conflicts.get(package.fragment_id) or []
+        if conflict_entries:
+            package.status = "needs_manual_fix"
+            terms = ", ".join(
+                sorted(
+                    {
+                        str(entry.get("term", ""))
+                        for entry in conflict_entries
+                        if isinstance(entry, dict) and entry.get("term")
+                    }
+                )
+            )
+            # 阻断信息补充计划地点与期望首帧资产，便于人工按计划场景修正
+            plan_locations = sorted(
+                {
+                    str(entry.get("plan_location", "") or "")
+                    for entry in conflict_entries
+                    if isinstance(entry, dict) and entry.get("plan_location")
+                }
+            )
+            if not plan_locations:
+                scene_location = str(getattr(scene, "location", "") or "").strip()
+                plan_locations = [scene_location] if scene_location else []
+            details: List[str] = []
+            if plan_locations:
+                details.append(f"计划地点={'/'.join(plan_locations)}")
+            if plan_scene_asset_id:
+                details.append(f"期望首帧资产={plan_scene_asset_id}")
+            message = (
+                f"地点冲突未解决，片段已阻断: {package.fragment_id}"
+                f"（{terms or '地点冲突'}"
+                f"{'；' + '；'.join(details) if details else ''}）"
+            )
+            package.warnings.append(message)
+            warning(message)
 
         scene_asset_ref = (
             _manifest_ref(manifest, scene_reference.asset_id)
@@ -422,3 +487,107 @@ def apply_image_to_video_routing(
         triggered += 1
 
     return triggered
+
+
+def _first_frame_asset_id(references: Any) -> str:
+    """从包的声明式引用中取首帧场景资产ID（无则返回空串）"""
+    for reference in references or []:
+        if not isinstance(reference, dict):
+            continue
+        if str(reference.get("role") or "") != "first_frame":
+            continue
+        asset_id = str(reference.get("asset_id") or "").strip()
+        if asset_id:
+            return asset_id
+    return ""
+
+
+def _scene_label(scene: Any, fragment: Any) -> str:
+    """生成违规项中的场景标识：优先镜头 scene_id，退回契约场景序号"""
+    scene_id = str(getattr(fragment, "scene_id", "") or "").strip()
+    if scene_id:
+        return scene_id
+    scene_num = getattr(scene, "scene_num", None)
+    if isinstance(scene_num, int):
+        return f"scene_{scene_num:03d}"
+    return ""
+
+
+def collect_plan_scene_violations(
+    route_plan: Any,
+    fragments: Optional[List[Any]],
+    shots: Optional[List[Any]],
+    contract: Any,
+) -> List[Dict[str, Any]]:
+    """收集「计划场景 vs 首帧资产」不一致的契约违规项（T-103/FR-099a）
+
+    只检查走图生视频且有首帧引用的包；计划场景存在且契约有对应资产时，
+    首帧 ``asset_id`` 必须等于该计划场景资产，否则说明路由期锚点漂移。
+    违规项交 ``merge_violations`` 合并后由审查按 MAJOR 计入，避免
+    “计划场景有资产、首帧用了别的场景”仍判审查通过。
+    """
+    if not isinstance(route_plan, dict) or contract is None:
+        return []
+
+    fragment_index = {
+        str(
+            getattr(fragment, "id", "") or getattr(fragment, "fragment_id", "")
+        ): fragment
+        for fragment in fragments or []
+    }
+    shot_index = {
+        str(getattr(shot, "id", "")): shot
+        for shot in shots or []
+        if getattr(shot, "id", "")
+    }
+
+    violations: List[Dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for package in route_plan.get("adapted_packages") or []:
+        if not isinstance(package, dict):
+            continue
+        if str(package.get("mode") or "") != RouteMode.IMAGE_TO_VIDEO.value:
+            continue
+        fragment_id = str(package.get("fragment_id") or "").strip()
+        if not fragment_id:
+            continue
+
+        fragment = fragment_index.get(fragment_id)
+        scene = _resolve_scene(contract, fragment, shot_index)
+        plan_asset = _find_scene_asset(contract, scene)
+        plan_asset_id = str(getattr(plan_asset, "asset_id", "") or "").strip()
+        if not plan_asset_id:
+            continue
+
+        first_frame_asset_id = _first_frame_asset_id(package.get("references"))
+        if not first_frame_asset_id or first_frame_asset_id == plan_asset_id:
+            continue
+
+        key = (fragment_id, first_frame_asset_id)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        scene_ref = _scene_label(scene, fragment)
+        location = str(getattr(scene, "location", "") or "").strip()
+        plan_desc = f"{scene_ref}（{location}）" if location else scene_ref
+        violations.append(
+            {
+                "type": "scene_anchor_mismatch",
+                "stage": "route_model",
+                "issue_code": "scene_anchor_mismatch",
+                "fragment_id": fragment_id,
+                "shot_id": str(getattr(fragment, "shot_id", "") or ""),
+                "scene": scene_ref,
+                "plan_location": location,
+                "expected_asset_id": plan_asset_id,
+                "actual_asset_id": first_frame_asset_id,
+                "message": (
+                    f"{fragment_id} 首帧场景与镜头计划不一致："
+                    f"计划场景 {plan_desc} 期望资产 {plan_asset_id}，"
+                    f"实际首帧 {first_frame_asset_id}"
+                ),
+            }
+        )
+
+    return violations

@@ -10,7 +10,8 @@ See LICENSE File For Details.
 @Time: 2026/1/26 23:36
 """
 import json
-from typing import Optional, Dict, Any, Literal
+import time
+from typing import Callable, List, Optional, Dict, Any, Literal
 
 from penshot.logger import info, error, warning
 from penshot.neopen.agent.base_llm_agent import BaseLLMAgent
@@ -124,33 +125,83 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         if not self.current_repair_params:
             return instructions
 
-        info(f"应用修复参数调整提示词，问题类型: {self.current_repair_params.issue_types}")
+        info(
+            f"应用修复参数调整提示词，问题码: {self.current_repair_params.issue_codes}"
+        )
 
-        issue_types = set(self.current_repair_params.issue_types)
+        issue_codes = set(self.current_repair_params.issue_codes or [])
+        applied: List[Dict[str, Any]] = []
+
+        def apply_repair(
+            issue_code: str, fix: Callable[[AIVideoInstructions], AIVideoInstructions]
+        ) -> AIVideoInstructions:
+            """执行单项修复并记录实际发生变化的片段数"""
+            before = {p.fragment_id: p.model_dump() for p in instructions.fragments}
+            updated = fix(instructions)
+            changed = [
+                p.fragment_id
+                for p in updated.fragments
+                if before.get(p.fragment_id) != p.model_dump()
+            ]
+            if changed:
+                applied.append(
+                    {
+                        "issue_code": issue_code,
+                        "fixed_issues": len(changed),
+                        "fragments": changed,
+                    }
+                )
+            return updated
 
         # 1. 修复空提示词
-        if "prompt_empty" in issue_types:
-            instructions = self._fix_empty_prompts(instructions, fragment_sequence)
+        if "prompt_empty" in issue_codes:
+            instructions = apply_repair(
+                "prompt_empty",
+                lambda i: self._fix_empty_prompts(i, fragment_sequence),
+            )
 
         # 2. 修复长度问题
-        if "prompt_too_long" in issue_types or "prompt_too_short" in issue_types:
-            instructions = self._fix_length_issues(instructions)
+        if "prompt_too_long" in issue_codes:
+            instructions = apply_repair("prompt_too_long", self._fix_length_issues)
+        if "prompt_too_short" in issue_codes:
+            instructions = apply_repair("prompt_too_short", self._fix_length_issues)
 
         # 3. 修复截断问题
-        if "prompt_truncated" in issue_types:
-            instructions = self._fix_truncated_prompts(instructions)
+        if "prompt_truncated" in issue_codes:
+            instructions = apply_repair(
+                "prompt_truncated", self._fix_truncated_prompts
+            )
 
         # 4. 修复风格不一致
-        if "style_inconsistent" in issue_types:
-            instructions = self._fix_style_consistency(instructions)
+        if "style_inconsistent" in issue_codes:
+            instructions = apply_repair(
+                "style_inconsistent", self._fix_style_consistency
+            )
 
         # 5. 修复负面提示词
-        if "negative_prompt_missing" in issue_types:
-            instructions = self._fix_negative_prompts(instructions)
+        if "negative_prompt_missing" in issue_codes:
+            instructions = apply_repair(
+                "negative_prompt_missing", self._fix_negative_prompts
+            )
 
-        # 6. 修复音频问题
-        if "audio" in str(issue_types):
-            instructions = self._fix_audio_issues(instructions)
+        # 6. 修复音频问题（兼容 audio_missing/audio_prompt_missing 等具体问题码）
+        audio_codes = sorted(code for code in issue_codes if "audio" in code)
+        for audio_code in audio_codes:
+            instructions = apply_repair(audio_code, self._fix_audio_issues)
+
+        if applied:
+            history = instructions.metadata.setdefault("repair_history", [])
+            history.append(
+                {
+                    "timestamp": time.time(),
+                    "repair_params": {
+                        "issue_types": self.current_repair_params.issue_types,
+                        "issue_codes": self.current_repair_params.issue_codes,
+                    },
+                    "applied": applied,
+                    "fixed_issues": sum(item["fixed_issues"] for item in applied),
+                }
+            )
 
         return instructions
 
