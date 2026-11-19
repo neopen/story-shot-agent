@@ -152,6 +152,10 @@ def build_repair_entries(
                     enum_value(item)
                     for item in (getattr(params, "issue_types", None) or [])
                 ],
+                "issue_codes": [
+                    enum_value(item)
+                    for item in (getattr(params, "issue_codes", None) or [])
+                ],
                 "fragments": list(getattr(params, "fragments", None) or []),
                 "severity_summary": dict(
                     getattr(params, "severity_summary", None) or {}

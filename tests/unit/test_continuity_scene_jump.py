@@ -195,14 +195,14 @@ class TestLocalSceneJumpRepair:
         """仅场景跳转时插入过渡镜头并记录修复历史"""
         agent = self._agent(self._sequence())
         agent.current_repair_params = QualityRepairParams(
-            fix_needed=True, issue_types=["scene_jump"]
+            fix_needed=True, issue_codes=["scene_jump"]
         )
 
         result = agent.process(None)
 
         assert len(result.shots) == 4
         assert result.shots[1].is_transition is True
-        assert result.metadata["repair_history"][0]["repair_params"]["issue_types"] == [
+        assert result.metadata["repair_history"][0]["repair_params"]["issue_codes"] == [
             "scene_jump"
         ]
         # 修复后同一个边界不再被上报，保证单轮收敛
@@ -212,7 +212,7 @@ class TestLocalSceneJumpRepair:
         """混合问题仍走 LLM 重新生成，本地修复只处理纯结构性问题"""
         agent = self._agent(self._sequence())
         agent.current_repair_params = QualityRepairParams(
-            fix_needed=True, issue_types=["scene_jump", "shot_insufficient"]
+            fix_needed=True, issue_codes=["scene_jump", "shot_insufficient"]
         )
 
         assert agent._repair_scene_jumps_locally() is None

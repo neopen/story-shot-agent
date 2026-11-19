@@ -322,7 +322,10 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
         """
         self.current_repair_params = repair_params
 
-        info(f"{node.value}节点收到修复参数，问题类型: {repair_params.issue_types}")
+        info(
+            f"{node.value}节点收到修复参数，问题类型: {repair_params.issue_types}，"
+            f"问题码: {repair_params.issue_codes}"
+        )
         if repair_params.suggestions:
             info(f"修复建议: {repair_params.suggestions}")
 
@@ -331,6 +334,7 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
             "timestamp": time.time(),
             "repair_params": {
                 "issue_types": repair_params.issue_types,
+                "issue_codes": repair_params.issue_codes,
                 "suggestions": repair_params.suggestions
             }
         })

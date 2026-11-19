@@ -112,7 +112,7 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         params = self.current_repair_params
         if not params or not params.fix_needed:
             return None
-        if set(params.issue_types or []) != {"scene_jump"}:
+        if set(params.issue_codes or []) != {"scene_jump"}:
             return None
         if self.last_shot_sequence is None or len(self.last_shot_sequence.shots) < 2:
             return None
@@ -131,6 +131,7 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
             "timestamp": time.time(),
             "repair_params": {
                 "issue_types": params.issue_types,
+                "issue_codes": params.issue_codes,
                 "suggestions": params.suggestions
             }
         })
@@ -151,12 +152,13 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         self._increase_shot_count = False
         self._prefer_shorter_shots = False
 
-        # 根据问题类型设置标志
-        if RuleType.SHOT_INSUFFICIENT.code in self.current_repair_params.issue_types:
+        # 根据问题码设置标志
+        issue_codes = set(self.current_repair_params.issue_codes or [])
+        if RuleType.SHOT_INSUFFICIENT.code in issue_codes:
             self._increase_shot_count = True
             debug("修复参数：将增加镜头数量")
 
-        if RuleType.SHOT_DURATION_TOO_LONG.code in self.current_repair_params.issue_types:
+        if RuleType.SHOT_DURATION_TOO_LONG.code in issue_codes:
             self._prefer_shorter_shots = True
             debug("修复参数：将缩短镜头时长")
 

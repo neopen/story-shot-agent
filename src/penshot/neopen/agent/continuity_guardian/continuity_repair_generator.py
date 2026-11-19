@@ -116,6 +116,7 @@ class ContinuityRepairGenerator:
             fix_needed=True,
             issue_count=len(issues),
             issue_types=issue_types,
+            issue_codes=issue_types,
             fragments=list(set([i.fragment_id for i in issues if i.fragment_id])),
             suggestions=suggestions,
             severity_summary=self._get_severity_summary(issues),

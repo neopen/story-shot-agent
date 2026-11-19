@@ -12,12 +12,13 @@
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from penshot.logger import error
+from penshot.logger import error, warning
 
 REPAIR_STATUS_NO_ISSUES = "no_issues"
 REPAIR_STATUS_REPAIRED = "repaired"
 REPAIR_STATUS_PARTIAL = "partial"
 REPAIR_STATUS_NO_ACTION = "no_action_taken"
+REPAIR_STATUS_MANUAL = "manual_required"
 
 
 def _manual_entry(stage: str, issue: Any) -> Dict[str, Any]:
@@ -47,8 +48,10 @@ def record_repair_outcome(
 
     判定规则：
     - 无问题 → ``no_issues``；
-    - 有问题且零动作 → ERROR 日志 + ``no_action_taken``，并把全部问题
-      记为人工处理项（问题存在却未被修复，必须显式暴露）；
+    - 有问题、零动作且没有自动策略命中 → ``manual_required``（问题本身
+      只能人工处理，不属于修复器失效）；
+    - 有问题、零动作但存在自动策略命中 → ERROR 日志 + ``no_action_taken``
+      （修复器具备能力却什么都没做，必须暴露）；
     - 有动作且仍有未覆盖问题 → ``partial``；
     - 有动作且全部问题在策略覆盖范围内 → ``repaired``。
 
@@ -77,12 +80,21 @@ def record_repair_outcome(
         return code in covered_codes or type_value in covered_types
 
     if issue_list and not actions:
-        status = REPAIR_STATUS_NO_ACTION
         entries = [_manual_entry(stage, issue) for issue in issue_list]
-        error(
-            f"{stage}修复未执行任何操作：发现{len(issue_list)}个问题，0个修复操作，"
-            f"已标记 {REPAIR_STATUS_NO_ACTION}"
-        )
+        auto_hits = [issue for issue in issue_list if is_auto(issue)]
+        if auto_hits:
+            status = REPAIR_STATUS_NO_ACTION
+            error(
+                f"{stage}修复未执行任何操作：发现{len(issue_list)}个问题，"
+                f"其中{len(auto_hits)}个属于可自动修复问题，已标记 "
+                f"{REPAIR_STATUS_NO_ACTION}"
+            )
+        else:
+            status = REPAIR_STATUS_MANUAL
+            warning(
+                f"{stage}修复无自动策略可用：发现{len(issue_list)}个问题，"
+                f"已标记 {REPAIR_STATUS_MANUAL}"
+            )
     else:
         forced_ids = {id(issue) for issue in (manual_issues or ())}
         entries = [_manual_entry(stage, issue) for issue in (manual_issues or ())]

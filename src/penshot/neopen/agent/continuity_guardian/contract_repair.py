@@ -302,6 +302,7 @@ def build_contract_repair_params(
         fix_needed=True,
         issue_count=len(violations),
         issue_types=issue_types,
+        issue_codes=issue_types,
         issues=list(violations),
         fragments=fragments,
         suggestions=suggestions,
@@ -336,6 +337,9 @@ def merge_repair_params(
         issue_count=(base.issue_count or 0) + (extra.issue_count or 0),
         issue_types=list(
             dict.fromkeys([*(base.issue_types or []), *(extra.issue_types or [])])
+        ),
+        issue_codes=list(
+            dict.fromkeys([*(base.issue_codes or []), *(extra.issue_codes or [])])
         ),
         issues=list(base.issues or []) + list(extra.issues or []),
         fragments=list(

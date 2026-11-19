@@ -348,6 +348,13 @@ class QualityAuditorAgent:
 
         def add_violation(violation, source_node=None):
             """添加问题（带去重）"""
+            # 过滤既无问题码又无描述的空违规，避免污染修复契约
+            issue_code_text = str(getattr(violation, "issue_code", "") or "").strip()
+            issue_desc_text = str(getattr(violation, "issue_desc", "") or "").strip()
+            if not issue_code_text and not issue_desc_text:
+                debug(f"跳过空违规记录: {type(violation).__name__}")
+                return False
+
             # 生成唯一签名
             fragment_id = getattr(violation, 'fragment_id', None) or ''
             description = getattr(violation, 'issue_desc', '')[:150] if getattr(violation, 'issue_desc', '') else ''
@@ -672,6 +679,11 @@ class QualityAuditorAgent:
                     fix_needed=True,
                     issue_count=len(issues),
                     issue_types=list(set([i.issue_type.value for i in issues if i.issue_type])),
+                    issue_codes=list(dict.fromkeys(
+                        code for code in (
+                            str(getattr(i, "issue_code", "") or "").strip() for i in issues
+                        ) if code
+                    )),
                     fragments=list(set([i.fragment_id for i in issues if i.fragment_id])),
                     suggestions=self._collect_suggestions(issues),
                     severity_summary=self._get_severity_summary(issues),

@@ -67,6 +67,7 @@ from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
 from penshot.neopen.agent.repair_outcome import (
+    REPAIR_STATUS_MANUAL,
     REPAIR_STATUS_NO_ACTION,
     REPAIR_STATUS_PARTIAL,
     REPAIR_STATUS_REPAIRED,
@@ -1587,19 +1588,39 @@ class WorkflowNodes:
 
             # P0-2：修复结论必须可核对——问题数与实际动作数分列，
             # 零动作不得提升分数，未覆盖问题进入最终输出的人工项
+            round_statuses = self._collect_round_repair_statuses(state, history_before)
             manual_items = self._collect_manual_fix_items(state)
             result.metadata["repair_issue_count"] = repair_issue_count
             result.metadata["repair_action_count"] = repair_actions_total
+            result.metadata["stage_repair_statuses"] = round_statuses
             if manual_items:
                 result.metadata["requires_manual_fix"] = manual_items
 
-            if repair_issue_count > 0 and repair_actions_total == 0:
+            # 聚合优先级：no_action_taken > manual_required > partial/repaired
+            if REPAIR_STATUS_NO_ACTION in round_statuses:
                 result.metadata["repair_status"] = REPAIR_STATUS_NO_ACTION
                 error(
-                    f"修复环节空转：发现{repair_issue_count}个问题，执行0个修复操作；"
+                    f"修复环节空转：发现{repair_issue_count}个问题，"
+                    f"执行{repair_actions_total}个修复操作；存在具备自动策略却未执行的阶段，"
                     f"已标记 repair_status={REPAIR_STATUS_NO_ACTION}，"
                     f"post_repair_score 保持 detection_score={result.detection_score}"
                 )
+                result.post_repair_score = result.detection_score
+            elif repair_issue_count > 0 and repair_actions_total == 0:
+                if REPAIR_STATUS_MANUAL in round_statuses:
+                    result.metadata["repair_status"] = REPAIR_STATUS_MANUAL
+                    warning(
+                        f"修复环节无自动策略可用：发现{repair_issue_count}个问题，"
+                        f"已标记 repair_status={REPAIR_STATUS_MANUAL}，"
+                        f"post_repair_score 保持 detection_score={result.detection_score}"
+                    )
+                else:
+                    result.metadata["repair_status"] = REPAIR_STATUS_NO_ACTION
+                    error(
+                        f"修复环节空转：发现{repair_issue_count}个问题，执行0个修复操作；"
+                        f"已标记 repair_status={REPAIR_STATUS_NO_ACTION}，"
+                        f"post_repair_score 保持 detection_score={result.detection_score}"
+                    )
                 result.post_repair_score = result.detection_score
             elif repair_actions_total > 0:
                 # 覆盖全部问题时为 repaired，仍有未覆盖问题则如实标记 partial
@@ -2720,6 +2741,20 @@ class WorkflowNodes:
                 except (AttributeError, TypeError, ValueError):
                     continue
         return total
+
+    def _collect_round_repair_statuses(
+        self, state: WorkflowState, history_before: Dict[str, int]
+    ) -> List[str]:
+        """收集本轮实际执行过修复的产物修复状态"""
+        statuses: List[str] = []
+        for name, metadata in self._artifact_metadata(state).items():
+            history = metadata.get("repair_history") or []
+            if len(history) <= history_before.get(name, 0):
+                continue
+            status = str(metadata.get("repair_status") or "")
+            if status:
+                statuses.append(status)
+        return statuses
 
     def _collect_manual_fix_items(self, state: WorkflowState) -> List[Dict[str, Any]]:
         """汇总各产物中不可自动修复、需人工处理的问题项"""

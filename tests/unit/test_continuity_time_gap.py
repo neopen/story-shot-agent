@@ -40,6 +40,8 @@ def test_time_gap_issue_maps_to_splitter_code():
     )
 
     assert params.issue_types == ["fragment_time_gap"]
+    # 连续性问题码同时进入确定性修复契约，供分割器精确匹配
+    assert params.issue_codes == ["fragment_time_gap"]
     assert params.fix_needed is True
     assert "frag_001" in params.suggestions
 
@@ -55,6 +57,7 @@ def test_splitter_reflows_timeline_for_time_gap_repair():
         fix_needed=True,
         issue_count=1,
         issue_types=["time_gap"],
+        issue_codes=["time_gap"],
     )
 
     repaired = splitter._apply_repair_params(fragments, None)

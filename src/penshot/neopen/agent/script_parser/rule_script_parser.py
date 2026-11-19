@@ -129,7 +129,7 @@ class RuleScriptParser(BaseScriptParser):
             return parsed_script
 
         repair_actions = []
-        issue_types = repair_params.issue_types
+        issue_types = set(repair_params.issue_codes or [])
 
         # 1. 场景问题修复
         if "scene_insufficient" in issue_types or "scene_missing" in issue_types:

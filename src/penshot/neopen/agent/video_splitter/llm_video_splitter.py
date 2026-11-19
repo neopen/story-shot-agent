@@ -305,9 +305,11 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
         if not self.current_repair_params:
             return fragments
 
-        info(f"应用修复参数调整片段，问题类型: {self.current_repair_params.issue_types}")
+        info(
+            f"应用修复参数调整片段，问题码: {self.current_repair_params.issue_codes}"
+        )
 
-        issue_types = set(self.current_repair_params.issue_types)
+        issue_types = set(self.current_repair_params.issue_codes or [])
 
         # 1. 修复时长问题
         if "fragment_duration_too_short" in issue_types or "fragment_duration_too_long" in issue_types:
