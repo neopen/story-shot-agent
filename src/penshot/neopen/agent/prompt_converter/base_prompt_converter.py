@@ -12,6 +12,9 @@ See LICENSE File For Details.
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 
+from penshot.neopen.agent.prompt_converter.camera_builder import (
+    normalize_instructions_shot_phrases,
+)
 from penshot.neopen.agent.prompt_converter.prompt_converter_models import AIVideoInstructions
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import QualityRepairParams
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
@@ -60,6 +63,14 @@ class BasePromptConverter(ABC):
             "total_prompts": len(fragments),
             "converter_type": self.__class__.__name__
         })
+
+        # 景别归一（FR-104）：提示词转换与修复重写后统一收敛开头景别短语
+        normalized = normalize_instructions_shot_phrases(instructions)
+        for change in normalized:
+            info(
+                f"景别归一: {change['fragment_id']} -> {change['applied_phrase']}"
+                f"（camera.shot_type={change['shot_type']}）"
+            )
 
         info(f"转换完成: {len(fragments)}个提示词, 总时长{total_duration:.1f}秒")
         return instructions

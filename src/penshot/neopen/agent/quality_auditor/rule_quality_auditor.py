@@ -372,7 +372,7 @@ class RuleQualityAuditor(BaseQualityAuditor):
                 standard_value=expected,
                 severity=SeverityLevel.WARNING,
                 fragment_id=fragment.fragment_id,
-                suggestion=f"下游以镜头计划景别 {expected} 为准；提示词景别表述可保留构图细节"
+                suggestion=f"景别已由提示词归一收敛，残留即阻断复查（计划景别 {expected}）",
             )
 
         if mismatch_count == 0:

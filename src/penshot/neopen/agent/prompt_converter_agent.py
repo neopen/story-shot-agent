@@ -24,6 +24,8 @@ from penshot.neopen.agent.continuity_guardian.style_anchors import (
     build_style_text,
 )
 from penshot.neopen.agent.prompt_converter.camera_builder import (
+    normalize_instructions_shot_phrases,
+    normalize_prompt_shot_phrase,
     repair_motion_conflict,
 )
 from penshot.neopen.agent.prompt_converter.prompt_converter_factory import (
@@ -67,6 +69,7 @@ _PROMPT_REPAIR_AUTO_CODES = frozenset(
         "audio_missing",
         "audio_duration_mismatch",
         RuleType.CAMERA_MOTION_PROMPT_MISMATCH.code,
+        RuleType.SHOT_TYPE_PROMPT_MISMATCH.code,
     }
 )
 
@@ -847,7 +850,36 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             prompt.camera.motion, detail = repaired
             repair_actions.append(f"{fragment_id} {detail}")
 
-        # ========== 8. 更新统计信息 ==========
+        # ========== 8. 修复景别表述（确定性归一，与审计共用映射表） ==========
+        shot_type_issues = [
+            i for i in issues if i.issue_code == RuleType.SHOT_TYPE_PROMPT_MISMATCH.code
+        ]
+        for issue in shot_type_issues:
+            fragment_id = issue.fragment_id
+            prompt = (
+                self._find_prompt(instructions, fragment_id) if fragment_id else None
+            )
+            if prompt is None or prompt.camera is None:
+                continue
+            shot_type = (
+                prompt.camera.source_shot_type or prompt.camera.shot_type or ""
+            ).strip()
+            updated, applied = normalize_prompt_shot_phrase(prompt.prompt, shot_type)
+            if applied is None or updated == prompt.prompt:
+                continue
+            prompt.prompt = updated
+            repair_actions.append(
+                f"归一景别表述: {fragment_id} -> {applied}（camera.shot_type={shot_type}）"
+            )
+
+        # ========== 9. 全局景别兜底归一（长度截断等修复可能删除开头景别） ==========
+        for change in normalize_instructions_shot_phrases(instructions):
+            repair_actions.append(
+                f"归一景别表述: {change['fragment_id']} -> {change['applied_phrase']}"
+                f"（camera.shot_type={change['shot_type']}）"
+            )
+
+        # ========== 11. 更新统计信息 ==========
         new_stats = {
             "prompt_count": len(instructions.fragments),
             "avg_prompt_length": sum(len(p.prompt) for p in instructions.fragments)
