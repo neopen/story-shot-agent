@@ -355,16 +355,11 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             audio_count = sum(1 for f in instructions.fragments if f.audio)
             debug(f"音频提示词生成: {audio_count}/{len(instructions.fragments)}个片段")
 
-            # 地点重写（FR-098）：以镜头计划场景为准收敛提示词地点短语
-            scene_stats = apply_scene_prompt_realignment(
+            # 地点重写（FR-098）：以镜头计划场景为准收敛提示词地点短语；
+            # 汇总与跳过明细由 apply_scene_prompt_realignment 统一输出
+            apply_scene_prompt_realignment(
                 instructions, fragment_sequence.fragments, parsed_script
             )
-            if scene_stats["realigned"] or scene_stats["conflicts"]:
-                info(
-                    f"地点重写: 改写{scene_stats['realigned']}个片段，"
-                    f"冲突{scene_stats['conflicts']}个片段，"
-                    f"跳过{scene_stats['skipped']}个片段"
-                )
 
             # 记录修复历史
             if repair_params and repair_params.fix_needed:

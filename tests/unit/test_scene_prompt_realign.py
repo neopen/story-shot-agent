@@ -138,7 +138,58 @@ def test_unknown_plan_location_skips_with_info():
     assert stats == {"realigned": 0, "conflicts": 0, "skipped": 1}
     assert instructions.metadata["scene_prompt_realigned"] == []
     assert instructions.metadata["scene_prompt_conflicts"] == {}
+    assert instructions.metadata["scene_prompt_realign_summary"] == {
+        "realigned": 0,
+        "conflicts": 0,
+        "skipped": 1,
+        "skipped_fragment_ids": ["frag_001"],
+    }
     assert instructions.fragments[0].prompt == "classroom background with desks"
+
+
+def test_fragment_scene_id_takes_precedence_over_notes():
+    """T-113：片段自带 scene_id 时直接解析计划地点，不依赖 notes 文本"""
+    fragment = SimpleNamespace(id="frag_030", scene_id="scene_001", continuity_notes={})
+    instructions = AIVideoInstructions(
+        fragments=[_prompt("frag_030", "corridor background with posters")]
+    )
+
+    stats = apply_scene_prompt_realignment(instructions, [fragment], _script())
+
+    assert stats["realigned"] == 1
+    assert instructions.fragments[0].prompt == "classroom background with posters"
+
+
+def test_unique_location_name_resolves_when_no_scene_id():
+    """T-113：无 scene_id 时按 notes 地点名在剧本中唯一命中解析"""
+    fragment = SimpleNamespace(id="frag_031", continuity_notes={"location": "教室"})
+    instructions = AIVideoInstructions(
+        fragments=[_prompt("frag_031", "corridor background with posters")]
+    )
+
+    stats = apply_scene_prompt_realignment(instructions, [fragment], _script())
+
+    assert stats["realigned"] == 1
+    assert instructions.fragments[0].prompt == "classroom background with posters"
+
+
+def test_ambiguous_location_name_skips():
+    """T-113：地点名在剧本中命中多个场景时视为无法解析并跳过"""
+    script = ParsedScript(
+        scenes=[
+            SceneInfo(id="scene_001", location="走廊尽头"),
+            SceneInfo(id="scene_002", location="走廊/班级记忆墙前"),
+        ]
+    )
+    fragment = SimpleNamespace(id="frag_032", continuity_notes={"location": "走廊"})
+    instructions = AIVideoInstructions(
+        fragments=[_prompt("frag_032", "classroom background with posters")]
+    )
+
+    stats = apply_scene_prompt_realignment(instructions, [fragment], script)
+
+    assert stats == {"realigned": 0, "conflicts": 0, "skipped": 1}
+    assert instructions.fragments[0].prompt == "classroom background with posters"
 
 
 def test_apply_writes_metadata_for_rewrite_and_conflict():
@@ -168,6 +219,7 @@ def test_apply_writes_metadata_for_rewrite_and_conflict():
     conflicts = instructions.metadata["scene_prompt_conflicts"]
     assert list(conflicts) == ["frag_021"]
     assert conflicts["frag_021"][0]["reason"] == "venue_furnishing"
+    assert conflicts["frag_021"][0]["plan_location"] == "走廊/班级记忆墙前"
 
 
 def test_route_blocks_fragment_with_unresolved_location_conflict():
@@ -225,4 +277,9 @@ def test_route_blocks_fragment_with_unresolved_location_conflict():
     assert blocked.mode.value == "image_to_video"
     assert blocked.status == "needs_manual_fix"
     assert any("地点冲突未解决" in message for message in blocked.warnings)
+    blocked_message = next(
+        message for message in blocked.warnings if "地点冲突未解决" in message
+    )
+    assert "计划地点=走廊" in blocked_message
+    assert "期望首帧资产=scene_001" in blocked_message
     assert packages[1].status == "ready"

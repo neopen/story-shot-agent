@@ -442,14 +442,29 @@ def apply_image_to_video_routing(
                     }
                 )
             )
-            package.warnings.append(
-                f"地点冲突未解决，片段已阻断: {package.fragment_id}"
-                f"（{terms or '地点冲突'}）"
+            # 阻断信息补充计划地点与期望首帧资产，便于人工按计划场景修正
+            plan_locations = sorted(
+                {
+                    str(entry.get("plan_location", "") or "")
+                    for entry in conflict_entries
+                    if isinstance(entry, dict) and entry.get("plan_location")
+                }
             )
-            warning(
+            if not plan_locations:
+                scene_location = str(getattr(scene, "location", "") or "").strip()
+                plan_locations = [scene_location] if scene_location else []
+            details: List[str] = []
+            if plan_locations:
+                details.append(f"计划地点={'/'.join(plan_locations)}")
+            if plan_scene_asset_id:
+                details.append(f"期望首帧资产={plan_scene_asset_id}")
+            message = (
                 f"地点冲突未解决，片段已阻断: {package.fragment_id}"
-                f"（{terms or '地点冲突'}）"
+                f"（{terms or '地点冲突'}"
+                f"{'；' + '；'.join(details) if details else ''}）"
             )
+            package.warnings.append(message)
+            warning(message)
 
         scene_asset_ref = (
             _manifest_ref(manifest, scene_reference.asset_id)

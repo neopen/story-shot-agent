@@ -16,7 +16,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from penshot.logger import info
+from penshot.logger import debug, info
 from penshot.neopen.agent.model_adapter.first_frame_builder import (
     _QUOTED_RE,
     _SCENE_LOCATION_GLOSSARY,
@@ -69,6 +69,7 @@ class SceneConflict:
     language: str
     clause: str
     reason: str
+    plan_location: str = ""
 
 
 @dataclass
@@ -249,6 +250,7 @@ def realign_scene_prompt(
                     language=language,
                     clause=clause,
                     reason="venue_furnishing",
+                    plan_location=plan_location,
                 )
             )
             continue
@@ -262,6 +264,7 @@ def realign_scene_prompt(
                     language=language,
                     clause=clause,
                     reason="rewrite_failed",
+                    plan_location=plan_location,
                 )
             )
             continue
@@ -275,6 +278,7 @@ def realign_scene_prompt(
                     language=language,
                     clause=clause,
                     reason="rewrite_failed",
+                    plan_location=plan_location,
                 )
             )
             continue
@@ -286,19 +290,53 @@ def realign_scene_prompt(
     return SceneRealignResult(prompt=updated, replaced=replaced, conflicts=conflicts)
 
 
-def _resolve_plan_location(fragment: Any, parsed_script: Any) -> str:
-    """片段 continuity_notes 的 ``场景scene_002`` → 剧本场景地点"""
-    notes = getattr(fragment, "continuity_notes", None)
-    if not isinstance(notes, dict):
-        return ""
-    match = _SCENE_ID_PATTERN.search(str(notes.get("location", "") or ""))
-    if match is None or parsed_script is None:
-        return ""
+def _scene_location_by_id(parsed_script: Any, scene_id: str) -> str:
+    """按场景 ID 从剧本取地点"""
     getter = getattr(parsed_script, "get_scene_by_id", None)
-    if not callable(getter):
+    if not scene_id or not callable(getter):
         return ""
-    scene = getter(match.group(0))
+    scene = getter(scene_id)
     return str(getattr(scene, "location", "") or "").strip() if scene else ""
+
+
+def _unique_scene_location(parsed_script: Any, hint: str) -> str:
+    """地点名在剧本中唯一命中时返回完整地点，歧义或未命中返回空"""
+    scenes = getattr(parsed_script, "scenes", None) or []
+    if not hint or not scenes:
+        return ""
+    locations = {str(getattr(scene, "location", "") or "").strip() for scene in scenes}
+    matches = {
+        location
+        for location in locations
+        if location and (hint == location or hint in location or location in hint)
+    }
+    return next(iter(matches)) if len(matches) == 1 else ""
+
+
+def _resolve_plan_location(fragment: Any, parsed_script: Any) -> str:
+    """解析片段所属计划场景地点
+
+    解析顺序：片段 ``scene_id`` → continuity_notes 的 scene_id → 剧本中
+    唯一命中的地点名。任一命中即返回，均未命中返回空串。
+    """
+    if parsed_script is None:
+        return ""
+
+    scene_id = str(getattr(fragment, "scene_id", "") or "").strip()
+    location = _scene_location_by_id(parsed_script, scene_id)
+    if location:
+        return location
+
+    notes = getattr(fragment, "continuity_notes", None)
+    hint = (
+        str(notes.get("location", "") or "").strip() if isinstance(notes, dict) else ""
+    )
+    match = _SCENE_ID_PATTERN.search(hint)
+    if match is not None:
+        location = _scene_location_by_id(parsed_script, match.group(0))
+        if location:
+            return location
+    return _unique_scene_location(parsed_script, hint)
 
 
 def apply_scene_prompt_realignment(
@@ -317,6 +355,7 @@ def apply_scene_prompt_realignment(
     }
     realigned_records: List[Dict[str, str]] = []
     conflict_records: Dict[str, List[Dict[str, str]]] = {}
+    skipped_ids: List[str] = []
     stats = {"realigned": 0, "conflicts": 0, "skipped": 0}
 
     for prompt in instructions.fragments:
@@ -325,7 +364,8 @@ def apply_scene_prompt_realignment(
             _resolve_plan_location(fragment, parsed_script) if fragment else ""
         )
         if not plan_location:
-            info(f"地点重写跳过: {prompt.fragment_id} 计划场景地点无法解析")
+            debug(f"地点重写跳过: {prompt.fragment_id} 计划场景地点无法解析")
+            skipped_ids.append(prompt.fragment_id)
             stats["skipped"] += 1
             continue
 
@@ -351,4 +391,12 @@ def apply_scene_prompt_realignment(
 
     instructions.metadata["scene_prompt_realigned"] = realigned_records
     instructions.metadata["scene_prompt_conflicts"] = conflict_records
+    instructions.metadata["scene_prompt_realign_summary"] = {
+        **stats,
+        "skipped_fragment_ids": skipped_ids,
+    }
+    info(
+        f"地点重写汇总: 改写={stats['realigned']}个片段，"
+        f"冲突={stats['conflicts']}个片段，跳过={stats['skipped']}个片段"
+    )
     return stats
