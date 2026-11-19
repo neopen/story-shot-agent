@@ -504,8 +504,11 @@ def _scene_prompt(fragment_id: str, prompt: str) -> AIVideoPrompt:
     )
 
 
-def test_scene_anchor_mismatch_auto_replaces_first_frame():
-    """片段写教室但镜头映射到走廊首帧时自动替换为匹配场景资产"""
+def test_scene_anchor_keeps_plan_scene_asset_when_prompt_conflicts():
+    """0.4.7 FR-097：计划场景有资产时以计划为准，提示词地点冲突不替换首帧
+
+    提示词里的教室表述由转换阶段确定性重写或阻断，路由阶段不得换成 scene_001。
+    """
     contract = _scene_contract()
     instructions = AIVideoInstructions(
         fragments=[
@@ -533,15 +536,11 @@ def test_scene_anchor_mismatch_auto_replaces_first_frame():
 
     package = packages[0]
     assert package.status == "ready"
-    assert package.warnings
-    message = package.warnings[0]
-    assert "已自动替换" in message
-    assert "教室" in message
-    assert "scene_001" in message
-    assert "走廊" in message
+    assert package.warnings == []
     first_frame = next(ref for ref in package.references if ref.role == "first_frame")
-    assert first_frame.asset_id == "scene_001"
-    assert "at 教室" in package.image_prompt
+    assert first_frame.asset_id == "scene_002"
+    assert "at 走廊/班级记忆墙" in package.image_prompt
+    assert package.model_params["scene_anchor_source"] == "plan"
 
 
 def test_scene_anchor_skips_prompt_without_location():
@@ -688,8 +687,8 @@ def test_scene_anchor_ignores_location_in_dialogue():
     assert packages[0].warnings == []
 
 
-def test_scene_anchor_ambiguous_blocks_fragment():
-    """片段同时提到多个其他场景时无法唯一匹配，标记 needs_manual_fix 阻断"""
+def test_scene_anchor_plan_scene_overrides_prompt_multi_location():
+    """0.4.7 FR-097：计划场景有资产时，提示词提到多个其他场景也不阻断"""
     contract = _scene_contract()
     contract.register_scene(
         SceneContract(
@@ -733,12 +732,14 @@ def test_scene_anchor_ambiguous_blocks_fragment():
     )
 
     package = packages[0]
-    assert package.status == "needs_manual_fix"
-    assert "已阻断" in package.warnings[0]
+    assert package.status == "ready"
+    assert package.warnings == []
+    first_frame = next(ref for ref in package.references if ref.role == "first_frame")
+    assert first_frame.asset_id == "scene_002"
 
 
-def test_scene_anchor_without_matching_asset_blocks_fragment():
-    """片段提到契约中不存在的场景时同样阻断，不能静默沿用错误首帧"""
+def test_scene_anchor_plan_scene_allows_unasset_prompt_location():
+    """0.4.7 FR-097：计划场景有资产时，提示词提到无资产地点不在路由阶段阻断"""
     contract = _scene_contract()
     instructions = AIVideoInstructions(
         fragments=[_scene_prompt("frag_006", "a lonely figure crosses the playground")]
@@ -759,5 +760,7 @@ def test_scene_anchor_without_matching_asset_blocks_fragment():
     )
 
     package = packages[0]
-    assert package.status == "needs_manual_fix"
-    assert "已阻断" in package.warnings[0]
+    assert package.status == "ready"
+    assert package.warnings == []
+    first_frame = next(ref for ref in package.references if ref.role == "first_frame")
+    assert first_frame.asset_id == "scene_002"

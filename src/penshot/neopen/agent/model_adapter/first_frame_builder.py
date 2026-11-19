@@ -343,6 +343,7 @@ class SceneAnchorResolution:
         reason: 判定原因：``auto_replace`` / ``ambiguous`` / ``no_asset``
         candidates: 文本命中的场景地点候选（用于追溯）
         message: 可直接写入 warnings 的说明
+        scene_anchor_source: 场景权威来源：``plan`` / ``plan_missing``
     """
 
     current_asset_id: str
@@ -352,6 +353,7 @@ class SceneAnchorResolution:
     reason: str = ""
     candidates: List[str] = field(default_factory=list)
     message: str = ""
+    scene_anchor_source: str = ""
 
 
 def resolve_scene_anchor(
@@ -360,14 +362,21 @@ def resolve_scene_anchor(
     scene: Any = None,
     fragment: Any = None,
     first_frame_asset_id: str = "",
+    plan_scene_asset_id: str = "",
 ) -> Optional[SceneAnchorResolution]:
     """判定片段场景与首帧场景资产是否一致，并给出替换/阻断结论
 
     仅当片段文本明确提到其他场景、且未提到当前首帧场景时触发：
-    - 唯一命中其他场景资产 → ``auto_replace``；
+    - 计划场景存在且契约有对应资产 → 计划优先，返回 None，地点冲突交由
+      提示词转换阶段确定性重写或阻断（FR-097）；
+    - 计划场景缺失或无对应资产、且唯一命中其他场景资产 → ``auto_replace``；
     - 命中多个场景资产 → ``ambiguous``（阻断）；
     - 未命中任何场景资产但文本含其他场景词 → ``no_asset``（阻断）；
     - 无场景证据 → 返回 None，不动作。
+
+    Args:
+        plan_scene_asset_id: 片段所属镜头计划场景对应的契约资产ID；为空表示
+            计划场景缺失或无对应资产，此时才允许自动替换首帧
 
     Returns:
         场景锚定结论；无需处理时返回 None
@@ -381,6 +390,14 @@ def resolve_scene_anchor(
         (item for item in scenes if _attr(item, "asset_id") == asset_id), None
     )
     if current is None:
+        return None
+
+    plan_asset_id = str(plan_scene_asset_id or "").strip()
+    plan_is_authoritative = bool(plan_asset_id) and any(
+        _attr(item, "asset_id") == plan_asset_id for item in scenes
+    )
+    # 计划场景有资产时以计划为准：提示词的其他地点词不再驱动首帧替换
+    if plan_is_authoritative:
         return None
 
     text = _strip_quoted_content(
@@ -397,6 +414,7 @@ def resolve_scene_anchor(
     ]
     fragment_id = _attr(fragment, "id") or _attr(prompt, "fragment_id")
     base = f"{fragment_id} 描述「"
+    downgrade = "；计划场景缺失或无对应资产，场景权威降级"
 
     if len(mentioned) == 1:
         target = mentioned[0]
@@ -411,8 +429,9 @@ def resolve_scene_anchor(
             message=(
                 f"{base}{target_name}」场景，但首帧资产为"
                 f"「{_attr(current, 'owner_name')}」，已自动替换为 "
-                f"{_attr(target, 'asset_id')}（{target_name}）"
+                f"{_attr(target, 'asset_id')}（{target_name}）{downgrade}"
             ),
+            scene_anchor_source="plan_missing",
         )
 
     if len(mentioned) > 1:
@@ -426,6 +445,7 @@ def resolve_scene_anchor(
                 f"{base}{'/'.join(names)}」等多个场景，首帧资产为"
                 f"「{_attr(current, 'owner_name')}」，无法唯一匹配，已阻断待人工指定场景"
             ),
+            scene_anchor_source="plan_missing",
         )
 
     # 零候选：文本出现其他场景词但没有对应资产，同样阻断而非静默放行
@@ -449,6 +469,7 @@ def resolve_scene_anchor(
             f"{base}{'/'.join(dict.fromkeys(stray))}」等场景，但契约无对应场景资产，"
             f"首帧资产为「{_attr(current, 'owner_name')}」，已阻断待人工指定场景"
         ),
+        scene_anchor_source="plan_missing",
     )
 
 
@@ -458,6 +479,7 @@ def check_scene_anchor_consistency(
     scene: Any = None,
     fragment: Any = None,
     first_frame_asset_id: str = "",
+    plan_scene_asset_id: str = "",
 ) -> str:
     """校验片段描述的场景与首帧场景资产是否一致（0.4.5 任务 7）
 
@@ -470,6 +492,7 @@ def check_scene_anchor_consistency(
         scene=scene,
         fragment=fragment,
         first_frame_asset_id=first_frame_asset_id,
+        plan_scene_asset_id=plan_scene_asset_id,
     )
     return resolution.message if resolution is not None else ""
 

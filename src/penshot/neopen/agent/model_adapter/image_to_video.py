@@ -200,6 +200,12 @@ def _scene_for_asset(contract: Any, asset_id: str) -> Optional[Any]:
     return None
 
 
+def _plan_scene_downgrade_warning(fragment_id: str, scene: Any) -> str:
+    """计划场景无法提供首帧资产时的降级说明（FR-099）"""
+    reason = "计划场景缺失" if scene is None else "计划场景无对应资产"
+    return f"{fragment_id} {reason}，场景权威降级"
+
+
 def _props_by_scene(parsed_script: Any) -> Dict[str, set[str]]:
     """道具引用约束：场景ID -> 该场景允许引用的道具名集合
 
@@ -329,6 +335,10 @@ def apply_image_to_video_routing(
 
         fragment = fragment_index.get(package.fragment_id)
         scene = _resolve_scene(contract, fragment, shot_index)
+        plan_scene_asset = _find_scene_asset(contract, scene)
+        plan_scene_asset_id = str(
+            getattr(plan_scene_asset, "asset_id", "") or ""
+        ).strip()
 
         critical = has_critical_text(prompt.prompt)
         anchors = _character_has_anchors(prompt, contract)
@@ -349,6 +359,10 @@ def apply_image_to_video_routing(
                 allowed_props = sorted(prop_scene_map.get(scene_id, set()))
 
         package.mode = RouteMode.IMAGE_TO_VIDEO
+        # 场景权威来源：计划场景有对应资产时以计划为准，否则降级为提示词推断
+        package.model_params["scene_anchor_source"] = (
+            "plan" if plan_scene_asset_id else "plan_missing"
+        )
         prop_states = {
             name: states[package.fragment_id]
             for name, states in prop_state_maps.items()
@@ -376,7 +390,7 @@ def apply_image_to_video_routing(
             ),
             None,
         )
-        # 0.4.5 任务 7：片段场景与首帧场景资产不一致时自动替换或阻断
+        # 0.4.7 T-101：计划场景有资产时以其为准，仅计划缺失/无资产才允许替换
         if scene_reference is not None:
             resolution = resolve_scene_anchor(
                 prompt,
@@ -384,6 +398,7 @@ def apply_image_to_video_routing(
                 scene=scene,
                 fragment=fragment,
                 first_frame_asset_id=scene_reference.asset_id,
+                plan_scene_asset_id=plan_scene_asset_id,
             )
             if resolution is not None:
                 package.warnings.append(resolution.message)
@@ -400,6 +415,14 @@ def apply_image_to_video_routing(
                 else:
                     package.status = "needs_manual_fix"
                     warning(f"场景锚定已阻断: {resolution.message}")
+            elif not plan_scene_asset_id:
+                package.warnings.append(
+                    _plan_scene_downgrade_warning(package.fragment_id, scene)
+                )
+        elif not plan_scene_asset_id:
+            package.warnings.append(
+                _plan_scene_downgrade_warning(package.fragment_id, scene)
+            )
 
         scene_asset_ref = (
             _manifest_ref(manifest, scene_reference.asset_id)
