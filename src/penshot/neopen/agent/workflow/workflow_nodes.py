@@ -84,6 +84,7 @@ from penshot.utils.log_utils import print_log_exception
 from penshot.neopen.agent.model_adapter import (
     adapt_instructions,
     apply_image_to_video_routing,
+    collect_plan_scene_violations,
     resolve_model_name,
 )
 from penshot.neopen.agent.model_adapter.model_router import build_route_plan
@@ -1383,8 +1384,16 @@ class WorkflowNodes:
                 state.domain.shot_sequence,
                 state.domain.contract,
             )
+            # T-103：路由阶段首帧资产与计划场景不一致同样计入契约违规
+            plan_scene_violations = collect_plan_scene_violations(
+                getattr(state.domain.instructions, "route_plan", None),
+                getattr(state.domain.fragment_sequence, "fragments", None),
+                getattr(state.domain.shot_sequence, "shots", None),
+                state.domain.contract,
+            )
             contract_violations = merge_violations(
-                state.domain.contract_violations, fresh_contract_violations
+                state.domain.contract_violations,
+                fresh_contract_violations + plan_scene_violations,
             )
 
             # 执行质量审查

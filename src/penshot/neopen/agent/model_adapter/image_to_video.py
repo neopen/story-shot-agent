@@ -472,3 +472,107 @@ def apply_image_to_video_routing(
         triggered += 1
 
     return triggered
+
+
+def _first_frame_asset_id(references: Any) -> str:
+    """从包的声明式引用中取首帧场景资产ID（无则返回空串）"""
+    for reference in references or []:
+        if not isinstance(reference, dict):
+            continue
+        if str(reference.get("role") or "") != "first_frame":
+            continue
+        asset_id = str(reference.get("asset_id") or "").strip()
+        if asset_id:
+            return asset_id
+    return ""
+
+
+def _scene_label(scene: Any, fragment: Any) -> str:
+    """生成违规项中的场景标识：优先镜头 scene_id，退回契约场景序号"""
+    scene_id = str(getattr(fragment, "scene_id", "") or "").strip()
+    if scene_id:
+        return scene_id
+    scene_num = getattr(scene, "scene_num", None)
+    if isinstance(scene_num, int):
+        return f"scene_{scene_num:03d}"
+    return ""
+
+
+def collect_plan_scene_violations(
+    route_plan: Any,
+    fragments: Optional[List[Any]],
+    shots: Optional[List[Any]],
+    contract: Any,
+) -> List[Dict[str, Any]]:
+    """收集「计划场景 vs 首帧资产」不一致的契约违规项（T-103/FR-099a）
+
+    只检查走图生视频且有首帧引用的包；计划场景存在且契约有对应资产时，
+    首帧 ``asset_id`` 必须等于该计划场景资产，否则说明路由期锚点漂移。
+    违规项交 ``merge_violations`` 合并后由审查按 MAJOR 计入，避免
+    “计划场景有资产、首帧用了别的场景”仍判审查通过。
+    """
+    if not isinstance(route_plan, dict) or contract is None:
+        return []
+
+    fragment_index = {
+        str(
+            getattr(fragment, "id", "") or getattr(fragment, "fragment_id", "")
+        ): fragment
+        for fragment in fragments or []
+    }
+    shot_index = {
+        str(getattr(shot, "id", "")): shot
+        for shot in shots or []
+        if getattr(shot, "id", "")
+    }
+
+    violations: List[Dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for package in route_plan.get("adapted_packages") or []:
+        if not isinstance(package, dict):
+            continue
+        if str(package.get("mode") or "") != RouteMode.IMAGE_TO_VIDEO.value:
+            continue
+        fragment_id = str(package.get("fragment_id") or "").strip()
+        if not fragment_id:
+            continue
+
+        fragment = fragment_index.get(fragment_id)
+        scene = _resolve_scene(contract, fragment, shot_index)
+        plan_asset = _find_scene_asset(contract, scene)
+        plan_asset_id = str(getattr(plan_asset, "asset_id", "") or "").strip()
+        if not plan_asset_id:
+            continue
+
+        first_frame_asset_id = _first_frame_asset_id(package.get("references"))
+        if not first_frame_asset_id or first_frame_asset_id == plan_asset_id:
+            continue
+
+        key = (fragment_id, first_frame_asset_id)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        scene_ref = _scene_label(scene, fragment)
+        location = str(getattr(scene, "location", "") or "").strip()
+        plan_desc = f"{scene_ref}（{location}）" if location else scene_ref
+        violations.append(
+            {
+                "type": "scene_anchor_mismatch",
+                "stage": "route_model",
+                "issue_code": "scene_anchor_mismatch",
+                "fragment_id": fragment_id,
+                "shot_id": str(getattr(fragment, "shot_id", "") or ""),
+                "scene": scene_ref,
+                "plan_location": location,
+                "expected_asset_id": plan_asset_id,
+                "actual_asset_id": first_frame_asset_id,
+                "message": (
+                    f"{fragment_id} 首帧场景与镜头计划不一致："
+                    f"计划场景 {plan_desc} 期望资产 {plan_asset_id}，"
+                    f"实际首帧 {first_frame_asset_id}"
+                ),
+            }
+        )
+
+    return violations

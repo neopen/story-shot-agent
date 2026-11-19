@@ -297,9 +297,10 @@ class RuleQualityAuditor(BaseQualityAuditor):
     ) -> None:
         """检查契约校验违规项（FR-060..FR-064 补强）
 
-        切镜/切片决策产出的契约违规项（unknown_character / orphan_fragment）
-        在审计前对最终产物复检合并后传入；审查报告必须计入这些违规并按
-        MAJOR 扣分，否则会出现"契约已告警而审查 100 分"的割裂。
+        切镜/切片/路由决策产出的契约违规项（unknown_character /
+        orphan_fragment / scene_anchor_mismatch）在审计前对最终产物复检
+        合并后传入；审查报告必须计入这些违规并按 MAJOR 扣分，否则会出现
+        "契约已告警而审查 100 分"的割裂。
         """
         check_name = "契约一致性复核检查"
         if contract is None:
@@ -312,6 +313,7 @@ class RuleQualityAuditor(BaseQualityAuditor):
         stage_nodes = {
             "segment_shot": PipelineNode.SEGMENT_SHOT,
             "split_video": PipelineNode.SPLIT_VIDEO,
+            "route_model": PipelineNode.ROUTE_MODEL,
         }
         suggestions = {
             "unknown_character": (
@@ -319,6 +321,10 @@ class RuleQualityAuditor(BaseQualityAuditor):
                 "幻觉角色需清除主角色标注"
             ),
             "orphan_fragment": "片段关联的镜头不存在：重新关联有效镜头或移除该片段",
+            "scene_anchor_mismatch": (
+                "首帧场景资产与镜头计划场景不一致：以计划场景资产重建首帧，"
+                "或人工确认计划场景是否错误"
+            ),
         }
         for violation in contract_violations:
             issue_code = str(violation.get("type") or "contract_violation")

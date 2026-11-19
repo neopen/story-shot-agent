@@ -29,6 +29,7 @@ from penshot.neopen.agent.model_adapter.first_frame_builder import (
 )
 from penshot.neopen.agent.model_adapter.image_to_video import (
     apply_image_to_video_routing,
+    collect_plan_scene_violations,
     has_critical_text,
     should_use_image_to_video,
 )
@@ -70,6 +71,7 @@ __all__ = [
     "split_static_motion",
     "apply_quality_gate",
     "apply_image_to_video_routing",
+    "collect_plan_scene_violations",
     "has_critical_text",
     "should_use_image_to_video",
 ]
