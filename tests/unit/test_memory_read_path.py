@@ -6,6 +6,7 @@ import pytest
 
 from penshot.neopen.agent.workflow.workflow_memory import WorkflowMemory
 from penshot.neopen.knowledge.memory.base_memory_layer import BaseMemoryLayer
+from penshot.neopen.knowledge.memory.long_term_memory import LongTermMemory
 from penshot.neopen.knowledge.memory.memory_manager import MemoryManager
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
 from penshot.neopen.knowledge.memory import script_memory as script_memory_module
@@ -168,3 +169,59 @@ def test_audit_keys_are_readable(memory_manager):
     assert workflow_memory.get_memory_list(
         "audit_results_history", MemoryLevel.MEDIUM_TERM
     ) == [{"score": 90, "status": "passed"}]
+
+
+class FakeVectorStore:
+    """只实现 prune 所需的 get/add_texts/delete 接口"""
+
+    def __init__(self):
+        self.entries = {}
+        self.deleted = []
+        self._counter = 0
+
+    def add_texts(self, texts, metadatas):
+        for text, metadata in zip(texts, metadatas):
+            self._counter += 1
+            memory_id = f"doc_{self._counter}"
+            self.entries[memory_id] = {"text": text, "timestamp": str(self._counter)}
+        return [f"doc_{self._counter}"]
+
+    def get(self, include=None):
+        ids = list(self.entries)
+        return {
+            "ids": ids,
+            "metadatas": [
+                {
+                    **(self.entries[memory_id]),
+                    "timestamp": self.entries[memory_id]["timestamp"],
+                }
+                for memory_id in ids
+            ],
+        }
+
+    def delete(self, ids):
+        for memory_id in ids:
+            self.entries.pop(memory_id, None)
+            self.deleted.append(memory_id)
+
+
+def test_long_term_prunes_oldest_documents():
+    config = MemoryConfig(
+        term_persist_path=None,
+        embeddings=object(),
+        long_term_max_documents=2,
+    )
+    memory = object.__new__(LongTermMemory)
+    memory.config = config
+    memory.script_id = "SN_PRUNE"
+    memory.store_path = ""
+    memory._key_values = {}
+    memory._kv_path = None
+    memory.vectorstore = FakeVectorStore()
+    memory.retriever = None
+
+    for index in range(4):
+        memory.add(f"text_{index}")
+
+    assert len(memory.vectorstore.entries) == 2
+    assert set(memory.vectorstore.entries) == {"doc_3", "doc_4"}
