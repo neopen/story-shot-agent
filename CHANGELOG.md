@@ -15,6 +15,37 @@
 * 0.4.7 场景权威、契约修复与 P0~P2 质量收口 ([#101](https://github.com/neopen/story-shot-agent/issues/101)) ([308e7c2](https://github.com/neopen/story-shot-agent/commit/308e7c20011175d84d03b5febd010181ad093d30))
 * **continuity:** 复合主角色按角色粒度校验，审计只采信复检 (0.4.7 T-118) ([#103](https://github.com/neopen/story-shot-agent/issues/103)) ([d4fd006](https://github.com/neopen/story-shot-agent/commit/d4fd006dbd1b069cdb0f0b9fd3730c4ec3373a26))
 
+### 场景与首帧
+
+* 片段所属场景已登记首帧资产时，以计划场景作为唯一权威，不再退化为文生视频（T-101）。
+* 按计划地点重写提示词；地点冲突直接阻断片段，并在告警中给出计划地点与期望首帧资产（T-102/T-113）。
+* 计划场景与首帧资产不一致计入契约违规，参与质量审查与修复（T-103）。
+* 景别表述统一归一、收紧景别探测，保留 POV 等主观视角（T-105）。
+* 地点解析改为 `scene_id` → `continuity_notes` 场景 → 剧本唯一地点名，歧义时跳过而非猜错；每轮只输出一条改写汇总，单条跳过降为 DEBUG（T-113）。
+
+### 契约与修复回路
+
+* 修复参数改用确定性问题码并按真实动作结算，避免“假修复”与空转重试（T-104）。
+* 修复状态按优先级保留；已收敛项、降级项与人工项同源，不再重复计入 `requires_manual_fix`（T-111）。
+* `unknown_character` 区分剧本真实角色与生成幻觉：真实角色补登记契约后即收敛，只对幻觉角色派发修复（T-114）。
+* 复合主角色（如“李明、张晨”）按角色粒度校验与修复，不再整串误报为未知角色（T-118）。
+* 风格问题改为确定性收敛：统一 `[Style: ...]` 前缀并移除冲突风格短语；无可靠风格来源时诚实转人工，不再无效重试或报 `repaired`（T-115）。
+* 审计节点与修复后复检只采信最终产物快照，已收敛的历史违规不再重复扣分（T-118）。
+
+### 审计与可观测性
+
+* 审计状态、分数与结论统一按检查通过率计算，结论列出未通过的检查项（P0-2）。
+* 测试运行不再写入 `logs/penshot_<date>.log`；新增 `PENSHOT_LOG_TO_FILE` / `PENSHOT_LOG_FILE` 控制文件日志开关与路径（P0-1）。
+* 计划模式下资产 pending 日志由 WARNING 降为 INFO，并输出实际待生成数量（T-116）。
+* 超长片段截断写入 `dropped_duration` / `manual_review_required`，并在片元序列元数据输出 `truncation_report`，便于下游与人工复核（T-117）。
+* 运镜冲突词表与同族判定对齐，减少同义运镜被误判（T-112）。
+
+### 升级说明
+
+* 无破坏性改动，无需数据迁移；契约 schema 版本保持 `0.4.4`。
+* 新增元数据均为可选字段：`scene_prompt_realign_summary`、`truncation_report`、截断片段的 `dropped_duration` / `manual_review_required`。
+* 需要区分测试与生产日志时，可设置 `PENSHOT_LOG_TO_FILE=0` 关闭文件日志，或用 `PENSHOT_LOG_FILE` 指定日志路径。
+
 ## [0.4.6](https://github.com/neopen/story-shot-agent/compare/v0.4.5...v0.4.6) (2026-11-17)
 
 

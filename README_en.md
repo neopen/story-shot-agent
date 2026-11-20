@@ -3,7 +3,6 @@
   <p align="center">
     <strong>A multi-agent collaborative screenplay storyboarding system with narrative continuity.</strong>
   </p>
-
 <p align="center">
   <!-- 第一行：技术栈与生态依赖 -->
   <a href="https://langchain-ai.github.io/langgraph/"><img src="https://img.shields.io/badge/LangGraph-1C3C3C.svg?style=flat-square&logo=langchain&logoColor=white" alt="LangGraph"></a>
@@ -25,22 +24,19 @@
     <a href="https://shot.helpenx.com" target="_blank"><b>WebSite</b></a> •
     <a href="https://shot.helpenx.com/docs/" target="_blank">Documentation</a> • 
     <a href="https://shot.helpenx.com/docs/architecture.html" target="_blank">Architecture</a> •
-    <a href="https://shot.helpenx.com/docs/mcp.html" target="_blank">MCP Service</a> 
+    <a href="https://shot.helpenx.com/docs/quick-start.html" target="_blank">Quick Start</a> 
   </p>
 
 
 
----
+- 🚀 **One-Click Conversion**: Any screenplay format (Film, Short Drama, Anime, Novel, etc.) → Shot-level descriptions → **Sora / Veo / Runway / Kling-ready prompts**
+- 🧠 **Continuity Guaranteed**: Multi-view references + RAG Knowledge + Multi-level memory + Chroma vector retrieval + Snapshotting + Multi-dimensional recall ensure character/scene/plot consistency across shots
 
-> 🚀 **One-Click Conversion**: Any screenplay format (Film, Short Drama, Anime, Novel, etc.) → Shot-level descriptions → **Sora / Veo / Runway / Kling-ready prompts**
-> 
-> 🧠 **Continuity Guaranteed**: Multi-view references + RAG Knowledge + Multi-level memory + Chroma vector retrieval + Snapshotting + Multi-dimensional recall ensure character/scene/plot consistency across shots
-> 
-> 🔌 **Multi-Ecosystem Support**: Out-of-the-box support for **Python SDK, MCP Service, Function Calling, REST API, and LangGraph Nodes**
-> 
-> ⚡ **Get Started in 5 Minutes**: `pip install penshot` + 3 lines of code, or  `docker pull neotems/penshot`
+- 🔌 **Multi-Ecosystem Support**: Out-of-the-box support for **Python SDK, MCP Service, Function Calling, REST API, and LangGraph Nodes**
 
----
+- ⚡ **Get Started in 5 Minutes**: `pip install penshot` + 3 lines of code, or  `docker pull neotems/penshot`
+
+
 
 ## 💡 Why PenShot?
 
@@ -53,7 +49,7 @@ A multi-agent collaborative screenplay storyboarding system built on **LangChain
 | **Time-consuming manual prompt engineering** | Auto-generates bilingual descriptions + negative prompts + audio cues |
 | **Complex multi-model setup** | One codebase supporting OpenAI, Qwen, DeepSeek, Ollama & more |
 
----
+
 
 ## 🌟 Core Features
 
@@ -352,45 +348,6 @@ Edit the `.env` file to configure the required LLM and Embedding parameters：`v
 
 ------
 
-## Development Roadmap
-
-<p align="center">
-  <img src="https://github.com/neopen/story-shot-agent/blob/main/assets/imgs/penshot-roadmap.webp" alt="PenShot Workflow" width="100%">
-</p>
-
-### Short-Term
-
-- Optimize long-shot segmentation logic for action continuity
-- Implement consistency validators for character clothing, positioning, and props
-- Specialized prompt format adaptation for Sora, Pika, and other models
-- Hybrid architecture combining rule-based engines and LLMs
-- Full English script support and intelligent node failure fallback
-- Fragment confidence scoring and debug mode (intermediate result persistence)
-
-### Mid-Term
-
-- Advanced camera language support (pan, tilt, zoom, tracking, follow)
-- Emotion-driven automatic visual style adjustment
-- Ultra-long script chunking + vector DB context memory
-- Multi-script batch queue processing & Web visualization interface
-- Character/scene reference image integration & multi-format export (XML/EDL/JSON)
-
-### Long-Term
-
-- Multimodal input (image + audio + text hybrid)
-- Real-time low-resolution preview & automatic continuity repair
-- Professional editing software plugins (Premiere/FCP/DaVinci)
-- Multi-user collaboration, version control, & autonomous learning from feedback
-- Bidirectional script-fragment traceability, semantic alignment detection, & multi-round correction mechanisms
-
-### Ultimate Goal
-
-Achieve zero-information-loss visualization for scripts of any length, language, or genre, delivering a standardized workflow that meets professional director-level storyboarding standards. The system will feature customizable styles, full traceability, automatic optimization loops, and cross-modal high consistency.
-
-
-
-------
-
 ## Contributing
 
 We welcome contributions via Issues or Pull Requests:
@@ -427,6 +384,7 @@ Copyright (c) 2025 neopen
 - Homepage: https://github.com/neopen/story-shot-agent
 - Documentation: https://shot.helpenx.com/docs/
 - Blog: https://pengline.cn/
+- HelpenX: https://helpenx.com/
 - Tool: https://helpoke.com/
 
 Special thanks to LangChain, LangGraph, Chroma, Ollama, and the open-source community for their technical support. If this project has been helpful to your work, please consider starring the repository and sharing your feedback.

@@ -13,7 +13,6 @@ ____  _____ _   _ ____  _  _  ___  _____
   <p align="center">
     <strong>基于 LangChain + LangGraph 多智能体协作的剧本转分镜系统，确保叙事连续性与镜头级提示词生成。</strong>
   </p>
-
   <p align="center">
   <!-- 第一行：技术栈与生态依赖 -->
   <a href="https://langchain-ai.github.io/langgraph/"><img src="https://img.shields.io/badge/LangGraph-1C3C3C.svg?style=flat-square&logo=langchain&logoColor=white" alt="LangGraph"></a>
@@ -34,19 +33,18 @@ ____  _____ _   _ ____  _  _  ___  _____
     <a href="https://github.com/neopen/story-shot-agent/blob/main/README_en.md" target="_blank">English</a> •
     <a href="https://shot.helpenx.com/" target="_blank"><b>官网</b></a> •
     <a href="https://shot.helpenx.com/docs/architecture.html" target="_blank">技术架构</a> •
-    <a href="https://shot.helpenx.com/docs/integration.html" target="_blank">集成指南</a> •
+    <a href="https://shot.helpenx.com/docs/quick-start.html" target="_blank">快速开始</a> •
     <a href="https://github.com/neopen/story-shot-agent/issues/58" target="_blank">（问题反馈</a> & 
     <a href="https://github.com/neopen/story-shot-agent/issues/85" target="_blank">需求采集）</a> 
 </p>
 
 
----
-> 🚀 **一键转换**：支持任意格式剧本（电影、短剧、动漫、小说等） → 镜头级描述 → **Sora / Veo / Runway / 可灵 Ready Prompt**  
-> 🧠 **连续性保障**：三视图 + RAG 知识库+ 三级记忆 + Chroma 向量检索 + 快照机制 + 多维召回，确保角色/场景/剧情跨片段一致  
-> 🔌 **多端生态支持**：开箱即用 **Python SDK、MCP 服务、Function Calling、REST API 及 LangGraph 节点**  
-> ⚡ **5 分钟上手**：`pip install penshot` + 3 行代码集成。或者 `docker pull neotems/penshot` 启动服务
 
-------
+- 🚀 **一键转换**：支持任意格式剧本（电影、短剧、动漫、小说等） → 镜头级描述 → **Sora / Veo / Runway / 可灵 等Prompt**  
+- 🧠 **连续性保障**：三视图 + RAG 知识库 + 三级记忆 + Chroma 向量检索 + 快照机制 + 多维召回，确保角色/场景/剧情跨片段一致  
+- 🔌 **多端生态支持**：开箱即用 **Python SDK、MCP、Function Calling、REST API、LangGraph 以及 Docker**  
+- ⚡ **5 分钟上手**：`pip install penshot` + 3 行代码集成。或者 `docker pull neotems/penshot` 启动服务
+
 
 
 ## 为什么选择 PenShot？
@@ -59,8 +57,6 @@ ____  _____ _   _ ____  _  _  ___  _____
 | 多模型适配复杂                | 一套代码，支持 OpenAI/Qwen/DeepSeek/Ollama 等主流 LLM |
 
 
-
-------
 
 ## 核心功能
 
@@ -480,34 +476,9 @@ docker run -d `
 </p>
 
 
-### 短期规划
 
-- 智能长镜头分割逻辑优化，保持动作连贯性
-- 角色服装、位置、道具的一致性校验器
-- 针对 Sora、Pika 等模型的提示词格式专项适配
-- 规则引擎与 LLM 混合处理架构
-- 完整英文剧本支持与节点失败智能降级
-- 片段置信度评分与调试模式（中间结果保存）
 
-### 中期规划
-
-- 复杂镜头语言支持（推拉摇移跟）
-- 情感分析驱动视觉风格自动调整
-- 超长剧本分块处理 + 向量数据库上下文记忆
-- 多剧本批量队列处理与 Web 可视化界面
-- 角色/场景参考图接入与多格式导出（XML/EDL/JSON）
-
-### 长期规划
-
-- 多模态输入（图+音+文混合）
-- 实时低分辨率预览与自动连续性修复
-- 专业剪辑软件插件（Premiere/FCP/DaVinci）
-- 多人协同、版本控制与从用户反馈中自动学习进化
-- 剧本-片段双向追溯、语义对齐度检测与多轮修正机制
-
-### 终极目标
-
-实现任意长度/语言/类型剧本的零信息损失视觉化，输出达到专业导演分镜水准的标准化工作流。系统具备风格可定制、结果可追溯、自动优化循环与跨模态高度一致性能力。
+**终极目标**：实现任意长度/语言/类型剧本的零信息损失视觉化，输出达到专业导演分镜水准的标准化工作流。系统具备风格可定制、结果可追溯、自动优化循环与跨模态高度一致性能力。
 
 
 
@@ -552,7 +523,8 @@ pytest tests/
 - 邮箱：helpenx@gmail.com
 - 文档：https://shot.helpenx.com/docs/
 - 博客：https://pengline.cn/
-- 工具：https://helpoke.com/
+- 星阵万象: https://helpenx.com/
+- 在线工具：https://helpoke.com/
 
 
 
