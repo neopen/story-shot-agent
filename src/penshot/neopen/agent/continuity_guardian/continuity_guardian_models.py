@@ -9,6 +9,7 @@ See LICENSE File For Details.
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/18 14:26
 """
+import bisect
 from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional
@@ -343,15 +344,27 @@ class StateTimeline(BaseModel):
         self.snapshots.sort(key=lambda x: x.timestamp)
 
     def get_snapshot_at_time(self, timestamp: float) -> Optional[StateSnapshot]:
-        """获取指定时间的快照"""
+        """获取与指定时间最近的状态快照
+
+        快照按时间升序排列，使用二分定位插入点后比较左右两侧，
+        返回时间上最近者（距离相同则取较早的快照），而非“第一个不早于”的快照。
+        """
         if not self.snapshots:
             return None
 
-        # 二分查找最接近的快照
-        for i, snapshot in enumerate(self.snapshots):
-            if snapshot.timestamp >= timestamp:
-                return snapshot
-        return self.snapshots[-1]
+        timestamps = [snapshot.timestamp for snapshot in self.snapshots]
+        index = bisect.bisect_left(timestamps, timestamp)
+
+        if index <= 0:
+            return self.snapshots[0]
+        if index >= len(self.snapshots):
+            return self.snapshots[-1]
+
+        before = self.snapshots[index - 1]
+        after = self.snapshots[index]
+        if timestamp - before.timestamp <= after.timestamp - timestamp:
+            return before
+        return after
 
     def get_latest_snapshot(self) -> Optional[StateSnapshot]:
         """获取最新的快照"""

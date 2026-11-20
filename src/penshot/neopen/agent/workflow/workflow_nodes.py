@@ -43,6 +43,9 @@ from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import 
 from penshot.neopen.agent.continuity_guardian.continuity_repair_generator import (
     ContinuityRepairGenerator,
 )
+from penshot.neopen.agent.continuity_guardian.prompt_style_guardian import (
+    PromptStyleGuardian,
+)
 from penshot.neopen.agent.continuity_guardian.continuity_report import (
     MAX_REPORT_ROUNDS,
     build_repair_entries,
@@ -198,6 +201,10 @@ class WorkflowNodes:
         # 初始化连续性守护组件
         self.generator = ContinuityRepairGenerator()
         self.checker = ContinuityGuardianChecker()
+        # 风格守护：知识库缺少风格召回能力时自动回退到契约锚点/默认风格
+        self.style_guardian = PromptStyleGuardian(
+            self.knowledge_manager, self.embeddings
+        )
 
         # 初始化资产锚点生成智能体（M0.4.2：默认只产出声明式计划，不调用生图接口）
         self.asset_generator = AssetGeneratorAgent()
@@ -1771,8 +1778,32 @@ class WorkflowNodes:
                 state.input.task_id, TaskStage.CONTINUITY_CHECKING, 50
             )
 
-            # 2. 执行连续性检查
-            check_result = self._check_continuity(continuity_context)
+            # 2. 执行连续性检查（快照 + 契约锚点 + 风格守护）
+            style_anchor = (
+                getattr(state.domain.contract, "style_anchor", None)
+                if state.domain.contract
+                else None
+            )
+            self.style_guardian.initialize_style(
+                state.domain.parsed_script, style_anchor
+            )
+            snapshot = self.checker.take_snapshot(continuity_context)
+            debug(
+                f"连续性快照已记录: {snapshot.snapshot_id}, "
+                f"累计={len(self.checker.timeline.snapshots)}"
+            )
+            check_result = self._check_continuity(
+                continuity_context, state.domain.contract
+            )
+            self.checker.check_style_drift_with_guardian(
+                continuity_context, self.style_guardian, check_result
+            )
+            check_result.metadata["snapshot"] = {
+                "snapshot_id": snapshot.snapshot_id,
+                "timestamp": snapshot.timestamp,
+                "snapshot_count": len(self.checker.timeline.snapshots),
+                "latest": self.checker.timeline.get_latest_snapshot() is not None,
+            }
 
             # 更新状态：检查完成
             self._update_task_progress(
@@ -2569,19 +2600,26 @@ class WorkflowNodes:
 
     # ======================== 连续性节点私有方法 ========================
 
-    def _check_continuity(self, context: Dict[str, Any]) -> ContinuityCheckResult:
+    def _check_continuity(
+        self, context: Dict[str, Any], contract: Any = None
+    ) -> ContinuityCheckResult:
         """
         执行连续性检查
 
         Args:
             context: 包含各阶段输出的上下文
+            contract: 全局一致性契约（存在时走契约校验主链）
 
         Returns:
             ContinuityCheckResult: 连续性检查结果对象
         """
         info("开始执行连续性检查...")
 
-        result = self.checker.check_all_continuity(context)
+        result: ContinuityCheckResult
+        if contract is not None:
+            result = self.checker.check_with_contract(context, contract)
+        else:
+            result = self.checker.check_all_continuity(context)
 
         summary = result.get_summary()
         info(
@@ -2617,7 +2655,7 @@ class WorkflowNodes:
         Returns:
             按阶段分组的问题字典
         """
-        issues_by_stage = {
+        issues_by_stage: Dict[PipelineNode, List[ContinuityIssue]] = {
             PipelineNode.PARSE_SCRIPT: [],
             PipelineNode.SEGMENT_SHOT: [],
             PipelineNode.SPLIT_VIDEO: [],
