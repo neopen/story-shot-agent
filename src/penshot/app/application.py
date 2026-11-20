@@ -53,7 +53,15 @@ async def app_startup():
 async def lifespan(app: FastAPI):
     await app_startup()
     await startup_with_recovery()
-    yield
+    try:
+        yield
+    finally:
+        # 关闭任务工厂，并兜底释放所有检查点 SQLite 连接
+        from ..neopen.task.task_init import shutdown_event
+        from ..neopen.agent.workflow.workflow_checkpointer import close_all_checkpointers
+
+        await shutdown_event()
+        close_all_checkpointers()
 
 
 # 创建FastAPI应用

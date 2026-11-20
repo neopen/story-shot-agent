@@ -875,8 +875,6 @@ class PublicConfigResponse(BaseModel):
     workflow_timeout: int = 1800
     checkpoint_mode: str = "auto"
     max_checkpoints_per_script: int = 10
-    checkpoint_max_connections: int = 5
-    checkpoint_idle_timeout: int = 600
     enable_llm_cache: bool = False
     cache_ttl_seconds: int = 300
     cache_mode: str = "strict"
