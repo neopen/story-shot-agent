@@ -312,6 +312,9 @@ class AIVideoPrompt(BaseModel):
     # 基本技术参数
     duration: float = Field(..., ge=0.5, description="视频时长（秒）")
 
+    # 随机种子：同一剧本内保持固定值，便于复现与跨片段一致性
+    seed: Optional[int] = Field(default=None, description="视频生成随机种子")
+
     # 模型选择
     model: str = Field(
         default="runway_gen2",

@@ -865,6 +865,7 @@ class PublicConfigResponse(BaseModel):
     audio_model: str = ""
     default_negative_prompt: str = ""
     default_style: str = ""
+    video_seed: Optional[int] = None
     max_prompt_length: int = 200
     min_prompt_length: int = 20
     prompt_length_max_threshold: int = 220

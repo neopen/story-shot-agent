@@ -440,6 +440,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
             main_character=fragment.continuity_notes.get("main_character", ""),
             negative_prompt=result.get("negative_prompt", self.config.default_negative_prompt),
             duration=fragment.duration,
+            seed=self.config.video_seed,
             model=self.config.video_model,
             style=result.get("style_hint"),
             audio=audio,
