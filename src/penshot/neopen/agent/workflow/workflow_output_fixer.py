@@ -10,6 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/2/9
 """
 
+import asyncio
 import time
 from typing import Dict, Any, Optional, List
 
@@ -29,7 +30,11 @@ class WorkflowOutputFixer:
         self.is_debug = is_debug
 
     async def enhanced_workflow_invoke(
-        self, workflow, initial_state: WorkflowState
+        self,
+        workflow,
+        initial_state: WorkflowState,
+        config: Optional[Dict[str, Any]] = None,
+        resume: bool = False,
     ) -> Dict[str, Any]:
         """
         增强的workflow调用，确保返回正确的分割片段
@@ -37,6 +42,8 @@ class WorkflowOutputFixer:
         Args:
             workflow: LangGraph workflow对象
             initial_state: 初始工作流状态
+            config: 运行配置；未传入时按 script_id/task_id 生成稳定 thread_id
+            resume: 为 True 时以 None 为输入，从最近检查点续跑
 
         Returns:
             修复后的最终结果
@@ -44,15 +51,19 @@ class WorkflowOutputFixer:
         debug("开始增强的workflow调用（修复片段序列）")
 
         try:
-            # 1. 执行原始workflow（支持异步）
-            debug(f"执行原始workflow，任务ID: {initial_state.input.task_id}")
+            # 1. 执行原始 workflow
+            task_id = initial_state.input.task_id
+            debug(f"执行原始workflow，任务ID: {task_id}")
 
-            # 注意：这里需要await workflow.ainvoke
-            # final_state = await workflow.ainvoke(
-            final_state = workflow.invoke(
-                initial_state,
-                config={"configurable": {"thread_id": f"process_{id(initial_state)}"}},
-            )
+            if config is None:
+                script_id = getattr(initial_state.input, "script_id", None)
+                config = {
+                    "configurable": {"thread_id": f"{script_id}_{task_id}"}
+                }
+
+            # 同步 SqliteSaver 不支持 ainvoke，放到线程池执行，避免阻塞事件循环
+            invoke_input = None if resume else initial_state
+            final_state = await asyncio.to_thread(workflow.invoke, invoke_input, config)
 
             # 2. 分析并修复输出
             debug("分析workflow输出，寻找正确的片段序列...")
