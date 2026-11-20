@@ -10,7 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/2/12 15:19
 """
 
-__version__ = "0.4.7"
+__version__ = "0.4.8"
 __author__ = "HiPeng"
 
 __all__ = [
