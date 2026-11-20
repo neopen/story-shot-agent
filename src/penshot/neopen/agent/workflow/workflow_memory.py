@@ -12,12 +12,38 @@ See LICENSE File For Details.
 
 from typing import Dict, Any, List, Optional
 import json
+from collections import Counter
 from datetime import datetime
 
 from penshot.logger import error, debug, info, warning
 from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
 from penshot.neopen.prompts.ingestion_policy import decide_ingestion
 from penshot.utils.log_utils import print_log_exception
+
+
+# 统一的记忆键规范：读写两侧共用，避免字面量漂移导致“只写不读”
+def stage_latest_key(stage_key: str) -> str:
+    return f"stage_{stage_key}_latest"
+
+
+def stage_history_key(stage_key: str) -> str:
+    return f"stage_{stage_key}_history"
+
+
+def stage_stats_key(stage_key: str) -> str:
+    return f"stats_{stage_key}"
+
+
+def stage_issues_key(stage_key: str) -> str:
+    return f"issues_{stage_key}"
+
+
+def common_patterns_key(stage_key: str) -> str:
+    return f"common_{stage_key}_patterns"
+
+
+def successful_patterns_key(stage_key: str) -> str:
+    return f"successful_{stage_key}_patterns"
 
 
 class WorkflowMemory:
@@ -72,16 +98,20 @@ class WorkflowMemory:
         try:
             # 1. 提取结果统计信息
             stats = self._extract_stage_stats(stage_key, result)
+            issues = None
 
-            # 合并外部元数据
+            # 合并外部元数据；问题列表单独存储，避免污染统计与中期摘要
             if metadata:
-                stats.update(metadata)
+                issues = metadata.get("issues")
+                stats.update({k: v for k, v in metadata.items() if k != "issues"})
 
             stats["timestamp"] = timestamp
             stats["stage_completed_at"] = timestamp
 
             # 2. 短期记忆缓存（完整结果）
             self.store_short_term_memory(stage_key, result, stats, timestamp)
+            if issues is not None:
+                self.store_stage_issues(stage_key, issues)
 
             # 3. 中期记忆持久化（统计摘要）
             self.store_medium_term_memory(stage_key, stats, timestamp)
@@ -106,11 +136,11 @@ class WorkflowMemory:
             包含短期、中期、长期记忆的上下文字典
         """
         context = {
-            "recent_stats": self.get_memory_dict(f"stats_{stage_key}", level=MemoryLevel.MEDIUM_TERM, default={}),
-            "recent_issues": self.get_memory_list(f"issues_{stage_key}", level=MemoryLevel.SHORT_TERM, default=[]),
-            "common_patterns": self.get_memory_list(f"common_{stage_key}_patterns", level=MemoryLevel.LONG_TERM, default=[]),
-            "successful_patterns": self.get_memory_list(f"successful_{stage_key}_patterns", level=MemoryLevel.LONG_TERM, default=[]),
-            "latest_result": self.memory_manager.get(f"stage_{stage_key}_latest", level=MemoryLevel.SHORT_TERM, default=None),
+            "recent_stats": self.get_memory_dict(stage_stats_key(stage_key), level=MemoryLevel.MEDIUM_TERM, default={}),
+            "recent_issues": self.get_memory_list(stage_issues_key(stage_key), level=MemoryLevel.SHORT_TERM, default=[]),
+            "common_patterns": self.get_memory_list(common_patterns_key(stage_key), level=MemoryLevel.LONG_TERM, default=[]),
+            "successful_patterns": self.get_memory_list(successful_patterns_key(stage_key), level=MemoryLevel.LONG_TERM, default=[]),
+            "latest_result": self.memory_manager.get(stage_latest_key(stage_key), level=MemoryLevel.SHORT_TERM, default=None),
             "has_memory": False
         }
 
@@ -132,6 +162,108 @@ class WorkflowMemory:
                  f"成功模式={len(context['successful_patterns'])}")
 
         return context
+
+    def store_short_term_value(self, key: str, value: Any, metadata: Optional[Dict] = None) -> None:
+        """按指定 key 写入短期记忆（供审计结果等非阶段键使用）"""
+        if not self.memory_manager:
+            return
+        self.memory_manager.add(
+            input_text=key,
+            output_text=value,
+            level=MemoryLevel.SHORT_TERM,
+            metadata={"_serialized": True, **(metadata or {})},
+        )
+
+    def append_memory_value(
+        self,
+        key: str,
+        entry: Dict[str, Any],
+        level: MemoryLevel,
+        limit: int = 50,
+    ) -> List[Any]:
+        """追加一条记录到指定 key 的列表，并截断到 limit"""
+        if not self.memory_manager:
+            return []
+        items = self.get_memory_list(key, level=level, default=[])
+        items.append(entry)
+        if len(items) > limit:
+            items = items[-limit:]
+        self.memory_manager.add(
+            input_text=key,
+            output_text=items,
+            level=level,
+            metadata={"_serialized": True, "type": "append_list"},
+        )
+        return items
+
+    def store_stage_issues(self, stage_key: str, issues: Any) -> None:
+        """写入阶段问题列表，并从问题类型频次派生 common 模式"""
+        if not self.memory_manager or issues is None:
+            return
+
+        issue_dicts = [self._issue_to_dict(issue) for issue in issues]
+        if not issue_dicts:
+            return
+
+        issues_key = stage_issues_key(stage_key)
+        merged = self.get_memory_list(issues_key, level=MemoryLevel.SHORT_TERM, default=[])
+        merged.extend(issue_dicts)
+        merged = merged[-20:]
+        self.memory_manager.add(
+            input_text=issues_key,
+            output_text=merged,
+            level=MemoryLevel.SHORT_TERM,
+            metadata={"_serialized": True, "stage": stage_key, "type": "stage_issues"},
+        )
+
+        # 问题类型频次 → 长期 common 模式，供下次运行提前规避
+        counts = Counter(
+            str(
+                item.get("type")
+                or item.get("issue_type")
+                or item.get("issue_code")
+                or "unknown"
+            )
+            for item in issue_dicts
+        )
+        common_key = common_patterns_key(stage_key)
+        patterns = self.get_memory_list(common_key, level=MemoryLevel.LONG_TERM, default=[])
+        by_type = {
+            str(item.get("issue_type")): item
+            for item in patterns
+            if isinstance(item, dict) and item.get("issue_type")
+        }
+        for issue_type, count in counts.items():
+            record = by_type.get(issue_type, {"issue_type": issue_type, "count": 0})
+            record["count"] = int(record.get("count", 0)) + count
+            record["last_seen"] = datetime.now().isoformat()
+            by_type[issue_type] = record
+
+        patterns = sorted(
+            by_type.values(), key=lambda item: item.get("count", 0), reverse=True
+        )[:20]
+        self.memory_manager.add(
+            input_text=common_key,
+            output_text=patterns,
+            level=MemoryLevel.LONG_TERM,
+            metadata={"_serialized": True, "stage": stage_key, "type": "common_patterns"},
+        )
+
+    @staticmethod
+    def _issue_to_dict(issue: Any) -> Dict[str, Any]:
+        """把问题对象归一为可序列化字典"""
+        if isinstance(issue, dict):
+            return dict(issue)
+        for method_name in ("model_dump", "dict"):
+            method = getattr(issue, method_name, None)
+            if callable(method):
+                try:
+                    value = method()
+                    if isinstance(value, dict):
+                        return value
+                except Exception:
+                    continue
+        return {"description": str(issue)}
 
     def get_memory_dict(self, key: str, level: MemoryLevel, default: Optional[Dict] = None) -> Dict:
         """
@@ -199,17 +331,25 @@ class WorkflowMemory:
             return
 
         # 获取长期记忆中的常见问题
-        common_issues = self.get_memory_list("common_parse_issues", level=MemoryLevel.LONG_TERM, default=[])
+        common_issues = self.get_memory_list(
+            common_patterns_key("parse_script"), level=MemoryLevel.LONG_TERM, default=[]
+        )
         if common_issues:
             info(f"已加载 {len(common_issues)} 条常见问题模式")
 
-        # 获取修复成功模式
-        repair_patterns = self.get_memory_list("repair_success_patterns", level=MemoryLevel.LONG_TERM, default=[])
+        # 获取修复成功模式（由质量审查节点写入）
+        repair_patterns = self.get_memory_list(
+            "successful_audit_patterns", level=MemoryLevel.LONG_TERM, default=[]
+        )
         if repair_patterns:
             info(f"已加载 {len(repair_patterns)} 条修复成功模式")
 
         # 获取成功提示词模式
-        successful_prompts = self.get_memory_list("successful_prompt_patterns", level=MemoryLevel.LONG_TERM, default=[])
+        successful_prompts = self.get_memory_list(
+            successful_patterns_key("convert_prompt"),
+            level=MemoryLevel.LONG_TERM,
+            default=[],
+        )
         if successful_prompts:
             info(f"已加载 {len(successful_prompts)} 条成功提示词模式")
 
@@ -322,7 +462,6 @@ class WorkflowMemory:
             stats: 统计信息字典（会被修改）
         """
         if hasattr(result, '__dict__'):
-            generic_attrs = ['duration', 'count', 'total', 'size', 'length']
             specific_attrs = ['duration', 'count', 'total_elements', 'fragment_count', 'shot_count']
 
             for attr in specific_attrs:
@@ -369,7 +508,7 @@ class WorkflowMemory:
 
             # 存储到短期记忆（自动覆盖同一阶段的最新结果）
             self.memory_manager.add(
-                input_text=f"stage_{stage_key}_latest",
+                input_text=stage_latest_key(stage_key),
                 output_text=memory_entry,
                 level=MemoryLevel.SHORT_TERM,
                 metadata={
@@ -381,7 +520,7 @@ class WorkflowMemory:
             )
 
             # 同时存储到历史列表（保留最近5条）
-            history_key = f"stage_{stage_key}_history"
+            history_key = stage_history_key(stage_key)
             history = self.memory_manager.get(history_key, level=MemoryLevel.SHORT_TERM, default=[])
 
             if not isinstance(history, list):
@@ -421,7 +560,7 @@ class WorkflowMemory:
         """
         try:
             # 获取该阶段的现有统计历史
-            stats_key = f"stats_{stage_key}"
+            stats_key = stage_stats_key(stage_key)
             existing_stats = self.memory_manager.get(stats_key, level=MemoryLevel.MEDIUM_TERM, default={})
 
             if not isinstance(existing_stats, dict):
@@ -594,7 +733,7 @@ class WorkflowMemory:
             )
 
             # 更新成功模式列表（用于历史上下文）
-            patterns_key = f"successful_{stage_key}_patterns"
+            patterns_key = successful_patterns_key(stage_key)
             patterns = self.memory_manager.get(patterns_key, level=MemoryLevel.LONG_TERM, default=[])
 
             if not isinstance(patterns, list):

@@ -247,7 +247,9 @@ class WorkflowNodes:
                 "stats_parse_script", level=MemoryLevel.MEDIUM_TERM
             )
             common_issues = self.workflow_memory.get_memory_list(
-                "common_parse_issues", level=MemoryLevel.LONG_TERM, default=[]
+                "common_parse_script_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             historical_context = {
@@ -324,21 +326,15 @@ class WorkflowNodes:
             parse_issues = self.script_parser.detect_issues(
                 parsed_script, state.input.raw_script
             )
-            if parse_issues:
-                self.workflow_memory.store_short_term_memory(
-                    stage_key="parse_script_issues",
-                    result=[issue.dict() for issue in parse_issues],
-                    stats={"issue_count": len(parse_issues)},
-                    timestamp=datetime.now().isoformat(),
-                )
 
-            # 6. 保存阶段记忆（统一入口）
+            # 6. 保存阶段记忆（统一入口；问题列表随 metadata 写入 issues_* 键）
             self.workflow_memory.after_stage_completion(
                 stage="parse_script",
                 result=parsed_script,
                 metadata={
                     "repair_applied": repair_params is not None,
                     "issue_count": len(parse_issues) if parse_issues else 0,
+                    "issues": parse_issues or [],
                     "repair_params": repair_params.model_dump()
                     if repair_params
                     else None,
@@ -482,7 +478,9 @@ class WorkflowNodes:
                 "issues_segment_shot", level=MemoryLevel.SHORT_TERM, default=[]
             )
             common_shot_patterns = self.workflow_memory.get_memory_list(
-                "common_shot_patterns", level=MemoryLevel.LONG_TERM, default=[]
+                "common_segment_shot_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             historical_context = {
@@ -571,6 +569,7 @@ class WorkflowNodes:
                     "shot_count": len(shot_sequence.shots),
                     "shot_types": shot_types,
                     "issue_count": len(segment_issues) if segment_issues else 0,
+                    "issues": segment_issues or [],
                 },
             )
 
@@ -647,7 +646,9 @@ class WorkflowNodes:
                 "issues_split_video", level=MemoryLevel.SHORT_TERM, default=[]
             )
             common_split_patterns = self.workflow_memory.get_memory_list(
-                "common_split_patterns", level=MemoryLevel.LONG_TERM, default=[]
+                "common_split_video_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             historical_context = {
@@ -743,6 +744,7 @@ class WorkflowNodes:
                     "repair_applied": repair_params is not None,
                     "fragment_count": len(fragment_sequence.fragments),
                     "issue_count": len(split_issues) if split_issues else 0,
+                    "issues": split_issues or [],
                 },
             )
 
@@ -807,7 +809,9 @@ class WorkflowNodes:
                 "issues_convert_prompt", level=MemoryLevel.SHORT_TERM, default=[]
             )
             successful_prompts = self.workflow_memory.get_memory_list(
-                "successful_prompt_patterns", level=MemoryLevel.LONG_TERM, default=[]
+                "successful_convert_prompt_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             # 2.1 按角色/场景锚点召回历史成功提示词（向量检索）
@@ -953,6 +957,7 @@ class WorkflowNodes:
                     "prompt_count": len(instructions.fragments),
                     "audio_prompt_count": audio_count,
                     "issue_count": len(convert_issues) if convert_issues else 0,
+                    "issues": convert_issues or [],
                 },
             )
 
@@ -1370,7 +1375,7 @@ class WorkflowNodes:
             "audit_results_history", level=MemoryLevel.MEDIUM_TERM, default=[]
         )
         successful_repair_patterns = self.workflow_memory.get_memory_list(
-            "repair_success_patterns", level=MemoryLevel.LONG_TERM, default=[]
+            "successful_audit_patterns", level=MemoryLevel.LONG_TERM, default=[]
         )
 
         # 构建历史上下文
@@ -1440,24 +1445,47 @@ class WorkflowNodes:
             state.domain.repair_params = result.repair_params
             state.domain.audit_timestamp = datetime.now().isoformat()
 
-            # 存储最新审查结果（使用 workflow_memory）
-            self.workflow_memory.store_short_term_memory(
-                stage_key="latest_audit_result",
-                result={
-                    "timestamp": datetime.now().isoformat(),
-                    "status": result.status.value,
-                    "score": result.score,
-                    "violations": [v.dict() for v in result.violations],
-                    "repair_params": {
-                        k: v.model_dump() for k, v in result.repair_params.items()
-                    }
-                    if result.repair_params
-                    else None,
-                    "report": result.model_dump(),
-                },
-                stats={"score": result.score, "status": result.status.value},
-                timestamp=datetime.now().isoformat(),
+            # 存储最新审查结果（使用 workflow_memory 的统一键）
+            audit_timestamp = datetime.now().isoformat()
+            audit_snapshot = {
+                "timestamp": audit_timestamp,
+                "status": result.status.value,
+                "score": result.score,
+                "violations": [v.dict() for v in result.violations],
+                "repair_params": {
+                    k: v.model_dump() for k, v in result.repair_params.items()
+                }
+                if result.repair_params
+                else None,
+                "report": result.model_dump(),
+            }
+            self.workflow_memory.store_short_term_value(
+                "latest_audit_result",
+                audit_snapshot,
+                metadata={"type": "audit_result"},
             )
+
+            # 审查历史（中期）与成功修复模式（长期），供后续任务复用
+            audit_history_entry = {
+                "timestamp": audit_timestamp,
+                "status": result.status.value,
+                "score": result.score,
+                "violation_count": len(result.violations),
+                "repair_requested": bool(result.repair_params),
+            }
+            self.workflow_memory.append_memory_value(
+                "audit_results_history",
+                audit_history_entry,
+                MemoryLevel.MEDIUM_TERM,
+                limit=50,
+            )
+            if result.score >= 80:
+                self.workflow_memory.append_memory_value(
+                    "successful_audit_patterns",
+                    audit_history_entry,
+                    MemoryLevel.LONG_TERM,
+                    limit=30,
+                )
 
             info(
                 f"审计结果汇总: 状态={result.status.value}, 分数={result.score}%, 问题统计={result.stats}"

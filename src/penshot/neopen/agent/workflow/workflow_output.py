@@ -445,13 +445,29 @@ class WorkflowOutputWriter:
             medium_term_stats = memory_stats.get("medium_term", {}) if isinstance(memory_stats, dict) else {}
             long_term_stats = memory_stats.get("long_term", {}) if isinstance(memory_stats, dict) else {}
 
+            short_term_size = (
+                short_term_stats.get("message_count", short_term_stats.get("current_size", 0))
+                if isinstance(short_term_stats, dict)
+                else 0
+            )
+            medium_term_stages = (
+                medium_term_stats.get("stages_count", medium_term_stats.get("stage_count", 0))
+                if isinstance(medium_term_stats, dict)
+                else 0
+            )
+            long_term_enabled = (
+                long_term_stats.get("enabled", long_term_stats.get("document_count", 0) > 0)
+                if isinstance(long_term_stats, dict)
+                else False
+            )
+
             memory_report = {
                 "task_id": task_id,
                 "script_id": script_id,
                 "memory_statistics": memory_stats,
-                "short_term_size": short_term_stats.get("current_size", 0) if isinstance(short_term_stats, dict) else 0,
-                "medium_term_stages": medium_term_stats.get("stage_count", 0) if isinstance(medium_term_stats, dict) else 0,
-                "long_term_enabled": long_term_stats.get("enabled", False) if isinstance(long_term_stats, dict) else False
+                "short_term_size": short_term_size,
+                "medium_term_stages": medium_term_stages,
+                "long_term_enabled": long_term_enabled,
             }
 
             # 同步保存，因为这是最后的报告
