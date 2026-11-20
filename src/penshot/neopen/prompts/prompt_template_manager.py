@@ -539,6 +539,104 @@ class PromptTemplateManager:
             raise RuntimeError(f"重建索引失败: {script_id}")
         return self._count_index_docs(self._indices.get(script_id))
 
+    def import_templates_from_global(
+        self,
+        script_id: Optional[str] = None,
+        limit_per_script: int = 50,
+        persist: bool = True,
+    ) -> int:
+        """把其他剧本的活跃模板复制到当前剧本（显式迁移，跨剧本召回仍保持只读）
+
+        跨剧本检索本身不会写回任何来源剧本；当需要让新剧本拥有独立索引时，
+        调用本方法按内容哈希去重后导入，并重建当前剧本索引。
+
+        Args:
+            script_id: 目标剧本ID（默认当前剧本）
+            limit_per_script: 每个来源剧本最多导入的模板数
+            persist: 是否落盘
+
+        Returns:
+            实际导入的模板数量
+        """
+        target_script_id = script_id or self._current_script_id
+        if not target_script_id:
+            warning("未指定剧本ID且未设置当前剧本，无法导入模板")
+            return 0
+
+        self._load_cache_for_script(target_script_id)
+        target_entries = self._caches.setdefault(target_script_id, [])
+        existing_hashes = {
+            str(entry.get("hash"))
+            for entry in target_entries
+            if entry.get("hash")
+        }
+
+        root = os.path.join(self.base_storage_dir, "prompt_templates")
+        try:
+            source_ids = sorted(
+                name for name in os.listdir(root)
+                if name != target_script_id
+                and os.path.isdir(os.path.join(root, name))
+            )
+        except FileNotFoundError:
+            return 0
+
+        imported = 0
+        for source_id in source_ids:
+            cache_path = self._get_cache_path(source_id)
+            if not os.path.exists(cache_path):
+                continue
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    entries = json.load(f)
+            except Exception as e:
+                warning(f"读取来源剧本缓存失败，跳过: {cache_path}, {e}")
+                continue
+            if not isinstance(entries, list):
+                continue
+
+            count = 0
+            for entry in entries:
+                if count >= limit_per_script:
+                    break
+                if not isinstance(entry, dict) or is_legacy_template(entry):
+                    continue
+                prompt_text = entry.get("prompt", "")
+                if not prompt_text:
+                    continue
+
+                template_hash = str(
+                    entry.get("hash") or self._generate_template_hash(prompt_text)
+                )
+                if template_hash in existing_hashes:
+                    continue
+
+                metadata = dict(entry.get("metadata") or {})
+                metadata.setdefault("schema_version", CONTRACT_SCHEMA_VERSION)
+                metadata.setdefault("audit_status", AUDIT_STATUS_UNKNOWN)
+                metadata["imported_from"] = source_id
+
+                target_entries.append({
+                    "prompt": prompt_text,
+                    "hash": template_hash,
+                    "metadata": self._truncate_metadata(metadata),
+                    "added_at": datetime.now().isoformat(),
+                })
+                existing_hashes.add(template_hash)
+                imported += 1
+                count += 1
+
+        if not imported:
+            debug(f"没有可导入的跨剧本模板: {target_script_id}")
+            return 0
+
+        self._save_cache_for_script(target_script_id)
+        self.rebuild_index_from_entries(
+            target_script_id, self._caches[target_script_id], persist=persist
+        )
+        info(f"已从其他剧本导入 {imported} 个模板到 {target_script_id}")
+        return imported
+
     def _get_current_index(self) -> Optional[BaseIndex]:
         """
         获取当前剧本的索引
