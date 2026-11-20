@@ -7,6 +7,14 @@
 
 ---
 
+## [0.4.7](https://github.com/neopen/story-shot-agent/compare/v0.4.6...v0.4.7) (2026-11-20)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* 0.4.7 场景权威、契约修复与 P0~P2 质量收口 ([#101](https://github.com/neopen/story-shot-agent/issues/101)) ([308e7c2](https://github.com/neopen/story-shot-agent/commit/308e7c20011175d84d03b5febd010181ad093d30))
+* **continuity:** 复合主角色按角色粒度校验，审计只采信复检 (0.4.7 T-118) ([#103](https://github.com/neopen/story-shot-agent/issues/103)) ([d4fd006](https://github.com/neopen/story-shot-agent/commit/d4fd006dbd1b069cdb0f0b9fd3730c4ec3373a26))
+
 ## [0.4.6](https://github.com/neopen/story-shot-agent/compare/v0.4.5...v0.4.6) (2026-11-17)
 
 
