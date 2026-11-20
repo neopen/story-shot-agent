@@ -157,6 +157,35 @@ def test_style_check_runs_alongside_character_check():
     assert result.issues_by_type.get(ContinuityIssueType.STYLE_INCONSISTENT.value)
 
 
+def test_style_sudden_change_between_adjacent_fragments():
+    checker = ContinuityGuardianChecker()
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(fragment_id="f1", prompt="a", duration=2, style="cinematic"),
+            AIVideoPrompt(fragment_id="f2", prompt="b", duration=2, style="anime"),
+        ]
+    )
+    result = ContinuityCheckResult()
+
+    checker.check_style_continuity({"instructions": instructions}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.STYLE_SUDDEN_CHANGE.value)
+
+
+def test_same_garment_color_drift_is_reported():
+    checker = ContinuityGuardianChecker()
+    result = ContinuityCheckResult()
+
+    checker._check_character_appearance_continuity(
+        "小明", "medium shot, wearing a red raincoat", 0, "f1", result
+    )
+    checker._check_character_appearance_continuity(
+        "小明", "medium shot, wearing a blue raincoat", 1, "f2", result
+    )
+
+    assert result.issues_by_type.get(ContinuityIssueType.COLOR_INCONSISTENT.value)
+
+
 def _prop_script(contents):
     elements = [
         SimpleNamespace(

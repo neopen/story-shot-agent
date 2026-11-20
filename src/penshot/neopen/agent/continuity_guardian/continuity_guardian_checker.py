@@ -17,7 +17,7 @@ from typing import Dict, Any, List, Optional, Pattern, Set
 
 from penshot.logger import info
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
-from penshot.neopen.constants.appearance import MAIN_GARMENT_KEYWORDS
+from penshot.neopen.constants.appearance import COLOR_KEYWORDS, MAIN_GARMENT_KEYWORDS
 from penshot.neopen.constants.continuity import (
     CROSS_CHUNK_SCENE_THRESHOLD,
     get_action_synonym_groups,
@@ -80,6 +80,15 @@ def _main_garment_signature(text: str) -> Set[str]:
     }
 
 
+def _color_signature(text: str) -> Set[str]:
+    """提取片段中出现的颜色词，用于同款服装的配色漂移检测"""
+    return {
+        keyword
+        for keyword in COLOR_KEYWORDS
+        if contains_keyword(text, (keyword,))
+    }
+
+
 class ContinuityGuardianChecker:
     """连续性检查器 - 负责检测跨阶段的连续性问题"""
 
@@ -87,6 +96,7 @@ class ContinuityGuardianChecker:
         self.timeline = StateTimeline()
         self.snapshot_counter = 0
         self._last_appearance: Dict[str, Set[str]] = {}  # 临时存储上次外观
+        self._last_color: Dict[str, Set[str]] = {}  # 临时存储上次服装配色
 
         # 去重缓存
         self._seen_issues: Set[str] = set()
@@ -103,6 +113,7 @@ class ContinuityGuardianChecker:
         self._processed_shots.clear()
         # 外观基线只在本轮片段序列内有效，跨轮保留会让首片段与上轮末片段误比较
         self._last_appearance.clear()
+        self._last_color.clear()
 
         result = ContinuityCheckResult()
 
@@ -250,8 +261,38 @@ class ContinuityGuardianChecker:
             if issue:
                 result.add_issue(issue)
 
+        # 同一件服装的配色漂移：服装词重叠但颜色集合完全不相交
+        colors = _color_signature(prompt)
+        previous_colors = self._last_color.get(character)
+        if (
+            colors
+            and previous_colors
+            and garments
+            and previous
+            and garments & previous
+            and not colors & previous_colors
+        ):
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.COLOR_INCONSISTENT,
+                description=(
+                    f"角色'{character}'服装配色不一致: "
+                    f"{'、'.join(sorted(previous_colors))} -> "
+                    f"{'、'.join(sorted(colors))}"
+                ),
+                severity=ContinuitySeverity.WARNING,
+                fragment_id=fragment_id,
+                position=index,
+                suggestion="统一角色服装配色",
+                source_stage=PipelineNode.CONVERT_PROMPT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
         if garments:
             self._last_appearance[character] = garments
+        if colors:
+            self._last_color[character] = colors
 
     def check_scene_continuity(self, context: Dict[str, Any],
                                result: ContinuityCheckResult) -> None:
@@ -379,8 +420,9 @@ class ContinuityGuardianChecker:
 
         # 记录已处理的关键词
         seen_keywords: Set[str] = set()
+        previous_style_tokens: Optional[Set[str]] = None
 
-        for prompt in instructions.fragments:
+        for index, prompt in enumerate(instructions.fragments):
             # 注意：不复用角色检查的 _processed_fragments，否则风格检查会被整体跳过
             prompt_style = getattr(prompt, "style", None)
             if prompt_style:
@@ -392,6 +434,34 @@ class ContinuityGuardianChecker:
                 for kw in style_keywords:
                     if len(kw) > 3:  # 忽略过短的词
                         seen_keywords.add(kw)
+
+                # 相邻片段风格关键词完全不相交 → 风格突变
+                current_tokens = {
+                    token for token in style_keywords if len(token) > 2
+                }
+                if (
+                    previous_style_tokens
+                    and current_tokens
+                    and not previous_style_tokens & current_tokens
+                ):
+                    issue = self._create_issue(
+                        issue_type=ContinuityIssueType.STYLE_SUDDEN_CHANGE,
+                        description=(
+                            f"片段'{prompt.fragment_id}'风格突变: "
+                            f"{' '.join(sorted(previous_style_tokens))} -> "
+                            f"{' '.join(sorted(current_tokens))}"
+                        ),
+                        severity=ContinuitySeverity.WARNING,
+                        fragment_id=prompt.fragment_id,
+                        position=index,
+                        suggestion="在风格变化处补充过渡描述或统一风格",
+                        source_stage=PipelineNode.CONVERT_PROMPT.value,
+                        auto_fixable=True,
+                    )
+                    if issue:
+                        result.add_issue(issue)
+                if current_tokens:
+                    previous_style_tokens = current_tokens
 
         unique_styles = set(styles)
         if len(unique_styles) > 2:
