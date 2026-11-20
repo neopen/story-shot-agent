@@ -291,6 +291,8 @@ def _audit_node(active_count, report):
         get_memory_list=lambda *args, **kwargs: [],
         get_memory_dict=lambda *args, **kwargs: {},
         store_short_term_memory=lambda *args, **kwargs: None,
+        store_short_term_value=lambda *args, **kwargs: None,
+        append_memory_value=lambda *args, **kwargs: [],
     )
     nodes.quality_auditor = SimpleNamespace(qa_process=lambda *args, **kwargs: report)
     nodes.knowledge_manager = _RecordingKnowledgeManager(active_count)
