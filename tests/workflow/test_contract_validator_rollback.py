@@ -95,6 +95,50 @@ class TestContractValidatorRollback:
 
         assert result == PipelineState.NEEDS_REPAIR
 
+    def test_split_multi_character_registered_passes(self, decision):
+        """同框多角色复合值逐个校验：全部已登记时不误报"""
+        contract = _contract(["李明", "张晨"])
+        state = _state(contract)
+        state.domain.shot_sequence = ShotSequence(
+            shots=[_shot("shot_001", "李明, 张晨")]
+        )
+
+        result = decision.decide_after_splitting(state)
+
+        assert result == PipelineState.SUCCESS
+        assert state.domain.contract_violations == []
+
+    def test_split_multi_character_reports_only_unknown_part(self, decision):
+        """复合值中只有未登记的名字计入违规，已登记角色不再连带误报"""
+        contract = _contract(["李明", "张晨"])
+        state = _state(contract)
+        state.domain.shot_sequence = ShotSequence(
+            shots=[_shot("shot_001", "李明, 路人甲")]
+        )
+
+        result = decision.decide_after_splitting(state)
+
+        assert result == PipelineState.NEEDS_RETRY
+        assert [v["character"] for v in state.domain.contract_violations] == ["路人甲"]
+        params = state.domain.repair_params[PipelineNode.SEGMENT_SHOT]
+        assert params.issue_count == 1
+
+    def test_fragment_multi_character_registered_passes(self, decision):
+        """切片阶段同样按角色粒度校验复合主角色"""
+        contract = _contract(["李明", "张晨"])
+        state = _state(contract)
+        state.domain.shot_sequence = ShotSequence(
+            shots=[_shot("shot_001", "李明、张晨")]
+        )
+        state.domain.fragment_sequence = FragmentSequence(
+            fragments=[_fragment("frag_001", "shot_001")]
+        )
+
+        result = decision.decide_after_fragmenting(state)
+
+        assert result == PipelineState.SUCCESS
+        assert state.domain.contract_violations == []
+
     def test_split_without_contract_passes(self, decision):
         """无契约时不阻塞：正常返回 SUCCESS"""
         state = _state(None)

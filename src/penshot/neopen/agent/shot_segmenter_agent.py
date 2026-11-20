@@ -15,7 +15,10 @@ from typing import Any, Optional, List, Dict, cast
 from penshot.logger import debug, info, error
 from penshot.neopen.agent.base_models import AgentMode, ElementType
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
-from penshot.neopen.agent.character_names import normalize_character_name
+from penshot.neopen.agent.character_names import (
+    normalize_character_name,
+    split_character_names,
+)
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import IssueType
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import BasicViolation, SeverityLevel, RuleType, QualityRepairParams
 from penshot.neopen.agent.repair_outcome import record_repair_outcome
@@ -603,25 +606,33 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
                 contract_issue = cast(Dict[str, Any], violation)
                 if (contract_issue.get("type") or "") != "unknown_character":
                     continue
+                characters = split_character_names(contract_issue.get("character"))
+                if not characters:
+                    continue
                 shot_id = contract_issue.get("shot_id")
                 shot = self._find_shot(shot_sequence, shot_id) if shot_id else None
-                character = normalize_character_name(contract_issue.get("character"))
-                if not character:
-                    continue
-                if character in parsed_names:
-                    # 剧本真实角色由契约补登记解决，不在镜头层改动，登记即收敛
+                fully_resolved = True
+                for character in characters:
+                    if character in parsed_names:
+                        # 剧本真实角色由契约补登记解决，不在镜头层改动
+                        continue
+                    if not shot:
+                        fully_resolved = False
+                        continue
+                    shot_names = split_character_names(shot.main_character)
+                    if character not in shot_names:
+                        # 违规项与当前镜头状态不符（历史项），不误改
+                        fully_resolved = False
+                        continue
+                    # 生成幻觉角色：从主角色标注中移除，画面描述保留
+                    shot.main_character = "、".join(
+                        name for name in shot_names if name != character
+                    )
+                    repair_actions.append(
+                        f"清除契约外角色主角色标注: {shot_id}「{character}」"
+                    )
+                if fully_resolved:
                     mark_resolved(contract_issue)
-                    continue
-                if not shot:
-                    continue
-                if normalize_character_name(shot.main_character) != character:
-                    continue
-                # 生成幻觉角色：清除主角色标注，画面描述保留（不涉及角色外观锚点）
-                shot.main_character = ""
-                repair_actions.append(
-                    f"清除契约外角色主角色标注: {shot_id}「{character}」"
-                )
-                mark_resolved(contract_issue)
 
         # ========== 7. 更新统计信息 ==========
         new_stats = {

@@ -1377,8 +1377,8 @@ class WorkflowNodes:
 
         try:
             # 审计前对最终产物复检契约一致性（FR-060..FR-064 补强）：
-            # 合并历史违规项与当下复检结果，让审查读取契约校验告警，
-            # 避免出现"契约已告警而审查 100 分"的割裂
+            # 只采信当下复检结果——历史违规可能在后续修复或契约补登记中
+            # 已收敛，继续合并会让已修复的镜头重复扣分
             fresh_contract_violations = validate_shot_sequence(
                 state.domain.shot_sequence, state.domain.contract
             ) + validate_fragment_sequence(
@@ -1394,9 +1394,10 @@ class WorkflowNodes:
                 state.domain.contract,
             )
             contract_violations = merge_violations(
-                state.domain.contract_violations,
-                fresh_contract_violations + plan_scene_violations,
+                None, fresh_contract_violations + plan_scene_violations
             )
+            # 审计列表与最终产物同步，后续修复/输出只反映未收敛的违规项
+            state.domain.contract_violations = contract_violations
 
             # 执行质量审查
             result = self.quality_auditor.qa_process(
@@ -2886,16 +2887,24 @@ class WorkflowNodes:
     ) -> float:
         """修复后规则复检评分；复检失败时回退检测分并告警"""
         try:
-            fresh_violations = validate_shot_sequence(
-                state.domain.shot_sequence, state.domain.contract
-            ) + validate_fragment_sequence(
-                state.domain.fragment_sequence,
-                state.domain.shot_sequence,
-                state.domain.contract,
+            fresh_violations = (
+                validate_shot_sequence(
+                    state.domain.shot_sequence, state.domain.contract
+                )
+                + validate_fragment_sequence(
+                    state.domain.fragment_sequence,
+                    state.domain.shot_sequence,
+                    state.domain.contract,
+                )
+                + collect_plan_scene_violations(
+                    getattr(state.domain.instructions, "route_plan", None),
+                    getattr(state.domain.fragment_sequence, "fragments", None),
+                    getattr(state.domain.shot_sequence, "shots", None),
+                    state.domain.contract,
+                )
             )
-            merged = merge_violations(
-                state.domain.contract_violations, fresh_violations
-            )
+            # 与审计节点同口径：只保留修复后仍未收敛的违规项
+            merged = merge_violations(None, fresh_violations)
             state.domain.contract_violations = merged
             return float(
                 self.quality_auditor.recheck_rule_score(
