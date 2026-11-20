@@ -12,7 +12,10 @@ See LICENSE File For Details.
 
 from typing import Any, Dict, List
 
-from penshot.neopen.agent.character_names import normalize_character_name
+from penshot.neopen.agent.character_names import (
+    normalize_character_name,
+    split_character_names,
+)
 
 
 def _known_characters(contract: Any) -> set[str]:
@@ -21,6 +24,20 @@ def _known_characters(contract: Any) -> set[str]:
     known = {normalize_character_name(name) for name in characters}
     known.discard("")
     return known
+
+
+def _unknown_characters(value: Any, known_characters: set[str]) -> List[str]:
+    """返回字段中未登记到契约的角色名
+
+    复合值（如 "李明, 张晨"）按角色粒度拆分后逐个校验，只有真正未登记的
+    名字才计入违规；整串作为契约角色登记时视为合法，保留向后兼容。
+    """
+    whole = normalize_character_name(value)
+    if not whole or whole in known_characters:
+        return []
+    return [
+        name for name in split_character_names(value) if name not in known_characters
+    ]
 
 
 def validate_shot_sequence(shot_sequence: Any, contract: Any) -> List[Dict[str, Any]]:
@@ -42,9 +59,11 @@ def validate_shot_sequence(shot_sequence: Any, contract: Any) -> List[Dict[str, 
 
     known_characters = _known_characters(contract)
     for shot in getattr(shot_sequence, "shots", []) or []:
-        character = normalize_character_name(getattr(shot, "main_character", None))
-        if character and character not in known_characters:
-            shot_id = getattr(shot, "id", None)
+        shot_id = getattr(shot, "id", None)
+        unknown = _unknown_characters(
+            getattr(shot, "main_character", None), known_characters
+        )
+        for character in unknown:
             issues.append(
                 {
                     "type": "unknown_character",
@@ -101,8 +120,10 @@ def validate_fragment_sequence(
             )
             continue
 
-        character = normalize_character_name(getattr(shot, "main_character", None))
-        if character and character not in known_characters:
+        unknown = _unknown_characters(
+            getattr(shot, "main_character", None), known_characters
+        )
+        for character in unknown:
             issues.append(
                 {
                     "type": "unknown_character",

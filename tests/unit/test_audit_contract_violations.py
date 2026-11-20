@@ -2,8 +2,8 @@
 
 覆盖：规则审查新增的契约一致性复核检查（计入评分与状态）、qa_process
 合并后的状态与分数、LLM 深度审查提示词中的契约警告区块、审计回路传回的
-BasicViolation 包装契约违规在分镜修复器中的确定性收敛、审计节点的
-历史+复检违规合并接线。
+BasicViolation 包装契约违规在分镜修复器中的确定性收敛、审计节点只采信
+最终产物复检结果的接线。
 """
 
 from types import SimpleNamespace
@@ -237,8 +237,45 @@ def test_repair_shots_clears_hallucinated_character_from_audit_violation():
     assert repaired.metadata["repair_history"][-1]["fixed_issues"] == 1
 
 
+def test_repair_shots_keeps_valid_part_of_composite_character():
+    """复合主角色只移除幻觉名字，已登记的剧本角色保留"""
+    shot_sequence = ShotSequence(
+        shots=[
+            ShotInfo(
+                id="shot_011",
+                scene_id="scene_001",
+                description="李明与陌生人对峙",
+                duration=3.0,
+                main_character="李明、张晨",
+            )
+        ]
+    )
+    structured_script = SimpleNamespace(characters=[SimpleNamespace(name="李明")])
+    wrapped = BasicViolation.create(
+        issue_code="unknown_character",
+        issue_type=IssueType.CONTINUITY,
+        issue_desc="镜头 shot_011 的角色 张晨 不在一致性契约中",
+        issue_value={
+            "type": "unknown_character",
+            "stage": "segment_shot",
+            "shot_id": "shot_011",
+            "character": "张晨",
+            "message": "镜头 shot_011 的角色 张晨 不在一致性契约中",
+        },
+        severity=SeverityLevel.MAJOR,
+    )
+
+    segmenter = ShotSegmenterAgent(
+        llm=None, config=ShotConfig(enable_llm=False, enable_enhance=False)
+    )
+    repaired = segmenter.repair_shots(shot_sequence, [wrapped], structured_script)
+
+    assert repaired.shots[0].main_character == "李明"
+    assert repaired.metadata["repair_history"][-1]["fixed_issues"] == 1
+
+
 # ---------------------------------------------------------------------------
-# 审计节点接线：复检最终产物并把历史+复检违规（去重）传给审查器
+# 审计节点接线：复检最终产物，只把未收敛的违规项传给审查器
 # ---------------------------------------------------------------------------
 
 
@@ -297,17 +334,17 @@ def _node_state() -> WorkflowState:
     return state
 
 
-def test_audit_node_merges_historical_and_fresh_violations():
-    """审计节点复检最终产物，历史违规与复检结果去重合并后一并传给审查器"""
+def test_audit_node_rechecks_final_products_only():
+    """审计节点只采信最终产物复检结果：已收敛的历史违规不再重复扣分"""
     state = _node_state()
-    historical = {
+    stale = {
         "type": "unknown_character",
         "stage": "segment_shot",
-        "shot_id": "shot_001",
-        "character": "神秘人",
-        "message": "镜头 shot_001 的角色 神秘人 不在一致性契约中",
+        "shot_id": "shot_999",
+        "character": "李老师",
+        "message": "镜头 shot_999 的角色 李老师 不在一致性契约中",
     }
-    state.domain.contract_violations = [dict(historical)]  # 与复检同键，应被去重
+    state.domain.contract_violations = [dict(stale)]
     report = QualityAuditReport(
         status=AuditStatus.MINOR_ISSUES, score=85.0, violations=[]
     )
@@ -315,12 +352,14 @@ def test_audit_node_merges_historical_and_fresh_violations():
 
     nodes.quality_audit_node(state)
 
-    merged = captured["contract_violations"]
-    assert len(merged) == 2
-    assert merged[0] == historical
-    by_key = {(v["type"], v.get("shot_id"), v.get("fragment_id")) for v in merged}
+    fresh = captured["contract_violations"]
+    assert len(fresh) == 2
+    assert all(v.get("shot_id") != "shot_999" for v in fresh)
+    by_key = {(v["type"], v.get("shot_id"), v.get("fragment_id")) for v in fresh}
     assert ("unknown_character", "shot_001", None) in by_key
     assert ("unknown_character", None, "frag_001") in by_key
+    # 审计列表与复检快照同步，供后续修复与输出消费
+    assert state.domain.contract_violations == fresh
 
 
 def test_audit_node_passes_empty_violations_without_contract_products():
