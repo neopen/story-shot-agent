@@ -7,11 +7,18 @@ import pytest
 from llama_index.core.embeddings import MockEmbedding
 
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
+    CharacterContract,
     GlobalConsistencyContract,
     SceneContract,
 )
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
     ContinuityGuardianChecker,
+)
+from penshot.neopen.agent.continuity_guardian.cross_chunk_validator import (
+    CrossChunkValidator,
+)
+from penshot.neopen.agent.continuity_guardian.long_script_chunker import (
+    LongScriptChunker,
 )
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import (
     ContinuityCheckResult,
@@ -29,6 +36,7 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 )
 from penshot.neopen.agent.prompt_converter_agent import PromptConverterAgent
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
+from penshot.neopen.agent.script_parser_agent import build_contract_from_parsed
 from penshot.neopen.constants import (
     ACTION_SYNONYM_GROUPS_ZH,
     HOLDING_VERBS_ZH,
@@ -175,7 +183,9 @@ def test_prop_object_change_is_reported():
     result = ContinuityCheckResult()
     checker.check_prop_continuity({"parsed_script": parsed}, result)
 
-    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value)
+    issues = result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value)
+    assert issues
+    assert issues[0].auto_fixable is False
 
 
 # ===================== 契约主链与结构化锚点 ======================
@@ -228,6 +238,128 @@ def test_check_with_contract_runs_all_checks_and_registers_anchors():
     assert result.issues_by_type.get(ContinuityIssueType.TIME_GAP.value)
     # 片段缺失风格且契约存在风格锚点时应被提示
     assert result.issues_by_type.get(ContinuityIssueType.STYLE_INCONSISTENT.value)
+
+
+def test_contract_captures_scene_weather_and_props():
+    parsed = SimpleNamespace(
+        scenes=[
+            SimpleNamespace(
+                id="scene_001",
+                location="图书馆",
+                time_of_day="night",
+                weather="rainy",
+                elements=[SimpleNamespace(character="小明", content="翻书")],
+            )
+        ],
+        characters=[],
+        global_metadata=SimpleNamespace(
+            key_props=[
+                SimpleNamespace(
+                    name="借阅卡",
+                    description="泛黄的借阅卡",
+                    color=None,
+                    appears_in=["scene_001"],
+                )
+            ],
+            character_outfits=[],
+            continuity_notes="",
+            audio_atmosphere="neutral",
+        ),
+    )
+
+    contract = build_contract_from_parsed(parsed, script_id="SN_SCENE")
+
+    scene = contract.scenes[1]
+    assert scene.weather == "rainy"
+    assert scene.props_in_scene == {"借阅卡": "泛黄的借阅卡"}
+
+
+def test_scene_anchors_detect_unknown_scene_and_time_conflict():
+    contract = GlobalConsistencyContract(script_id="S", task_id="T")
+    contract.register_scene(
+        SceneContract(
+            scene_num=1,
+            location="咖啡店",
+            time_of_day="day",
+            characters_in_scene=["小明"],
+        )
+    )
+    contract.register_scene(
+        SceneContract(
+            scene_num=2,
+            location="咖啡店",
+            time_of_day="night",
+            characters_in_scene=["小明"],
+        )
+    )
+    unknown_shot = _shot("s_unknown", "小明推门", scene_id="scene_009")
+
+    result = ContinuityGuardianChecker().check_with_contract(
+        {"shot_sequence": SimpleNamespace(shots=[unknown_shot])}, contract
+    )
+
+    descriptions = [issue.description for issue in result.issues]
+    assert any("scene_009" in text for text in descriptions)
+    assert any("时间不一致" in text for text in descriptions)
+
+
+def test_character_anchor_detects_first_fragment_conflict():
+    contract = GlobalConsistencyContract(script_id="S", task_id="T")
+    contract.characters["小明"] = CharacterContract(
+        name="小明", appearance_anchors={"clothing": "红色雨衣"}
+    )
+    instructions = AIVideoInstructions(
+        fragments=[
+            AIVideoPrompt(
+                fragment_id="frag_001",
+                prompt="medium shot, wearing a blue coat",
+                duration=2,
+                main_character="小明",
+            )
+        ]
+    )
+
+    result = ContinuityGuardianChecker().check_with_contract(
+        {"instructions": instructions}, contract
+    )
+
+    assert result.issues_by_type.get(ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE.value)
+
+
+def test_time_reverse_is_reported():
+    checker = ContinuityGuardianChecker()
+    result = ContinuityCheckResult()
+    fragments = SimpleNamespace(
+        fragments=[
+            _fragment("frag_001", 5.0, 2.0),
+            _fragment("frag_002", 4.0, 2.0),
+        ]
+    )
+
+    checker.check_time_continuity({"fragment_sequence": fragments}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.TIME_REVERSE.value)
+
+
+def test_long_script_chunker_uses_scene_ids_for_boundaries():
+    scenes = [
+        SimpleNamespace(id=f"scene_{index:03d}", elements=[])
+        for index in range(1, 32)
+    ]
+    chunks = LongScriptChunker().chunk_script(SimpleNamespace(scenes=scenes))
+
+    assert len(chunks) >= 2
+    assert chunks[0].start_scene == 1
+    assert chunks[-1].end_scene == 31
+
+
+def test_cross_chunk_validator_flags_main_character_disappearing():
+    issues = CrossChunkValidator().validate_chunk_transition(
+        {"characters_in_chunk": ["小明", "小红"], "main_characters": ["小明"]},
+        {"characters_in_chunk": ["小红"], "main_characters": ["小明"]},
+    )
+
+    assert any(issue["type"] == "character_disappears" for issue in issues)
 
 
 # ============================ seed ============================
