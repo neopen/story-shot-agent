@@ -438,6 +438,28 @@ class ContinuityGuardianChecker:
 
             expected_start = curr.start_time + curr.duration
 
+            # 时间倒流：后一片段的起点早于前一片段起点，属于结构性错误
+            if nxt.start_time < curr.start_time - 0.1:
+                reverse_key = f"reverse_{pair_key}"
+                if reverse_key not in seen_overlaps:
+                    seen_overlaps.add(reverse_key)
+                    issue = self._create_issue(
+                        issue_type=ContinuityIssueType.TIME_REVERSE,
+                        description=(
+                            f"片段时间倒流: {nxt.id}({nxt.start_time:.2f}s) "
+                            f"早于 {curr.id}({curr.start_time:.2f}s)"
+                        ),
+                        severity=ContinuitySeverity.ERROR,
+                        fragment_id=nxt.id,
+                        position=i,
+                        suggestion="按镜头顺序重排片段时间轴",
+                        source_stage=PipelineNode.SPLIT_VIDEO.value,
+                        auto_fixable=True
+                    )
+                    if issue:
+                        result.add_issue(issue)
+                continue
+
             if abs(nxt.start_time - expected_start) > 0.1:
                 if nxt.start_time > expected_start:
                     gap = nxt.start_time - expected_start
@@ -512,7 +534,9 @@ class ContinuityGuardianChecker:
                         severity=ContinuitySeverity.WARNING,
                         scene_id=props[i]["scene"],
                         suggestion="确保道具前后一致",
-                        source_stage=PipelineNode.PARSE_SCRIPT.value
+                        source_stage=PipelineNode.PARSE_SCRIPT.value,
+                        # 解析阶段没有确定性道具修复能力，避免自动修复空转
+                        auto_fixable=False,
                     )
                     if issue:
                         result.add_issue(issue)
@@ -535,15 +559,15 @@ class ContinuityGuardianChecker:
                                contract: GlobalConsistencyContract,
                                result: ContinuityCheckResult) -> None:
         """契约校验：角色缺席、场景角色、结构化锚点、跨块连续性"""
-        # 1. 角色长期缺席
+        # 1. 角色长期缺席：结构性问题，解析/分镜无法确定性修复
         for issue_data in contract.get_character_appearance_consistency():
             issue = self._create_issue(
-                issue_type=ContinuityIssueType.CHARACTER_MISSING,
+                issue_type=ContinuityIssueType.CHARACTER_DISAPPEAR,
                 description=issue_data.get("suggestion", ""),
                 severity=ContinuitySeverity(issue_data.get("severity", "moderate")),
                 suggestion=issue_data.get("suggestion"),
                 source_stage=PipelineNode.CONTINUITY_CHECK,
-                auto_fixable=issue_data.get("auto_fixable", True)
+                auto_fixable=False,
             )
             if issue:
                 result.add_issue(issue)
@@ -553,8 +577,10 @@ class ContinuityGuardianChecker:
             if issue:
                 result.add_issue(issue)
 
-        # 3. 结构化锚点（ContinuityAnchor）
+        # 3. 结构化锚点（ContinuityAnchor）：角色外观 / 场景 / 风格
         anchors = self.build_anchors_from_contract(contract)
+        self._check_character_appearance_anchors(context, anchors, result)
+        self._check_scene_anchors(context, anchors, result)
         self._check_style_anchor(context, anchors, result)
 
         # 4. 长剧本跨块连续性（CrossChunkValidator）
@@ -583,6 +609,8 @@ class ContinuityGuardianChecker:
                 value={
                     "location": getattr(scene, "location", ""),
                     "time_of_day": getattr(scene, "time_of_day", ""),
+                    "weather": getattr(scene, "weather", ""),
+                    "characters": list(getattr(scene, "characters_in_scene", []) or []),
                 },
                 priority=1,
             ))
@@ -638,6 +666,120 @@ class ContinuityGuardianChecker:
         )
         if issue:
             result.add_issue(issue)
+
+    def _check_character_appearance_anchors(
+        self, context: Dict[str, Any], anchors: List[ContinuityAnchor],
+        result: ContinuityCheckResult,
+    ) -> None:
+        """用角色外观锚点校验片段服装；首个片段也有基线，不再只比较上一片段"""
+        instructions = context.get("instructions")
+        if not instructions:
+            return
+
+        anchors_by_name = {
+            anchor.name: (anchor.value or {})
+            for anchor in anchors
+            if anchor.anchor_type == "character"
+        }
+
+        for index, prompt in enumerate(instructions.fragments):
+            character = getattr(prompt, "main_character", None)
+            if not character:
+                continue
+            anchor_value = anchors_by_name.get(character) or {}
+            expected = _main_garment_signature(
+                str(anchor_value.get("clothing", "") or "")
+            )
+            if not expected:
+                continue
+
+            actual = _main_garment_signature(getattr(prompt, "prompt", "") or "")
+            if not actual or actual & expected:
+                continue
+
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE,
+                description=(
+                    f"角色'{character}'服装与契约锚点不一致: "
+                    f"期望 {'、'.join(sorted(expected))}，"
+                    f"实际 {'、'.join(sorted(actual))}"
+                ),
+                severity=ContinuitySeverity.WARNING,
+                fragment_id=prompt.fragment_id,
+                position=index,
+                suggestion="按契约外观锚点修正片段服装描述",
+                source_stage=PipelineNode.CONVERT_PROMPT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
+    def _check_scene_anchors(
+        self, context: Dict[str, Any], anchors: List[ContinuityAnchor],
+        result: ContinuityCheckResult,
+    ) -> None:
+        """用场景锚点校验分镜场景是否越界，以及相邻场景地点/时间是否冲突"""
+        scene_anchors = sorted(
+            (anchor for anchor in anchors if anchor.anchor_type == "scene"),
+            key=lambda anchor: int(anchor.name) if str(anchor.name).isdigit() else 0,
+        )
+        if not scene_anchors:
+            return
+
+        known_scenes = {
+            f"scene_{int(anchor.name):03d}"
+            for anchor in scene_anchors
+            if str(anchor.name).isdigit()
+        }
+        reported_scenes: Set[str] = set()
+        shots = getattr(context.get("shot_sequence"), "shots", []) or []
+        for shot in shots:
+            scene_id = getattr(shot, "scene_id", None)
+            if not scene_id or scene_id in known_scenes or scene_id in reported_scenes:
+                continue
+            reported_scenes.add(scene_id)
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.SCENE_INCONSISTENT,
+                description=f"镜头{shot.id}的场景'{scene_id}'不在契约场景锚点中",
+                severity=ContinuitySeverity.WARNING,
+                shot_id=shot.id,
+                scene_id=scene_id,
+                suggestion="检查分镜场景编号，或补登记对应契约场景",
+                source_stage=PipelineNode.SEGMENT_SHOT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
+        for previous, current in zip(scene_anchors, scene_anchors[1:]):
+            prev_value = previous.value or {}
+            curr_value = current.value or {}
+            shared_characters = set(prev_value.get("characters") or []) & set(
+                curr_value.get("characters") or []
+            )
+            if (
+                prev_value.get("location")
+                and prev_value.get("location") == curr_value.get("location")
+                and prev_value.get("time_of_day") != curr_value.get("time_of_day")
+                and shared_characters
+            ):
+                issue = self._create_issue(
+                    issue_type=ContinuityIssueType.SCENE_INCONSISTENT,
+                    description=(
+                        f"场景{previous.name}->{current.name} 地点相同但时间不一致: "
+                        f"{prev_value.get('time_of_day')} -> {curr_value.get('time_of_day')}"
+                    ),
+                    severity=ContinuitySeverity.WARNING,
+                    scene_id=(
+                        f"scene_{int(current.name):03d}"
+                        if str(current.name).isdigit() else current.name
+                    ),
+                    suggestion="补充时间过渡说明或统一场景时间",
+                    source_stage=PipelineNode.CONTINUITY_CHECK,
+                    auto_fixable=False,
+                )
+                if issue:
+                    result.add_issue(issue)
 
     def _check_chunk_transitions(self, context: Dict[str, Any],
                                  result: ContinuityCheckResult) -> None:

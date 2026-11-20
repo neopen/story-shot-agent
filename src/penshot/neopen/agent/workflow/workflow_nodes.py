@@ -2717,14 +2717,17 @@ class WorkflowNodes:
         """
         source_mapping = {
             ContinuityIssueType.CHARACTER_MISSING: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.CHARACTER_DISAPPEAR: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE: PipelineNode.CONVERT_PROMPT,
             ContinuityIssueType.SCENE_JUMP: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.SCENE_TOO_FREQUENT: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.SCENE_INCONSISTENT: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.ACTION_BREAK: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.STYLE_INCONSISTENT: PipelineNode.CONVERT_PROMPT,
             ContinuityIssueType.STYLE_SUDDEN_CHANGE: PipelineNode.CONVERT_PROMPT,
             ContinuityIssueType.TIME_GAP: PipelineNode.SPLIT_VIDEO,
             ContinuityIssueType.TIME_OVERLAP: PipelineNode.SPLIT_VIDEO,
+            ContinuityIssueType.TIME_REVERSE: PipelineNode.SPLIT_VIDEO,
             ContinuityIssueType.PROP_CHANGE: PipelineNode.PARSE_SCRIPT,
             ContinuityIssueType.PROP_DISAPPEAR: PipelineNode.PARSE_SCRIPT,
             ContinuityIssueType.PROP_APPEAR: PipelineNode.PARSE_SCRIPT,
