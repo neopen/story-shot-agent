@@ -47,12 +47,21 @@ def _prop_object_pattern(language: str = "zh") -> Pattern[str]:
     return re.compile(pattern)
 
 
+_NEGATION_PATTERN = re.compile(r"(?:不|没|未|别|无|勿|莫)(?:有|再|曾|想|要|敢)?$")
+
+
+def _is_negated(text: str, start: int) -> bool:
+    """判断关键词前是否紧邻否定词，如“没有回头”“不再看”"""
+    return _NEGATION_PATTERN.search(text[:start]) is not None
+
+
 def _canonical_action(text: str, language: str = "zh") -> Optional[str]:
     """把文本中的动作归一到同义组标识，未命中的返回 None"""
     for group in get_action_synonym_groups(language):
         for keyword in sorted(group, key=len, reverse=True):
-            if keyword in text:
-                return "|".join(sorted(group))
+            for match in re.finditer(re.escape(keyword), text):
+                if not _is_negated(text, match.start()):
+                    return "|".join(sorted(group))
     return None
 
 
@@ -108,9 +117,11 @@ class ContinuityGuardianChecker:
 
     def check_all_continuity(self, context: Dict[str, Any]) -> ContinuityCheckResult:
         """执行所有连续性检查"""
-        # 清望去重缓存
+        # 清望去重缓存（动作/风格缓存跨轮保留会让已复现的问题被永久吞掉）
         self._seen_issues.clear()
         self._processed_shots.clear()
+        self._seen_actions.clear()
+        self._seen_style_issues.clear()
         # 外观基线只在本轮片段序列内有效，跨轮保留会让首片段与上轮末片段误比较
         self._last_appearance.clear()
         self._last_color.clear()
@@ -401,7 +412,8 @@ class ContinuityGuardianChecker:
                             position=i,
                             suggestion="确保动作前后连贯",
                             source_stage=PipelineNode.SEGMENT_SHOT.value,
-                            auto_fixable=True
+                            # 动作词表判定仅为启发式，重跑分镜无法确定性修复，避免自动重试空转
+                            auto_fixable=False,
                         )
                         if issue:
                             result.add_issue(issue)
