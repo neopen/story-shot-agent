@@ -187,7 +187,7 @@ def build_round_record(
         round_index: 轮次序号（从 1 开始）
         retry_count: 本轮开始前的连续性修复重试次数
         max_retries: 最大连续性修复重试次数
-        phase: 本轮结论：passed | needs_repair | retry_exhausted
+        phase: 本轮结论：passed | needs_repair | retry_exhausted | unfixable_skipped
         issues_by_stage: 问题按来源阶段统计
         repairs: 本轮生成的修复动作
         repair_stages: 本轮触发的修复阶段
@@ -382,6 +382,8 @@ def _derive_final_status(
         return "needs_repair"
     if rounds[-1].get("phase") == "retry_exhausted":
         return "needs_human_review"
+    if rounds[-1].get("phase") == "unfixable_skipped":
+        return "continued_with_issues"
     if passed:
         had_issues = any(int(item.get("total_issues") or 0) > 0 for item in rounds)
         return "passed_after_repair" if had_issues else "passed"
@@ -394,8 +396,9 @@ def build_repair_history(
     script_id: str,
     rounds: Optional[Iterable[Dict[str, Any]]] = None,
     repair_params: Optional[Dict[Any, Any]] = None,
+    quality_repair: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """构建修复历史报告（当前主要覆盖连续性驱动的修复动作）"""
+    """构建修复历史报告（聚合连续性修复动作与质量审查修复汇总）"""
     round_items = [dict(item) for item in (rounds or []) if isinstance(item, dict)][
         -MAX_REPORT_ROUNDS:
     ]
@@ -424,10 +427,17 @@ def build_repair_history(
         bucket = by_stage.setdefault(stage, {"count": 0, "actions": []})
         bucket["latest_params"] = entry
 
+    continuity_action_count = len(actions)
+    quality_action_count = (
+        int(quality_repair.get("action_count") or 0) if quality_repair else 0
+    )
+
     return {
         "task_id": task_id,
         "script_id": script_id,
-        "repair_count": len(actions),
+        "repair_count": continuity_action_count + quality_action_count,
+        "continuity_repair_count": continuity_action_count,
+        "quality_repair": quality_repair,
         "repairs": by_stage,
         "repair_actions": actions,
         "continuity_rounds": [
@@ -443,7 +453,9 @@ def build_repair_history(
             "repair_rounds": sum(
                 1 for item in round_items if item.get("phase") == "needs_repair"
             ),
-            "repair_actions": len(actions),
+            "repair_actions": continuity_action_count + quality_action_count,
+            "continuity_repair_actions": continuity_action_count,
+            "quality_repair_actions": quality_action_count,
             "stages": sorted(by_stage.keys()),
         },
         "generated_at": datetime.now().isoformat(),

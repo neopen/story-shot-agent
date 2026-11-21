@@ -8,6 +8,9 @@ import json
 
 from langgraph.graph import END
 
+from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
+    ContinuityGuardianChecker,
+)
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import (
     ContinuityCheckResult,
     ContinuityIssue,
@@ -16,6 +19,9 @@ from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import 
 )
 from penshot.neopen.agent.continuity_guardian.continuity_repair_generator import (
     ContinuityRepairGenerator,
+)
+from penshot.neopen.agent.continuity_guardian.prompt_style_guardian import (
+    PromptStyleGuardian,
 )
 from penshot.neopen.agent.workflow.workflow_decision import PipelineDecision
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode, PipelineState
@@ -26,10 +32,11 @@ from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.tools.result_storage_tool import ResultStorage
 
 
-class _SequencedChecker:
-    """按调用顺序返回预设结果的连续性检查器"""
+class _SequencedChecker(ContinuityGuardianChecker):
+    """按调用顺序返回预设结果的连续性检查器（保留快照等真实能力）"""
 
     def __init__(self, results):
+        super().__init__()
         self._results = list(results)
         self.calls = 0
 
@@ -77,6 +84,7 @@ def _build_nodes() -> WorkflowNodes:
     nodes = object.__new__(WorkflowNodes)
     nodes.checker = _SequencedChecker([_failed_result(), ContinuityCheckResult()])
     nodes.generator = ContinuityRepairGenerator()
+    nodes.style_guardian = PromptStyleGuardian(None, None)
     nodes.knowledge_manager = None
     nodes.task_manager = None
     return nodes

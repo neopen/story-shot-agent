@@ -178,6 +178,32 @@ def test_report_retry_exhausted_needs_human():
     assert report["comparison"]["final_issue_count"] == 1
 
 
+def test_report_unfixable_issues_continue_with_issues():
+    """问题不可自动修复时报告标记为继续执行，而非未检查"""
+    skipped_round = build_round_record(
+        _result([_issue()]),
+        round_index=1,
+        retry_count=0,
+        max_retries=3,
+        phase="unfixable_skipped",
+        issues_by_stage={"convert_prompt": 1},
+    )
+
+    report = build_continuity_report(
+        task_id="task_1",
+        script_id="script_1",
+        rounds=[skipped_round],
+        current_issues=[_issue()],
+        continuity_passed=False,
+        retry_count=0,
+        max_retries=3,
+    )
+
+    assert report["final_status"] == "continued_with_issues"
+    assert report["round_count"] == 1
+    assert report["total_continuity_issues"] == 1
+
+
 def test_repair_history_groups_actions_by_stage():
     """修复历史按阶段聚合修复动作"""
     failed_round = build_round_record(
@@ -201,3 +227,25 @@ def test_repair_history_groups_actions_by_stage():
     assert history["repairs"]["convert_prompt"]["actions"][0]["round"] == 1
     assert history["repairs"]["convert_prompt"]["latest_params"]["issue_count"] == 1
     assert history["summary"]["stages"] == ["convert_prompt"]
+
+
+def test_repair_history_includes_quality_repair():
+    """修复历史同时汇总质量审查阶段的修复动作"""
+    history = build_repair_history(
+        task_id="task_1",
+        script_id="script_1",
+        rounds=[],
+        quality_repair={
+            "issue_count": 2,
+            "action_count": 2,
+            "status": "repaired",
+            "stage_statuses": ["repaired", "repaired"],
+            "post_repair_score": 100.0,
+        },
+    )
+
+    assert history["repair_count"] == 2
+    assert history["continuity_repair_count"] == 0
+    assert history["quality_repair"]["action_count"] == 2
+    assert history["summary"]["repair_actions"] == 2
+    assert history["summary"]["quality_repair_actions"] == 2

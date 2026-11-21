@@ -331,7 +331,31 @@ class WorkflowOutputWriter:
             script_id=state.input.script_id,
             rounds=state.domain.continuity_rounds,
             repair_params=state.domain.repair_params,
+            quality_repair=self._build_quality_repair_summary(state),
         )
+
+    @staticmethod
+    def _build_quality_repair_summary(
+        state: WorkflowState,
+    ) -> Optional[Dict[str, Any]]:
+        """提取质量审查阶段的修复汇总，供 repair_history 统一呈现"""
+        report = state.domain.audit_report
+        if report is None:
+            return None
+        metadata = getattr(report, "metadata", None) or {}
+        issue_count = int(metadata.get("repair_issue_count") or 0)
+        action_count = int(metadata.get("repair_action_count") or 0)
+        status = metadata.get("repair_status")
+        if not (issue_count or action_count or status):
+            return None
+        return {
+            "issue_count": issue_count,
+            "action_count": action_count,
+            "status": status,
+            "stage_statuses": list(metadata.get("stage_repair_statuses") or []),
+            "detection_score": getattr(report, "detection_score", None),
+            "post_repair_score": getattr(report, "post_repair_score", None),
+        }
 
     async def _save_repair_history(
         self,
@@ -381,6 +405,12 @@ class WorkflowOutputWriter:
                     "timestamp": audit.get("timestamp") if isinstance(audit, dict) else None
                 })
 
+            audit_report = state.domain.audit_report
+            audit_metadata = (
+                getattr(audit_report, "metadata", None) or {}
+                if audit_report is not None
+                else {}
+            )
             quality_report = {
                 "task_id": state.input.task_id,
                 "script_id": state.input.script_id,
@@ -388,8 +418,16 @@ class WorkflowOutputWriter:
                 "latest_audit": latest_audit,
                 "audit_history": audit_history,
                 "quality_score_trend": quality_trend,
-                "final_score": state.domain.audit_report.score if state.domain.audit_report else 0,
-                "final_status": state.domain.audit_report.status.value if state.domain.audit_report else "unknown"
+                "final_score": audit_report.score if audit_report else 0,
+                "post_repair_score": (
+                    getattr(audit_report, "post_repair_score", None)
+                    if audit_report
+                    else None
+                ),
+                "repair_status": audit_metadata.get("repair_status"),
+                "repair_issue_count": audit_metadata.get("repair_issue_count", 0),
+                "repair_action_count": audit_metadata.get("repair_action_count", 0),
+                "final_status": audit_report.status.value if audit_report else "unknown"
             }
 
             await self._save_json_async(state.input.script_id, state.input.task_id, quality_report, "quality_report.json")

@@ -1969,27 +1969,40 @@ class WorkflowNodes:
                 f"重试次数: {state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}"
             )
 
+            # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
+            repairable_by_stage = {
+                stage: [i for i in issues if getattr(i, "auto_fixable", True)]
+                for stage, issues in issues_by_stage.items()
+            }
+            repairable_by_stage = {
+                stage: stage_issues
+                for stage, stage_issues in repairable_by_stage.items()
+                if stage_issues
+            }
+            if not repairable_by_stage:
+                # 记录本轮结论，避免报告误判为“未检查”
+                warning("连续性问题均不支持自动修复，跳过自动重试")
+                self._record_continuity_round(
+                    state,
+                    build_round_record(
+                        check_result,
+                        round_index=state.domain.continuity_retry_count + 1,
+                        retry_count=state.domain.continuity_retry_count,
+                        max_retries=state.domain.max_continuity_retries,
+                        phase="unfixable_skipped",
+                        issues_by_stage=stage_counts,
+                        contract_violations=state.domain.contract_violations,
+                    ),
+                )
+                state.domain.needs_continuity_repair = False
+                state.execution.current_stage = AgentStage.CONTINUITY
+                return state
+
             # 6. 检查重试限制
             if (
                 state.domain.continuity_retry_count
                 < state.domain.max_continuity_retries
             ):
-                # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
-                repairable_by_stage = {
-                    stage: [i for i in issues if getattr(i, "auto_fixable", True)]
-                    for stage, issues in issues_by_stage.items()
-                }
-                repairable_by_stage = {
-                    stage: issues
-                    for stage, issues in repairable_by_stage.items()
-                    if issues
-                }
-                if not repairable_by_stage:
-                    warning("连续性问题均不支持自动修复，跳过自动重试")
-                    state.domain.needs_continuity_repair = False
-                    state.execution.current_stage = AgentStage.CONTINUITY
-                    return state
-
                 # 7. 生成修复参数并触发重试（契约锚点驱动）
                 contract_violations_by_stage = group_violations_by_stage(
                     state.domain.contract_violations
