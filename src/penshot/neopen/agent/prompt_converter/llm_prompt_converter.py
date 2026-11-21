@@ -88,6 +88,9 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         # === 构建全局元素映射 ===
         self._build_element_map()
 
+        # 转换器实例会跨轮复用，音频链必须从本轮首片段重新开始
+        self.last_audio_id = None
+
         prompts = []
         project_info = {
             "title": fragment_sequence.source_info.get("title", "AI视频项目"),
