@@ -21,11 +21,18 @@ from penshot.neopen.agent.quality_auditor.llm_quality_auditor import (
     LLMQualityAuditor,
 )
 from penshot.neopen.agent.quality_auditor.quality_auditor_enum import AuditStatus
+from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
+    QualityAuditReport,
+)
+from penshot.neopen.agent.workflow.workflow_decision import PipelineDecision
 from penshot.neopen.agent.workflow.workflow_memory import (
     WorkflowMemory,
     stage_issues_key,
     unwrap_stage_stats,
 )
+from penshot.neopen.agent.workflow.workflow_models import PipelineNode, PipelineState
+from penshot.neopen.agent.workflow.workflow_nodes import WorkflowNodes
+from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 from penshot.neopen.knowledge.memory.memory_models import MemoryLevel
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.shot_config import ShotConfig
@@ -239,3 +246,21 @@ def test_convert_resets_audio_chain_per_round():
     converter.convert(fragment_sequence, ParsedScript(title="测试"), None, None)
 
     assert converter.seen_audio_ids == [None]
+
+
+# ===================== 审计决策写入状态 =====================
+
+
+def test_decide_after_audit_persists_last_audit_result():
+    """审计决策必须能写入 last_audit_result，供执行汇总读取。"""
+    decision = PipelineDecision()
+    state = WorkflowState.from_raw_script("测试剧本")
+    state.domain.audit_report = QualityAuditReport(
+        status=AuditStatus.MINOR_ISSUES, score=90.0
+    )
+
+    result = decision.decide_after_audit(state)
+
+    assert result == PipelineState.VALID
+    assert state.domain.last_audit_result["score"] == 90.0
+    assert state.domain.last_audit_result["status"] == AuditStatus.MINOR_ISSUES.value
