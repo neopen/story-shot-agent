@@ -129,6 +129,16 @@ class WorkflowNodes:
     - 循环检查节点：检查节点循环次数并记录状态
     """
 
+    # 可由审计修复回路重算问题的产物阶段
+    _STAGE_REPAIR_NODES = frozenset(
+        {
+            PipelineNode.PARSE_SCRIPT,
+            PipelineNode.SEGMENT_SHOT,
+            PipelineNode.SPLIT_VIDEO,
+            PipelineNode.CONVERT_PROMPT,
+        }
+    )
+
     def __init__(
         self,
         script_id,
@@ -1605,6 +1615,7 @@ class WorkflowNodes:
             # 调用各阶段修复器
             repair_issue_count = 0
             repair_actions_total = 0
+            repaired_nodes: List[PipelineNode] = []
             # 修复前快照：动作数与状态序列都只统计本轮新增，避免历史轮次重复聚合
             history_before = self._repair_history_sizes(state)
             status_history_before = self._repair_status_history_sizes(state)
@@ -1661,12 +1672,18 @@ class WorkflowNodes:
                             )
                             debug("提示词转换修复完成")
 
+                        if node in self._STAGE_REPAIR_NODES:
+                            repaired_nodes.append(node)
                     except Exception as e:
                         error(f"修复阶段 {node.value} 时出错: {str(e)}")
                         print_log_exception()
                         state.errors.error_messages.append(
                             f"修复{node.value}失败: {str(e)}"
                         )
+
+                # 修复后重算阶段问题，避免已修复问题残留在记忆中被下一轮审计反复消费
+                if repaired_nodes:
+                    self._refresh_stage_issues(state, repaired_nodes)
 
                 repair_actions_total = self._count_new_repair_actions(
                     state, history_before
@@ -2879,6 +2896,52 @@ class WorkflowNodes:
             name: len(metadata.get("repair_status_history") or [])
             for name, metadata in self._artifact_metadata(state).items()
         }
+
+    def _refresh_stage_issues(
+        self, state: WorkflowState, nodes: List[PipelineNode]
+    ) -> None:
+        """修复后对已重算产物重新检测问题并覆盖阶段问题记忆
+
+        审计合并的是 ``issues_<stage>`` 记忆快照；若不重算，已修复的问题会
+        在下一轮继续被消费，导致修复空转与审计循环超限。
+        """
+        detectors = {
+            PipelineNode.PARSE_SCRIPT: (
+                "parse_script",
+                lambda: self.script_parser.detect_issues(
+                    state.domain.parsed_script, state.input.raw_script
+                ),
+            ),
+            PipelineNode.SEGMENT_SHOT: (
+                "segment_shot",
+                lambda: self.shot_segmenter.detect_issues(
+                    state.domain.shot_sequence, state.domain.parsed_script
+                ),
+            ),
+            PipelineNode.SPLIT_VIDEO: (
+                "split_video",
+                lambda: self.video_splitter.detect_issues(
+                    state.domain.fragment_sequence, state.domain.shot_sequence
+                ),
+            ),
+            PipelineNode.CONVERT_PROMPT: (
+                "convert_prompt",
+                lambda: self.prompt_converter.detect_issues(
+                    state.domain.instructions, state.domain.fragment_sequence
+                ),
+            ),
+        }
+        for node in nodes:
+            detector = detectors.get(node)
+            if detector is None:
+                continue
+            stage_key, detect = detector
+            try:
+                issues = detect() or []
+                self.workflow_memory.store_stage_issues(stage_key, issues)
+                debug(f"修复后重算阶段问题: {stage_key}, 剩余{len(issues)}个")
+            except Exception as e:
+                warning(f"修复后重算阶段问题失败: {stage_key}, {e}")
 
     def _count_new_repair_actions(
         self, state: WorkflowState, history_before: Dict[str, int]

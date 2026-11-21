@@ -126,6 +126,37 @@ def test_stage_issues_cleared_when_round_has_none():
     assert workflow_memory.get_memory_list(key, MemoryLevel.SHORT_TERM) == []
 
 
+class _CleanSegmenter:
+    """修复后已无问题的分镜器桩，记录重算调用次数"""
+
+    def __init__(self):
+        self.calls = 0
+
+    def detect_issues(self, shot_sequence, parsed_script):
+        self.calls += 1
+        return []
+
+
+def test_refresh_stage_issues_clears_fixed_issues():
+    """修复后必须重算阶段问题，避免已修复的 shot_repetitive 残留并触发空转。"""
+    memory = _FakeMemory()
+    nodes = object.__new__(WorkflowNodes)
+    nodes.workflow_memory = WorkflowMemory("SN", memory, None)
+    nodes.shot_segmenter = _CleanSegmenter()
+    state = SimpleNamespace(
+        domain=SimpleNamespace(shot_sequence=object(), parsed_script=object())
+    )
+    key = stage_issues_key("segment_shot")
+
+    nodes.workflow_memory.store_stage_issues(
+        "segment_shot", [_issue("shot_repetitive", "重复镜头", fragment_id="shot_006")]
+    )
+    nodes._refresh_stage_issues(state, [PipelineNode.SEGMENT_SHOT])
+
+    assert nodes.shot_segmenter.calls == 1
+    assert nodes.workflow_memory.get_memory_list(key, MemoryLevel.SHORT_TERM) == []
+
+
 # ===================== 动作判定与跨轮缓存 =====================
 
 
