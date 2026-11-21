@@ -284,7 +284,8 @@ def extract_appearance_from_outfit(
             garment_clauses.append(_enrich_garment(clause, colors, materials))
         elif has_accessory:
             accessory_clauses.append(clause)
-        else:
+        elif not set(classify_anchor_domains(clause)) - {"clothing"}:
+            # 仅当子句未落入 hair/face/body/accessories 时才作为服装残留
             residual_clauses.append(clause)
 
     anchors: Dict[str, str] = {}
@@ -336,7 +337,10 @@ def extract_appearance_from_text(
         _collect_keyword_anchor(anchors, "body", clause, BODY_KEYWORDS)
         _collect_keyword_anchor(anchors, "accessories", clause, ACCESSORY_KEYWORDS)
 
-        if _contains_appearance_signal(clause):
+        # 已归类为 hair/face/body/accessories 的子句不得再并入 clothing，
+        # 否则“头发微湿”这类外观状态会污染服装锚点并触发混域告警
+        other_domains = set(classify_anchor_domains(clause)) - {"clothing"}
+        if not other_domains and _contains_appearance_signal(clause):
             clothing_clauses.append(clause)
 
     if clothing_clauses:
