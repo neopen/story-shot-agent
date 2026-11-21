@@ -76,6 +76,16 @@ def test_poor_history_stats_still_detected():
     assert agent.get_historical_insights()["quality_level"] == "poor"
 
 
+def test_non_parse_stats_not_marked_poor():
+    """分镜/切片/提示词统计不含 completeness_score，不得按 0 分判为 poor。"""
+    agent = _DummyRepairableAgent()
+    agent.apply_historical_context(
+        {"historical_stats": {"shot_count": 12, "success": True}}
+    )
+
+    assert "quality_level" not in agent.get_historical_insights()
+
+
 # ===================== 阶段问题去重与替换 =====================
 
 

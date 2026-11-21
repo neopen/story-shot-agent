@@ -208,7 +208,11 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
         if not historical_stats:
             return
 
-        # 提取关键指标 - 安全获取 parsing_confidence
+        # 仅解析阶段统计带 completeness_score；分镜/切片/提示词统计没有该字段，
+        # 不能默认 0 分误判为 poor 并每轮开启增强验证
+        if "completeness_score" not in historical_stats:
+            return
+
         avg_completeness = historical_stats.get("completeness_score", 0)
         parsing_confidence = historical_stats.get("parsing_confidence", {})
         parsing_confidence = self._safe_get_dict(parsing_confidence, {})
