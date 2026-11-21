@@ -114,13 +114,20 @@ class TaskLifecycleService:
             error(f"配置序列化失败: {e}")
             return {"raw": str(config)}
 
-    def _workflow_key(self, config: Any) -> str:
-        """生成工作流缓存键（与 get_workflow 使用同一套算法，供缓存清理复用）"""
+    def _workflow_key(self, config: Any, task_id: Optional[str] = None) -> str:
+        """生成工作流缓存键（与 get_workflow 使用同一套算法，供缓存清理复用）
+
+        键中包含 task_id，保证管线实例按任务隔离：管线内部持有 task_id/script_id
+        与检查点连接，跨任务复用会导致检查点写入错误的时间线。
+        """
         try:
-            payload = json.dumps(self._serialize_config(config), sort_keys=True, ensure_ascii=False)
+            payload_data = self._serialize_config(config)
+            if task_id:
+                payload_data = {**payload_data, "_task_id": task_id}
+            payload = json.dumps(payload_data, sort_keys=True, ensure_ascii=False)
         except Exception as e:
             warning(f"生成工作流键失败: {e}")
-            payload = str(config)
+            payload = f"{task_id}:{config}"
         import uuid
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, payload))
 
@@ -438,18 +445,11 @@ class TaskLifecycleService:
             if cfg is None:
                 return
 
-            key = self._workflow_key(cfg)
+            # 键中包含 task_id，天然按任务隔离，无需再扫描其他任务配置
+            key = self._workflow_key(cfg, task_id=task_id)
             if key and self.workflow_registry.get(key):
-                still_used = False
-                for other_id, other_cfg in self.repository.iter_raw_configs():
-                    if other_id == task_id or other_cfg is None:
-                        continue
-                    if self._workflow_key(other_cfg) == key:
-                        still_used = True
-                        break
-                if not still_used:
-                    self.workflow_registry.pop(key)
-                    debug(f"清理工作流缓存: {key}")
+                self.workflow_registry.pop(key)
+                debug(f"清理工作流缓存: {key}")
         except Exception as e:
             error(f"清理工作流缓存失败: {e}")
 
@@ -555,7 +555,7 @@ class TaskLifecycleService:
                 config = raw
 
         # 与缓存清理共用同一套键算法，避免两处算法不一致导致清理失效
-        key = self._workflow_key(config)
+        key = self._workflow_key(config, task_id=task_id)
 
         pipeline = self.workflow_registry.get(key)
         if pipeline is not None:

@@ -12,11 +12,13 @@ See LICENSE File For Details.
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Any, Dict, List
 
 from langchain_chroma import Chroma
 
-from penshot.logger import error, debug
+from penshot.logger import error, debug, warning
+from penshot.neopen.knowledge.memory.base_memory_layer import BaseMemoryLayer
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
 
 
@@ -36,19 +38,28 @@ def _relevance_from_distance(distance: float) -> float:
     return max(0.0, min(1.0, 1.0 - distance / 2.0))
 
 
-class LongTermMemory:
+class LongTermMemory(BaseMemoryLayer):
     """长期记忆 - 基于向量检索的记忆"""
 
+    backend_type = "long_term"
+
     def __init__(self, config: MemoryConfig, script_id: str):
-        self.config = config
-        self.script_id = script_id
+        super().__init__(config, script_id)
 
         # 向量存储路径
         self.store_path = f"{config.term_persist_path}/{script_id}"
 
+        # 按 key 精确存取的 KV 层：不依赖向量检索，保证按 key 读取稳定可用
+        self._kv_path: Optional[Path] = None
+        if config.term_persist_path:
+            kv_dir = Path(config.term_persist_path) / script_id
+            kv_dir.mkdir(parents=True, exist_ok=True)
+            self._kv_path = kv_dir / "long_term_kv.json"
+            self._key_values = self._load_json_dict(self._kv_path)
+
         # 延迟初始化
         self.vectorstore: Optional[Chroma] = None
-        self.retriever = None
+        self.retriever: Any = None
 
         # 后台异步初始化
         self._vectorstore_future: Future = _VECTORSTORE_EXECUTOR.submit(
@@ -105,7 +116,7 @@ class LongTermMemory:
             return self.vectorstore
 
         try:
-            vectorstore = self._vectorstore_future.result()
+            vectorstore: Optional[Chroma] = self._vectorstore_future.result()
 
             if vectorstore is None:
                 raise RuntimeError(
@@ -125,11 +136,18 @@ class LongTermMemory:
         """判断向量数据库是否初始化完成"""
         return self.vectorstore is not None
 
+    def _persist(self) -> None:
+        """持久化按 key 的长期记忆（JSON 侧车）"""
+        self._save_json_dict(self._kv_path, self._key_values)
+
+    def _delete_kv_file(self) -> None:
+        self._delete_file(self._kv_path)
+
     def add(
         self,
         text: str,
         metadata: Optional[Dict] = None
-    ):
+    ) -> None:
         """添加记忆"""
 
         vectorstore = self._ensure_vectorstore()
@@ -158,6 +176,46 @@ class LongTermMemory:
                 **(metadata or {})
             }]
         )
+
+        # 向量库只增不删会持续膨胀，写入后按上限清理最旧记录
+        self.prune_old()
+
+    def prune_old(self, max_documents: Optional[int] = None) -> int:
+        """按时间戳清理最旧记录，保留不超过 max_documents 条
+
+        Args:
+            max_documents: 保留上限；未指定时取配置值，<=0 表示不清理
+
+        Returns:
+            实际删除的记录数
+        """
+        limit = (
+            max_documents
+            if max_documents is not None
+            else getattr(self.config, "long_term_max_documents", 0)
+        )
+        if not limit or limit <= 0:
+            return 0
+
+        try:
+            vectorstore = self._ensure_vectorstore()
+            results = vectorstore.get(include=["metadatas"])
+            ids = list(results.get("ids") or [])
+            if len(ids) <= limit:
+                return 0
+
+            metadatas = results.get("metadatas") or [{} for _ in ids]
+            paired = list(zip(ids, metadatas))
+            paired.sort(key=lambda pair: (pair[1] or {}).get("timestamp", ""))
+            remove_ids = [item_id for item_id, _ in paired[: len(paired) - limit]]
+            if remove_ids:
+                vectorstore.delete(remove_ids)
+                debug(f"长期记忆清理旧记录: {len(remove_ids)} 条")
+            return len(remove_ids)
+
+        except Exception as e:
+            warning(f"清理长期记忆失败: {e}")
+            return 0
 
     def search(
         self,
@@ -241,9 +299,8 @@ class LongTermMemory:
 
         return 0
 
-    def clear(self):
-        """清空所有记忆"""
-
+    def _clear_backend(self) -> None:
+        """清空并重建向量库（KV 与文件由基类统一处理）"""
         try:
             vectorstore = self._ensure_vectorstore()
 
@@ -273,16 +330,14 @@ class LongTermMemory:
         except Exception as e:
             error(f"清空长期记忆失败: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
-        """获取统计信息"""
-
+    def _extra_stats(self) -> Dict[str, Any]:
         try:
             vectorstore = self._ensure_vectorstore()
 
             count = vectorstore._collection.count()
 
             return {
-                "type": "long_term",
+                "enabled": True,
                 "document_count": count,
                 "k": self.config.long_term_k,
                 "store_path": self.store_path
@@ -292,7 +347,7 @@ class LongTermMemory:
             error(f"获取长期记忆统计信息失败: {e}")
 
             return {
-                "type": "long_term",
+                "enabled": False,
                 "document_count": 0,
                 "k": self.config.long_term_k,
                 "store_path": self.store_path

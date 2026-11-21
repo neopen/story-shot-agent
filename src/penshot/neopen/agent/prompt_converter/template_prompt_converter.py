@@ -107,6 +107,7 @@ class TemplatePromptConverter(BasePromptConverter):
             prompt=full_prompt,
             negative_prompt=self.config.default_negative_prompt,
             duration=fragment.duration,
+            seed=self.config.video_seed,
             main_character=character,
             model=self.config.video_model,
             style=style_hint,

@@ -71,8 +71,10 @@ class ScriptMemory:
         if level == MemoryLevel.MEDIUM_TERM:
             self.medium_term.add(input_text, output_text, metadata)
         elif level == MemoryLevel.LONG_TERM and self.long_term:
+            # 先写入按 key 的 KV，再写向量库；向量库失败也不影响按 key 读取
+            self.long_term.set_value(input_text, output_text)
             combined = f"问题: {input_text}\n回答: {output_text}"
-            self.long_term.add(combined, metadata)
+            self.long_term.add(combined, {**(metadata or {}), "memory_key": input_text})
         else:
             # 自动流转：重要的短期记忆提升到中期
             if metadata and metadata.get("important", False):
@@ -94,8 +96,12 @@ class ScriptMemory:
         self.medium_term.add(stage_name, content, metadata)
 
         # 如果内容重要，也添加到长期记忆
-        if metadata and metadata.get("important"):
-            self.long_term.add(f"阶段: {stage_name}\n{content}", metadata)
+        if metadata and metadata.get("important") and self.long_term:
+            self.long_term.set_value(stage_name, content)
+            self.long_term.add(
+                f"阶段: {stage_name}\n{content}",
+                {**metadata, "memory_key": stage_name},
+            )
 
     def recall(self, query: str, level: Optional[MemoryLevel] = None,
                k: int = 3) -> MemoryContext:
@@ -103,23 +109,60 @@ class ScriptMemory:
         context = MemoryContext()
 
         if level is None or level == MemoryLevel.SHORT_TERM:
-            # 获取短期记忆
-            context.short_term = self.short_term.get_recent(k)
+            # 获取短期记忆；query 命中内容/元数据时优先返回相关条目
+            recent = self.short_term.get_recent(k)
+            if query:
+                matched = [
+                    item
+                    for item in recent
+                    if query in str(item.get("content", ""))
+                    or query in str(item.get("output", ""))
+                    or query == item.get("metadata", {}).get("key")
+                ]
+                if matched:
+                    recent = matched
+            context.short_term = recent
 
         if level is None or level == MemoryLevel.MEDIUM_TERM:
-            # 获取中期摘要
-            context.medium_term = self.medium_term.get_summary()
+            # 优先按 key 精确取值，否则返回整体摘要
+            if self.medium_term.has_value(query):
+                context.medium_term = self.medium_term.get_value(query)
+            else:
+                context.medium_term = self.medium_term.get_summary()
 
         if (level is None or level == MemoryLevel.LONG_TERM) and self.long_term:
-            # 获取长期相关记忆
-            context.long_term = self.long_term.search(query, k)
+            # 按 key 精确命中优先，再补充语义检索结果
+            memories = []
+            if self.long_term.has_value(query):
+                memories.append(
+                    {
+                        "content": self.long_term.get_value(query),
+                        "score": 1.0,
+                        "metadata": {"memory_key": query, "exact": True},
+                    }
+                )
+            for item in self.long_term.search(query, k):
+                if item.get("metadata", {}).get("memory_key") == query:
+                    continue
+                memories.append(item)
+            context.long_term = memories[:k]
 
         return context
 
     def search(self, query: str, k: int = 3, level: MemoryLevel = MemoryLevel.LONG_TERM) -> List[Dict]:
         """语义搜索"""
         if level == MemoryLevel.LONG_TERM and self.long_term:
-            return self.long_term.search(query, k)
+            results = []
+            if self.long_term.has_value(query):
+                results.append(
+                    {
+                        "content": self.long_term.get_value(query),
+                        "score": 1.0,
+                        "metadata": {"memory_key": query, "exact": True},
+                    }
+                )
+            results.extend(self.long_term.search(query, k))
+            return results[:k]
         elif level == MemoryLevel.SHORT_TERM:
             # 短期记忆的简单关键词搜索
             recent = self.short_term.get_recent(k * 2)

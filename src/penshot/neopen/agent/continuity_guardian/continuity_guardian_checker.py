@@ -9,22 +9,75 @@ See LICENSE File For Details.
 @GitHub: https://github.com/neopen/story-shot-agent
 @Time: 2026/3/28 20:45
 """
+import re
 import time
 import uuid
-from typing import Dict, Any, List, Set, Optional
+from functools import lru_cache
+from typing import Dict, Any, List, Optional, Pattern, Set
 
 from penshot.logger import info
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
-from penshot.neopen.constants.appearance import MAIN_GARMENT_KEYWORDS
+from penshot.neopen.constants.appearance import COLOR_KEYWORDS, MAIN_GARMENT_KEYWORDS
+from penshot.neopen.constants.continuity import (
+    CROSS_CHUNK_SCENE_THRESHOLD,
+    get_action_synonym_groups,
+    get_holding_verbs,
+    get_prop_object_pattern_template,
+)
 from .appearance_anchors import contains_keyword
 from .consistency_contract import GlobalConsistencyContract
 from .continuity_guardian_models import (
-    ContinuityIssue, ContinuityIssueType, ContinuitySeverity,
+    ContinuityAnchor, ContinuityIssue, ContinuityIssueType, ContinuitySeverity,
     CharacterState, StateSnapshot, StateTimeline, ContinuityCheckResult
 )
+from .cross_chunk_validator import CrossChunkValidator
+from .long_script_chunker import LongScriptChunker
 
 # 只用“主体服装名词集合”比较换装：片段措辞（身穿/佩戴/修饰语增减）与
 # 单件细节（鞋袜、配饰）差异都不算外观变化，避免反复误报。
+
+
+@lru_cache(maxsize=8)
+def _prop_object_pattern(language: str = "zh") -> Pattern[str]:
+    """按语言构建“持握动词 + 对象”匹配模式（词表与模板见 constants.continuity）"""
+    verbs = get_holding_verbs(language)
+    template = get_prop_object_pattern_template(language)
+    # 用 replace 而非 str.format：模板中的 {1,8} 是正则量词，不是格式占位符
+    pattern = template.replace("{verbs}", "|".join(map(re.escape, verbs)))
+    return re.compile(pattern)
+
+
+_NEGATION_PATTERN = re.compile(r"(?:不|没|未|别|无|勿|莫)(?:有|再|曾|想|要|敢)?$")
+
+
+def _is_negated(text: str, start: int) -> bool:
+    """判断关键词前是否紧邻否定词，如“没有回头”“不再看”"""
+    return _NEGATION_PATTERN.search(text[:start]) is not None
+
+
+def _canonical_action(text: str, language: str = "zh") -> Optional[str]:
+    """把文本中的动作归一到同义组标识，未命中的返回 None"""
+    for group in get_action_synonym_groups(language):
+        for keyword in sorted(group, key=len, reverse=True):
+            for match in re.finditer(re.escape(keyword), text):
+                if not _is_negated(text, match.start()):
+                    return "|".join(sorted(group))
+    return None
+
+
+def _extract_prop_objects(text: str, language: str = "zh") -> List[str]:
+    """提取持握动词后的道具对象短语（仅取对象，不把动词当道具）"""
+    objects = []
+    for match in _prop_object_pattern(language).finditer(text or ""):
+        obj = match.group(1).strip("的了着，。！？、；,.!?; ")
+        if len(obj) >= 1:
+            objects.append(obj)
+    return objects
+
+
+def _same_object(left: str, right: str) -> bool:
+    """道具对象相同：互相包含即视为同一对象（避免“照片/旧照片”误报）"""
+    return left in right or right in left
 
 
 def _main_garment_signature(text: str) -> Set[str]:
@@ -36,29 +89,42 @@ def _main_garment_signature(text: str) -> Set[str]:
     }
 
 
+def _color_signature(text: str) -> Set[str]:
+    """提取片段中出现的颜色词，用于同款服装的配色漂移检测"""
+    return {
+        keyword
+        for keyword in COLOR_KEYWORDS
+        if contains_keyword(text, (keyword,))
+    }
+
+
 class ContinuityGuardianChecker:
     """连续性检查器 - 负责检测跨阶段的连续性问题"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.timeline = StateTimeline()
         self.snapshot_counter = 0
-        self._last_appearance = {}  # 临时存储上次外观
+        self._last_appearance: Dict[str, Set[str]] = {}  # 临时存储上次外观
+        self._last_color: Dict[str, Set[str]] = {}  # 临时存储上次服装配色
 
         # 去重缓存
         self._seen_issues: Set[str] = set()
         self._processed_shots: Set[str] = set()
-        self._processed_fragments: Set[str] = set()
+        self._seen_actions: Set[str] = set()
+        self._seen_style_issues: Set[str] = set()
         # 已上报过修复的场景跳转（跨轮保留，避免对结构性场景切换反复重试）
         self._reported_scene_jumps: Set[str] = set()
 
     def check_all_continuity(self, context: Dict[str, Any]) -> ContinuityCheckResult:
         """执行所有连续性检查"""
-        # 清望去重缓存
+        # 清望去重缓存（动作/风格缓存跨轮保留会让已复现的问题被永久吞掉）
         self._seen_issues.clear()
         self._processed_shots.clear()
-        self._processed_fragments.clear()
+        self._seen_actions.clear()
+        self._seen_style_issues.clear()
         # 外观基线只在本轮片段序列内有效，跨轮保留会让首片段与上轮末片段误比较
         self._last_appearance.clear()
+        self._last_color.clear()
 
         result = ContinuityCheckResult()
 
@@ -85,7 +151,7 @@ class ContinuityGuardianChecker:
         return result
 
     def _create_issue(self, issue_type: ContinuityIssueType, description: str,
-                      severity: ContinuitySeverity, **kwargs) -> Optional[ContinuityIssue]:
+                      severity: ContinuitySeverity, **kwargs: Any) -> Optional[ContinuityIssue]:
         """创建连续性问题"""
         # 生成唯一签名用于去重
         fragment_id = kwargs.get("fragment_id", "") or kwargs.get("shot_id", "") or ""
@@ -126,7 +192,9 @@ class ContinuityGuardianChecker:
         characters = {c.name: c for c in parsed_script.characters}
 
         # 跟踪角色出现情况
-        character_appearances = {char: [] for char in characters.keys()}
+        character_appearances: Dict[str, List[str]] = {
+            char: [] for char in characters.keys()
+        }
 
         # 去重：跟踪已处理的角色-场景对
         processed_character_scene = set()
@@ -167,11 +235,6 @@ class ContinuityGuardianChecker:
         instructions = context.get("instructions")
         if instructions:
             for i, prompt in enumerate(instructions.fragments):
-                # 去重：跳过已处理的片段
-                if prompt.fragment_id in self._processed_fragments:
-                    continue
-                self._processed_fragments.add(prompt.fragment_id)
-
                 if prompt.main_character:
                     self._check_character_appearance_continuity(
                         prompt.main_character,
@@ -183,7 +246,7 @@ class ContinuityGuardianChecker:
 
     def _check_character_appearance_continuity(self, character: str, prompt: str,
                                                index: int, fragment_id: str,
-                                               result: ContinuityCheckResult):
+                                               result: ContinuityCheckResult) -> None:
         """检查角色服装连续性
 
         比较片段间命中的主体服装词：只有片段明确描述了服装、且与上次已知服装
@@ -209,8 +272,38 @@ class ContinuityGuardianChecker:
             if issue:
                 result.add_issue(issue)
 
+        # 同一件服装的配色漂移：服装词重叠但颜色集合完全不相交
+        colors = _color_signature(prompt)
+        previous_colors = self._last_color.get(character)
+        if (
+            colors
+            and previous_colors
+            and garments
+            and previous
+            and garments & previous
+            and not colors & previous_colors
+        ):
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.COLOR_INCONSISTENT,
+                description=(
+                    f"角色'{character}'服装配色不一致: "
+                    f"{'、'.join(sorted(previous_colors))} -> "
+                    f"{'、'.join(sorted(colors))}"
+                ),
+                severity=ContinuitySeverity.WARNING,
+                fragment_id=fragment_id,
+                position=index,
+                suggestion="统一角色服装配色",
+                source_stage=PipelineNode.CONVERT_PROMPT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
         if garments:
             self._last_appearance[character] = garments
+        if colors:
+            self._last_color[character] = colors
 
     def check_scene_continuity(self, context: Dict[str, Any],
                                result: ContinuityCheckResult) -> None:
@@ -294,40 +387,37 @@ class ContinuityGuardianChecker:
         if not shot_sequence or len(shot_sequence.shots) < 2:
             return
 
-        action_state = {}
-        action_keywords = ["走", "跑", "跳", "转身", "坐下", "站起", "拿起", "放下"]
+        action_state: Dict[str, str] = {}
 
         for i, shot in enumerate(shot_sequence.shots):
-            # 去重：跳过已处理的镜头
-            if shot.id in self._processed_shots:
+            # 注意：不复用场景检查的 _processed_shots，否则动作检查会被整体跳过
+            # 近义动作归一后再比较，避免“走 -> 步行”这类同义改写被误报
+            current_action = _canonical_action(shot.description)
+            if not current_action:
                 continue
 
-            current_actions = [kw for kw in action_keywords if kw in shot.description]
+            if shot.main_character:
+                last_action = action_state.get(shot.main_character)
+                if last_action and current_action != last_action:
+                    # 去重：避免重复报告相同的动作变化
+                    action_key = f"{shot.main_character}_{last_action}_{current_action}"
+                    if action_key not in self._seen_actions:
+                        self._seen_actions.add(action_key)
 
-            if shot.main_character and current_actions:
-                if shot.main_character in action_state:
-                    last_action = action_state[shot.main_character]
-                    if last_action and current_actions[0] != last_action:
-                        # 去重：避免重复报告相同的动作变化
-                        action_key = f"{shot.main_character}_{last_action}_{current_actions[0]}"
-                        if not hasattr(self, '_seen_actions'):
-                            self._seen_actions = set()
-                        if action_key not in self._seen_actions:
-                            self._seen_actions.add(action_key)
-
-                            issue = self._create_issue(
-                                issue_type=ContinuityIssueType.ACTION_BREAK,
-                                description=f"角色'{shot.main_character}'动作不连续: {last_action} -> {current_actions[0]}",
-                                severity=ContinuitySeverity.MODERATE,
-                                shot_id=shot.id,
-                                position=i,
-                                suggestion="确保动作前后连贯",
-                                source_stage=PipelineNode.SEGMENT_SHOT.value,
-                                auto_fixable=True
-                            )
-                            if issue:
-                                result.add_issue(issue)
-                action_state[shot.main_character] = current_actions[0]
+                        issue = self._create_issue(
+                            issue_type=ContinuityIssueType.ACTION_BREAK,
+                            description=f"角色'{shot.main_character}'动作不连续: {last_action} -> {current_action}",
+                            severity=ContinuitySeverity.MODERATE,
+                            shot_id=shot.id,
+                            position=i,
+                            suggestion="确保动作前后连贯",
+                            source_stage=PipelineNode.SEGMENT_SHOT.value,
+                            # 动作词表判定仅为启发式，重跑分镜无法确定性修复，避免自动重试空转
+                            auto_fixable=False,
+                        )
+                        if issue:
+                            result.add_issue(issue)
+                action_state[shot.main_character] = current_action
 
     def check_style_continuity(self, context: Dict[str, Any],
                                result: ContinuityCheckResult) -> None:
@@ -337,27 +427,53 @@ class ContinuityGuardianChecker:
         if not instructions or len(instructions.fragments) < 2:
             return
 
-        styles = []
-        style_count = {}
+        styles: List[str] = []
+        style_count: Dict[str, int] = {}
 
         # 记录已处理的关键词
-        seen_keywords = set()
+        seen_keywords: Set[str] = set()
+        previous_style_tokens: Optional[Set[str]] = None
 
-        for prompt in instructions.fragments:
-            # 去重：跳过已处理的片段
-            if prompt.fragment_id in self._processed_fragments:
-                continue
-            self._processed_fragments.add(prompt.fragment_id)
-
-            if prompt.style:
-                styles.append(prompt.style)
-                style_count[prompt.style] = style_count.get(prompt.style, 0) + 1
+        for index, prompt in enumerate(instructions.fragments):
+            # 注意：不复用角色检查的 _processed_fragments，否则风格检查会被整体跳过
+            prompt_style = getattr(prompt, "style", None)
+            if prompt_style:
+                styles.append(prompt_style)
+                style_count[prompt_style] = style_count.get(prompt_style, 0) + 1
 
                 # 检查风格关键词一致性
-                style_keywords = prompt.style.lower().split()
+                style_keywords = prompt_style.lower().split()
                 for kw in style_keywords:
                     if len(kw) > 3:  # 忽略过短的词
                         seen_keywords.add(kw)
+
+                # 相邻片段风格关键词完全不相交 → 风格突变
+                current_tokens = {
+                    token for token in style_keywords if len(token) > 2
+                }
+                if (
+                    previous_style_tokens
+                    and current_tokens
+                    and not previous_style_tokens & current_tokens
+                ):
+                    issue = self._create_issue(
+                        issue_type=ContinuityIssueType.STYLE_SUDDEN_CHANGE,
+                        description=(
+                            f"片段'{prompt.fragment_id}'风格突变: "
+                            f"{' '.join(sorted(previous_style_tokens))} -> "
+                            f"{' '.join(sorted(current_tokens))}"
+                        ),
+                        severity=ContinuitySeverity.WARNING,
+                        fragment_id=prompt.fragment_id,
+                        position=index,
+                        suggestion="在风格变化处补充过渡描述或统一风格",
+                        source_stage=PipelineNode.CONVERT_PROMPT.value,
+                        auto_fixable=True,
+                    )
+                    if issue:
+                        result.add_issue(issue)
+                if current_tokens:
+                    previous_style_tokens = current_tokens
 
         unique_styles = set(styles)
         if len(unique_styles) > 2:
@@ -368,8 +484,6 @@ class ContinuityGuardianChecker:
 
             # 去重：避免重复报告
             style_key = f"style_{len(unique_styles)}_{hash(str(sorted(style_list)))}"
-            if not hasattr(self, '_seen_style_issues'):
-                self._seen_style_issues = set()
             if style_key not in self._seen_style_issues:
                 self._seen_style_issues.add(style_key)
 
@@ -405,6 +519,28 @@ class ContinuityGuardianChecker:
             pair_key = f"{curr.id}_{nxt.id}"
 
             expected_start = curr.start_time + curr.duration
+
+            # 时间倒流：后一片段的起点早于前一片段起点，属于结构性错误
+            if nxt.start_time < curr.start_time - 0.1:
+                reverse_key = f"reverse_{pair_key}"
+                if reverse_key not in seen_overlaps:
+                    seen_overlaps.add(reverse_key)
+                    issue = self._create_issue(
+                        issue_type=ContinuityIssueType.TIME_REVERSE,
+                        description=(
+                            f"片段时间倒流: {nxt.id}({nxt.start_time:.2f}s) "
+                            f"早于 {curr.id}({curr.start_time:.2f}s)"
+                        ),
+                        severity=ContinuitySeverity.ERROR,
+                        fragment_id=nxt.id,
+                        position=i,
+                        suggestion="按镜头顺序重排片段时间轴",
+                        source_stage=PipelineNode.SPLIT_VIDEO.value,
+                        auto_fixable=True
+                    )
+                    if issue:
+                        result.add_issue(issue)
+                continue
 
             if abs(nxt.start_time - expected_start) > 0.1:
                 if nxt.start_time > expected_start:
@@ -448,92 +584,415 @@ class ContinuityGuardianChecker:
         if not parsed_script:
             return
 
-        prop_state = {}
-        seen_prop_changes = set()
+        prop_state: Dict[str, List[Dict[str, Any]]] = {}
+        seen_prop_changes: Set[str] = set()
 
         for scene in parsed_script.scenes:
             for elem in scene.elements:
-                prop_keywords = ["拿", "举", "抱", "提", "端", "持", "握"]
-                for kw in prop_keywords:
-                    if kw in elem.content:
-                        if elem.character:
-                            if elem.character not in prop_state:
-                                prop_state[elem.character] = []
-                            prop_state[elem.character].append({
-                                "prop": kw,
-                                "scene": scene.id,
-                                "time": elem.sequence
-                            })
+                if not elem.character:
+                    continue
+                # 优先消费解析期结构化 prop_object；规则/旧数据再回退到文本提取。
+                structured_prop = getattr(elem, "prop_object", None)
+                objects = (
+                    [structured_prop]
+                    if structured_prop
+                    else _extract_prop_objects(elem.content)
+                )
+                for obj in objects:
+                    prop_state.setdefault(elem.character, []).append({
+                        "prop": obj,
+                        "scene": scene.id,
+                        "time": elem.sequence
+                    })
 
         for character, props in prop_state.items():
             if len(props) > 1:
                 for i in range(len(props) - 1):
-                    if props[i]["prop"] != props[i + 1]["prop"]:
-                        change_key = f"{character}_{props[i]['prop']}_{props[i+1]['prop']}"
-                        if change_key not in seen_prop_changes:
-                            seen_prop_changes.add(change_key)
-                            issue = self._create_issue(
-                                issue_type=ContinuityIssueType.PROP_CHANGE,
-                                description=f"角色'{character}'道具变化: {props[i]['prop']} -> {props[i + 1]['prop']}",
-                                severity=ContinuitySeverity.WARNING,
-                                scene_id=props[i]["scene"],
-                                suggestion="确保道具前后一致",
-                                source_stage=PipelineNode.PARSE_SCRIPT.value
-                            )
-                            if issue:
-                                result.add_issue(issue)
-
-    def check_with_contract(self, context: Dict[str, Any],
-                            contract: GlobalConsistencyContract) -> ContinuityCheckResult:
-        """带契约的连续性检查"""
-        # 清望去重缓存
-        self._seen_issues.clear()
-
-        result = ContinuityCheckResult()
-
-        # 1. 基础检查
-        self.check_character_continuity(context, result)
-        self.check_scene_continuity(context, result)
-        self.check_time_continuity(context, result)
-
-        # 2. 契约验证
-        if contract:
-            # 检查角色出现一致性
-            for issue_data in contract.get_character_appearance_consistency():
-                issue_key = f"contract_char_{issue_data.get('suggestion', '')[:50]}"
-                if issue_key not in self._seen_issues:
-                    self._seen_issues.add(issue_key)
+                    previous, current = props[i]["prop"], props[i + 1]["prop"]
+                    if _same_object(previous, current):
+                        continue
+                    change_key = f"{character}_{previous}_{current}"
+                    if change_key in seen_prop_changes:
+                        continue
+                    seen_prop_changes.add(change_key)
                     issue = self._create_issue(
-                        issue_type=ContinuityIssueType.CHARACTER_MISSING,
-                        description=issue_data.get("suggestion", ""),
-                        severity=ContinuitySeverity(issue_data.get("severity", "moderate")),
-                        suggestion=issue_data.get("suggestion"),
-                        source_stage=PipelineNode.CONTINUITY_CHECK,
-                        auto_fixable=issue_data.get("auto_fixable", True)
+                        issue_type=ContinuityIssueType.PROP_CHANGE,
+                        description=f"角色'{character}'持有道具变化: {previous} -> {current}",
+                        severity=ContinuitySeverity.WARNING,
+                        scene_id=props[i]["scene"],
+                        suggestion="确保道具前后一致",
+                        source_stage=PipelineNode.PARSE_SCRIPT.value,
+                        # 解析阶段没有确定性道具修复能力，避免自动修复空转
+                        auto_fixable=False,
                     )
                     if issue:
                         result.add_issue(issue)
 
-            # 检查场景一致性
-            scene_issues = self._check_scene_consistency_with_contract(context, contract)
-            for issue in scene_issues:
-                if issue:
-                    result.add_issue(issue)
+    def check_with_contract(self, context: Dict[str, Any],
+                            contract: GlobalConsistencyContract) -> ContinuityCheckResult:
+        """带契约的连续性检查（主链入口）
+
+        先执行原有六项基础检查，再叠加契约校验、结构化锚点与长剧本跨块校验，
+        避免出现“契约方法已定义但主链不生效”的情况。
+        """
+        result = self.check_all_continuity(context)
+
+        if contract:
+            self._apply_contract_checks(context, contract, result)
 
         return result
 
-    def _check_scene_consistency_with_contract(self, context: Dict,
+    def _apply_contract_checks(self, context: Dict[str, Any],
+                               contract: GlobalConsistencyContract,
+                               result: ContinuityCheckResult) -> None:
+        """契约校验：角色缺席、场景角色、结构化锚点、跨块连续性"""
+        # 1. 角色长期缺席：结构性问题，解析/分镜无法确定性修复
+        for issue_data in contract.get_character_appearance_consistency():
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.CHARACTER_DISAPPEAR,
+                description=issue_data.get("suggestion", ""),
+                severity=ContinuitySeverity(issue_data.get("severity", "moderate")),
+                suggestion=issue_data.get("suggestion"),
+                source_stage=PipelineNode.CONTINUITY_CHECK,
+                auto_fixable=False,
+            )
+            if issue:
+                result.add_issue(issue)
+
+        # 2. 场景角色一致性
+        for issue in self._check_scene_consistency_with_contract(context, contract):
+            if issue:
+                result.add_issue(issue)
+
+        # 3. 结构化锚点（ContinuityAnchor）：角色外观 / 场景 / 风格
+        anchors = self.build_anchors_from_contract(contract)
+        self._check_character_appearance_anchors(context, anchors, result)
+        self._check_scene_anchors(context, anchors, result)
+        self._check_style_anchor(context, anchors, result)
+
+        # 4. 长剧本跨块连续性（CrossChunkValidator）
+        self._check_chunk_transitions(context, result)
+
+    def build_anchors_from_contract(
+        self, contract: GlobalConsistencyContract
+    ) -> List[ContinuityAnchor]:
+        """把全局契约转换为结构化连续性锚点，并登记到时间线"""
+        anchors: List[ContinuityAnchor] = []
+
+        for name, char in (getattr(contract, "characters", {}) or {}).items():
+            anchors.append(ContinuityAnchor(
+                anchor_id=f"character_{name}",
+                anchor_type="character",
+                name=name,
+                value=dict(getattr(char, "appearance_anchors", {}) or {}),
+                priority=2,
+            ))
+
+        for num, scene in (getattr(contract, "scenes", {}) or {}).items():
+            anchors.append(ContinuityAnchor(
+                anchor_id=f"scene_{num}",
+                anchor_type="scene",
+                name=str(num),
+                value={
+                    "location": getattr(scene, "location", ""),
+                    "time_of_day": getattr(scene, "time_of_day", ""),
+                    "weather": getattr(scene, "weather", ""),
+                    "characters": list(getattr(scene, "characters_in_scene", []) or []),
+                },
+                priority=1,
+            ))
+
+        style_anchor = getattr(contract, "style_anchor", {}) or {}
+        if style_anchor:
+            anchors.append(ContinuityAnchor(
+                anchor_id="style",
+                anchor_type="style",
+                name="global_style",
+                value=dict(style_anchor),
+                priority=3,
+            ))
+
+        self.timeline.continuity_anchors = {
+            anchor.anchor_id: anchor.model_dump() for anchor in anchors
+        }
+        return anchors
+
+    def _check_style_anchor(self, context: Dict[str, Any],
+                            anchors: List[ContinuityAnchor],
+                            result: ContinuityCheckResult) -> None:
+        """校验片段是否落实风格锚点（有锚点但片段缺风格即提示）"""
+        style_anchor = next(
+            (anchor for anchor in anchors if anchor.anchor_type == "style"), None
+        )
+        if not style_anchor or not style_anchor.value:
+            return
+
+        instructions = context.get("instructions")
+        if not instructions:
+            return
+
+        missing = [
+            prompt.fragment_id
+            for prompt in instructions.fragments
+            if not (prompt.style or "").strip()
+        ]
+        if not missing:
+            return
+
+        issue = self._create_issue(
+            issue_type=ContinuityIssueType.STYLE_INCONSISTENT,
+            description=(
+                f"{len(missing)}个片段未落实全局风格锚点: "
+                f"{', '.join(missing[:5])}"
+            ),
+            severity=ContinuitySeverity.WARNING,
+            fragment_id=missing[0],
+            suggestion="按契约风格锚点补齐片段风格描述",
+            source_stage=PipelineNode.CONVERT_PROMPT.value,
+            auto_fixable=True,
+        )
+        if issue:
+            result.add_issue(issue)
+
+    def _check_character_appearance_anchors(
+        self, context: Dict[str, Any], anchors: List[ContinuityAnchor],
+        result: ContinuityCheckResult,
+    ) -> None:
+        """用角色外观锚点校验片段服装；首个片段也有基线，不再只比较上一片段"""
+        instructions = context.get("instructions")
+        if not instructions:
+            return
+
+        anchors_by_name = {
+            anchor.name: (anchor.value or {})
+            for anchor in anchors
+            if anchor.anchor_type == "character"
+        }
+
+        for index, prompt in enumerate(instructions.fragments):
+            character = getattr(prompt, "main_character", None)
+            if not character:
+                continue
+            anchor_value = anchors_by_name.get(character) or {}
+            expected = _main_garment_signature(
+                str(anchor_value.get("clothing", "") or "")
+            )
+            if not expected:
+                continue
+
+            actual = _main_garment_signature(getattr(prompt, "prompt", "") or "")
+            if not actual or actual & expected:
+                continue
+
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE,
+                description=(
+                    f"角色'{character}'服装与契约锚点不一致: "
+                    f"期望 {'、'.join(sorted(expected))}，"
+                    f"实际 {'、'.join(sorted(actual))}"
+                ),
+                severity=ContinuitySeverity.WARNING,
+                fragment_id=prompt.fragment_id,
+                position=index,
+                suggestion="按契约外观锚点修正片段服装描述",
+                source_stage=PipelineNode.CONVERT_PROMPT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
+    def _check_scene_anchors(
+        self, context: Dict[str, Any], anchors: List[ContinuityAnchor],
+        result: ContinuityCheckResult,
+    ) -> None:
+        """用场景锚点校验分镜场景是否越界，以及相邻场景地点/时间是否冲突"""
+        scene_anchors = sorted(
+            (anchor for anchor in anchors if anchor.anchor_type == "scene"),
+            key=lambda anchor: int(anchor.name) if str(anchor.name).isdigit() else 0,
+        )
+        if not scene_anchors:
+            return
+
+        known_scenes = {
+            f"scene_{int(anchor.name):03d}"
+            for anchor in scene_anchors
+            if str(anchor.name).isdigit()
+        }
+        reported_scenes: Set[str] = set()
+        shots = getattr(context.get("shot_sequence"), "shots", []) or []
+        for shot in shots:
+            scene_id = getattr(shot, "scene_id", None)
+            if not scene_id or scene_id in known_scenes or scene_id in reported_scenes:
+                continue
+            reported_scenes.add(scene_id)
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.SCENE_INCONSISTENT,
+                description=f"镜头{shot.id}的场景'{scene_id}'不在契约场景锚点中",
+                severity=ContinuitySeverity.WARNING,
+                shot_id=shot.id,
+                scene_id=scene_id,
+                suggestion="检查分镜场景编号，或补登记对应契约场景",
+                source_stage=PipelineNode.SEGMENT_SHOT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
+        for previous, current in zip(scene_anchors, scene_anchors[1:]):
+            prev_value = previous.value or {}
+            curr_value = current.value or {}
+            shared_characters = set(prev_value.get("characters") or []) & set(
+                curr_value.get("characters") or []
+            )
+            if (
+                prev_value.get("location")
+                and prev_value.get("location") == curr_value.get("location")
+                and prev_value.get("time_of_day") != curr_value.get("time_of_day")
+                and shared_characters
+            ):
+                issue = self._create_issue(
+                    issue_type=ContinuityIssueType.SCENE_INCONSISTENT,
+                    description=(
+                        f"场景{previous.name}->{current.name} 地点相同但时间不一致: "
+                        f"{prev_value.get('time_of_day')} -> {curr_value.get('time_of_day')}"
+                    ),
+                    severity=ContinuitySeverity.WARNING,
+                    scene_id=(
+                        f"scene_{int(current.name):03d}"
+                        if str(current.name).isdigit() else current.name
+                    ),
+                    suggestion="补充时间过渡说明或统一场景时间",
+                    source_stage=PipelineNode.CONTINUITY_CHECK,
+                    auto_fixable=False,
+                )
+                if issue:
+                    result.add_issue(issue)
+
+    def _check_chunk_transitions(self, context: Dict[str, Any],
+                                 result: ContinuityCheckResult) -> None:
+        """长剧本按场景分块后检查块间角色连续性"""
+        parsed_script = context.get("parsed_script")
+        if not parsed_script:
+            return
+
+        scenes = getattr(parsed_script, "scenes", []) or []
+        if len(scenes) <= CROSS_CHUNK_SCENE_THRESHOLD:
+            return
+
+        chunks = LongScriptChunker().chunk_script(parsed_script)
+        if len(chunks) < 2:
+            return
+
+        summaries = [self._summarize_chunk(chunk) for chunk in chunks]
+        # 跨多个块出现的角色视为主角，避免把每个客串角色都当作“突然出现”
+        chunk_membership: Dict[str, int] = {}
+        for summary in summaries:
+            for name in summary["characters_in_chunk"]:
+                chunk_membership[name] = chunk_membership.get(name, 0) + 1
+        main_characters = {
+            name for name, count in chunk_membership.items() if count >= 2
+        }
+
+        validator = CrossChunkValidator()
+        previous = summaries[0]
+        for chunk, current in zip(chunks[1:], summaries[1:]):
+            for raw in validator.validate_chunk_transition(previous, current):
+                character = raw.get("character", "")
+                if character not in main_characters:
+                    continue
+                issue_type = (
+                    ContinuityIssueType.CHARACTER_MISSING
+                    if raw.get("type") == "character_disappears"
+                    else ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE
+                )
+                issue = self._create_issue(
+                    issue_type=issue_type,
+                    description=raw.get("suggestion", ""),
+                    severity=ContinuitySeverity.WARNING,
+                    scene_id=f"chunk_{chunk.chunk_id}",
+                    suggestion="在块边界补充角色出场/退场过渡",
+                    source_stage=PipelineNode.CONTINUITY_CHECK,
+                    auto_fixable=False,
+                )
+                if issue:
+                    result.add_issue(issue)
+            previous = current
+
+    @staticmethod
+    def _summarize_chunk(chunk: Any) -> Dict[str, Any]:
+        """把剧本块归纳为跨块校验器需要的字段"""
+        characters: List[str] = []
+        first_location = ""
+        last_location = ""
+        for scene in getattr(chunk, "scenes", []) or []:
+            location = getattr(scene, "location", "") or ""
+            if location and not first_location:
+                first_location = location
+            if location:
+                last_location = location
+            for elem in getattr(scene, "elements", []) or []:
+                name = getattr(elem, "character", None)
+                if name and name not in characters:
+                    characters.append(name)
+        return {
+            "characters_in_chunk": characters,
+            "first_location": first_location,
+            "last_location": last_location,
+        }
+
+    def check_style_drift_with_guardian(
+        self, context: Dict[str, Any], guardian: Any,
+        result: ContinuityCheckResult,
+    ) -> None:
+        """使用 PromptStyleGuardian 检测提示词风格漂移并转为连续性问题"""
+        instructions = context.get("instructions")
+        if guardian is None or not instructions or not instructions.fragments:
+            return
+
+        prompts = [prompt.prompt or "" for prompt in instructions.fragments]
+        try:
+            drift_issues = guardian.detect_style_drift(prompts)
+        except Exception as e:
+            info(f"风格漂移检测失败，跳过: {e}")
+            return
+
+        for item in drift_issues:
+            index = item.get("fragment_index", 0)
+            if not 0 <= index < len(instructions.fragments):
+                continue
+            prompt = instructions.fragments[index]
+            is_drift = item.get("issue") == "style_drift"
+            issue = self._create_issue(
+                issue_type=ContinuityIssueType.STYLE_INCONSISTENT,
+                description=(
+                    f"片段'{prompt.fragment_id}'风格与全局风格画像差异过大"
+                    f"(相似度={item.get('similarity', 0):.2f})"
+                ),
+                severity=(
+                    ContinuitySeverity.MODERATE if is_drift
+                    else ContinuitySeverity.WARNING
+                ),
+                fragment_id=prompt.fragment_id,
+                position=index,
+                suggestion=item.get("suggestion", "统一片段风格描述"),
+                source_stage=PipelineNode.CONVERT_PROMPT.value,
+                auto_fixable=True,
+            )
+            if issue:
+                result.add_issue(issue)
+
+    def _check_scene_consistency_with_contract(self, context: Dict[str, Any],
                                                contract: GlobalConsistencyContract) -> List[ContinuityIssue]:
         """检查场景与契约的一致性"""
-        issues = []
+        issues: List[ContinuityIssue] = []
         shot_sequence = context.get("shot_sequence")
 
         if not shot_sequence:
             return issues
 
         # 追踪场景中出现的角色
-        scene_characters = {}
-        seen_scene_keys = set()
+        scene_characters: Dict[str, Set[str]] = {}
+        seen_scene_keys: Set[str] = set()
 
         for shot in shot_sequence.shots:
             if shot.scene_id not in scene_characters:
@@ -565,7 +1024,7 @@ class ContinuityGuardianChecker:
         return issues
 
     def take_snapshot(self, context: Dict[str, Any]) -> StateSnapshot:
-        """创建状态快照"""
+        """创建状态快照（记录角色外观与当前片段进度）"""
         self.snapshot_counter += 1
 
         snapshot = StateSnapshot(
@@ -583,6 +1042,23 @@ class ContinuityGuardianChecker:
                     appearance={"description": char.description or ""},
                     emotion={"type": "neutral", "intensity": 0.5}
                 )
+
+        # 用最新片段序列补全快照引用，便于按时间回溯“当时执行到哪”
+        instructions = context.get("instructions")
+        fragments = getattr(instructions, "fragments", None) or []
+        if fragments:
+            last_fragment = fragments[-1]
+            snapshot.references = {
+                "fragment_id": getattr(last_fragment, "fragment_id", None),
+                "shot_id": None,
+                "element_ids": [],
+            }
+            snapshot.global_state = {
+                **snapshot.global_state,
+                "fragment_count": len(fragments),
+                "fragment_ids": [f.fragment_id for f in fragments[:20]],
+                "anchor_count": len(self.timeline.continuity_anchors),
+            }
 
         self.timeline.add_snapshot(snapshot)
         return snapshot

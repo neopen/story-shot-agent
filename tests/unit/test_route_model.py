@@ -280,6 +280,50 @@ def test_route_model_node_keeps_plan_scene_over_prompt_location():
     assert plan["blocked_fragments"] == []
 
 
+def test_route_model_node_marks_pending_assets_when_required_not_ready():
+    """计划内必需资产未就绪时必须标记 pending_assets，不能沿用 ready。"""
+    nodes = object.__new__(WorkflowNodes)
+    nodes.storage = _FakeStorage()
+
+    state = WorkflowState.from_raw_script(
+        "测试剧本", task_id="task_005", script_id="script_005"
+    )
+    state.domain.contract = _scene_route_contract()
+    state.domain.instructions = AIVideoInstructions(
+        fragments=[
+            _prompt(
+                "medium shot, a woman in a high school classroom",
+                main_character="张晨",
+            )
+        ]
+    )
+    state.domain.shot_sequence = ShotSequence(
+        shots=[ShotInfo(id="shot_001", scene_id="scene_002", description="楼道空镜")]
+    )
+    state.domain.fragment_sequence = FragmentSequence(
+        fragments=[VideoFragment(id="frag_001", shot_id="shot_001", duration=3.0)]
+    )
+    state.domain.asset_plan = AssetPlanDocument(
+        assets=[
+            AssetSpec(
+                asset_id="scene_002",
+                asset_type=AssetType.SCENE,
+                owner_name="楼道",
+                image_prompt="a quiet hallway at night",
+                status=AssetStatus.PENDING,
+            )
+        ]
+    ).to_dict()
+
+    nodes.route_model_node(state)
+
+    decision = state.domain.instructions.route_plan["decisions"][0]
+    assert decision["status"] == "pending_assets"
+    assert any(
+        "required_assets_pending" in warning for warning in decision["warnings"]
+    )
+
+
 def _scene_route_contract() -> GlobalConsistencyContract:
     """教室 + 走廊两个场景资产，用于验证路由节点的场景锚定回写"""
     contract = GlobalConsistencyContract(script_id="s1", task_id="t1")

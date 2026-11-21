@@ -18,7 +18,7 @@ from penshot.neopen.agent.continuity_guardian.consistency_contract import Global
 class CrossChunkValidator:
     """跨块一致性验证器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.chunk_results: List[Dict] = []
 
     def validate_chunk_transition(self, prev_result: Dict, curr_result: Dict) -> List[Dict]:

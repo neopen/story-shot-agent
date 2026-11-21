@@ -104,19 +104,47 @@ class BaseScriptParser(ABC):
 
         # 构建角色列表
         characters = self._build_character_data(data)
+        global_metadata = self._build_global_metadata(data.get("global_metadata", {}))
+
+        # LLM 未填 prop_object 时，用关键道具名做确定性回填
+        self._bind_prop_objects(scenes, global_metadata)
 
         # 返回完整解析结果
         return ParsedScript(
             title=data.get("title"),
             characters=characters,
             scenes=scenes,
-            global_metadata=self._build_global_metadata(data.get("global_metadata", {})),
+            global_metadata=global_metadata,
             metadata={
                 "parsed_at": datetime.now().isoformat(),
                 "version": "mvp_1.0",
                 "parser_type": self.__class__.__name__
             }
         )
+
+    @staticmethod
+    def _bind_prop_objects(scenes, global_metadata: GlobalMetadata) -> None:
+        """优先保留模型输出的 prop_object，缺失时按关键道具名回填"""
+        prop_names = sorted(
+            (
+                getattr(prop, "name", "")
+                for prop in getattr(global_metadata, "key_props", None) or []
+            ),
+            key=len,
+            reverse=True,
+        )
+        prop_names = [name for name in prop_names if name]
+        if not prop_names:
+            return
+
+        for scene in scenes:
+            for element in getattr(scene, "elements", None) or []:
+                if getattr(element, "prop_object", None):
+                    continue
+                text = f"{element.content} {getattr(element, 'description', '') or ''}"
+                matched = next((name for name in prop_names if name in text), None)
+                if matched:
+                    element.prop_object = matched
 
     def _build_character_data(self, data: Dict[str, Any]) -> List[CharacterInfo]:
         """构建角色对象"""
@@ -176,6 +204,7 @@ class BaseScriptParser(ABC):
             character=elem_data.get("character"),
             target_character=elem_data.get("target_character"),
             description=elem_data.get("description", ""),
+            prop_object=elem_data.get("prop_object"),
             intensity=elem_data.get("intensity", 0.5),
             emotion=elem_data.get("emotion", "neutral"),
             audio_context=element_audio_context,

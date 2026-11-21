@@ -191,6 +191,8 @@ def _nodes(report: QualityAuditReport, repair_result) -> WorkflowNodes:
     nodes.workflow_memory = SimpleNamespace(
         get_memory_list=lambda *args, **kwargs: [],
         store_short_term_memory=lambda *args, **kwargs: None,
+        store_short_term_value=lambda *args, **kwargs: None,
+        append_memory_value=lambda *args, **kwargs: [],
     )
     nodes.quality_auditor = SimpleNamespace(qa_process=lambda *args, **kwargs: report)
     nodes.knowledge_manager = SimpleNamespace(

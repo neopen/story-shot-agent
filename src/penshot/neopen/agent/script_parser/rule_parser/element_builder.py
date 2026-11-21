@@ -10,7 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/9/17
 """
 
-from typing import Sequence
+from typing import Optional, Sequence
 
 from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.script_parser.rule_parser.config_vocabulary import (
@@ -151,9 +151,22 @@ class ElementBuilder:
             character=draft.character,
             target_character=draft.target_character,
             description=self._describe(draft),
+            prop_object=self._infer_prop_object(
+                f"{draft.content} {draft.description or ''}"
+            ),
             intensity=self._inference.intensity(draft),
             emotion=self._inference.emotion(draft),
         )
+
+    def _infer_prop_object(self, text: str) -> Optional[str]:
+        """按道具词表取文本中最长的命中项作为元素道具"""
+        candidates = [
+            word
+            for words in (self._vocabulary.prop_keywords or {}).values()
+            for word in words
+            if word and word in text
+        ]
+        return max(candidates, key=len) if candidates else None
 
     @staticmethod
     def _describe(draft: ElementDraft) -> str:

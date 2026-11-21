@@ -59,6 +59,7 @@ script_parser_system:
                 "character": "角色名，必须与 characters[].name 的值保持一致",
                 "target_character": "目标角色名，必须与 characters[].name 的值保持一致，若没有则为 null",
                 "description": "元素的视觉描述（动作、表情、画面细节）",
+                "prop_object": "该元素中角色持有/操作的道具名称（必须来自 key_props 或原文明确道具；没有则为 null）",
                 "intensity": 0.0-1.0,
                 "emotion": "neutral/happy/sad/angry/tense/fear/surprise/disgust/anxious/excited/calm/tender/hesitant/crying/whisper/choking/repression/emotional/shock/resigned/resolute/nostalgic/heavy/other",
                 "audio_context": {{

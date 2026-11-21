@@ -18,13 +18,15 @@ from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import PromptTemplate
 
-from penshot.logger import debug, info, error
+from penshot.logger import debug, info, error, warning
+from penshot.neopen.knowledge.memory.base_memory_layer import BaseMemoryLayer
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
-from penshot.neopen.tools.result_storage_tool import create_result_storage
 
 
-class MediumTermMemory:
+class MediumTermMemory(BaseMemoryLayer):
     """中期记忆 - 基于LangChain的摘要记忆，支持文件持久化"""
+
+    backend_type = "medium_term"
 
     # 默认摘要提示词
     DEFAULT_SUMMARY_PROMPT = PromptTemplate(
@@ -41,9 +43,8 @@ class MediumTermMemory:
     )
 
     def __init__(self, llm: BaseLanguageModel, config: MemoryConfig, script_id: str):
+        super().__init__(config, script_id)
         self.llm = llm
-        self.config = config
-        self.script_id = script_id
 
         # 会话历史存储
         self._session_histories: Dict[str, InMemoryChatMessageHistory] = {}
@@ -54,13 +55,15 @@ class MediumTermMemory:
         # 阶段摘要缓存
         self._stage_summaries: Dict[str, str] = {}
 
+        # 从磁盘恢复的摘要（会话历史为空时回退使用）
+        self._restored_summary: str = ""
+
         # 文件持久化路径
         self.persist_path = None
         if config.term_persist_path:
             self.persist_path = Path(config.term_persist_path) / script_id
             self.persist_path.mkdir(parents=True, exist_ok=True)
             self._load_from_file()  # 启动时加载
-            self.storage = create_result_storage(base_output_dir=config.term_persist_path)
 
         debug(f"初始化中期记忆: script={script_id}, max_tokens={config.medium_term_max_tokens}, "
               f"persist={self.persist_path is not None}")
@@ -99,6 +102,9 @@ class MediumTermMemory:
         # 先读取既有摘要，再写入本次历史，否则会读到刚加入的内容
         current_summary = self.get_summary()
 
+        # 按 stage_name 作为 key 同步写入 KV，保证 MemoryManager.get 可按 key 命中
+        self._key_values[stage_name] = content
+
         # 会话历史中最后一条消息即最新摘要
         history = self._get_session_history(f"stage_{stage_name}")
         new_summary = self._summarize(current_summary, content)
@@ -110,7 +116,7 @@ class MediumTermMemory:
             self._stage_summaries[stage_name] = content
 
         # 持久化到文件
-        self._persist_to_file()
+        self._persist()
 
         debug(f"添加阶段内容: {stage_name}, 长度={len(content)}")
 
@@ -126,24 +132,31 @@ class MediumTermMemory:
                 if len(summary) > self.max_token_limit * 2:
                     summary = summary[:self.max_token_limit * 2] + "..."
                 return summary
-        return ""
+        # 新进程尚未写入会话历史时，回退到磁盘恢复的摘要
+        return self._restored_summary
 
     def get_stage_summary(self, stage_name: str) -> Optional[str]:
         """获取特定阶段摘要"""
         return self._stage_summaries.get(stage_name)
 
-    def clear(self):
-        """清空摘要"""
+    def _clear_backend(self) -> None:
+        """清空摘要与会话历史"""
         self._session_histories.clear()
         self._stage_summaries.clear()
-
-        # 删除持久化文件
-        if self.persist_path:
-            summary_file = self.persist_path / "medium_summary.json"
-            if summary_file.exists():
-                summary_file.unlink()
-
+        self._restored_summary = ""
         debug("清空中期记忆")
+
+    def _delete_kv_file(self) -> None:
+        if self.persist_path:
+            self._delete_file(self._summary_file())
+
+    def _summary_file(self) -> Path:
+        """中期记忆持久化文件（读写必须使用同一路径）"""
+        return self.persist_path / "medium_summary.json"
+
+    def _persist(self):
+        """基类持久化钩子：摘要与 KV 写入同一文件"""
+        self._persist_to_file()
 
     def _persist_to_file(self):
         """持久化到文件"""
@@ -156,10 +169,12 @@ class MediumTermMemory:
                 "script_id": self.script_id,
                 "summary": summary,
                 "stage_summaries": self._stage_summaries,
+                "key_values": self._key_values,
                 "updated_at": datetime.now().isoformat(),
                 "max_tokens": self.max_token_limit
             }
-            self.storage.save_json_result(self.script_id, "", data, f"medium_summary_{datetime.now().strftime('%Y%m%d%H')}.json")
+            with open(self._summary_file(), "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
 
         except Exception as e:
             error(f"持久化摘要失败: {e}")
@@ -170,19 +185,24 @@ class MediumTermMemory:
             return
 
         try:
-            summary_file = self.persist_path / "medium_summary.json"
+            summary_file = self._summary_file()
             if not summary_file.exists():
                 return
 
             with open(summary_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # 恢复阶段摘要
+            # 恢复阶段摘要与按 key 的记忆
             self._stage_summaries = data.get("stage_summaries", {})
+            key_values = data.get("key_values", {})
+            if isinstance(key_values, dict):
+                self._key_values = key_values
+            self._restored_summary = data.get("summary", "") or ""
 
-            info(f"加载摘要文件: {summary_file}, 阶段数={len(self._stage_summaries)}")
+            info(f"加载摘要文件: {summary_file}, 阶段数={len(self._stage_summaries)}, "
+                 f"KV={len(self._key_values)}")
         except Exception as e:
-            error(f"加载摘要文件失败: {e}")
+            warning(f"加载摘要文件失败: {e}")
 
     def export_summary(self) -> Dict[str, Any]:
         """导出摘要（用于调试或迁移）"""
@@ -193,11 +213,9 @@ class MediumTermMemory:
             "stats": self.get_stats()
         }
 
-    def get_stats(self) -> Dict[str, Any]:
-        """获取统计信息"""
+    def _extra_stats(self) -> Dict[str, Any]:
         summary = self.get_summary()
         return {
-            "type": "medium_term",
             "summary_length": len(summary),
             "max_tokens": self.max_token_limit,
             "stages_count": len(self._stage_summaries),

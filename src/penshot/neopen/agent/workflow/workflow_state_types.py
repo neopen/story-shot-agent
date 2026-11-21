@@ -87,6 +87,8 @@ class DomainState(BaseModel):
     audit_history: List[Dict[str, Any]] = []
     audit_executed: bool = False
     audit_timestamp: Optional[str] = None
+    # 最近一次审计结果摘要，供决策与执行汇总读取
+    last_audit_result: Optional[Dict[str, Any]] = None
 
     # 连续性契约（一等公民）：解析阶段构建，切镜/切片/提示词阶段消费
     contract: Optional[Any] = None

@@ -50,6 +50,8 @@ class ShotConfig(AIConfig):
     audio_model: str = AudioModelType.XTTSv2.value
     default_negative_prompt: str = "blurry, distorted, low quality, cartoonish, bad anatomy"
     default_style: str = VideoStyle.CINEMATIC.value
+    # 视频生成随机种子；未设置时按剧本内容派生稳定值，保证同一剧本可复现
+    video_seed: Optional[int] = None
     max_prompt_length: int = 200    # 提示词最大长度（单词数）
     min_prompt_length: int = 20
 
@@ -70,12 +72,11 @@ class ShotConfig(AIConfig):
     workflow_timeout: int = 1800  # 工作流总超时时间（秒），默认30分钟
 
     # ======================检查点配置
-    checkpoint_mode: str = "auto"   # 检查点模式: auto, memory, sqlite, postgres
+    checkpoint_mode: str = "auto"   # 检查点模式: auto, memory, sqlite
     checkpoint_dir: Optional[str] = settings.get_data_paths().get('data_checkpoint')
-    postgres_uri: Optional[str] = None    # PostgreSQL URI
-    max_checkpoints_per_script: int = 10    # 每脚本最多保存的检查点数量
-    checkpoint_max_connections: int = 5     # 检查点最大连接数
-    checkpoint_idle_timeout: int = 600      # 检查点空闲超时时间（秒）
+    # 预留字段：当前版本仅支持本地 SQLite，此值会被请求清洗逻辑强制清空
+    postgres_uri: Optional[str] = None
+    max_checkpoints_per_script: int = 10    # 每脚本最多保留的检查点文件数量（0 表示不清理）
 
     def __post_init__(self):
         """配置参数验证"""

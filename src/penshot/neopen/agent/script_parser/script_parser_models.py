@@ -118,6 +118,12 @@ class BaseElement(BaseModel):
 
     description: str = Field(default=None, description="其他的描述文本")
 
+    # 该元素中角色持有/操作的道具（结构化字段，供连续性检查直接消费）
+    prop_object: Optional[str] = Field(
+        default=None,
+        description="元素中角色持有或操作的道具名称；无则为 None",
+    )
+
     intensity: float = Field(
         default=0.5,
         ge=0.0,

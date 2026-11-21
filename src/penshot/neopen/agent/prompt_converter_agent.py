@@ -10,6 +10,8 @@ See LICENSE File For Details.
 @Time: 2026/1/18 14:23
 """
 
+import hashlib
+import json
 import time
 from typing import Any, Dict, List, Optional
 
@@ -392,6 +394,7 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                     }
                 )
 
+            self._apply_video_seed(instructions, parsed_script)
             self.last_instructions = instructions
             return instructions
 
@@ -399,6 +402,36 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
             print_log_exception()
             error(f"视频转换提示词异常: {e}")
             return None
+
+    def _apply_video_seed(
+        self, instructions: AIVideoInstructions, parsed_script: ParsedScript
+    ) -> None:
+        """为所有片段补齐固定 seed：显式配置优先，否则按剧本内容派生稳定值"""
+        if not instructions or not instructions.fragments:
+            return
+
+        config = getattr(self, "config", None)
+        seed = getattr(config, "video_seed", None)
+        if seed is None and parsed_script is not None:
+            try:
+                if hasattr(parsed_script, "model_dump"):
+                    payload = parsed_script.model_dump()
+                else:
+                    payload = parsed_script.dict()
+                # 排除解析时间/统计等易变字段，保证同一剧本重复运行得到同一 seed
+                for volatile_key in ("metadata", "stats"):
+                    payload.pop(volatile_key, None)
+                serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+                seed = int(
+                    hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:8], 16
+                ) % (2**31 - 1)
+            except Exception as e:
+                debug(f"派生视频 seed 失败，保持为空: {e}")
+                return
+
+        for fragment in instructions.fragments:
+            if fragment.seed is None:
+                fragment.seed = seed
 
     def detect_prompt_issues(
         self, instructions: AIVideoInstructions, fragment_sequence: FragmentSequence

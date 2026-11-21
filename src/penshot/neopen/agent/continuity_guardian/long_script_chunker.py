@@ -10,6 +10,7 @@ See LICENSE File For Details.
 @Time: 2026/4/28 0:21
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
@@ -41,7 +42,7 @@ class LongScriptChunker:
         self.max_duration_per_chunk = max_duration_per_chunk
         self.overlap_scenes = overlap_scenes
 
-    def chunk_script(self, parsed_script) -> List[ScriptChunk]:
+    def chunk_script(self, parsed_script: Any) -> List[ScriptChunk]:
         """
         将剧本分块
 
@@ -56,8 +57,8 @@ class LongScriptChunker:
         if total_scenes <= self.max_scenes_per_chunk:
             return [self._create_chunk(0, scenes, 0, total_scenes - 1)]
 
-        chunks = []
-        chunk_scenes = []
+        chunks: List[ScriptChunk] = []
+        chunk_scenes: List[Any] = []
         current_duration = 0.0
 
         for i, scene in enumerate(scenes):
@@ -70,8 +71,8 @@ class LongScriptChunker:
                     chunks.append(self._create_chunk(
                         len(chunks),
                         chunk_scenes,
-                        chunk_scenes[0].number - 1,
-                        chunk_scenes[-1].number - 1
+                        self._scene_number(chunk_scenes[0]),
+                        self._scene_number(chunk_scenes[-1])
                     ))
                     # 保留重叠场景
                     overlap = chunk_scenes[-self.overlap_scenes:] if self.overlap_scenes > 0 else []
@@ -86,19 +87,28 @@ class LongScriptChunker:
             chunks.append(self._create_chunk(
                 len(chunks),
                 chunk_scenes,
-                chunk_scenes[0].number - 1,
-                chunk_scenes[-1].number - 1
+                self._scene_number(chunk_scenes[0]),
+                self._scene_number(chunk_scenes[-1])
             ))
 
         return chunks
 
-    def _estimate_scene_duration(self, scene) -> float:
+    @staticmethod
+    def _scene_number(scene: Any) -> int:
+        """取场景序号（优先显式字段，其次从 scene_001 这类 ID 解析）"""
+        number = getattr(scene, "number", None)
+        if isinstance(number, int):
+            return number
+        match = re.search(r"(\d+)$", getattr(scene, "id", "") or "")
+        return int(match.group(1)) if match else 0
+
+    def _estimate_scene_duration(self, scene: Any) -> float:
         """估算场景时长（秒）"""
         # 基于元素数量估算
         element_count = len(getattr(scene, 'elements', []))
         return max(10.0, element_count * 4.0)  # 每个元素约4秒
 
-    def _create_chunk(self, chunk_id: int, scenes: List,
+    def _create_chunk(self, chunk_id: int, scenes: List[Any],
                       start_scene: int, end_scene: int) -> ScriptChunk:
         """创建剧本块"""
         return ScriptChunk(

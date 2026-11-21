@@ -7,6 +7,31 @@
 
 ---
 
+## [未发布] (Unreleased)
+
+### 🐛 Bug Fixes (问题修复)
+
+* **continuity:** 连续性问题均不可自动修复时记录 `unfixable_skipped` 轮次，报告状态由 `not_checked` 修正为 `continued_with_issues`，不再与“检查已执行且流程继续”的事实矛盾。
+* **reports:** `repair_history.json` 汇总质量审查阶段的修复动作，`repair_count` 与日志中的修复动作数一致；新增 `continuity_repair_count` / `quality_repair` 分列。
+* **reports:** `quality_report.json` 增加 `post_repair_score`、`repair_status`、`repair_issue_count`、`repair_action_count`，修复后复检分数不再只存在于审计明细中。
+* **tests:** 连续性节点测试补齐 `style_guardian` 与真实检查器能力，修复 5 个测试失败；索引检索测试显式包装 `LangchainEmbedding`，兼容当前 llama-index/langchain-community 版本组合。
+
+### ✨ Features (功能特性)
+
+* **continuity:** 场景/角色锚点、状态快照、跨块校验与风格漂移检测；道具结构化解析并写入场景契约。
+* **memory:** 三层记忆统一 `BaseMemoryLayer`，修复读取链路与工作流键一致性，长期记忆增加保留上限与自动清理。
+* **prompt:** 片段固定 `seed`、音频链每轮重置、剧本语言推断与音频提示词归一，支持跨剧本模板迁移。
+* **checkpoint:** 稳定 `thread_id` 与断点续跑，工作流缓存按任务隔离并回收检查点连接。
+
+### 🔧 Refactoring (重构)
+
+* **audit:** 修复参数改用确定性问题码并按真实动作结算，修复后强制复审；模型支持校验对齐能力注册表。
+* **routing:** 片段模型回写路由结果，计划场景作为首帧唯一权威，必需资产待生成时显式标记。
+
+### ✅ Tests (测试)
+
+* 新增记忆、连续性、审查、路由、检查点回归用例，覆盖快照、锚点、seed、误报与模板迁移。
+
 ## [0.4.7](https://github.com/neopen/story-shot-agent/compare/v0.4.6...v0.4.7) (2026-11-20)
 
 

@@ -18,6 +18,10 @@ from penshot.neopen.agent.continuity_guardian.appearance_anchors import (
     classify_anchor_domains,
     contains_keyword,
 )
+from penshot.neopen.agent.model_adapter.capability_registry import (
+    get_capability,
+    list_model_names,
+)
 from penshot.neopen.agent.continuity_guardian.style_anchors import (
     LIGHTING_FAMILY_MARKERS,
 )
@@ -217,23 +221,28 @@ class RuleQualityAuditor(BaseQualityAuditor):
             self._add_check(report, check_name, "passed", f"共{fragment_count}个片段")
 
     def _check_model_support(self, instructions: AIVideoInstructions, report: QualityAuditReport) -> None:
-        """检查模型支持"""
+        """检查模型支持
+
+        路由产物（如 kling_3/runway_gen4）以能力注册表为准；旧版
+        `VideoModelType` 仅作别名兜底，不能反过来把已注册模型判为不支持。
+        """
         check_name = "模型支持检查"
         unsupported_models = []
 
         for fragment in instructions.fragments:
-            if not parse_model_name(fragment.model):
-                unsupported_models.append(fragment.model)
+            model_name = str(fragment.model or "").strip()
+            if get_capability(model_name) is None and not parse_model_name(model_name):
+                unsupported_models.append(model_name)
 
         if unsupported_models:
-            unique_models = list(set(unsupported_models))
+            unique_models = list(dict.fromkeys(unsupported_models))
             self._add_violation(
                 report=report,
                 rule_type=RuleType.MODEL_UNSUPPORTED,
                 source_node=PipelineNode.CONVERT_PROMPT,
                 issue_value=f"{', '.join(unique_models)}",
                 severity=SeverityLevel.WARNING,
-                suggestion="使用支持的模型: runway_gen2, sora, pika"
+                suggestion=f"使用已注册模型: {', '.join(sorted(list_model_names()))}"
             )
             self._add_check(report, check_name, "warning", f"发现{len(unique_models)}个不支持的模型")
         else:

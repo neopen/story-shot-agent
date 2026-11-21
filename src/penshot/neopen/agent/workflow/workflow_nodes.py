@@ -43,6 +43,9 @@ from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import 
 from penshot.neopen.agent.continuity_guardian.continuity_repair_generator import (
     ContinuityRepairGenerator,
 )
+from penshot.neopen.agent.continuity_guardian.prompt_style_guardian import (
+    PromptStyleGuardian,
+)
 from penshot.neopen.agent.continuity_guardian.continuity_report import (
     MAX_REPORT_ROUNDS,
     build_repair_entries,
@@ -61,7 +64,10 @@ from penshot.neopen.agent.workflow.workflow_error_handler import (
     WorkflowErrorHandler,
     ErrorHandlerMiddleware,
 )
-from penshot.neopen.agent.workflow.workflow_memory import WorkflowMemory
+from penshot.neopen.agent.workflow.workflow_memory import (
+    WorkflowMemory,
+    unwrap_stage_stats,
+)
 from penshot.neopen.agent.workflow.workflow_models import AgentStage, PipelineNode
 from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
@@ -122,6 +128,16 @@ class WorkflowNodes:
     - 人工干预节点：暂停流程等待人工输入
     - 循环检查节点：检查节点循环次数并记录状态
     """
+
+    # 可由审计修复回路重算问题的产物阶段
+    _STAGE_REPAIR_NODES = frozenset(
+        {
+            PipelineNode.PARSE_SCRIPT,
+            PipelineNode.SEGMENT_SHOT,
+            PipelineNode.SPLIT_VIDEO,
+            PipelineNode.CONVERT_PROMPT,
+        }
+    )
 
     def __init__(
         self,
@@ -198,6 +214,10 @@ class WorkflowNodes:
         # 初始化连续性守护组件
         self.generator = ContinuityRepairGenerator()
         self.checker = ContinuityGuardianChecker()
+        # 风格守护：知识库缺少风格召回能力时自动回退到契约锚点/默认风格
+        self.style_guardian = PromptStyleGuardian(
+            self.knowledge_manager, self.embeddings
+        )
 
         # 初始化资产锚点生成智能体（M0.4.2：默认只产出声明式计划，不调用生图接口）
         self.asset_generator = AssetGeneratorAgent()
@@ -236,11 +256,15 @@ class WorkflowNodes:
             recent_strategy = self.workflow_memory.get_memory_dict(
                 "parsing_strategy_recent", level=MemoryLevel.SHORT_TERM
             )
-            historical_stats = self.workflow_memory.get_memory_dict(
-                "stats_parse_script", level=MemoryLevel.MEDIUM_TERM
+            historical_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_parse_script", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             common_issues = self.workflow_memory.get_memory_list(
-                "common_parse_issues", level=MemoryLevel.LONG_TERM, default=[]
+                "common_parse_script_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             historical_context = {
@@ -317,21 +341,15 @@ class WorkflowNodes:
             parse_issues = self.script_parser.detect_issues(
                 parsed_script, state.input.raw_script
             )
-            if parse_issues:
-                self.workflow_memory.store_short_term_memory(
-                    stage_key="parse_script_issues",
-                    result=[issue.dict() for issue in parse_issues],
-                    stats={"issue_count": len(parse_issues)},
-                    timestamp=datetime.now().isoformat(),
-                )
 
-            # 6. 保存阶段记忆（统一入口）
+            # 6. 保存阶段记忆（统一入口；问题列表随 metadata 写入 issues_* 键）
             self.workflow_memory.after_stage_completion(
                 stage="parse_script",
                 result=parsed_script,
                 metadata={
                     "repair_applied": repair_params is not None,
                     "issue_count": len(parse_issues) if parse_issues else 0,
+                    "issues": parse_issues or [],
                     "repair_params": repair_params.model_dump()
                     if repair_params
                     else None,
@@ -468,14 +486,18 @@ class WorkflowNodes:
             self._update_task_progress(state.input.task_id, TaskStage.SEGMENT_START, 0)
 
             # 1. 加载历史上下文（使用 workflow_memory）
-            historical_shot_stats = self.workflow_memory.get_memory_dict(
-                "stats_segment_shot", level=MemoryLevel.MEDIUM_TERM
+            historical_shot_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_segment_shot", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             historical_shot_issues = self.workflow_memory.get_memory_list(
                 "issues_segment_shot", level=MemoryLevel.SHORT_TERM, default=[]
             )
             common_shot_patterns = self.workflow_memory.get_memory_list(
-                "common_shot_patterns", level=MemoryLevel.LONG_TERM, default=[]
+                "common_segment_shot_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             historical_context = {
@@ -564,6 +586,7 @@ class WorkflowNodes:
                     "shot_count": len(shot_sequence.shots),
                     "shot_types": shot_types,
                     "issue_count": len(segment_issues) if segment_issues else 0,
+                    "issues": segment_issues or [],
                 },
             )
 
@@ -633,14 +656,18 @@ class WorkflowNodes:
             self._update_task_progress(state.input.task_id, TaskStage.SPLIT_START, 0)
 
             # 1. 加载历史上下文（使用 workflow_memory）
-            historical_split_stats = self.workflow_memory.get_memory_dict(
-                "stats_split_video", level=MemoryLevel.MEDIUM_TERM
+            historical_split_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_split_video", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             historical_split_issues = self.workflow_memory.get_memory_list(
                 "issues_split_video", level=MemoryLevel.SHORT_TERM, default=[]
             )
             common_split_patterns = self.workflow_memory.get_memory_list(
-                "common_split_patterns", level=MemoryLevel.LONG_TERM, default=[]
+                "common_split_video_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             historical_context = {
@@ -736,6 +763,7 @@ class WorkflowNodes:
                     "repair_applied": repair_params is not None,
                     "fragment_count": len(fragment_sequence.fragments),
                     "issue_count": len(split_issues) if split_issues else 0,
+                    "issues": split_issues or [],
                 },
             )
 
@@ -793,14 +821,18 @@ class WorkflowNodes:
                         )
 
             # 2. 加载历史上下文（使用 workflow_memory）
-            historical_convert_stats = self.workflow_memory.get_memory_dict(
-                "stats_convert_prompt", level=MemoryLevel.MEDIUM_TERM
+            historical_convert_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_convert_prompt", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             historical_convert_issues = self.workflow_memory.get_memory_list(
                 "issues_convert_prompt", level=MemoryLevel.SHORT_TERM, default=[]
             )
             successful_prompts = self.workflow_memory.get_memory_list(
-                "successful_prompt_patterns", level=MemoryLevel.LONG_TERM, default=[]
+                "successful_convert_prompt_patterns",
+                level=MemoryLevel.LONG_TERM,
+                default=[],
             )
 
             # 2.1 按角色/场景锚点召回历史成功提示词（向量检索）
@@ -946,6 +978,7 @@ class WorkflowNodes:
                     "prompt_count": len(instructions.fragments),
                     "audio_prompt_count": audio_count,
                     "issue_count": len(convert_issues) if convert_issues else 0,
+                    "issues": convert_issues or [],
                 },
             )
 
@@ -1094,11 +1127,45 @@ class WorkflowNodes:
             package_status = {
                 package.fragment_id: package.status for package in adapted_packages
             }
+            asset_status = {
+                str(asset.get("asset_id")): str(asset.get("status") or "pending")
+                for asset in (asset_plan or {}).get("assets", [])
+                if isinstance(asset, dict)
+            }
+            prompt_lookup = {
+                fragment.fragment_id: fragment
+                for fragment in instructions.fragments
+            }
+            pending_asset_decisions: List[str] = []
             for decision in plan.decisions:
                 decision.warnings = list(package_warnings.get(decision.fragment_id, []))
                 decision.status = package_status.get(decision.fragment_id, "ready")
                 decision.degraded_assets = list(
                     degraded_assets.get(decision.fragment_id, [])
+                )
+                # 片段模型以路由决策为准，避免下游读到转换器默认模型
+                prompt = prompt_lookup.get(decision.fragment_id)
+                if prompt is not None and decision.target_model:
+                    prompt.model = decision.target_model
+                # 声明图生视频但计划内必需资产尚未就绪时，状态必须如实反映，不能标记 ready
+                # 仅当资产被本计划追踪时才参与判定，无计划时不应凭空判定为缺失
+                pending_required = [
+                    str(ref.asset_id)
+                    for ref in decision.references
+                    if getattr(ref, "required", False)
+                    and str(ref.asset_id) in asset_status
+                    and asset_status[str(ref.asset_id)] not in {"ready", "generated"}
+                ]
+                if pending_required and decision.status == "ready":
+                    decision.status = "pending_assets"
+                    decision.warnings.append(
+                        f"required_assets_pending: {', '.join(pending_required)}"
+                    )
+                    pending_asset_decisions.append(decision.fragment_id)
+            if pending_asset_decisions:
+                warning(
+                    f"路由依赖资产尚未生成，已标记 pending_assets: "
+                    f"{', '.join(pending_asset_decisions)}"
                 )
             if degraded_assets:
                 info(
@@ -1320,17 +1387,10 @@ class WorkflowNodes:
                 )
                 return state
             elif time_diff < 10:
+                # 有新的修复参数说明产物已变化，必须重新审计，不能回放旧报告
                 info(
                     f"质量审查重新执行 (有新的修复参数: {list(state.domain.repair_params.keys())})"
                 )
-                last_result = self.workflow_memory.get_memory_dict(
-                    "latest_audit_result", level=MemoryLevel.SHORT_TERM
-                )
-                if last_result:
-                    report_data = last_result.get("report")
-                    if report_data:
-                        state.domain.audit_report = QualityAuditReport(**report_data)
-                        return state
 
         info(
             f"进入质量审查节点（增强版），当前阶段={state.execution.current_stage.value}"
@@ -1363,7 +1423,7 @@ class WorkflowNodes:
             "audit_results_history", level=MemoryLevel.MEDIUM_TERM, default=[]
         )
         successful_repair_patterns = self.workflow_memory.get_memory_list(
-            "repair_success_patterns", level=MemoryLevel.LONG_TERM, default=[]
+            "successful_audit_patterns", level=MemoryLevel.LONG_TERM, default=[]
         )
 
         # 构建历史上下文
@@ -1433,24 +1493,47 @@ class WorkflowNodes:
             state.domain.repair_params = result.repair_params
             state.domain.audit_timestamp = datetime.now().isoformat()
 
-            # 存储最新审查结果（使用 workflow_memory）
-            self.workflow_memory.store_short_term_memory(
-                stage_key="latest_audit_result",
-                result={
-                    "timestamp": datetime.now().isoformat(),
-                    "status": result.status.value,
-                    "score": result.score,
-                    "violations": [v.dict() for v in result.violations],
-                    "repair_params": {
-                        k: v.model_dump() for k, v in result.repair_params.items()
-                    }
-                    if result.repair_params
-                    else None,
-                    "report": result.model_dump(),
-                },
-                stats={"score": result.score, "status": result.status.value},
-                timestamp=datetime.now().isoformat(),
+            # 存储最新审查结果（使用 workflow_memory 的统一键）
+            audit_timestamp = datetime.now().isoformat()
+            audit_snapshot = {
+                "timestamp": audit_timestamp,
+                "status": result.status.value,
+                "score": result.score,
+                "violations": [v.dict() for v in result.violations],
+                "repair_params": {
+                    k: v.model_dump() for k, v in result.repair_params.items()
+                }
+                if result.repair_params
+                else None,
+                "report": result.model_dump(),
+            }
+            self.workflow_memory.store_short_term_value(
+                "latest_audit_result",
+                audit_snapshot,
+                metadata={"type": "audit_result"},
             )
+
+            # 审查历史（中期）与成功修复模式（长期），供后续任务复用
+            audit_history_entry = {
+                "timestamp": audit_timestamp,
+                "status": result.status.value,
+                "score": result.score,
+                "violation_count": len(result.violations),
+                "repair_requested": bool(result.repair_params),
+            }
+            self.workflow_memory.append_memory_value(
+                "audit_results_history",
+                audit_history_entry,
+                MemoryLevel.MEDIUM_TERM,
+                limit=50,
+            )
+            if result.score >= 80:
+                self.workflow_memory.append_memory_value(
+                    "successful_audit_patterns",
+                    audit_history_entry,
+                    MemoryLevel.LONG_TERM,
+                    limit=30,
+                )
 
             info(
                 f"审计结果汇总: 状态={result.status.value}, 分数={result.score}%, 问题统计={result.stats}"
@@ -1532,6 +1615,7 @@ class WorkflowNodes:
             # 调用各阶段修复器
             repair_issue_count = 0
             repair_actions_total = 0
+            repaired_nodes: List[PipelineNode] = []
             # 修复前快照：动作数与状态序列都只统计本轮新增，避免历史轮次重复聚合
             history_before = self._repair_history_sizes(state)
             status_history_before = self._repair_status_history_sizes(state)
@@ -1588,12 +1672,18 @@ class WorkflowNodes:
                             )
                             debug("提示词转换修复完成")
 
+                        if node in self._STAGE_REPAIR_NODES:
+                            repaired_nodes.append(node)
                     except Exception as e:
                         error(f"修复阶段 {node.value} 时出错: {str(e)}")
                         print_log_exception()
                         state.errors.error_messages.append(
                             f"修复{node.value}失败: {str(e)}"
                         )
+
+                # 修复后重算阶段问题，避免已修复问题残留在记忆中被下一轮审计反复消费
+                if repaired_nodes:
+                    self._refresh_stage_issues(state, repaired_nodes)
 
                 repair_actions_total = self._count_new_repair_actions(
                     state, history_before
@@ -1771,8 +1861,32 @@ class WorkflowNodes:
                 state.input.task_id, TaskStage.CONTINUITY_CHECKING, 50
             )
 
-            # 2. 执行连续性检查
-            check_result = self._check_continuity(continuity_context)
+            # 2. 执行连续性检查（快照 + 契约锚点 + 风格守护）
+            style_anchor = (
+                getattr(state.domain.contract, "style_anchor", None)
+                if state.domain.contract
+                else None
+            )
+            self.style_guardian.initialize_style(
+                state.domain.parsed_script, style_anchor
+            )
+            snapshot = self.checker.take_snapshot(continuity_context)
+            debug(
+                f"连续性快照已记录: {snapshot.snapshot_id}, "
+                f"累计={len(self.checker.timeline.snapshots)}"
+            )
+            check_result = self._check_continuity(
+                continuity_context, state.domain.contract
+            )
+            self.checker.check_style_drift_with_guardian(
+                continuity_context, self.style_guardian, check_result
+            )
+            check_result.metadata["snapshot"] = {
+                "snapshot_id": snapshot.snapshot_id,
+                "timestamp": snapshot.timestamp,
+                "snapshot_count": len(self.checker.timeline.snapshots),
+                "latest": self.checker.timeline.get_latest_snapshot() is not None,
+            }
 
             # 更新状态：检查完成
             self._update_task_progress(
@@ -1855,27 +1969,40 @@ class WorkflowNodes:
                 f"重试次数: {state.domain.continuity_retry_count}/{state.domain.max_continuity_retries}"
             )
 
+            # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
+            repairable_by_stage = {
+                stage: [i for i in issues if getattr(i, "auto_fixable", True)]
+                for stage, issues in issues_by_stage.items()
+            }
+            repairable_by_stage = {
+                stage: stage_issues
+                for stage, stage_issues in repairable_by_stage.items()
+                if stage_issues
+            }
+            if not repairable_by_stage:
+                # 记录本轮结论，避免报告误判为“未检查”
+                warning("连续性问题均不支持自动修复，跳过自动重试")
+                self._record_continuity_round(
+                    state,
+                    build_round_record(
+                        check_result,
+                        round_index=state.domain.continuity_retry_count + 1,
+                        retry_count=state.domain.continuity_retry_count,
+                        max_retries=state.domain.max_continuity_retries,
+                        phase="unfixable_skipped",
+                        issues_by_stage=stage_counts,
+                        contract_violations=state.domain.contract_violations,
+                    ),
+                )
+                state.domain.needs_continuity_repair = False
+                state.execution.current_stage = AgentStage.CONTINUITY
+                return state
+
             # 6. 检查重试限制
             if (
                 state.domain.continuity_retry_count
                 < state.domain.max_continuity_retries
             ):
-                # 仅对声明可自动修复的问题生成修复参数，避免无解问题反复重试
-                repairable_by_stage = {
-                    stage: [i for i in issues if getattr(i, "auto_fixable", True)]
-                    for stage, issues in issues_by_stage.items()
-                }
-                repairable_by_stage = {
-                    stage: issues
-                    for stage, issues in repairable_by_stage.items()
-                    if issues
-                }
-                if not repairable_by_stage:
-                    warning("连续性问题均不支持自动修复，跳过自动重试")
-                    state.domain.needs_continuity_repair = False
-                    state.execution.current_stage = AgentStage.CONTINUITY
-                    return state
-
                 # 7. 生成修复参数并触发重试（契约锚点驱动）
                 contract_violations_by_stage = group_violations_by_stage(
                     state.domain.contract_violations
@@ -2569,19 +2696,26 @@ class WorkflowNodes:
 
     # ======================== 连续性节点私有方法 ========================
 
-    def _check_continuity(self, context: Dict[str, Any]) -> ContinuityCheckResult:
+    def _check_continuity(
+        self, context: Dict[str, Any], contract: Any = None
+    ) -> ContinuityCheckResult:
         """
         执行连续性检查
 
         Args:
             context: 包含各阶段输出的上下文
+            contract: 全局一致性契约（存在时走契约校验主链）
 
         Returns:
             ContinuityCheckResult: 连续性检查结果对象
         """
         info("开始执行连续性检查...")
 
-        result = self.checker.check_all_continuity(context)
+        result: ContinuityCheckResult
+        if contract is not None:
+            result = self.checker.check_with_contract(context, contract)
+        else:
+            result = self.checker.check_all_continuity(context)
 
         summary = result.get_summary()
         info(
@@ -2617,7 +2751,7 @@ class WorkflowNodes:
         Returns:
             按阶段分组的问题字典
         """
-        issues_by_stage = {
+        issues_by_stage: Dict[PipelineNode, List[ContinuityIssue]] = {
             PipelineNode.PARSE_SCRIPT: [],
             PipelineNode.SEGMENT_SHOT: [],
             PipelineNode.SPLIT_VIDEO: [],
@@ -2651,14 +2785,17 @@ class WorkflowNodes:
         """
         source_mapping = {
             ContinuityIssueType.CHARACTER_MISSING: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.CHARACTER_DISAPPEAR: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.CHARACTER_APPEARANCE_CHANGE: PipelineNode.CONVERT_PROMPT,
             ContinuityIssueType.SCENE_JUMP: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.SCENE_TOO_FREQUENT: PipelineNode.SEGMENT_SHOT,
+            ContinuityIssueType.SCENE_INCONSISTENT: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.ACTION_BREAK: PipelineNode.SEGMENT_SHOT,
             ContinuityIssueType.STYLE_INCONSISTENT: PipelineNode.CONVERT_PROMPT,
             ContinuityIssueType.STYLE_SUDDEN_CHANGE: PipelineNode.CONVERT_PROMPT,
             ContinuityIssueType.TIME_GAP: PipelineNode.SPLIT_VIDEO,
             ContinuityIssueType.TIME_OVERLAP: PipelineNode.SPLIT_VIDEO,
+            ContinuityIssueType.TIME_REVERSE: PipelineNode.SPLIT_VIDEO,
             ContinuityIssueType.PROP_CHANGE: PipelineNode.PARSE_SCRIPT,
             ContinuityIssueType.PROP_DISAPPEAR: PipelineNode.PARSE_SCRIPT,
             ContinuityIssueType.PROP_APPEAR: PipelineNode.PARSE_SCRIPT,
@@ -2772,6 +2909,52 @@ class WorkflowNodes:
             name: len(metadata.get("repair_status_history") or [])
             for name, metadata in self._artifact_metadata(state).items()
         }
+
+    def _refresh_stage_issues(
+        self, state: WorkflowState, nodes: List[PipelineNode]
+    ) -> None:
+        """修复后对已重算产物重新检测问题并覆盖阶段问题记忆
+
+        审计合并的是 ``issues_<stage>`` 记忆快照；若不重算，已修复的问题会
+        在下一轮继续被消费，导致修复空转与审计循环超限。
+        """
+        detectors = {
+            PipelineNode.PARSE_SCRIPT: (
+                "parse_script",
+                lambda: self.script_parser.detect_issues(
+                    state.domain.parsed_script, state.input.raw_script
+                ),
+            ),
+            PipelineNode.SEGMENT_SHOT: (
+                "segment_shot",
+                lambda: self.shot_segmenter.detect_issues(
+                    state.domain.shot_sequence, state.domain.parsed_script
+                ),
+            ),
+            PipelineNode.SPLIT_VIDEO: (
+                "split_video",
+                lambda: self.video_splitter.detect_issues(
+                    state.domain.fragment_sequence, state.domain.shot_sequence
+                ),
+            ),
+            PipelineNode.CONVERT_PROMPT: (
+                "convert_prompt",
+                lambda: self.prompt_converter.detect_issues(
+                    state.domain.instructions, state.domain.fragment_sequence
+                ),
+            ),
+        }
+        for node in nodes:
+            detector = detectors.get(node)
+            if detector is None:
+                continue
+            stage_key, detect = detector
+            try:
+                issues = detect() or []
+                self.workflow_memory.store_stage_issues(stage_key, issues)
+                debug(f"修复后重算阶段问题: {stage_key}, 剩余{len(issues)}个")
+            except Exception as e:
+                warning(f"修复后重算阶段问题失败: {stage_key}, {e}")
 
     def _count_new_repair_actions(
         self, state: WorkflowState, history_before: Dict[str, int]

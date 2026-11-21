@@ -147,7 +147,7 @@ class RunwayGen4Adapter(BaseModelAdapter):
         return f"camera: {camera['shot_type']}, {camera['motion']}"
 
     def build_model_config(self, prompt: AIVideoPrompt) -> Dict[str, Any]:
-        return {"aspect_ratio": "16:9", "motion_scale": 1.0, "seed": None}
+        return {"aspect_ratio": "16:9", "motion_scale": 1.0, "seed": prompt.seed}
 
 
 class Kling3Adapter(BaseModelAdapter):
@@ -175,6 +175,7 @@ class Kling3Adapter(BaseModelAdapter):
             "aspect_ratio": "16:9",
             "negative_prompt": True,
             "camera_control": True,
+            "seed": prompt.seed,
         }
 
 
@@ -193,7 +194,12 @@ class LumaDreamAdapter(BaseModelAdapter):
         return f"[{camera['shot_type']}] [{camera['motion']}]"
 
     def build_model_config(self, prompt: AIVideoPrompt) -> Dict[str, Any]:
-        return {"resolution": "720p", "aspect_ratio": "16:9", "loop": False}
+        return {
+            "resolution": "720p",
+            "aspect_ratio": "16:9",
+            "loop": False,
+            "seed": prompt.seed,
+        }
 
 
 class Sora2Adapter(BaseModelAdapter):
@@ -212,7 +218,12 @@ class Sora2Adapter(BaseModelAdapter):
         return f"Shot type: {camera['shot_type']}. Camera movement: {camera['motion']}."
 
     def build_model_config(self, prompt: AIVideoPrompt) -> Dict[str, Any]:
-        return {"resolution": "1080p", "text_rendering": True, "negative_prompt": False}
+        return {
+            "resolution": "1080p",
+            "text_rendering": True,
+            "negative_prompt": False,
+            "seed": prompt.seed,
+        }
 
 
 class Pika2Adapter(BaseModelAdapter):
@@ -236,4 +247,5 @@ class Pika2Adapter(BaseModelAdapter):
             "guidance_scale": 12,
             "negative_prompt": True,
             "frame_rate": 24,
+            "seed": prompt.seed,
         }

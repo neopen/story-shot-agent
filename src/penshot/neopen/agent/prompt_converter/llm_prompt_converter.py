@@ -88,6 +88,9 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
         # === 构建全局元素映射 ===
         self._build_element_map()
 
+        # 转换器实例会跨轮复用，音频链必须从本轮首片段重新开始
+        self.last_audio_id = None
+
         prompts = []
         project_info = {
             "title": fragment_sequence.source_info.get("title", "AI视频项目"),
@@ -440,6 +443,7 @@ class LLMPromptConverter(BasePromptConverter, BaseLLMAgent):
             main_character=fragment.continuity_notes.get("main_character", ""),
             negative_prompt=result.get("negative_prompt", self.config.default_negative_prompt),
             duration=fragment.duration,
+            seed=self.config.video_seed,
             model=self.config.video_model,
             style=result.get("style_hint"),
             audio=audio,

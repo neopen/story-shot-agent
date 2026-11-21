@@ -197,16 +197,22 @@ class BaseRepairableAgent(BaseAgent, Generic[T, K]):
         """
         historical_stats = historical_context.get("historical_stats")
 
-        # 安全处理 historical_stats
-        if historical_stats is None:
+        # 无历史统计时不能按 0 分判定为 poor，否则每次首轮都会误开增强验证
+        if not historical_stats:
             self._historical_insights["stats"] = {}
             return
 
         historical_stats = self._safe_get_dict(historical_stats, {})
 
         self._historical_insights["stats"] = historical_stats
+        if not historical_stats:
+            return
 
-        # 提取关键指标 - 安全获取 parsing_confidence
+        # 仅解析阶段统计带 completeness_score；分镜/切片/提示词统计没有该字段，
+        # 不能默认 0 分误判为 poor 并每轮开启增强验证
+        if "completeness_score" not in historical_stats:
+            return
+
         avg_completeness = historical_stats.get("completeness_score", 0)
         parsing_confidence = historical_stats.get("parsing_confidence", {})
         parsing_confidence = self._safe_get_dict(parsing_confidence, {})

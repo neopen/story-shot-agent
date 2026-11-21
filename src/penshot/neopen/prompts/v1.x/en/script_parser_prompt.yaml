@@ -53,6 +53,7 @@ script_parser_system:
                 "character": "character name (must match characters[].name)",
                 "target_character": "target character name (must match characters[].name) or null",
                 "description": "visual description for this element (actions, expressions, shot details)",
+                "prop_object": "name of the prop held or operated by the character in this element (must come from key_props or be explicit in the source text; null if none)",
                 "intensity": 0.0-1.0,
                 "emotion": "neutral/happy/sad/angry/fear/surprise/disgust/anxious/calm/tender",
                 "audio_context": {{

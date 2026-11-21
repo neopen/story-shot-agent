@@ -19,11 +19,12 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableLambda
 
 from penshot.logger import debug, warning, info, error
+from penshot.neopen.knowledge.memory.base_memory_layer import BaseMemoryLayer
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig
 from penshot.neopen.knowledge.memory.redis_chat_history import RedisChatMessageHistory
 
 
-class ShortTermMemory:
+class ShortTermMemory(BaseMemoryLayer):
     """
     短期记忆 - 基于LangChain的缓冲记忆
 
@@ -33,6 +34,8 @@ class ShortTermMemory:
     - 内存缓冲区也按剧本隔离
     """
 
+    backend_type = "short_term"
+
     def __init__(self, config: MemoryConfig, script_id: str):
         """
         初始化短期记忆
@@ -41,8 +44,7 @@ class ShortTermMemory:
             config: 记忆配置
             script_id: 剧本ID，用于数据隔离
         """
-        self.config = config
-        self.script_id = script_id
+        super().__init__(config, script_id)
         self.max_size = config.short_term_size
 
         # 为当前剧本生成唯一的 session_id
@@ -61,12 +63,17 @@ class ShortTermMemory:
         # 创建带记忆的链
         self.memory = self._create_memory_chain()
 
+        # KV 持久化路径（与消息缓冲互补，供 MemoryManager.get 使用）
+        self._kv_path: Optional[Path] = None
+
         # 文件持久化路径（Redis 不可用时使用）
         self._persist_path = None
         if not self._redis_available and config.term_persist_path:
             self._persist_path = Path(config.term_persist_path) / script_id / "short_term.json"
             self._persist_path.parent.mkdir(parents=True, exist_ok=True)
+            self._kv_path = self._persist_path.parent / "short_term_kv.json"
             self._load_from_file()
+            self._key_values = self._load_json_dict(self._kv_path)
 
         info(f"初始化短期记忆: script={script_id}, session_id={self._session_id}, "
              f"size={config.short_term_size}, redis_enabled={self._redis_available}")
@@ -180,10 +187,16 @@ class ShortTermMemory:
         """
         debug(f"短期记忆添加: script={self.script_id}, input={input_text[:50]}...")
 
+        # 按 input_text 作为 key 同步写入 KV，保证 MemoryManager.get 可按 key 命中
+        self.set_value(input_text, output_text)
+
+        entry_metadata = dict(metadata or {})
+        entry_metadata.setdefault("key", input_text)
+
         self.memory.invoke({
             "input": input_text,
             "output": output_text,
-            "metadata": metadata or {},
+            "metadata": entry_metadata,
             "session_id": self._session_id
         })
         debug(f"短期记忆当前大小: {len(self._message_buffer)}")
@@ -279,8 +292,8 @@ class ShortTermMemory:
             warning(f"获取所有消息失败: {e}")
             return []
 
-    def clear(self) -> None:
-        """清空当前剧本的记忆"""
+    def _clear_backend(self) -> None:
+        """清理短期记忆的消息缓冲与会话历史"""
         try:
             if self._session_id in self._session_histories:
                 history = self._session_histories[self._session_id]
@@ -294,8 +307,10 @@ class ShortTermMemory:
         except Exception as e:
             warning(f"清空记忆失败: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
-        """获取统计信息 - 修复版"""
+    def _delete_kv_file(self) -> None:
+        self._delete_file(self._kv_path)
+
+    def _extra_stats(self) -> Dict[str, Any]:
         # 确保从正确的来源获取计数
         buffer_count = len(self._message_buffer)
 
@@ -310,8 +325,6 @@ class ShortTermMemory:
                 debug(f"从 Redis 获取计数失败: {e}")
 
         return {
-            "type": "short_term",
-            "script_id": self.script_id,
             "session_id": self._session_id,
             "message_count": buffer_count,  # 确保正确返回
             "max_size": self.max_size,
@@ -365,3 +378,7 @@ class ShortTermMemory:
             info(f"从文件加载短期记忆: {len(data)} 条")
         except Exception as e:
             warning(f"加载短期记忆文件失败: {e}")
+
+    def _persist(self) -> None:
+        """持久化按 key 的短期记忆（无持久化路径时仅保留在内存）"""
+        self._save_json_dict(self._kv_path, self._key_values)

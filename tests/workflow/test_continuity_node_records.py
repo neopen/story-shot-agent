@@ -3,6 +3,9 @@
 验证节点把每轮检查与修复动作写入 State，并可供报告直接消费。
 """
 
+from penshot.neopen.agent.continuity_guardian.continuity_guardian_checker import (
+    ContinuityGuardianChecker,
+)
 from penshot.neopen.agent.continuity_guardian.continuity_guardian_models import (
     ContinuityCheckResult,
     ContinuityIssue,
@@ -15,15 +18,19 @@ from penshot.neopen.agent.continuity_guardian.continuity_repair_generator import
 from penshot.neopen.agent.continuity_guardian.continuity_report import (
     build_continuity_report,
 )
+from penshot.neopen.agent.continuity_guardian.prompt_style_guardian import (
+    PromptStyleGuardian,
+)
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.agent.workflow.workflow_nodes import WorkflowNodes
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
 
 
-class _FakeChecker:
-    """固定返回指定检查结果的连续性检查器"""
+class _FakeChecker(ContinuityGuardianChecker):
+    """固定返回指定检查结果的连续性检查器（保留快照等真实能力）"""
 
     def __init__(self, result: ContinuityCheckResult):
+        super().__init__()
         self.result = result
 
     def check_all_continuity(self, context):
@@ -36,6 +43,7 @@ def _nodes(result: ContinuityCheckResult) -> WorkflowNodes:
     nodes = object.__new__(WorkflowNodes)
     nodes.checker = _FakeChecker(result)
     nodes.generator = ContinuityRepairGenerator()
+    nodes.style_guardian = PromptStyleGuardian(None, None)
     nodes.knowledge_manager = None
     nodes.task_manager = None
     return nodes
@@ -58,6 +66,15 @@ def _failed_result() -> ContinuityCheckResult:
     """构造包含一个问题的检查结果"""
     result = ContinuityCheckResult()
     result.add_issue(_issue())
+    return result
+
+
+def _unfixable_result() -> ContinuityCheckResult:
+    """构造仅含不可自动修复问题的检查结果"""
+    result = ContinuityCheckResult()
+    issue = _issue()
+    issue.auto_fixable = False
+    result.add_issue(issue)
     return result
 
 
@@ -90,6 +107,20 @@ def test_continuity_node_records_repair_round():
     assert state.domain.needs_continuity_repair is True
     assert state.execution.current_node == PipelineNode.CONVERT_PROMPT
     assert state.domain.repair_params[PipelineNode.CONVERT_PROMPT].fix_needed is True
+
+
+def test_continuity_node_records_unfixable_round():
+    """问题不可自动修复时记录跳过轮次且不转人工"""
+    nodes = _nodes(_unfixable_result())
+    state = WorkflowState.from_raw_script("测试剧本")
+
+    nodes.continuity_check_node(state)
+
+    record = state.domain.continuity_rounds[-1]
+    assert record["phase"] == "unfixable_skipped"
+    assert state.domain.needs_continuity_repair is False
+    assert state.execution.needs_human_review is False
+    assert state.domain.continuity_retry_count == 0
 
 
 def test_continuity_node_records_retry_exhausted_round():

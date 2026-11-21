@@ -209,6 +209,8 @@ def test_audit_node_marks_manual_required_when_no_auto_strategy():
     nodes.workflow_memory = SimpleNamespace(
         get_memory_list=lambda *args, **kwargs: [],
         store_short_term_memory=lambda *args, **kwargs: None,
+        store_short_term_value=lambda *args, **kwargs: None,
+        append_memory_value=lambda *args, **kwargs: [],
     )
     nodes.quality_auditor = SimpleNamespace(
         qa_process=lambda *args, **kwargs: report,

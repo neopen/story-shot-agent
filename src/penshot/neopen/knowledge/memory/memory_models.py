@@ -45,11 +45,12 @@ class MemoryConfig:
     long_term_enabled: bool = True
     long_term_k: int = 3
     long_term_score_threshold: float = 0.7
+    long_term_max_documents: int = 500  # 向量库保留上限，超出后清理最旧记录
 
     # 嵌入模型配置
-    embeddings: Embeddings = None
+    embeddings: Optional[Embeddings] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """未显式提供嵌入模型时复用统一嵌入工厂，避免再初始化一套无关的模型"""
         if not self.embeddings:
             try:

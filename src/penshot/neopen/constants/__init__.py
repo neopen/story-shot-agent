@@ -5,6 +5,7 @@
 - ``rag``：检索与向量索引默认参数
 - ``character``：角色相关词表（如非角色占位词）
 - ``appearance``：角色外观词表（按语言分组）
+- ``continuity``：连续性检查词表与阈值（按语言分组）
 """
 
 from penshot.neopen.constants.appearance import (
@@ -22,6 +23,17 @@ from penshot.neopen.constants.character import (
     NON_CHARACTER_NAMES_EN,
     NON_CHARACTER_NAMES_ZH,
 )
+from penshot.neopen.constants.continuity import (
+    ACTION_SYNONYM_GROUPS,
+    ACTION_SYNONYM_GROUPS_ZH,
+    CROSS_CHUNK_SCENE_THRESHOLD,
+    HOLDING_VERBS,
+    HOLDING_VERBS_ZH,
+    PROP_OBJECT_PATTERN_TEMPLATES,
+    get_action_synonym_groups,
+    get_holding_verbs,
+    get_prop_object_pattern_template,
+)
 from penshot.neopen.constants.rag import (
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
@@ -35,8 +47,17 @@ from penshot.neopen.constants.schema import CONTRACT_SCHEMA_VERSION
 __all__ = [
     "ACCESSORY_KEYWORDS",
     "ACCESSORY_ONLY_KEYWORDS",
+    "ACTION_SYNONYM_GROUPS",
+    "ACTION_SYNONYM_GROUPS_ZH",
     "BODY_KEYWORDS",
     "CONTRACT_SCHEMA_VERSION",
+    "CROSS_CHUNK_SCENE_THRESHOLD",
+    "HOLDING_VERBS",
+    "HOLDING_VERBS_ZH",
+    "PROP_OBJECT_PATTERN_TEMPLATES",
+    "get_action_synonym_groups",
+    "get_holding_verbs",
+    "get_prop_object_pattern_template",
     "DEFAULT_CHUNK_OVERLAP",
     "DEFAULT_CHUNK_SIZE",
     "EXCLUDE_KEYWORDS",

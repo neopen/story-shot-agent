@@ -123,8 +123,8 @@ class TaskManager:
         return self.lifecycle_service.get_workflow(script_id, task_id, config)
 
     def clear_workflow_cache(self):
-        """清理工作流缓存"""
-        cache_size = self.workflow_registry.clear()
+        """清理工作流缓存（同时释放各工作流持有的检查点连接）"""
+        cache_size = self.workflow_registry.clear(close_workflows=True)
         info(f"清理工作流缓存，共清理 {cache_size} 项")
 
     def get_cached_workflow_keys(self) -> List[str]:

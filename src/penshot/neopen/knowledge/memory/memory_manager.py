@@ -19,6 +19,9 @@ from penshot.neopen.knowledge.memory.memory_context import MemoryContext
 from penshot.neopen.knowledge.memory.memory_models import MemoryConfig, MemoryLevel
 from penshot.neopen.knowledge.memory.script_memory import ScriptMemory
 
+# 区分“键不存在”和“值为 None”
+_MISSING = object()
+
 
 class MemoryManager:
     """全局记忆管理器 - 统一记忆检索接口"""
@@ -143,19 +146,13 @@ class MemoryManager:
         Returns:
             记忆值（已反序列化）
         """
-        context = self.recall(key, level=level, script_id=script_id)
+        script = self.get_script(script_id)
+        value = self._get_layer_value(script, key, level)
 
-        if level == MemoryLevel.SHORT_TERM:
-            if context.short_term:
-                return context.short_term[-1].get("output", default)
+        if value is _MISSING:
             return default
-        elif level == MemoryLevel.MEDIUM_TERM:
-            return context.medium_term if context.medium_term else default
-        elif level == MemoryLevel.LONG_TERM:
-            if context.long_term:
-                return context.long_term[-1].get("content", default)
-            return default
-        return default
+
+        return self._deserialize_value(value)
 
     def get_list(self, key: str, level: MemoryLevel = MemoryLevel.SHORT_TERM,
                  script_id: Optional[str] = None) -> List[Any]:
@@ -170,17 +167,18 @@ class MemoryManager:
         Returns:
             记忆值列表（已反序列化）
         """
-        context = self.recall(key, level=level, script_id=script_id)
+        script = self.get_script(script_id)
+        value = self._get_layer_value(script, key, level)
 
-        if level == MemoryLevel.SHORT_TERM:
-            if context.short_term:
-                return [item.get("output") for item in context.short_term if item.get("output")]
+        if value is _MISSING:
             return []
-        elif level == MemoryLevel.LONG_TERM:
-            if context.long_term:
-                return [item.get("content") for item in context.long_term if item.get("content")]
+
+        value = self._deserialize_value(value)
+        if isinstance(value, list):
+            return value
+        if value in (None, "", {}, ()):
             return []
-        return []
+        return [value]
 
     def get_latest(self, key: str, level: MemoryLevel = MemoryLevel.SHORT_TERM,
                    default: Any = None, script_id: Optional[str] = None) -> Any:
@@ -198,7 +196,7 @@ class MemoryManager:
         if isinstance(value, str):
             try:
                 return json.loads(value)
-            except:
+            except (json.JSONDecodeError, TypeError):
                 return value
         return value
 
@@ -224,16 +222,8 @@ class MemoryManager:
         Returns:
             是否存在
         """
-        if level == MemoryLevel.SHORT_TERM:
-            context = self.recall(key, level=level, script_id=script_id)
-            return bool(context.short_term)
-        elif level == MemoryLevel.MEDIUM_TERM:
-            context = self.recall(key, level=level, script_id=script_id)
-            return bool(context.medium_term)
-        elif level == MemoryLevel.LONG_TERM:
-            context = self.recall(key, level=level, script_id=script_id)
-            return bool(context.long_term)
-        return False
+        script = self.get_script(script_id)
+        return self._get_layer_value(script, key, level) is not _MISSING
 
     def count(self, key: str, level: MemoryLevel = MemoryLevel.SHORT_TERM,
               script_id: Optional[str] = None) -> int:
@@ -248,13 +238,16 @@ class MemoryManager:
         Returns:
             记忆数量
         """
-        if level == MemoryLevel.SHORT_TERM:
-            context = self.recall(key, level=level, script_id=script_id)
-            return len(context.short_term)
-        elif level == MemoryLevel.LONG_TERM:
-            context = self.recall(key, level=level, script_id=script_id)
-            return len(context.long_term)
-        return 0
+        script = self.get_script(script_id)
+        value = self._get_layer_value(script, key, level)
+        if value is _MISSING:
+            return 0
+        value = self._deserialize_value(value)
+        if isinstance(value, list):
+            return len(value)
+        if value in (None, "", {}, ()):
+            return 0
+        return 1
 
     # ===================== 语义搜索接口 =====================
 
@@ -340,6 +333,28 @@ class MemoryManager:
         info("清空所有记忆")
 
     # ===================== 私有辅助方法 =====================
+    def _get_layer_value(self, script: ScriptMemory, key: str, level: MemoryLevel) -> Any:
+        """按记忆级别从对应层的 KV 精确取值，未命中返回 _MISSING"""
+        if level == MemoryLevel.SHORT_TERM:
+            return script.short_term.get_value(key, _MISSING)
+        if level == MemoryLevel.MEDIUM_TERM:
+            return script.medium_term.get_value(key, _MISSING)
+        if level == MemoryLevel.LONG_TERM:
+            if script.long_term is None:
+                return _MISSING
+            return script.long_term.get_value(key, _MISSING)
+        return _MISSING
+
+    @staticmethod
+    def _deserialize_value(value: Any) -> Any:
+        """KV 中以 JSON 字符串保存的复合值在此恢复为对象"""
+        if isinstance(value, str) and value.startswith(("{", "[")):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        return value
+
     def _deserialize(self, value: str, metadata: Dict = None) -> Any:
         """反序列化记忆值"""
         if not value:

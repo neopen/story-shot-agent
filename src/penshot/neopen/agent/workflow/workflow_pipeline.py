@@ -19,7 +19,7 @@ from penshot.logger import debug, error, info, warning
 from penshot.neopen.agent.script_parser_agent import ScriptParserAgent
 from penshot.utils.log_utils import print_log_exception
 from penshot.utils.obj_utils import to_dict
-from .workflow_checkpointer import create_checkpointer
+from .workflow_checkpointer import create_checkpointer, release_checkpointer
 from .workflow_decision import PipelineDecision
 from .workflow_models import AgentStage, PipelineNode, PipelineState
 from .workflow_nodes import WorkflowNodes
@@ -36,10 +36,16 @@ from ...shot_config import ShotConfig
 class MultiAgentPipeline:
     """多智能体协作流程"""
 
-    def __init__(self, script_id, task_id, config: ShotConfig, task_manager):
+    def __init__(
+        self,
+        script_id: str,
+        task_id: str,
+        config: ShotConfig,
+        task_manager: Any,
+    ) -> None:
         """
         初始化多智能体流程
-        
+
         Args:
             script_id: 剧本ID
             config: 用户配置（LLM）
@@ -55,7 +61,7 @@ class MultiAgentPipeline:
         self._init_agents()
         self.workflow = self._build_workflow()
 
-    def _init_agents(self):
+    def _init_agents(self) -> None:
         """初始化各个智能体"""
         debug("初始化智能体组件")
 
@@ -82,7 +88,7 @@ class MultiAgentPipeline:
         # 初始化修复器
         self.output_fixer = WorkflowOutputFixer()
 
-    def _build_workflow(self):
+    def _build_workflow(self) -> Any:
         """使用 WorkflowOrchestrator 初始化基于LangGraph的工作流"""
         debug("使用 WorkflowOrchestrator 初始化LangGraph工作流")
 
@@ -311,7 +317,10 @@ class MultiAgentPipeline:
 
         # 编译工作流（添加记忆器）
         saver = self.checkpointer.get_saver()
-        compiled_graph = orchestrator.graph.compile(checkpointer=saver)
+        graph = orchestrator.graph
+        if graph is None:
+            raise RuntimeError("工作流图尚未构建")
+        compiled_graph = graph.compile(checkpointer=saver)
         debug("工作流构建完成")
 
         return compiled_graph
@@ -362,11 +371,19 @@ class MultiAgentPipeline:
         initial_state.execution.global_loop_exceeded = config.global_loop_exceeded
         initial_state.execution.loop_warning_issued = config.loop_warning_issued
 
+        # 同一任务使用稳定的 thread_id，避免每次运行写入全新时间线
+        workflow_config = self.checkpointer.get_config()
+        resume = self._has_resumable_state(workflow_config)
+        if resume:
+            info(f"检测到未完成的检查点，任务 {self.task_id} 将从最近快照继续执行")
+
         try:
             # 执行工作流
             debug(f"调用 workflow invoke()，任务ID: {self.task_id}")
 
-            final_result = await self._enhanced_workflow_execution(initial_state)
+            final_result = await self._enhanced_workflow_execution(
+                initial_state, workflow_config, resume
+            )
 
             # 处理返回结果
             success = final_result.get("success", False)
@@ -396,7 +413,36 @@ class MultiAgentPipeline:
                 "workflow_status": "exception"
             }
 
-    def _get_completed_stages(self, state) -> dict[str, Any]:
+        finally:
+            # 任务收尾时按配置清理旧检查点文件（跳过仍在使用的实例）
+            await self._cleanup_checkpoints(config)
+
+    def _has_resumable_state(self, workflow_config: Dict[str, Any]) -> bool:
+        """判断当前任务是否存在可续跑的检查点（最近快照仍有未执行的 next 节点）"""
+        try:
+            snapshot = self.workflow.get_state(workflow_config)
+        except Exception as e:
+            debug(f"读取检查点状态失败: {e}")
+            return False
+
+        return bool(getattr(snapshot, "next", None))
+
+    async def _cleanup_checkpoints(self, config: ShotConfig) -> None:
+        """清理超出保留数量的旧检查点文件"""
+        try:
+            keep_count = getattr(config, "max_checkpoints_per_script", 10)
+            await asyncio.to_thread(self.checkpointer.cleanup_old_checkpoints, keep_count)
+        except Exception as e:
+            warning(f"清理旧检查点失败: {e}")
+
+    def close(self) -> None:
+        """释放管线持有的检查点连接（缓存淘汰或服务关闭时调用）"""
+        try:
+            release_checkpointer(self.script_id, self.task_id)
+        except Exception as e:
+            warning(f"关闭检查点失败: {e}")
+
+    def _get_completed_stages(self, state: Any) -> dict[str, Any]:
         """获取已完成的阶段列表和统计信息（支持字典和对象输入）"""
         try:
             if isinstance(state, dict):
@@ -569,7 +615,7 @@ class MultiAgentPipeline:
             print_log_exception()
             return False
 
-    def _validate_final_output(self, data: Dict[str, Any]):
+    def _validate_final_output(self, data: Dict[str, Any]) -> None:
         """验证最终输出"""
         try:
             if not isinstance(data, dict):
@@ -584,9 +630,6 @@ class MultiAgentPipeline:
 
                 if len(fragments) == shot_count and shot_count > 0:
                     info(f"片段数({len(fragments)})等于镜头数({shot_count})，没有分割记录")
-
-                    metadata = fragment_sequence.get("metadata", {})
-                    ai_split_count = metadata.get("ai_split_count", 0)
         except Exception as e:
             error(f"验证最终输出时出错: {str(e)}")
 
@@ -663,7 +706,6 @@ class MultiAgentPipeline:
             shot_count = source_info.get("shot_count", 0)
 
             # 检查统计是否正确
-            current_fragment_count = len(fragments)
             current_stats = fragment_sequence.get("stats", {})
 
             # 统一提取片段 metadata（兼容字典与对象两种形态）
@@ -701,7 +743,12 @@ class MultiAgentPipeline:
             error(f"验证片段统计时出错: {str(e)}")
             return data
 
-    async def _enhanced_workflow_execution(self, initial_state: WorkflowState) -> Dict[str, Any]:
+    async def _enhanced_workflow_execution(
+        self,
+        initial_state: WorkflowState,
+        workflow_config: Optional[Dict[str, Any]] = None,
+        resume: bool = False,
+    ) -> Dict[str, Any]:
         """增强的工作流执行方法（添加统计修复）"""
         debug("开始增强的工作流执行...")
 
@@ -716,7 +763,9 @@ class MultiAgentPipeline:
             final_result = await asyncio.wait_for(
                 self.output_fixer.enhanced_workflow_invoke(
                     self.workflow,
-                    initial_state
+                    initial_state,
+                    config=workflow_config,
+                    resume=resume,
                 ),
                 timeout=timeout
             )
@@ -728,7 +777,8 @@ class MultiAgentPipeline:
             if not self._validate_fixed_result(final_result):
                 warning("工作流输出修复验证有问题，但继续返回结果")
 
-            return self.output_fixer.parse_result_to_dict(final_result)
+            parsed_result = self.output_fixer.parse_result_to_dict(final_result)
+            return parsed_result if parsed_result is not None else final_result
 
         except asyncio.TimeoutError:
             error(f"工作流执行超时: {timeout}秒")
@@ -748,10 +798,10 @@ class MultiAgentPipeline:
 
             warning("尝试原始workflow调用作为回退...")
             try:
-                # raw_state = await self.workflow.ainvoke(
-                raw_state = self.workflow.invoke(
-                    initial_state,
-                    config={"configurable": {"thread_id": f"process_{id(initial_state)}"}}
+                # 同步 SqliteSaver 不支持 ainvoke，放到线程池执行
+                raw_input = None if resume else initial_state
+                raw_state = await asyncio.to_thread(
+                    self.workflow.invoke, raw_input, workflow_config
                 )
 
                 result = self._convert_raw_state_to_result(raw_state, initial_state)

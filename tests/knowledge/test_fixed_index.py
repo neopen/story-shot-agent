@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.embeddings.langchain import LangchainEmbedding
 
 from penshot.neopen.knowledge.llamaIndex.llama_index_knowledge import ScriptKnowledgeBase
 from penshot.neopen.shot_config import ShotConfig
@@ -32,6 +33,9 @@ pytestmark = pytest.mark.skipif(
 async def test_fixed():
     config = ShotConfig()
     embeddings = config.get_embed_by_config()
+    # 当前 llama-index 的 langchain 桥接与已装 langchain-community 版本不兼容，
+    # resolve_embed_model 无法自动识别 LangChain Embeddings，需显式包装
+    index_embeddings = LangchainEmbedding(embeddings)
     script_id = "SN1780745829485283341820"
 
     print("=" * 60)
@@ -42,9 +46,7 @@ async def test_fixed():
     script_dir = INDEX_DIR
     storage_context = StorageContext.from_defaults(persist_dir=str(script_dir))
     index = VectorStoreIndex(
-        nodes=[],
-        storage_context=storage_context,
-        embed_model=embeddings
+        nodes=[], storage_context=storage_context, embed_model=index_embeddings
     )
 
     # 不设阈值

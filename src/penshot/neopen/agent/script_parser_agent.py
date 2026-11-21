@@ -59,6 +59,23 @@ def _scene_characters(scene: SceneInfo) -> List[str]:
     return names
 
 
+def _scene_props_index(global_metadata: object) -> Dict[str, Dict[str, str]]:
+    """把 global_metadata.key_props 归一化为“场景ID -> {道具名: 状态}”"""
+    index: Dict[str, Dict[str, str]] = {}
+    for prop in getattr(global_metadata, "key_props", None) or []:
+        name = str(getattr(prop, "name", "") or "").strip()
+        if not name:
+            continue
+        state = str(
+            getattr(prop, "description", "")
+            or getattr(prop, "color", "")
+            or "present"
+        ).strip()
+        for scene_id in getattr(prop, "appears_in", None) or []:
+            index.setdefault(str(scene_id), {})[name] = state
+    return index
+
+
 def _character_outfit_index(global_metadata: object) -> Dict[str, Dict[str, str]]:
     """把 global_metadata.character_outfits 归一化为“角色名 -> 结构化服装”
 
@@ -104,19 +121,31 @@ def build_contract_from_parsed(
             task_id=script_id or f"task_{int(time.time())}",
         )
 
+    # 全局元数据：道具用于场景契约，服装用于外观锚点
+    global_metadata = getattr(parsed_script, "global_metadata", None)
+    props_index = _scene_props_index(global_metadata)
+
     # 从解析结果填充契约（适配当前 SceneInfo / ParsedScript 模型）
     for index, scene in enumerate(parsed_script.scenes, start=1):
+        scene_id = getattr(scene, "id", "")
+        # 全局关键道具 + 元素级结构化道具都进入场景道具表
+        scene_props = dict(props_index.get(scene_id, {}))
+        for element in getattr(scene, "elements", None) or []:
+            prop_object = getattr(element, "prop_object", None)
+            if prop_object:
+                scene_props.setdefault(prop_object, "present")
         scene_contract = SceneContract(
             scene_num=_scene_number(scene, index),
             location=getattr(scene, "location", None) or "unknown",
             time_of_day=getattr(scene, "time_of_day", None) or "day",
+            weather=getattr(scene, "weather", None) or "clear",
             characters_in_scene=_scene_characters(scene),
+            props_in_scene=scene_props,
             main_emotion="neutral",
         )
         contract.register_scene(scene_contract)
 
     # 结构化服装按角色建索引，供外观锚点优先使用
-    global_metadata = getattr(parsed_script, "global_metadata", None)
     outfit_index = _character_outfit_index(global_metadata)
 
     # 从角色描述中提取外观锚点，统一驱动后续片段中的角色外观

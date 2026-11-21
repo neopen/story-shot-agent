@@ -16,13 +16,13 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 try:
     from langgraph.checkpoint.sqlite import SqliteSaver
 except ImportError:
     # langgraph-checkpoint-sqlite 未安装时优雅降级：SQLite 模式自动回退为内存模式
-    SqliteSaver = None
+    SqliteSaver = None  # type: ignore[assignment,misc]
 
 from penshot.logger import debug, info, warning
 from penshot.neopen.shot_config import ShotConfig
@@ -32,6 +32,11 @@ class CheckpointMode(str, Enum):
     """检查点存储模式"""
     MEMORY = "memory"   # 内存模式（开发测试）
     SQLITE = "sqlite"   # SQLite 模式（本地生产）
+
+
+def _normalize_path(path: str) -> str:
+    """统一路径大小写与分隔符，供活跃文件比较使用"""
+    return os.path.normcase(os.path.abspath(path))
 
 
 @dataclass
@@ -91,8 +96,8 @@ class WorkflowCheckpointer:
         # 确定存储模式
         self.mode = self._determine_mode()
         self.db_path: Optional[str] = None
-        self._saver = None
-        self._conn = None
+        self._saver: Any = None
+        self._conn: Optional[sqlite3.Connection] = None
 
         # 设置存储路径
         self._setup_storage()
@@ -108,38 +113,44 @@ class WorkflowCheckpointer:
         info(f"检查点管理器初始化: {script_id}/{task_id}, mode={self.mode.value}")
 
     def _determine_mode(self) -> CheckpointMode:
-        """确定存储模式"""
-        mode = getattr(self.config, 'checkpoint_mode', 'auto')
+        """确定存储模式（非法取值统一回退为 auto）"""
+        raw_mode = getattr(self.config, 'checkpoint_mode', 'auto')
+        mode = raw_mode.value if isinstance(raw_mode, CheckpointMode) else str(raw_mode).lower()
+
+        if mode not in ('auto', 'memory', 'sqlite'):
+            warning(f"未知的检查点模式: {raw_mode}，回退为 auto")
+            mode = 'auto'
 
         if mode == 'memory':
             return CheckpointMode.MEMORY
 
-        elif mode == 'sqlite':
+        # 依赖缺失时提前回退，避免 mode 显示为 sqlite 但实际使用 MemorySaver
+        if SqliteSaver is None:
+            warning("langgraph-checkpoint-sqlite 未安装，检查点降级为内存模式")
+            return CheckpointMode.MEMORY
+
+        # auto 或 sqlite：先探测目录可写性，失败则降级到内存
+        try:
+            checkpoint_dir = getattr(self.config, 'checkpoint_dir', None) or 'data/checkpoints'
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            test_path = os.path.join(checkpoint_dir, '.write_test')
+            with open(test_path, 'w') as f:
+                f.write('test')
+            os.remove(test_path)
             return CheckpointMode.SQLITE
+        except Exception:
+            warning("SQLite 不可用，降级到内存模式")
+            return CheckpointMode.MEMORY
 
-        else:  # auto 或其他
-            # 尝试使用 SQLite，失败则降级到内存
-            try:
-                checkpoint_dir = getattr(self.config, 'checkpoint_dir', 'data/checkpoints')
-                os.makedirs(checkpoint_dir, exist_ok=True)
-                test_path = os.path.join(checkpoint_dir, '.write_test')
-                with open(test_path, 'w') as f:
-                    f.write('test')
-                os.remove(test_path)
-                return CheckpointMode.SQLITE
-            except Exception:
-                warning("SQLite 不可用，降级到内存模式")
-                return CheckpointMode.MEMORY
-
-    def _setup_storage(self):
+    def _setup_storage(self) -> None:
         """设置存储路径"""
         if self.mode == CheckpointMode.SQLITE:
-            checkpoint_dir = getattr(self.config, 'checkpoint_dir', 'data/checkpoints')
+            checkpoint_dir = getattr(self.config, 'checkpoint_dir', None) or 'data/checkpoints'
             script_dir = os.path.join(checkpoint_dir, self.script_id)
             os.makedirs(script_dir, exist_ok=True)
             self.db_path = os.path.join(script_dir, f"task_{self.task_id}.db")
 
-    def get_saver(self):
+    def get_saver(self) -> Any:
         """
         获取 BaseCheckpointSaver 实例（供 LangGraph 使用）
 
@@ -162,12 +173,15 @@ class WorkflowCheckpointer:
                 from langgraph.checkpoint.memory import MemorySaver
                 self._saver = MemorySaver()
             else:
-                # 创建数据库连接
-                self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
-                self._conn.execute("PRAGMA journal_mode=WAL")
-                self._conn.execute("PRAGMA synchronous=NORMAL")
+                # 创建数据库连接（SQLite 模式下存储路径已在 _setup_storage 中初始化）
+                if self.db_path is None:
+                    raise RuntimeError("SQLite 检查点路径未初始化")
+                conn = sqlite3.connect(self.db_path, check_same_thread=False)
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA synchronous=NORMAL")
 
-                self._saver = SqliteSaver(self._conn)
+                self._conn = conn
+                self._saver = SqliteSaver(conn)
                 info(f"使用 SqliteSaver: {self.db_path}")
 
         return self._saver
@@ -189,7 +203,7 @@ class WorkflowCheckpointer:
         """获取线程ID"""
         return f"{self.script_id}_{self.task_id}"
 
-    def cleanup_old_checkpoints(self, keep_count: int = 10):
+    def cleanup_old_checkpoints(self, keep_count: int = 10) -> None:
         """
         清理旧的检查点文件
 
@@ -199,7 +213,7 @@ class WorkflowCheckpointer:
         if self.mode != CheckpointMode.SQLITE:
             return
 
-        if not self.db_path:
+        if not self.db_path or keep_count <= 0:
             return
 
         script_dir = os.path.dirname(self.db_path)
@@ -209,19 +223,28 @@ class WorkflowCheckpointer:
         if len(files) <= keep_count:
             return
 
+        active_paths = CheckpointerFactory.active_db_paths()
+        current_path = _normalize_path(self.db_path)
+
         # 按修改时间排序
         files.sort(key=os.path.getmtime, reverse=True)
 
-        # 删除多余文件（保留当前使用的）
+        # 删除多余文件（保留当前文件及所有仍在使用的实例文件）
         removed = 0
         for old_file in files[keep_count:]:
-            if old_file != self.db_path:  # 不删除当前正在使用的
-                try:
-                    os.remove(old_file)
-                    removed += 1
-                    debug(f"已清理旧检查点: {old_file}")
-                except Exception as e:
-                    warning(f"清理检查点失败: {old_file}, {e}")
+            normalized = _normalize_path(old_file)
+            if normalized == current_path or normalized in active_paths:
+                continue
+            try:
+                # WAL 模式下会同时产生 -wal / -shm 旁文件，需一并删除
+                for suffix in ("", "-wal", "-shm"):
+                    path = old_file + suffix
+                    if os.path.exists(path):
+                        os.remove(path)
+                removed += 1
+                debug(f"已清理旧检查点: {old_file}")
+            except Exception as e:
+                warning(f"清理检查点失败: {old_file}, {e}")
 
         if removed > 0:
             info(f"已清理 {removed} 个旧检查点文件")
@@ -238,25 +261,26 @@ class WorkflowCheckpointer:
 
         return self.stats
 
-    async def close(self):
-        """关闭检查点，释放资源"""
-        if self._conn:
+    def close(self) -> None:
+        """关闭检查点并释放 SQLite 连接（同步方法，供上下文管理器与工厂同步调用）"""
+        if self._conn is not None:
             try:
                 self._conn.close()
-            except Exception:
-                pass
+            except Exception as e:
+                warning(f"关闭 SQLite 检查点连接失败: {e}")
             self._conn = None
 
         self._saver = None
         info(f"检查点已关闭: {self.script_id}/{self.task_id}")
 
-    def __enter__(self):
+    def __enter__(self) -> "WorkflowCheckpointer":
         """上下文管理器入口"""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
         """上下文管理器出口"""
         self.close()
+        return False
 
 
 # ============================================================================
@@ -283,7 +307,30 @@ class CheckpointerFactory:
             return cls._instances[key]
 
     @classmethod
-    def close_all(cls):
+    def release(cls, script_id: str, task_id: str) -> None:
+        """释放并关闭指定任务的检查点实例"""
+        key = f"{script_id}_{task_id}"
+        with cls._lock:
+            cp = cls._instances.pop(key, None)
+
+        if cp is not None:
+            try:
+                cp.close()
+            except Exception as e:
+                warning(f"关闭检查点失败: {key}, {e}")
+
+    @classmethod
+    def active_db_paths(cls) -> set:
+        """返回工厂当前持有的所有 SQLite 文件路径（规范化后），供清理时跳过活跃文件"""
+        with cls._lock:
+            return {
+                _normalize_path(cp.db_path)
+                for cp in cls._instances.values()
+                if cp.db_path
+            }
+
+    @classmethod
+    def close_all(cls) -> None:
         """关闭所有检查点"""
         with cls._lock:
             for key, cp in cls._instances.items():
@@ -315,6 +362,11 @@ def create_checkpointer(script_id: str, task_id: str, config: ShotConfig) -> Wor
     return CheckpointerFactory.get_or_create(script_id, task_id, config)
 
 
-def close_all_checkpointers():
+def release_checkpointer(script_id: str, task_id: str) -> None:
+    """释放指定任务的检查点（缓存淘汰/任务收尾时调用）"""
+    CheckpointerFactory.release(script_id, task_id)
+
+
+def close_all_checkpointers() -> None:
     """关闭所有检查点"""
     CheckpointerFactory.close_all()

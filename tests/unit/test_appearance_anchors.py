@@ -189,6 +189,23 @@ def test_free_text_fallback_has_no_sentence_fragments():
         assert banned not in anchors["clothing"]
 
 
+def test_hair_clause_not_folded_into_clothing():
+    """头发状态子句只进 hair，不得并入 clothing 造成混域污染"""
+    anchors = extract_appearance_from_text("穿着素色外套，头发微湿")
+
+    assert anchors["hair"] == "头发微湿"
+    assert anchors["clothing"] == "素色外套"
+
+
+def test_outfit_hair_clause_not_folded_into_clothing():
+    """结构化服装描述里的头发子句同样不得残留进 clothing"""
+    anchors = extract_appearance_anchors(
+        "", {"description": "素色外套，头发微湿"}
+    )
+
+    assert anchors["clothing"] == "素色外套"
+
+
 def test_merge_first_value_wins():
     """FR-005：同字段首值优先，重复提取不会改变既有锚点"""
     character = CharacterContract(name="林小雨")
