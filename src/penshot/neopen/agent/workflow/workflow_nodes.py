@@ -1117,11 +1117,45 @@ class WorkflowNodes:
             package_status = {
                 package.fragment_id: package.status for package in adapted_packages
             }
+            asset_status = {
+                str(asset.get("asset_id")): str(asset.get("status") or "pending")
+                for asset in (asset_plan or {}).get("assets", [])
+                if isinstance(asset, dict)
+            }
+            prompt_lookup = {
+                fragment.fragment_id: fragment
+                for fragment in instructions.fragments
+            }
+            pending_asset_decisions: List[str] = []
             for decision in plan.decisions:
                 decision.warnings = list(package_warnings.get(decision.fragment_id, []))
                 decision.status = package_status.get(decision.fragment_id, "ready")
                 decision.degraded_assets = list(
                     degraded_assets.get(decision.fragment_id, [])
+                )
+                # 片段模型以路由决策为准，避免下游读到转换器默认模型
+                prompt = prompt_lookup.get(decision.fragment_id)
+                if prompt is not None and decision.target_model:
+                    prompt.model = decision.target_model
+                # 声明图生视频但计划内必需资产尚未就绪时，状态必须如实反映，不能标记 ready
+                # 仅当资产被本计划追踪时才参与判定，无计划时不应凭空判定为缺失
+                pending_required = [
+                    str(ref.asset_id)
+                    for ref in decision.references
+                    if getattr(ref, "required", False)
+                    and str(ref.asset_id) in asset_status
+                    and asset_status[str(ref.asset_id)] not in {"ready", "generated"}
+                ]
+                if pending_required and decision.status == "ready":
+                    decision.status = "pending_assets"
+                    decision.warnings.append(
+                        f"required_assets_pending: {', '.join(pending_required)}"
+                    )
+                    pending_asset_decisions.append(decision.fragment_id)
+            if pending_asset_decisions:
+                warning(
+                    f"路由依赖资产尚未生成，已标记 pending_assets: "
+                    f"{', '.join(pending_asset_decisions)}"
                 )
             if degraded_assets:
                 info(
