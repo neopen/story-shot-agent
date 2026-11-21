@@ -473,11 +473,7 @@ class PipelineDecision:
         Returns:
             PipelineState: 决策结果
         """
-        # 检查是否已经审查过且结果有效
-        if state.domain.audit_executed and state.domain.audit_report:
-            info("检测到可能的重复质量审查调用，使用上次结果")
-            return PipelineState.SUCCESS
-
+        # 审计结果必须按当前报告重新决策；上游修复后旧结论不能短路路由
         # 检查节点循环限制
         loop_decision, loop_reason = self._check_and_increment_node_loop(state, PipelineNode.AUDIT_QUALITY)
         if loop_decision != PipelineState.SUCCESS:

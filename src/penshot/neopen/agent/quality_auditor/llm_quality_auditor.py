@@ -9,6 +9,7 @@ See LICENSE File For Details.
 @Github: https://github.com/neopen/story-shot-agent
 @Time: 2026/1/27 0:00
 """
+import hashlib
 import json
 import re
 import time
@@ -34,6 +35,7 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseLLMAgent):
         self.llm_client = llm_client
         self.last_llm_result = None
         self.last_audit_time = 0
+        self.last_content_signature: Optional[str] = None
 
     # llm_quality_auditor.py - 修改 audit 和 _call_llm_audit 方法
 
@@ -42,13 +44,15 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseLLMAgent):
         """执行LLM深度审查"""
         info(f"执行LLM深度审查，片段数: {len(instructions.fragments)}")
 
-        if self._should_run_llm_audit(instructions):
+        signature = self._content_signature(instructions)
+        if self._should_run_llm_audit(instructions, signature):
             try:
                 # 将历史上下文传递给 LLM 调用
                 llm_result = self._call_llm_audit(instructions, historical_context)
                 validated_result = self._validate_llm_result(llm_result, instructions)
                 self.last_llm_result = validated_result
                 self.last_audit_time = time.time()
+                self.last_content_signature = signature
                 return self._convert_to_report(validated_result, instructions)
             except Exception as e:
                 error(f"LLM审查失败: {str(e)}")
@@ -190,11 +194,24 @@ class LLMQualityAuditor(BaseQualityAuditor, BaseLLMAgent):
             ""
         ])
 
-    def _should_run_llm_audit(self, instructions: AIVideoInstructions) -> bool:
+    @staticmethod
+    def _content_signature(instructions: AIVideoInstructions) -> str:
+        """片段内容指纹：修复重跑后提示词变化必须触发复审"""
+        payload = "\n".join(
+            f"{frag.fragment_id}|{frag.duration}|{frag.prompt}"
+            for frag in instructions.fragments
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _should_run_llm_audit(
+        self, instructions: AIVideoInstructions, signature: str
+    ) -> bool:
         """判断是否应该执行LLM审查"""
         if self.last_llm_result is None:
             return True
         if time.time() - self.last_audit_time > 300:
+            return True
+        if signature != self.last_content_signature:
             return True
         if len(instructions.fragments) != len(self.last_llm_result.get("fragments_checked", [])):
             return True

@@ -1343,17 +1343,10 @@ class WorkflowNodes:
                 )
                 return state
             elif time_diff < 10:
+                # 有新的修复参数说明产物已变化，必须重新审计，不能回放旧报告
                 info(
                     f"质量审查重新执行 (有新的修复参数: {list(state.domain.repair_params.keys())})"
                 )
-                last_result = self.workflow_memory.get_memory_dict(
-                    "latest_audit_result", level=MemoryLevel.SHORT_TERM
-                )
-                if last_result:
-                    report_data = last_result.get("report")
-                    if report_data:
-                        state.domain.audit_report = QualityAuditReport(**report_data)
-                        return state
 
         info(
             f"进入质量审查节点（增强版），当前阶段={state.execution.current_stage.value}"
