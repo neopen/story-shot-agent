@@ -579,9 +579,14 @@ class ContinuityGuardianChecker:
             for elem in scene.elements:
                 if not elem.character:
                     continue
-                # 只记录“持有动词 + 对象”，动词变化本身不代表道具变化；
-                # 无法抽取对象时不记录，避免纯动词比较产生误报。
-                for obj in _extract_prop_objects(elem.content):
+                # 优先消费解析期结构化 prop_object；规则/旧数据再回退到文本提取。
+                structured_prop = getattr(elem, "prop_object", None)
+                objects = (
+                    [structured_prop]
+                    if structured_prop
+                    else _extract_prop_objects(elem.content)
+                )
+                for obj in objects:
                     prop_state.setdefault(elem.character, []).append({
                         "prop": obj,
                         "scene": scene.id,

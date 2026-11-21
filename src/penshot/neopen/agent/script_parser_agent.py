@@ -128,13 +128,19 @@ def build_contract_from_parsed(
     # 从解析结果填充契约（适配当前 SceneInfo / ParsedScript 模型）
     for index, scene in enumerate(parsed_script.scenes, start=1):
         scene_id = getattr(scene, "id", "")
+        # 全局关键道具 + 元素级结构化道具都进入场景道具表
+        scene_props = dict(props_index.get(scene_id, {}))
+        for element in getattr(scene, "elements", None) or []:
+            prop_object = getattr(element, "prop_object", None)
+            if prop_object:
+                scene_props.setdefault(prop_object, "present")
         scene_contract = SceneContract(
             scene_num=_scene_number(scene, index),
             location=getattr(scene, "location", None) or "unknown",
             time_of_day=getattr(scene, "time_of_day", None) or "day",
             weather=getattr(scene, "weather", None) or "clear",
             characters_in_scene=_scene_characters(scene),
-            props_in_scene=props_index.get(scene_id, {}),
+            props_in_scene=scene_props,
             main_emotion="neutral",
         )
         contract.register_scene(scene_contract)
