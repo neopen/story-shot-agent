@@ -234,6 +234,31 @@ def test_asset_usage_missing_detected_with_fragment_and_asset_id():
     assert violation.issue_value["reason"] == "片段未出现在 usage.fragments 中"
 
 
+def test_registered_routed_models_not_flagged_unsupported():
+    """路由选中的已注册模型（kling_3/runway_gen4）不得被判为不支持"""
+    fragments = [
+        _fragment(fragment_id="frag_001", model="kling_3"),
+        _fragment(fragment_id="frag_002", model="runway_gen4"),
+    ]
+
+    report = _auditor().audit(_instructions(fragments=fragments))
+
+    assert [v for v in report.violations if v.issue_code == "model_unsupported"] == []
+
+
+def test_unknown_model_flagged_with_registered_model_suggestion():
+    """真正未注册且无别名的模型仍要告警，建议列表来自能力注册表"""
+    fragment = _fragment(model="totally_unknown_model")
+
+    report = _auditor().audit(_instructions(fragments=[fragment]))
+    violations = [v for v in report.violations if v.issue_code == "model_unsupported"]
+
+    assert len(violations) == 1
+    assert "kling_3" in violations[0].suggestion
+    assert "runway_gen4" in violations[0].suggestion
+    assert "runway_gen2, sora, pika" not in violations[0].suggestion
+
+
 def test_clean_inputs_produce_no_new_rule_violations():
     """干净契约/指令不得产生四条新规则的误报"""
     instructions = _instructions(
