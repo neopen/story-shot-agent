@@ -64,7 +64,10 @@ from penshot.neopen.agent.workflow.workflow_error_handler import (
     WorkflowErrorHandler,
     ErrorHandlerMiddleware,
 )
-from penshot.neopen.agent.workflow.workflow_memory import WorkflowMemory
+from penshot.neopen.agent.workflow.workflow_memory import (
+    WorkflowMemory,
+    unwrap_stage_stats,
+)
 from penshot.neopen.agent.workflow.workflow_models import AgentStage, PipelineNode
 from penshot.neopen.agent.workflow.workflow_output import WorkflowOutputWriter
 from penshot.neopen.agent.workflow.workflow_state_types import WorkflowState
@@ -243,8 +246,10 @@ class WorkflowNodes:
             recent_strategy = self.workflow_memory.get_memory_dict(
                 "parsing_strategy_recent", level=MemoryLevel.SHORT_TERM
             )
-            historical_stats = self.workflow_memory.get_memory_dict(
-                "stats_parse_script", level=MemoryLevel.MEDIUM_TERM
+            historical_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_parse_script", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             common_issues = self.workflow_memory.get_memory_list(
                 "common_parse_script_patterns",
@@ -471,8 +476,10 @@ class WorkflowNodes:
             self._update_task_progress(state.input.task_id, TaskStage.SEGMENT_START, 0)
 
             # 1. 加载历史上下文（使用 workflow_memory）
-            historical_shot_stats = self.workflow_memory.get_memory_dict(
-                "stats_segment_shot", level=MemoryLevel.MEDIUM_TERM
+            historical_shot_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_segment_shot", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             historical_shot_issues = self.workflow_memory.get_memory_list(
                 "issues_segment_shot", level=MemoryLevel.SHORT_TERM, default=[]
@@ -639,8 +646,10 @@ class WorkflowNodes:
             self._update_task_progress(state.input.task_id, TaskStage.SPLIT_START, 0)
 
             # 1. 加载历史上下文（使用 workflow_memory）
-            historical_split_stats = self.workflow_memory.get_memory_dict(
-                "stats_split_video", level=MemoryLevel.MEDIUM_TERM
+            historical_split_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_split_video", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             historical_split_issues = self.workflow_memory.get_memory_list(
                 "issues_split_video", level=MemoryLevel.SHORT_TERM, default=[]
@@ -802,8 +811,10 @@ class WorkflowNodes:
                         )
 
             # 2. 加载历史上下文（使用 workflow_memory）
-            historical_convert_stats = self.workflow_memory.get_memory_dict(
-                "stats_convert_prompt", level=MemoryLevel.MEDIUM_TERM
+            historical_convert_stats = unwrap_stage_stats(
+                self.workflow_memory.get_memory_dict(
+                    "stats_convert_prompt", level=MemoryLevel.MEDIUM_TERM
+                )
             )
             historical_convert_issues = self.workflow_memory.get_memory_list(
                 "issues_convert_prompt", level=MemoryLevel.SHORT_TERM, default=[]

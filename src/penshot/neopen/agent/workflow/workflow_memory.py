@@ -46,6 +46,16 @@ def successful_patterns_key(stage_key: str) -> str:
     return f"successful_{stage_key}_patterns"
 
 
+def unwrap_stage_stats(raw: Any) -> Dict[str, Any]:
+    """中期记忆存的是 {summary, history, latest_stats} 包装，下游只消费最新一次统计"""
+    if not isinstance(raw, dict):
+        return {}
+    latest_stats = raw.get("latest_stats")
+    if isinstance(latest_stats, dict):
+        return latest_stats
+    return raw
+
+
 class WorkflowMemory:
     """
     工作流节点记忆管理类

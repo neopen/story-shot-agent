@@ -201,7 +201,9 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
         historical_stats = self.current_historical_context.get("historical_stats")
         if historical_stats and isinstance(historical_stats, dict):
             avg_shot_count = historical_stats.get("shot_count", 0)
-            avg_duration = historical_stats.get("avg_duration", 0)
+            avg_duration = historical_stats.get(
+                "avg_shot_duration", historical_stats.get("avg_duration", 0)
+            )
 
             if avg_shot_count:
                 debug(f"历史分镜统计: 平均镜头数={avg_shot_count}, 平均时长={avg_duration}")
