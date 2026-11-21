@@ -7,6 +7,18 @@
 
 ---
 
+## [0.4.8](https://github.com/neopen/story-shot-agent/compare/v0.4.7...v0.4.8) (2026-11-21)
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* **release:** 连续性、记忆与报告一致性收口 ([#106](https://github.com/neopen/story-shot-agent/issues/106)) ([a8a1068](https://github.com/neopen/story-shot-agent/commit/a8a10681d6e23144cab36314333035e7fb190b89))
+
+
+### 📝 Documentation (文档更新)
+
+* 文档完善 ([#104](https://github.com/neopen/story-shot-agent/issues/104)) ([7ec7e9e](https://github.com/neopen/story-shot-agent/commit/7ec7e9e0215b9d0e368faf63e7a6f16d38a07d2a))
+
 ## [未发布] (Unreleased)
 
 ### 🐛 Bug Fixes (问题修复)
