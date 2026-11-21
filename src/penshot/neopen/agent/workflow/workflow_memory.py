@@ -206,25 +206,43 @@ class WorkflowMemory:
         )
         return items
 
+    @staticmethod
+    def _issue_signature(item: Dict[str, Any]) -> tuple:
+        """问题去重签名：同一问题跨重试轮次只保留一条"""
+        return (
+            str(item.get("source_node") or ""),
+            str(item.get("issue_type") or item.get("type") or ""),
+            str(item.get("issue_code") or ""),
+            str(item.get("fragment_id") or item.get("shot_id") or ""),
+            str(item.get("issue_desc") or item.get("description") or "")[:150],
+        )
+
     def store_stage_issues(self, stage_key: str, issues: Any) -> None:
-        """写入阶段问题列表，并从问题类型频次派生 common 模式"""
+        """写入该阶段本轮有效问题（替换而非追加），并从问题类型频次派生 common 模式"""
         if not self.memory_manager or issues is None:
             return
 
         issue_dicts = [self._issue_to_dict(issue) for issue in issues]
-        if not issue_dicts:
-            return
+        deduped: List[Dict[str, Any]] = []
+        seen: set = set()
+        for item in issue_dicts:
+            signature = self._issue_signature(item)
+            if signature in seen:
+                continue
+            seen.add(signature)
+            deduped.append(item)
 
+        # 阶段重跑后旧的已修复问题必须被清除，否则最终报告会长期保留历史问题
         issues_key = stage_issues_key(stage_key)
-        merged = self.get_memory_list(issues_key, level=MemoryLevel.SHORT_TERM, default=[])
-        merged.extend(issue_dicts)
-        merged = merged[-20:]
         self.memory_manager.add(
             input_text=issues_key,
-            output_text=merged,
+            output_text=deduped[-20:],
             level=MemoryLevel.SHORT_TERM,
             metadata={"_serialized": True, "stage": stage_key, "type": "stage_issues"},
         )
+
+        if not issue_dicts:
+            return
 
         # 问题类型频次 → 长期 common 模式，供下次运行提前规避
         counts = Counter(
@@ -234,7 +252,7 @@ class WorkflowMemory:
                 or item.get("issue_code")
                 or "unknown"
             )
-            for item in issue_dicts
+            for item in deduped
         )
         common_key = common_patterns_key(stage_key)
         patterns = self.get_memory_list(common_key, level=MemoryLevel.LONG_TERM, default=[])
