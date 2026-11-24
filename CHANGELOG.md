@@ -7,6 +7,13 @@
 
 ---
 
+## [0.4.9](https://github.com/neopen/story-shot-agent/compare/v0.4.8...v0.4.9) (2026-11-24)
+
+
+### 🔧 Other Changes (其他变更)
+
+* **license:** 协议由 MIT 迁移为 Apache-2.0 ([#108](https://github.com/neopen/story-shot-agent/issues/108)) ([0c53724](https://github.com/neopen/story-shot-agent/commit/0c537244d2bac6d5dbb0602bae0d1818d52bd3cb))
+
 ## [0.4.8](https://github.com/neopen/story-shot-agent/compare/v0.4.7...v0.4.8) (2026-11-21)
 
 
