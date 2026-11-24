@@ -7,14 +7,27 @@
 
 ---
 
-## [未发布] (Unreleased)
+## [0.4.8](https://github.com/neopen/story-shot-agent/compare/v0.4.7...v0.4.8) (2026-11-21)
+
 
 ### 🐛 Bug Fixes (问题修复)
 
-* **continuity:** 连续性问题均不可自动修复时记录 `unfixable_skipped` 轮次，报告状态由 `not_checked` 修正为 `continued_with_issues`，不再与“检查已执行且流程继续”的事实矛盾。
+* **release:** 连续性、记忆与报告一致性收口 ([#106](https://github.com/neopen/story-shot-agent/issues/106)) ([a8a1068](https://github.com/neopen/story-shot-agent/commit/a8a10681d6e23144cab36314333035e7fb190b89))
+
+
+### 📝 Documentation (文档更新)
+
+* 文档完善 ([#104](https://github.com/neopen/story-shot-agent/issues/104)) ([7ec7e9e](https://github.com/neopen/story-shot-agent/commit/7ec7e9e0215b9d0e368faf63e7a6f16d38a07d2a))
+
+
+### 🐛 Bug Fixes (问题修复)
+
+* **continuity:** 连续性问题均不可自动修复时记录 `unfixable_skipped` 轮次，报告 `final_status` 由 `not_checked` 修正为 `continued_with_issues`，不再与“检查已执行且流程继续”的事实矛盾。
+* **continuity:** 外观连续性状态子句不再混入服装锚点，避免同一角色因动作/情绪被误报为外观变化。
 * **reports:** `repair_history.json` 汇总质量审查阶段的修复动作，`repair_count` 与日志中的修复动作数一致；新增 `continuity_repair_count` / `quality_repair` 分列。
 * **reports:** `quality_report.json` 增加 `post_repair_score`、`repair_status`、`repair_issue_count`、`repair_action_count`，修复后复检分数不再只存在于审计明细中。
-* **tests:** 连续性节点测试补齐 `style_guardian` 与真实检查器能力，修复 5 个测试失败；索引检索测试显式包装 `LangchainEmbedding`，兼容当前 llama-index/langchain-community 版本组合。
+* **audit:** 模型支持校验对齐能力注册表；历史阶段统计缺少完整度时不再误判为 `poor`；修复后重算阶段问题，避免空转循环。
+* **workflow:** 声明 `last_audit_result` 状态字段，修复检查点恢复时字段缺失导致的审计状态不一致。
 
 ### ✨ Features (功能特性)
 
@@ -25,12 +38,20 @@
 
 ### 🔧 Refactoring (重构)
 
-* **audit:** 修复参数改用确定性问题码并按真实动作结算，修复后强制复审；模型支持校验对齐能力注册表。
+* **audit:** 修复参数改用确定性问题码并按真实动作结算，修复后强制复审。
 * **routing:** 片段模型回写路由结果，计划场景作为首帧唯一权威，必需资产待生成时显式标记。
 
 ### ✅ Tests (测试)
 
 * 新增记忆、连续性、审查、路由、检查点回归用例，覆盖快照、锚点、seed、误报与模板迁移。
+* 连续性节点测试注入 `style_guardian` 并复用真实检查器快照能力；索引检索测试显式包装 `LangchainEmbedding`，兼容当前 llama-index/langchain-community 版本组合。
+* 新增报告一致性用例，锁定质量修复汇总与修复历史的字段契约。
+
+### ⚠️ 升级与迁移
+
+* 无破坏性改动，无需数据迁移；配置项与 SDK 调用方式保持不变。
+* 报告新增字段均为可选：`quality_report.json` 的 `post_repair_score` / `repair_status` / `repair_issue_count` / `repair_action_count`，`repair_history.json` 的 `continuity_repair_count` / `quality_repair`。
+* `continuity_report.json` 的 `final_status` 新增取值 `continued_with_issues`，对应“已检查、存在不可自动修复问题、流程继续”的场景；依赖旧枚举值的下游请按未知值兜底处理。
 
 ## [0.4.7](https://github.com/neopen/story-shot-agent/compare/v0.4.6...v0.4.7) (2026-11-20)
 
