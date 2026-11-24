@@ -1,7 +1,8 @@
 """
-Copyright (c) 2025 neopen
-Licensed under the MIT License.
-See LICENSE File For Details.
+Copyright 2025 neopen
+SPDX-License-Identifier: Apache-2.0
+Licensed under the Apache License, Version 2.0.
+See the LICENSE and NOTICE files for details.
 
 @FileName: json_parser_tool.py
 @Description: JSON响应解析工具模块，提供从LLM响应中提取和解析JSON数据的功能，支持处理Markdown代码块中的JSON

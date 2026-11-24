@@ -27,7 +27,7 @@ ____  _____ _   _ ____  _  _  ___  _____
   <a href="https://pepy.tech/project/penshot"><img src="https://img.shields.io/pepy/dt/penshot?style=flat-square&color=blue" alt="PyPI Downloads"></a>
   <a href="https://hub.docker.com/r/neotems/penshot"><img src="https://img.shields.io/docker/pulls/neotems/penshot?style=flat-square&logo=docker&logoColor=white" alt="Docker Pulls"></a>
   <a href="https://github.com/neopen/story-shot-agent"><img src="https://img.shields.io/github/stars/neopen/story-shot-agent?style=flat-square&logo=github" alt="GitHub Stars"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License"></a>
 </p>
 <p align="center">
     <a href="https://github.com/neopen/story-shot-agent/blob/main/README_en.md" target="_blank">English</a> •
@@ -508,11 +508,13 @@ pytest tests/
 
 ## 许可证
 
-本项目采用 MIT 开源协议，详见 [LICENSE](LICENSE) 文件。 
+本项目采用 [Apache License 2.0](LICENSE) 开源协议，版权归 neopen 所有。随附的 [NOTICE](NOTICE) 文件包含归属声明，再分发时须与许可证文本一并保留。
 
-[MIT](LICENSE) © 2025 HiPeng (NeoPen)
+- 允许商业使用、修改、再分发，并包含明确的专利授权；
+- 再分发时需保留版权声明、许可证文本与 NOTICE 文件；
+- 许可证不授予商标使用权。
 
-> 本项目采用 MIT 开源协议，您可以自由使用、修改和分发，只需保留原始版权声明。
+[Apache-2.0](LICENSE) © 2025 neopen
 
 
 ------

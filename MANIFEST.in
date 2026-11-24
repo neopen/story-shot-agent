@@ -1,6 +1,10 @@
 # MANIFEST.in
 # 确保所有非 Python 文件被打包
 
+# 许可证与归属声明
+include LICENSE
+include NOTICE
+
 # 配置文件
 include src/penshot/*.yaml
 include src/penshot/*.yml
