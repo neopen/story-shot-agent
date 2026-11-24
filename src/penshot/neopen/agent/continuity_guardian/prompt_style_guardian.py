@@ -1,7 +1,8 @@
 """
-Copyright (c) 2025 neopen
-Licensed under the MIT License.
-See LICENSE File For Details.
+Copyright 2025 neopen
+SPDX-License-Identifier: Apache-2.0
+Licensed under the Apache License, Version 2.0.
+See the LICENSE and NOTICE files for details.
 
 @FileName: prompt_style_guardian.py
 @Description: 提示词风格守护者 - 确保多片段提示词风格一致

@@ -1,7 +1,8 @@
 """
-Copyright (c) 2025 neopen
-Licensed under the MIT License.
-See LICENSE File For Details.
+Copyright 2025 neopen
+SPDX-License-Identifier: Apache-2.0
+Licensed under the Apache License, Version 2.0.
+See the LICENSE and NOTICE files for details.
 
 @FileName: prop_rule.py
 @Description: 道具规则 - 从道具词表与「关键道具：」场记里抽取贯穿全剧的道具

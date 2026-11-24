@@ -1,7 +1,8 @@
 """
-Copyright (c) 2025 neopen
-Licensed under the MIT License.
-See LICENSE File For Details.
+Copyright 2025 neopen
+SPDX-License-Identifier: Apache-2.0
+Licensed under the Apache License, Version 2.0.
+See the LICENSE and NOTICE files for details.
 
 @FileName: continuity.py
 @Description: 连续性检查词表：按语言分组，供动作/道具一致性判定使用

@@ -1,7 +1,8 @@
 """
-Copyright (c) 2025 neopen
-Licensed under the MIT License.
-See LICENSE File For Details.
+Copyright 2025 neopen
+SPDX-License-Identifier: Apache-2.0
+Licensed under the Apache License, Version 2.0.
+See the LICENSE and NOTICE files for details.
 
 @FileName: workflow_output.py
 @Description: 工作流输出封装 - 异步保存各类报告，不阻塞主流程

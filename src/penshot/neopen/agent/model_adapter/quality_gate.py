@@ -1,7 +1,8 @@
 """
-Copyright (c) 2025 neopen
-Licensed under the MIT License.
-See LICENSE File For Details.
+Copyright 2025 neopen
+SPDX-License-Identifier: Apache-2.0
+Licensed under the Apache License, Version 2.0.
+See the LICENSE and NOTICE files for details.
 
 @FileName: quality_gate.py
 @Description: Gate 1 结构与逻辑质量检查（P0-4）：发现问题回写 warnings，不再静默全绿

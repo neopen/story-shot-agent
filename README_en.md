@@ -17,7 +17,7 @@
   <a href="https://pepy.tech/project/penshot"><img src="https://img.shields.io/pepy/dt/penshot?style=flat-square&color=blue" alt="PyPI Downloads"></a>
   <a href="https://hub.docker.com/r/neotems/penshot"><img src="https://img.shields.io/docker/pulls/neotems/penshot?style=flat-square&logo=docker&logoColor=white" alt="Docker Pulls"></a>
   <a href="https://github.com/neopen/story-shot-agent"><img src="https://img.shields.io/github/stars/neopen/story-shot-agent?style=flat-square&logo=github" alt="GitHub Stars"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License"></a>
 </p>
   <p align="center">
     <a href="https://github.com/neopen/story-shot-agent/blob/main/README.md">中文文档</a> •
@@ -372,9 +372,14 @@ pytest tests/
 
 ## License
 
-This project is licensed under the [MIT](LICENSE) License.
+This project is licensed under the [Apache License 2.0](LICENSE).
 
-Copyright (c) 2025 neopen
+Copyright 2025 neopen
+
+You may use, modify, and redistribute this software, including for commercial
+purposes. Redistributions must retain the copyright notice, the license text,
+and the [NOTICE](NOTICE) file. The license provides an express patent grant and
+does not grant trademark rights.
 
 
 ------
