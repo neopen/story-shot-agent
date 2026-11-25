@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from llama_index.core.embeddings import MockEmbedding
 
+from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     CharacterContract,
     GlobalConsistencyContract,
@@ -319,6 +320,59 @@ def test_structured_prop_put_down_is_not_reported():
     ]
     parsed = SimpleNamespace(
         scenes=[SimpleNamespace(id="scene_002", elements=elements)]
+    )
+    result = ContinuityCheckResult()
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
+
+
+def test_dialogue_prop_and_taken_off_clothing_not_reported():
+    """台词话题里的道具、脱下的衣物不是“持有道具变化”（真实剧本误报回归）"""
+
+    def _elem(elem_id, elem_type, content, prop, sequence):
+        return SimpleNamespace(
+            id=elem_id,
+            type=elem_type,
+            character="陈阳",
+            sequence=sequence,
+            content=content,
+            prop_object=prop,
+        )
+
+    checker = ContinuityGuardianChecker()
+    elements = [
+        _elem(
+            "elem_003",
+            ElementType.ACTION,
+            "陈阳骑着电动车冲进雨幕，后座外卖箱里露出一角蓝色封面的书",
+            "《飞鸟集》",
+            1,
+        ),
+        _elem(
+            "elem_004",
+            ElementType.DIALOGUE,
+            "对不起！这书……是你的？",
+            "《飞鸟集》",
+            2,
+        ),
+        _elem(
+            "elem_007",
+            ElementType.ACTION,
+            "陈阳从雨衣里掏出干毛巾裹住书",
+            "干毛巾",
+            3,
+        ),
+        _elem(
+            "elem_010",
+            ElementType.ACTION,
+            "陈阳脱下雨衣罩在她头上，两人并肩跑向屋檐",
+            "黄色雨衣",
+            4,
+        ),
+    ]
+    parsed = SimpleNamespace(
+        scenes=[SimpleNamespace(id="scene_001", elements=elements)]
     )
     result = ContinuityCheckResult()
     checker.check_prop_continuity({"parsed_script": parsed}, result)

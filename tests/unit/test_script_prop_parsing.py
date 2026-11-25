@@ -83,7 +83,29 @@ def test_rule_element_builder_infers_prop_from_vocabulary():
     assert builder._infer_prop_object("他看向窗外") is None
 
 
-def test_checker_uses_structured_prop_without_text_verb():
+def test_checker_uses_grounded_structured_prop():
+    """结构化道具在元素原文中出现时，即使没有持握动词也以结构化字段为准"""
+    checker = ContinuityGuardianChecker()
+    parsed = SimpleNamespace(
+        scenes=[
+            SimpleNamespace(
+                id="scene_001",
+                elements=[
+                    _element("他手里的照片被雨水打湿", "照片", sequence=1),
+                    _element("他攥着钥匙站在门口", "钥匙", sequence=2),
+                ],
+            )
+        ]
+    )
+    result = ContinuityCheckResult()
+
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value)
+
+
+def test_checker_ignores_ungrounded_structured_prop():
+    """元素原文未提及的结构化道具不可信（可能是他人/容器里的道具），不参与比较"""
     checker = ContinuityGuardianChecker()
     parsed = SimpleNamespace(
         scenes=[
@@ -100,7 +122,7 @@ def test_checker_uses_structured_prop_without_text_verb():
 
     checker.check_prop_continuity({"parsed_script": parsed}, result)
 
-    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value)
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
 
 
 def test_contract_merges_element_level_props():

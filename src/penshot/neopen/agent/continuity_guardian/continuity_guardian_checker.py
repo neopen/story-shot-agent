@@ -17,6 +17,7 @@ from functools import lru_cache
 from typing import Dict, Any, List, Optional, Pattern, Set
 
 from penshot.logger import info
+from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.constants.appearance import COLOR_KEYWORDS, MAIN_GARMENT_KEYWORDS
 from penshot.neopen.constants.continuity import (
@@ -81,9 +82,9 @@ def _same_object(left: str, right: str) -> bool:
     return left in right or right in left
 
 
-# 释放类动作：道具被放下/交出/撞倒后角色不再持有，不能当作“持有道具变化”
+# 释放类动作：道具被放下/交出/脱下/撞倒后角色不再持有，不能当作“持有道具变化”
 _PROP_RELEASE_PATTERN = re.compile(
-    r"(?:放(?:在|下|到|回)|搁(?:在|下)|递给|交给|塞给|扔|丢|摔|碰倒|打翻)"
+    r"(?:放(?:在|下|到|回)|搁(?:在|下)|递给|交给|塞给|扔|丢|摔|碰倒|打翻|脱下|脱掉|摘下|取下|卸下)"
 )
 _RELEASE_OBJECT_WINDOW = 10
 
@@ -635,24 +636,33 @@ class ContinuityGuardianChecker:
             for elem in scene.elements:
                 if not elem.character:
                     continue
+                # 台词中提到的道具是话题（“这书是你的？”），不代表角色持有
+                elem_type = getattr(elem, "type", None)
+                if str(getattr(elem_type, "value", elem_type) or "") == (
+                    ElementType.DIALOGUE.value
+                ):
+                    continue
                 # 优先消费解析期结构化 prop_object；规则/旧数据再回退到文本提取。
+                # 结构化道具需在元素原文中出现，避免把其他角色/容器里的道具
+                # （外卖箱里的书）算作当前角色的持有状态。
                 structured_prop = getattr(elem, "prop_object", None)
                 content = getattr(elem, "content", "") or ""
-                objects = (
-                    [structured_prop]
-                    if structured_prop
-                    else _extract_prop_objects(content)
-                )
-                # 当前持有道具被放下/交出/撞倒：先清空，避免跨元素的假变化
+                if structured_prop and _shares_object_token(content, structured_prop):
+                    objects = [structured_prop]
+                else:
+                    objects = _extract_prop_objects(content)
+                # 当前持有道具被放下/交出/脱下/撞倒：先清空，避免跨元素的假变化
                 current_held = held_prop.get(elem.character)
                 if current_held and _is_released(content, current_held):
                     held_prop.pop(elem.character, None)
                     held_scene.pop(elem.character, None)
                 for obj in objects:
-                    # 道具在元素内被明确放下/交出/撞倒：不再持有，不算道具变化
+                    # 道具在元素内被明确放下/交出/脱下/撞倒：不再持有，不算道具变化
                     if _is_released(content, obj):
-                        held_prop.pop(elem.character, None)
-                        held_scene.pop(elem.character, None)
+                        held = held_prop.get(elem.character)
+                        if held and _shares_object_token(held, obj):
+                            held_prop.pop(elem.character, None)
+                            held_scene.pop(elem.character, None)
                         continue
                     previous = held_prop.get(elem.character)
                     if previous and not _same_object(previous, obj):
