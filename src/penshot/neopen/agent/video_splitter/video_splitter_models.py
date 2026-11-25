@@ -32,6 +32,10 @@ class VideoFragment(BaseModel):
 
     # 核心引用信息
     shot_id: str = Field(..., description="所属镜头ID")
+    scene_id: Optional[str] = Field(
+        default=None,
+        description="来源镜头所属场景ID，供地点解析与连续性检查直接使用"
+    )
     element_ids: List[str] = Field(
         default_factory=list,
         description="包含的剧本元素ID列表"

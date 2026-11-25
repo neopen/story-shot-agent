@@ -37,6 +37,8 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 from penshot.neopen.agent.prompt_converter_agent import PromptConverterAgent
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.script_parser_agent import build_contract_from_parsed
+from penshot.neopen.agent.video_splitter.llm_video_splitter import LLMVideoSplitter
+from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
 from penshot.neopen.constants import (
     ACTION_SYNONYM_GROUPS_ZH,
     HOLDING_VERBS_ZH,
@@ -123,6 +125,29 @@ def test_action_change_still_reports_break():
     checker.check_action_continuity({"shot_sequence": shots}, result)
 
     assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value)
+
+
+def test_fix_fragments_continuity_preserves_existing_notes():
+    """修复连续性时保留分割阶段写入的 location/main_character，不再整体清空"""
+    splitter = object.__new__(LLMVideoSplitter)
+    fragment = VideoFragment(
+        id="frag_001",
+        shot_id="shot_001",
+        duration=3.0,
+        continuity_notes={
+            "main_character": "林晚",
+            "location": "场景scene_001",
+            "main_action": "望向隧道深处",
+        },
+    )
+    shot = SimpleNamespace(scene_id="scene_001")
+
+    splitter._fix_fragments_continuity([fragment], shot)
+
+    assert fragment.continuity_notes["main_character"] == "林晚"
+    assert fragment.continuity_notes["location"] == "场景scene_001"
+    assert fragment.continuity_notes["main_action"] == "望向隧道深处"
+    assert fragment.continuity_notes["continuity_check"] == "passed"
 
 
 def test_style_check_runs_alongside_character_check():

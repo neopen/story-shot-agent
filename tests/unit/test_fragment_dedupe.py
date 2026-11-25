@@ -697,3 +697,30 @@ def test_post_process_normalizes_durations_without_shot_sequence():
     assert result.fragments[0].description == "林晚低头看着纸条。"
     assert result.metadata["dedupe_applied"] is False
     assert "dedupe_report" not in result.metadata
+
+
+def test_rule_splitter_propagates_scene_id_to_fragments():
+    """规则分割输出片段携带来源镜头 scene_id，地点解析无需依赖 notes 文本"""
+    for duration in (3.0, 6.0):
+        shot = make_shot("shot_001", "scene_002", description="林晚站在走廊尽头")
+        shot.duration = duration
+        fragments = SPLITTER.split_shot(shot, 0.0, 0)
+
+        assert fragments
+        assert all(fragment.scene_id == "scene_002" for fragment in fragments)
+        assert all(
+            fragment.continuity_notes["location"] == "场景scene_002"
+            for fragment in fragments
+        )
+
+
+def test_merge_fragments_propagates_scene_id():
+    """合并片段时保留来源镜头的 scene_id，避免下游地点解析丢失"""
+    previous = make_fragment("frag_001", "shot_001", "空旷的站台。", duration=1.0)
+    previous.scene_id = "scene_001"
+    current = make_fragment("frag_002", "shot_001", "昏黄的灯光。", duration=1.0)
+
+    merged = merge_fragments(previous, current)
+
+    assert merged is not None
+    assert merged.scene_id == "scene_001"

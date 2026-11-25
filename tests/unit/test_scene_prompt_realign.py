@@ -44,6 +44,7 @@ def _fragment(fragment_id: str, scene_id: str = "scene_002") -> VideoFragment:
     return VideoFragment(
         id=fragment_id,
         shot_id=f"shot_{fragment_id[-3:]}",
+        scene_id=scene_id,
         duration=3.0,
         description="",
         continuity_notes={"location": f"场景{scene_id}"},
@@ -149,7 +150,13 @@ def test_unknown_plan_location_skips_with_info():
 
 def test_fragment_scene_id_takes_precedence_over_notes():
     """T-113：片段自带 scene_id 时直接解析计划地点，不依赖 notes 文本"""
-    fragment = SimpleNamespace(id="frag_030", scene_id="scene_001", continuity_notes={})
+    fragment = VideoFragment(
+        id="frag_030",
+        shot_id="shot_030",
+        scene_id="scene_001",
+        duration=3.0,
+        continuity_notes={},
+    )
     instructions = AIVideoInstructions(
         fragments=[_prompt("frag_030", "corridor background with posters")]
     )
