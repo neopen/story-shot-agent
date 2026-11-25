@@ -17,8 +17,12 @@ import time
 from typing import Any, Dict, List, Optional
 
 from penshot.logger import debug, error, info, warning
-from penshot.neopen.agent.base_models import AgentMode
+from penshot.neopen.agent.base_models import AgentMode, parse_model_name
 from penshot.neopen.agent.base_repairable_agent import BaseRepairableAgent
+from penshot.neopen.agent.model_adapter.capability_registry import (
+    get_capability,
+    list_model_names,
+)
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     GlobalConsistencyContract,
 )
@@ -598,20 +602,22 @@ class PromptConverterAgent(BaseRepairableAgent[AIVideoInstructions, FragmentSequ
                         )
                     )
 
-        # 7. 检查模型支持
+        # 7. 检查模型支持（以能力注册表为准：路由产出的 kling_3/runway_gen4 均为已注册模型）
         for prompt in prompts:
-            if prompt.model != self.config.video_model:
-                issues.append(
-                    BasicViolation.create_violation(
-                        rule_type=RuleType.MODEL_UNSUPPORTED,
-                        issue_value=prompt.model,
-                        standard_value=self.config.video_model,
-                        severity=SeverityLevel.WARNING,
-                        fragment_id=prompt.fragment_id,
-                        source_node=PipelineNode.CONVERT_PROMPT,
-                        suggestion=f"使用支持的模型: {', '.join(self.config.supported_models)}",
-                    )
+            model_name = str(prompt.model or "").strip()
+            if get_capability(model_name) is not None or parse_model_name(model_name):
+                continue
+            issues.append(
+                BasicViolation.create_violation(
+                    rule_type=RuleType.MODEL_UNSUPPORTED,
+                    issue_value=model_name,
+                    standard_value=self.config.video_model,
+                    severity=SeverityLevel.WARNING,
+                    fragment_id=prompt.fragment_id,
+                    source_node=PipelineNode.CONVERT_PROMPT,
+                    suggestion=f"使用已注册模型: {', '.join(sorted(list_model_names()))}",
                 )
+            )
 
         return issues
 
