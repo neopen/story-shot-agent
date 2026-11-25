@@ -275,6 +275,57 @@ def test_prop_object_change_is_reported():
     assert issues[0].auto_fixable is False
 
 
+def test_prop_put_down_then_pick_up_is_not_reported():
+    """放下道具后再拿别的东西，不是“持有道具变化”（真实剧本误报回归）"""
+    checker = ContinuityGuardianChecker()
+    parsed = _prop_script(
+        [
+            "陈默提着一份餐盒爬上六楼",
+            "他把餐盒放在鞋柜上",
+            "陈默后退半步，手一抖碰倒了茶几上的玻璃杯",
+        ]
+    )
+    result = ContinuityCheckResult()
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
+
+
+def test_structured_prop_put_down_is_not_reported():
+    """结构化 prop_object 放下后同样需清空持有状态"""
+    checker = ContinuityGuardianChecker()
+    elements = [
+        SimpleNamespace(
+            id="elem_001",
+            character="陈默",
+            sequence=1,
+            content="外卖员陈默提着一份已经凉透的餐盒爬上六楼",
+            prop_object="餐盒",
+        ),
+        SimpleNamespace(
+            id="elem_002",
+            character="陈默",
+            sequence=2,
+            content="他把餐盒放在鞋柜上，轻声喊了一句",
+            prop_object="餐盒",
+        ),
+        SimpleNamespace(
+            id="elem_003",
+            character="陈默",
+            sequence=3,
+            content="只见那人手里还攥着一个已经停止录制的手机",
+            prop_object="手机",
+        ),
+    ]
+    parsed = SimpleNamespace(
+        scenes=[SimpleNamespace(id="scene_002", elements=elements)]
+    )
+    result = ContinuityCheckResult()
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
+
+
 # ===================== 契约主链与结构化锚点 ======================
 
 
