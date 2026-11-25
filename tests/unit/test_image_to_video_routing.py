@@ -96,6 +96,17 @@ def test_has_critical_text_ignores_environmental_signage():
     assert has_critical_text("subtitle displays the address") is True
 
 
+def test_chinese_blurred_sign_is_not_critical_text():
+    """“咖啡店招牌模糊可见”只是氛围招牌，不要求呈现文字"""
+    assert has_critical_text("背景中咖啡店招牌模糊可见，雨丝渐稀") is False
+
+
+def test_chinese_sign_with_explicit_text_is_critical():
+    """明确要求招牌上的文字/店名时才构成 critical_text"""
+    assert has_critical_text("招牌上写着‘雨中的约定’五个大字") is True
+    assert has_critical_text("招牌上的店名清晰可见") is True
+
+
 def test_should_use_image_to_video_for_high_consistency():
     contract = _contract()
     prompt = AIVideoPrompt(
