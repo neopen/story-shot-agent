@@ -127,6 +127,39 @@ def test_action_change_still_reports_break():
     assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value)
 
 
+def test_non_adjacent_action_progression_not_reported():
+    """跨越多镜头的正常动作推进不判为动作断裂（正视->拾起->迈步）"""
+    checker = ContinuityGuardianChecker()
+    shots = SimpleNamespace(
+        shots=[
+            _shot("s1", "林晚低头看着那张白纸"),
+            _shot("s2", "站台管理员转身走回值班室", character="站台管理员"),
+            _shot("s3", "林晚将纸条紧紧握在手心"),
+            _shot("s4", "信号灯在空旷的站台上闪烁", character=None),
+            _shot("s5", "林晚迈步走上列车"),
+        ]
+    )
+    result = ContinuityCheckResult()
+    checker.check_action_continuity({"shot_sequence": shots}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value, []) == []
+
+
+def test_adjacent_different_character_actions_not_reported():
+    """相邻镜头属于不同角色时，动作差异不构成同一角色的断裂"""
+    checker = ContinuityGuardianChecker()
+    shots = SimpleNamespace(
+        shots=[
+            _shot("s1", "林晚向前走"),
+            _shot("s2", "站台管理员转身跑开", character="站台管理员"),
+        ]
+    )
+    result = ContinuityCheckResult()
+    checker.check_action_continuity({"shot_sequence": shots}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value, []) == []
+
+
 def test_fix_fragments_continuity_preserves_existing_notes():
     """修复连续性时保留分割阶段写入的 location/main_character，不再整体清空"""
     splitter = object.__new__(LLMVideoSplitter)

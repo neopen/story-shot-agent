@@ -388,37 +388,44 @@ class ContinuityGuardianChecker:
         if not shot_sequence or len(shot_sequence.shots) < 2:
             return
 
-        action_state: Dict[str, str] = {}
+        previous_shot = None
+        previous_action: Optional[str] = None
 
         for i, shot in enumerate(shot_sequence.shots):
             # 注意：不复用场景检查的 _processed_shots，否则动作检查会被整体跳过
-            # 近义动作归一后再比较，避免“走 -> 步行”这类同义改写被误报
+            # 近义动作归一后再比较，避免“走 -> 步行”这类同义改写被误报；
+            # 只比较相邻且同一主角的镜头：跨越多镜头后的动作推进（凝视 -> 拾起
+            # -> 迈步）属于正常叙事，不应判为动作断裂
             current_action = _canonical_action(shot.description)
-            if not current_action:
-                continue
+            if (
+                current_action
+                and shot.main_character
+                and previous_action
+                and previous_shot is not None
+                and previous_shot.main_character == shot.main_character
+                and current_action != previous_action
+            ):
+                # 去重：避免重复报告相同的动作变化
+                action_key = f"{shot.main_character}_{previous_action}_{current_action}"
+                if action_key not in self._seen_actions:
+                    self._seen_actions.add(action_key)
 
-            if shot.main_character:
-                last_action = action_state.get(shot.main_character)
-                if last_action and current_action != last_action:
-                    # 去重：避免重复报告相同的动作变化
-                    action_key = f"{shot.main_character}_{last_action}_{current_action}"
-                    if action_key not in self._seen_actions:
-                        self._seen_actions.add(action_key)
+                    issue = self._create_issue(
+                        issue_type=ContinuityIssueType.ACTION_BREAK,
+                        description=f"角色'{shot.main_character}'动作不连续: {previous_action} -> {current_action}",
+                        severity=ContinuitySeverity.MODERATE,
+                        shot_id=shot.id,
+                        position=i,
+                        suggestion="确保动作前后连贯",
+                        source_stage=PipelineNode.SEGMENT_SHOT.value,
+                        # 动作词表判定仅为启发式，重跑分镜无法确定性修复，避免自动重试空转
+                        auto_fixable=False,
+                    )
+                    if issue:
+                        result.add_issue(issue)
 
-                        issue = self._create_issue(
-                            issue_type=ContinuityIssueType.ACTION_BREAK,
-                            description=f"角色'{shot.main_character}'动作不连续: {last_action} -> {current_action}",
-                            severity=ContinuitySeverity.MODERATE,
-                            shot_id=shot.id,
-                            position=i,
-                            suggestion="确保动作前后连贯",
-                            source_stage=PipelineNode.SEGMENT_SHOT.value,
-                            # 动作词表判定仅为启发式，重跑分镜无法确定性修复，避免自动重试空转
-                            auto_fixable=False,
-                        )
-                        if issue:
-                            result.add_issue(issue)
-                action_state[shot.main_character] = current_action
+            previous_shot = shot
+            previous_action = current_action
 
     def check_style_continuity(self, context: Dict[str, Any],
                                result: ContinuityCheckResult) -> None:
