@@ -76,6 +76,38 @@ def test_cross_family_motions_still_warn(caplog):
     assert "运镜关键词冲突" in _warnings(caplog)
 
 
+def test_english_words_containing_pan_or_tilt_are_not_motion():
+    """apartment/pants/panic/head tilted 属于名词或人物姿态，不是运镜（真实剧本误报回归）"""
+    for text in (
+        "pressing the doorbell on an old apartment door",
+        "wearing a dark uniform with work pants",
+        "eyes filled with extreme fear and panic",
+        "a figure slumped on cushions, head tilted unnaturally",
+    ):
+        motion, keyword = detect_motion_from_text(text)
+        assert motion is None, (text, motion, keyword)
+
+
+def test_substring_motion_words_do_not_warn(caplog):
+    """无关单词命中 pan/tilt 时不得报运镜冲突，camera.motion 保持 static"""
+    caplog.set_level(logging.WARNING, logger="PenShot")
+
+    camera = build_camera_control(
+        "medium shot inside the apartment, dark work pants, panic in his eyes"
+    )
+
+    assert camera.motion == CameraMotion.STATIC
+    assert "运镜关键词冲突" not in _warnings(caplog)
+
+
+def test_word_boundary_still_detects_real_pan():
+    """按词边界匹配后，真实 pan 运镜仍能识别"""
+    motion, keyword = detect_motion_from_text("slow pan left across the room")
+
+    assert motion == CameraMotion.PAN
+    assert keyword == "pan"
+
+
 def test_static_motion_with_follow_text_is_consistency_warning():
     """结构化为 static 但提示词写跟随，反向校验仍应告警"""
     result = check_motion_consistency("镜头跟随主角", CameraMotion.STATIC)

@@ -11,7 +11,9 @@ See the LICENSE and NOTICE files for details.
 @Time: 2026/11/01
 """
 
+import re
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 from penshot.neopen.agent.model_adapter.model_models import (
@@ -40,11 +42,24 @@ _SHOT_TYPE_KEYWORDS: Dict[str, str] = {
 _MOTION_KEYWORDS: Dict[str, str] = {
     "tracking shot": "dolly",
     "dolly": "dolly",
+    "dollies": "dolly",
     "handheld": "handheld",
     "zoom": "zoom",
+    "zooms": "zoom",
+    "zooming": "zoom",
     "tilt": "tilt",
+    "tilts": "tilt",
+    "tilting": "tilt",
     "pan": "pan",
+    "pans": "pan",
+    "panning": "pan",
 }
+
+
+@lru_cache(maxsize=16)
+def _motion_keyword_pattern(keyword: str) -> "re.Pattern[str]":
+    """运镜关键词按单词边界匹配，避免 pan 误命中 apartment/pants 等单词"""
+    return re.compile(rf"(?<![A-Za-z]){re.escape(keyword)}(?![A-Za-z])", re.IGNORECASE)
 
 
 def _detect_camera(prompt: str) -> Optional[Dict[str, str]]:
@@ -59,7 +74,7 @@ def _detect_camera(prompt: str) -> Optional[Dict[str, str]]:
             break
 
     for keyword, value in _MOTION_KEYWORDS.items():
-        if keyword in lowered:
+        if _motion_keyword_pattern(keyword).search(prompt):
             motion = value
             break
 

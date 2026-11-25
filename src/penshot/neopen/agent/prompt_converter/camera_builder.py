@@ -14,6 +14,7 @@ POV、极特写等特殊视角（FR-031）。
 """
 
 import re
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 from penshot.logger import warning
@@ -144,8 +145,10 @@ _TEXT_ALIASES: List[Tuple[str, str]] = sorted(
 )
 
 _MOTION_KEYWORDS = {
-    CameraMotion.PAN: ("pan", "摇镜", "横向移动"),
-    CameraMotion.TILT: ("tilt", "俯仰", "上下移动"),
+    # 英文按词边界匹配，动词需显式列出变形（pan/pans/panning）：
+    # 泛化后缀会重新把“head tilted”这类人物姿态误判为运镜。
+    CameraMotion.PAN: ("pan", "pans", "panning", "摇镜", "横向移动"),
+    CameraMotion.TILT: ("tilt", "tilts", "tilting", "俯仰", "上下移动"),
     CameraMotion.DOLLY: (
         "dolly in",
         "dolly out",
@@ -161,17 +164,45 @@ _MOTION_KEYWORDS = {
         "camera pull",
         "follow shot",
         "dolly",
+        "dollies",
         "推镜",
         "拉镜",
         "跟拍",
         "镜头跟随",
     ),
-    CameraMotion.ZOOM: ("zoom", "变焦", "推近", "拉远"),
+    CameraMotion.ZOOM: ("zoom", "zooms", "zooming", "变焦", "推近", "拉远"),
     # “手持”单独出现多指“手里拿着道具”，仅保留明确的运镜表述
     CameraMotion.HANDHELD: ("handheld", "手持镜头", "手持拍摄", "手持晃动", "晃动"),
     CameraMotion.CRANE: ("crane", "升降", "摇臂"),
-    CameraMotion.ORBIT: ("orbit", "环绕", "绕拍"),
+    CameraMotion.ORBIT: ("orbit", "orbits", "orbiting", "环绕", "绕拍"),
 }
+
+_ASCII_LETTER_PATTERN = re.compile(r"[A-Za-z]")
+
+
+@lru_cache(maxsize=64)
+def _motion_keyword_pattern(keyword: str) -> "re.Pattern[str]":
+    """运镜关键词匹配模式：英文按单词边界，中文按子串
+
+    提示词是英文长句，短词用子串匹配会误命中无关单词
+    （``pan`` 命中 ``apartment``/``pants``/``panic``，``tilt`` 命中 ``head tilted``），
+    导致伪运镜冲突告警并污染 camera.motion 与时长估算。
+    """
+    escaped = re.escape(keyword)
+    if _ASCII_LETTER_PATTERN.search(keyword):
+        return re.compile(rf"(?<![A-Za-z]){escaped}(?![A-Za-z])", re.IGNORECASE)
+    return re.compile(escaped, re.IGNORECASE)
+
+
+def _match_motion_candidates(lowered: str) -> List[Tuple[CameraMotion, str]]:
+    """收集文本命中的运镜关键词（英文按词边界，中文按子串）"""
+    return [
+        (motion, keyword)
+        for motion, keywords in _MOTION_KEYWORDS.items()
+        for keyword in keywords
+        if _motion_keyword_pattern(keyword).search(lowered)
+    ]
+
 
 # 方向语义相容的运动族：推镜/拉镜/变焦同属 dolly 族，互相不告警
 _MOTION_FAMILIES: Dict[CameraMotion, str] = {
@@ -450,12 +481,7 @@ def _detect_motion(description: str) -> tuple[CameraMotion, float]:
     并仅对跨运动族的冲突词告警；同族（如 pull-back 与 zoom）不构成冲突。
     """
     lowered = (description or "").lower()
-    candidates: List[Tuple[CameraMotion, str]] = [
-        (motion, keyword)
-        for motion, keywords in _MOTION_KEYWORDS.items()
-        for keyword in keywords
-        if keyword in lowered
-    ]
+    candidates = _match_motion_candidates(lowered)
     if not candidates:
         _warn_static_motion_mismatch(lowered)
         return CameraMotion.STATIC, 0.2
@@ -489,12 +515,7 @@ def detect_motion_from_text(text: str) -> Tuple[Optional[CameraMotion], str]:
     未命中时返回 ``(None, "")``，便于区分“没写运镜”和“明确写静态”。
     """
     lowered = (text or "").lower()
-    candidates: List[Tuple[CameraMotion, str]] = [
-        (motion, keyword)
-        for motion, keywords in _MOTION_KEYWORDS.items()
-        for keyword in keywords
-        if keyword in lowered
-    ]
+    candidates = _match_motion_candidates(lowered)
     if not candidates:
         return None, ""
     motion, keyword = candidates[0]
