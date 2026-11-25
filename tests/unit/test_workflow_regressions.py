@@ -20,9 +20,14 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 from penshot.neopen.agent.quality_auditor.llm_quality_auditor import (
     LLMQualityAuditor,
 )
-from penshot.neopen.agent.quality_auditor.quality_auditor_enum import AuditStatus
+from penshot.neopen.agent.quality_auditor.quality_auditor_enum import (
+    AuditStatus,
+    IssueType,
+)
 from penshot.neopen.agent.quality_auditor.quality_auditor_models import (
+    BasicViolation,
     QualityAuditReport,
+    SeverityLevel,
 )
 from penshot.neopen.agent.workflow.workflow_decision import PipelineDecision
 from penshot.neopen.agent.workflow.workflow_memory import (
@@ -305,3 +310,53 @@ def test_decide_after_audit_persists_last_audit_result():
     assert result == PipelineState.VALID
     assert state.domain.last_audit_result["score"] == 90.0
     assert state.domain.last_audit_result["status"] == AuditStatus.MINOR_ISSUES.value
+
+
+def _moderate_violation(issue_code: str) -> BasicViolation:
+    return BasicViolation.create(
+        issue_code=issue_code,
+        issue_type=IssueType.CHARACTER,
+        issue_desc="角色未在镜头中出现",
+        severity=SeverityLevel.MODERATE,
+    )
+
+
+def test_decide_after_audit_continues_for_manual_only_moderate_issues():
+    """中度问题已如实标记人工项（无自动策略）时不得反复修复直至循环超时"""
+    decision = PipelineDecision()
+    state = WorkflowState.from_raw_script("测试剧本")
+    state.domain.audit_report = QualityAuditReport(
+        status=AuditStatus.MODERATE_ISSUES,
+        score=85.0,
+        violations=[_moderate_violation("character_not_in_shots")],
+        metadata={
+            "requires_manual_fix": [
+                {
+                    "stage": "分镜生成",
+                    "issue_code": "character_not_in_shots",
+                    "fragment_id": "",
+                    "reason": "修复器无对应策略",
+                }
+            ]
+        },
+    )
+
+    result = decision.decide_after_audit(state)
+
+    assert result == PipelineState.VALID
+
+
+def test_decide_after_audit_repairs_moderate_issues_with_auto_strategy():
+    """存在自动策略可覆盖的中度问题时仍需修复"""
+    decision = PipelineDecision()
+    state = WorkflowState.from_raw_script("测试剧本")
+    state.domain.audit_report = QualityAuditReport(
+        status=AuditStatus.MODERATE_ISSUES,
+        score=85.0,
+        violations=[_moderate_violation("shot_repetitive")],
+        metadata={},
+    )
+
+    result = decision.decide_after_audit(state)
+
+    assert result == PipelineState.NEEDS_REPAIR
