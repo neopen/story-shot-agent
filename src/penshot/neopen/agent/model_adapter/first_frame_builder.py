@@ -271,6 +271,11 @@ _SCENE_LOCATION_GLOSSARY: Dict[str, tuple[str, ...]] = {
     "办公室": ("office",),
     "医院": ("hospital",),
     "咖啡馆": ("cafe", "coffee shop"),
+    # 剧本常用“咖啡店/咖啡厅”，与“咖啡馆”同族，避免正确地点被判为地点冲突
+    "咖啡店": ("cafe", "coffee shop", "coffee house"),
+    "咖啡厅": ("cafe", "coffee shop"),
+    # “街角”属于街道类地点，英文提示词里的 street/corner 是同一地点
+    "街角": ("street corner", "corner", "street"),
     "餐厅": ("restaurant",),
     "商店": ("store", "shop"),
     "家": ("home",),

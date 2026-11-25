@@ -290,3 +290,51 @@ def test_route_blocks_fragment_with_unresolved_location_conflict():
     assert "计划地点=走廊" in blocked_message
     assert "期望首帧资产=scene_001" in blocked_message
     assert packages[1].status == "ready"
+
+
+# ===================== 词表同族与误报回归（真实剧本） =====================
+
+
+def test_cafe_and_street_match_plan_location_family():
+    """计划地点“城市街角咖啡店外长椅旁”与提示词 cafe/street 同族，不得判为冲突"""
+    prompt = "wide shot, urban street corner cafe exterior, metal bench with puddles"
+
+    result = realign_scene_prompt(
+        prompt, "城市街角咖啡店外长椅旁", fragment_id="frag_001"
+    )
+
+    assert result.conflicts == []
+    assert result.replaced == []
+    assert result.prompt == prompt
+
+
+def test_coffee_shop_not_double_counted_as_generic_shop():
+    """coffee shop 已属计划地点同族，不能再把其中的 shop 计为商店冲突"""
+    prompt = "background showing clearing sky and coffee shop sign"
+
+    result = realign_scene_prompt(
+        prompt, "城市街角咖啡店外长椅旁", fragment_id="frag_008"
+    )
+
+    assert result.conflicts == []
+
+
+def test_library_card_is_not_a_location_conflict():
+    """道具名“library card（借阅卡）”不得当作图书馆场景冲突"""
+    prompt = "one book cover features a clear white library card with text"
+
+    result = realign_scene_prompt(
+        prompt, "城市街角咖啡店外长椅旁", fragment_id="frag_005"
+    )
+
+    assert result.conflicts == []
+    assert result.replaced == []
+    assert result.prompt == prompt
+
+
+def test_nested_shop_not_flagged_after_coffee_shop_rewritten():
+    """更长地点词改写成功后，其内部短词不得再触发阻断"""
+    result = realign_scene_prompt("coffee shop counter", "餐厅", fragment_id="frag_020")
+
+    assert result.replaced == [("coffee shop", "restaurant")]
+    assert result.conflicts == []

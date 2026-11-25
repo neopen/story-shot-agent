@@ -82,14 +82,59 @@ class SceneRealignResult:
     conflicts: List[SceneConflict] = field(default_factory=list)
 
 
+# 非地点的固定搭配：地点词只作为道具/物件名出现（library card=借阅卡），
+# 检测前先屏蔽这些短语，避免把道具名当成场景证据
+_NON_LOCATION_COLLOCATIONS = (
+    "library card",
+    "library stamp",
+    "library barcode",
+    "street lamp",
+    "street light",
+    "street sign",
+)
+
+
+def _strip_non_location_collocations(text: str) -> str:
+    """屏蔽非地点的地点词固定搭配，仅用于冲突检测，不改写原文"""
+    stripped = text
+    for phrase in _NON_LOCATION_COLLOCATIONS:
+        stripped = re.sub(
+            rf"(?<![A-Za-z]){re.escape(phrase)}(?![A-Za-z])",
+            " ",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+    return stripped
+
+
+def _term_spans(text: str, term: str) -> List[Tuple[int, int]]:
+    """返回地点词的全部命中区间（英文整词忽略大小写，中文子串）"""
+    if not text or not term:
+        return []
+    if term.isascii():
+        pattern = re.compile(
+            rf"(?<![A-Za-z]){re.escape(term)}(?![A-Za-z])", re.IGNORECASE
+        )
+        return [match.span() for match in pattern.finditer(text)]
+    spans: List[Tuple[int, int]] = []
+    start = 0
+    while True:
+        index = text.find(term, start)
+        if index < 0:
+            return spans
+        spans.append((index, index + len(term)))
+        start = index + len(term)
+
+
+def _span_covered(span: Tuple[int, int], covered: List[Tuple[int, int]]) -> bool:
+    """命中区间是否已被更长的地点词覆盖（coffee shop 内的 shop）"""
+    start, end = span
+    return any(left <= start and end <= right for left, right in covered)
+
+
 def _contains_term(text: str, term: str) -> bool:
     """英文整词匹配且忽略大小写，中文按子串匹配"""
-    if not term:
-        return False
-    if term.isascii():
-        pattern = rf"(?<![A-Za-z]){re.escape(term)}(?![A-Za-z])"
-        return re.search(pattern, text, re.IGNORECASE) is not None
-    return term in text
+    return bool(_term_spans(text, term))
 
 
 def _location_family(plan_location: str) -> set[str]:
@@ -224,7 +269,7 @@ def realign_scene_prompt(
         return SceneRealignResult(prompt=prompt)
 
     family = _location_family(plan_location)
-    unquoted = _strip_quoted_content(prompt)
+    unquoted = _strip_non_location_collocations(_strip_quoted_content(prompt))
     # 主地点已出现时视为一致，避免把“走廊里看向教室门”改成“走廊里看向走廊门”；
     # 多段计划（如“走廊/班级记忆墙前”）只以首段作为主地点判定。
     primary = (_plan_segments(plan_location) or [plan_location])[0]
@@ -235,11 +280,19 @@ def realign_scene_prompt(
     conflicts: List[SceneConflict] = []
     replaced: List[Tuple[str, str]] = []
     rewritten_clauses: set[str] = set()
+    handled_spans: List[Tuple[int, int]] = []
     updated = prompt
 
     for term in _conflict_terms(family):
-        if not _contains_term(unquoted, term):
+        # 只处理未被更长地点词覆盖的命中：coffee shop 里的 shop 不应再算一次
+        spans = [
+            span
+            for span in _term_spans(unquoted, term)
+            if not _span_covered(span, handled_spans)
+        ]
+        if not spans:
             continue
+        handled_spans.extend(_term_spans(unquoted, term))
 
         clause = _first_clause_with_term(unquoted, term)
         language = "en" if term.isascii() else "zh"
