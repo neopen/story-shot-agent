@@ -17,6 +17,7 @@ from functools import lru_cache
 from typing import Dict, Any, List, Optional, Pattern, Set
 
 from penshot.logger import info
+from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.workflow.workflow_models import PipelineNode
 from penshot.neopen.constants.appearance import COLOR_KEYWORDS, MAIN_GARMENT_KEYWORDS
 from penshot.neopen.constants.continuity import (
@@ -79,6 +80,40 @@ def _extract_prop_objects(text: str, language: str = "zh") -> List[str]:
 def _same_object(left: str, right: str) -> bool:
     """道具对象相同：互相包含即视为同一对象（避免“照片/旧照片”误报）"""
     return left in right or right in left
+
+
+# 释放类动作：道具被放下/交出/脱下/撞倒后角色不再持有，不能当作“持有道具变化”
+_PROP_RELEASE_PATTERN = re.compile(
+    r"(?:放(?:在|下|到|回)|搁(?:在|下)|递给|交给|塞给|扔|丢|摔|碰倒|打翻|脱下|脱掉|摘下|取下|卸下)"
+)
+_RELEASE_OBJECT_WINDOW = 10
+
+
+def _shares_object_token(text: str, obj: str) -> bool:
+    """判断道具短语是否在文本中提及；长短语允许按 2 字段共享
+
+    文本抽取会把量词和后续动宾一起截进对象（如“一份餐盒爬上六楼”），
+    直接互相包含无法与“餐盒”对齐，故对较长的对象做 2 字片段重合判定。
+    """
+    if not text or not obj:
+        return False
+    if obj in text or text in obj:
+        return True
+    if len(obj) <= 2:
+        return False
+    return any(obj[i : i + 2] in text for i in range(len(obj) - 1))
+
+
+def _is_released(content: str, obj: str) -> bool:
+    """判断道具在元素内容中是否已被放下/交出/撞倒"""
+    if not content or not obj:
+        return False
+    for match in _PROP_RELEASE_PATTERN.finditer(content):
+        start = max(0, match.start() - _RELEASE_OBJECT_WINDOW)
+        end = min(len(content), match.end() + _RELEASE_OBJECT_WINDOW)
+        if _shares_object_token(content[start:end], obj):
+            return True
+    return False
 
 
 def _main_garment_signature(text: str) -> Set[str]:
@@ -388,37 +423,44 @@ class ContinuityGuardianChecker:
         if not shot_sequence or len(shot_sequence.shots) < 2:
             return
 
-        action_state: Dict[str, str] = {}
+        previous_shot = None
+        previous_action: Optional[str] = None
 
         for i, shot in enumerate(shot_sequence.shots):
             # 注意：不复用场景检查的 _processed_shots，否则动作检查会被整体跳过
-            # 近义动作归一后再比较，避免“走 -> 步行”这类同义改写被误报
+            # 近义动作归一后再比较，避免“走 -> 步行”这类同义改写被误报；
+            # 只比较相邻且同一主角的镜头：跨越多镜头后的动作推进（凝视 -> 拾起
+            # -> 迈步）属于正常叙事，不应判为动作断裂
             current_action = _canonical_action(shot.description)
-            if not current_action:
-                continue
+            if (
+                current_action
+                and shot.main_character
+                and previous_action
+                and previous_shot is not None
+                and previous_shot.main_character == shot.main_character
+                and current_action != previous_action
+            ):
+                # 去重：避免重复报告相同的动作变化
+                action_key = f"{shot.main_character}_{previous_action}_{current_action}"
+                if action_key not in self._seen_actions:
+                    self._seen_actions.add(action_key)
 
-            if shot.main_character:
-                last_action = action_state.get(shot.main_character)
-                if last_action and current_action != last_action:
-                    # 去重：避免重复报告相同的动作变化
-                    action_key = f"{shot.main_character}_{last_action}_{current_action}"
-                    if action_key not in self._seen_actions:
-                        self._seen_actions.add(action_key)
+                    issue = self._create_issue(
+                        issue_type=ContinuityIssueType.ACTION_BREAK,
+                        description=f"角色'{shot.main_character}'动作不连续: {previous_action} -> {current_action}",
+                        severity=ContinuitySeverity.MODERATE,
+                        shot_id=shot.id,
+                        position=i,
+                        suggestion="确保动作前后连贯",
+                        source_stage=PipelineNode.SEGMENT_SHOT.value,
+                        # 动作词表判定仅为启发式，重跑分镜无法确定性修复，避免自动重试空转
+                        auto_fixable=False,
+                    )
+                    if issue:
+                        result.add_issue(issue)
 
-                        issue = self._create_issue(
-                            issue_type=ContinuityIssueType.ACTION_BREAK,
-                            description=f"角色'{shot.main_character}'动作不连续: {last_action} -> {current_action}",
-                            severity=ContinuitySeverity.MODERATE,
-                            shot_id=shot.id,
-                            position=i,
-                            suggestion="确保动作前后连贯",
-                            source_stage=PipelineNode.SEGMENT_SHOT.value,
-                            # 动作词表判定仅为启发式，重跑分镜无法确定性修复，避免自动重试空转
-                            auto_fixable=False,
-                        )
-                        if issue:
-                            result.add_issue(issue)
-                action_state[shot.main_character] = current_action
+            previous_shot = shot
+            previous_action = current_action
 
     def check_style_continuity(self, context: Dict[str, Any],
                                result: ContinuityCheckResult) -> None:
@@ -585,49 +627,65 @@ class ContinuityGuardianChecker:
         if not parsed_script:
             return
 
-        prop_state: Dict[str, List[Dict[str, Any]]] = {}
+        # 角色当前持有道具；放下/交出/撞倒后清空，不做“持有道具变化”比较
+        held_prop: Dict[str, str] = {}
+        held_scene: Dict[str, str] = {}
         seen_prop_changes: Set[str] = set()
 
         for scene in parsed_script.scenes:
             for elem in scene.elements:
                 if not elem.character:
                     continue
+                # 台词中提到的道具是话题（“这书是你的？”），不代表角色持有
+                elem_type = getattr(elem, "type", None)
+                if str(getattr(elem_type, "value", elem_type) or "") == (
+                    ElementType.DIALOGUE.value
+                ):
+                    continue
                 # 优先消费解析期结构化 prop_object；规则/旧数据再回退到文本提取。
+                # 结构化道具需在元素原文中出现，避免把其他角色/容器里的道具
+                # （外卖箱里的书）算作当前角色的持有状态。
                 structured_prop = getattr(elem, "prop_object", None)
-                objects = (
-                    [structured_prop]
-                    if structured_prop
-                    else _extract_prop_objects(elem.content)
-                )
+                content = getattr(elem, "content", "") or ""
+                if structured_prop and _shares_object_token(content, structured_prop):
+                    objects = [structured_prop]
+                else:
+                    objects = _extract_prop_objects(content)
+                # 当前持有道具被放下/交出/脱下/撞倒：先清空，避免跨元素的假变化
+                current_held = held_prop.get(elem.character)
+                if current_held and _is_released(content, current_held):
+                    held_prop.pop(elem.character, None)
+                    held_scene.pop(elem.character, None)
                 for obj in objects:
-                    prop_state.setdefault(elem.character, []).append({
-                        "prop": obj,
-                        "scene": scene.id,
-                        "time": elem.sequence
-                    })
-
-        for character, props in prop_state.items():
-            if len(props) > 1:
-                for i in range(len(props) - 1):
-                    previous, current = props[i]["prop"], props[i + 1]["prop"]
-                    if _same_object(previous, current):
+                    # 道具在元素内被明确放下/交出/脱下/撞倒：不再持有，不算道具变化
+                    if _is_released(content, obj):
+                        held = held_prop.get(elem.character)
+                        if held and _shares_object_token(held, obj):
+                            held_prop.pop(elem.character, None)
+                            held_scene.pop(elem.character, None)
                         continue
-                    change_key = f"{character}_{previous}_{current}"
-                    if change_key in seen_prop_changes:
-                        continue
-                    seen_prop_changes.add(change_key)
-                    issue = self._create_issue(
-                        issue_type=ContinuityIssueType.PROP_CHANGE,
-                        description=f"角色'{character}'持有道具变化: {previous} -> {current}",
-                        severity=ContinuitySeverity.WARNING,
-                        scene_id=props[i]["scene"],
-                        suggestion="确保道具前后一致",
-                        source_stage=PipelineNode.PARSE_SCRIPT.value,
-                        # 解析阶段没有确定性道具修复能力，避免自动修复空转
-                        auto_fixable=False,
-                    )
-                    if issue:
-                        result.add_issue(issue)
+                    previous = held_prop.get(elem.character)
+                    if previous and not _same_object(previous, obj):
+                        change_key = f"{elem.character}_{previous}_{obj}"
+                        if change_key not in seen_prop_changes:
+                            seen_prop_changes.add(change_key)
+                            issue = self._create_issue(
+                                issue_type=ContinuityIssueType.PROP_CHANGE,
+                                description=(
+                                    f"角色'{elem.character}'持有道具变化:"
+                                    f" {previous} -> {obj}"
+                                ),
+                                severity=ContinuitySeverity.WARNING,
+                                scene_id=held_scene.get(elem.character, scene.id),
+                                suggestion="确保道具前后一致",
+                                source_stage=PipelineNode.PARSE_SCRIPT.value,
+                                # 解析阶段没有确定性道具修复能力，避免自动修复空转
+                                auto_fixable=False,
+                            )
+                            if issue:
+                                result.add_issue(issue)
+                    held_prop[elem.character] = obj
+                    held_scene[elem.character] = scene.id
 
     def check_with_contract(self, context: Dict[str, Any],
                             contract: GlobalConsistencyContract) -> ContinuityCheckResult:

@@ -99,6 +99,7 @@ class RuleVideoSplitter(BaseVideoSplitter):
             fragment = VideoFragment(
                 id=fragment_id,
                 shot_id=shot.id,
+                scene_id=shot.scene_id,
                 element_ids=shot.element_ids,
                 shot_type=shot.shot_type.value
                 if hasattr(shot.shot_type, "value")
@@ -132,6 +133,7 @@ class RuleVideoSplitter(BaseVideoSplitter):
                 fragment = VideoFragment(
                     id=fragment_id,
                     shot_id=shot.id,
+                    scene_id=shot.scene_id,
                     element_ids=shot.element_ids if seg_idx == 0 else [],
                     shot_type=shot.shot_type.value
                     if hasattr(shot.shot_type, "value")

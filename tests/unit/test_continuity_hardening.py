@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from llama_index.core.embeddings import MockEmbedding
 
+from penshot.neopen.agent.base_models import ElementType
 from penshot.neopen.agent.continuity_guardian.consistency_contract import (
     CharacterContract,
     GlobalConsistencyContract,
@@ -37,6 +38,8 @@ from penshot.neopen.agent.prompt_converter.prompt_converter_models import (
 from penshot.neopen.agent.prompt_converter_agent import PromptConverterAgent
 from penshot.neopen.agent.script_parser.script_parser_models import ParsedScript
 from penshot.neopen.agent.script_parser_agent import build_contract_from_parsed
+from penshot.neopen.agent.video_splitter.llm_video_splitter import LLMVideoSplitter
+from penshot.neopen.agent.video_splitter.video_splitter_models import VideoFragment
 from penshot.neopen.constants import (
     ACTION_SYNONYM_GROUPS_ZH,
     HOLDING_VERBS_ZH,
@@ -123,6 +126,62 @@ def test_action_change_still_reports_break():
     checker.check_action_continuity({"shot_sequence": shots}, result)
 
     assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value)
+
+
+def test_non_adjacent_action_progression_not_reported():
+    """跨越多镜头的正常动作推进不判为动作断裂（正视->拾起->迈步）"""
+    checker = ContinuityGuardianChecker()
+    shots = SimpleNamespace(
+        shots=[
+            _shot("s1", "林晚低头看着那张白纸"),
+            _shot("s2", "站台管理员转身走回值班室", character="站台管理员"),
+            _shot("s3", "林晚将纸条紧紧握在手心"),
+            _shot("s4", "信号灯在空旷的站台上闪烁", character=None),
+            _shot("s5", "林晚迈步走上列车"),
+        ]
+    )
+    result = ContinuityCheckResult()
+    checker.check_action_continuity({"shot_sequence": shots}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value, []) == []
+
+
+def test_adjacent_different_character_actions_not_reported():
+    """相邻镜头属于不同角色时，动作差异不构成同一角色的断裂"""
+    checker = ContinuityGuardianChecker()
+    shots = SimpleNamespace(
+        shots=[
+            _shot("s1", "林晚向前走"),
+            _shot("s2", "站台管理员转身跑开", character="站台管理员"),
+        ]
+    )
+    result = ContinuityCheckResult()
+    checker.check_action_continuity({"shot_sequence": shots}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.ACTION_BREAK.value, []) == []
+
+
+def test_fix_fragments_continuity_preserves_existing_notes():
+    """修复连续性时保留分割阶段写入的 location/main_character，不再整体清空"""
+    splitter = object.__new__(LLMVideoSplitter)
+    fragment = VideoFragment(
+        id="frag_001",
+        shot_id="shot_001",
+        duration=3.0,
+        continuity_notes={
+            "main_character": "林晚",
+            "location": "场景scene_001",
+            "main_action": "望向隧道深处",
+        },
+    )
+    shot = SimpleNamespace(scene_id="scene_001")
+
+    splitter._fix_fragments_continuity([fragment], shot)
+
+    assert fragment.continuity_notes["main_character"] == "林晚"
+    assert fragment.continuity_notes["location"] == "场景scene_001"
+    assert fragment.continuity_notes["main_action"] == "望向隧道深处"
+    assert fragment.continuity_notes["continuity_check"] == "passed"
 
 
 def test_style_check_runs_alongside_character_check():
@@ -215,6 +274,110 @@ def test_prop_object_change_is_reported():
     issues = result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value)
     assert issues
     assert issues[0].auto_fixable is False
+
+
+def test_prop_put_down_then_pick_up_is_not_reported():
+    """放下道具后再拿别的东西，不是“持有道具变化”（真实剧本误报回归）"""
+    checker = ContinuityGuardianChecker()
+    parsed = _prop_script(
+        [
+            "陈默提着一份餐盒爬上六楼",
+            "他把餐盒放在鞋柜上",
+            "陈默后退半步，手一抖碰倒了茶几上的玻璃杯",
+        ]
+    )
+    result = ContinuityCheckResult()
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
+
+
+def test_structured_prop_put_down_is_not_reported():
+    """结构化 prop_object 放下后同样需清空持有状态"""
+    checker = ContinuityGuardianChecker()
+    elements = [
+        SimpleNamespace(
+            id="elem_001",
+            character="陈默",
+            sequence=1,
+            content="外卖员陈默提着一份已经凉透的餐盒爬上六楼",
+            prop_object="餐盒",
+        ),
+        SimpleNamespace(
+            id="elem_002",
+            character="陈默",
+            sequence=2,
+            content="他把餐盒放在鞋柜上，轻声喊了一句",
+            prop_object="餐盒",
+        ),
+        SimpleNamespace(
+            id="elem_003",
+            character="陈默",
+            sequence=3,
+            content="只见那人手里还攥着一个已经停止录制的手机",
+            prop_object="手机",
+        ),
+    ]
+    parsed = SimpleNamespace(
+        scenes=[SimpleNamespace(id="scene_002", elements=elements)]
+    )
+    result = ContinuityCheckResult()
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
+
+
+def test_dialogue_prop_and_taken_off_clothing_not_reported():
+    """台词话题里的道具、脱下的衣物不是“持有道具变化”（真实剧本误报回归）"""
+
+    def _elem(elem_id, elem_type, content, prop, sequence):
+        return SimpleNamespace(
+            id=elem_id,
+            type=elem_type,
+            character="陈阳",
+            sequence=sequence,
+            content=content,
+            prop_object=prop,
+        )
+
+    checker = ContinuityGuardianChecker()
+    elements = [
+        _elem(
+            "elem_003",
+            ElementType.ACTION,
+            "陈阳骑着电动车冲进雨幕，后座外卖箱里露出一角蓝色封面的书",
+            "《飞鸟集》",
+            1,
+        ),
+        _elem(
+            "elem_004",
+            ElementType.DIALOGUE,
+            "对不起！这书……是你的？",
+            "《飞鸟集》",
+            2,
+        ),
+        _elem(
+            "elem_007",
+            ElementType.ACTION,
+            "陈阳从雨衣里掏出干毛巾裹住书",
+            "干毛巾",
+            3,
+        ),
+        _elem(
+            "elem_010",
+            ElementType.ACTION,
+            "陈阳脱下雨衣罩在她头上，两人并肩跑向屋檐",
+            "黄色雨衣",
+            4,
+        ),
+    ]
+    parsed = SimpleNamespace(
+        scenes=[SimpleNamespace(id="scene_001", elements=elements)]
+    )
+    result = ContinuityCheckResult()
+    checker.check_prop_continuity({"parsed_script": parsed}, result)
+
+    assert result.issues_by_type.get(ContinuityIssueType.PROP_CHANGE.value, []) == []
 
 
 # ===================== 契约主链与结构化锚点 ======================

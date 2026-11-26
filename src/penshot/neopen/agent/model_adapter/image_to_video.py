@@ -38,11 +38,13 @@ from penshot.neopen.agent.prop_usage import advance_prop_state, mentions_prop
 READABLE_TEXT_MARKERS_ZH = (
     "文字",
     "字迹",
+    "字样",
+    "写着",
     "地址",
     "手写",
     "字幕",
-    "招牌",
-    "标牌",
+    # 招牌/标牌本身只是物体，只有明确要求呈现其上文字（写着/字样/店名）才算
+    "店名",
     "海报",
     "书名",
     "报纸",

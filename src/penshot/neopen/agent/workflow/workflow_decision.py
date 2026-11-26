@@ -565,6 +565,33 @@ class PipelineDecision:
                     f"问题类型: {critical_summary}"
                 )
 
+            # 与连续性检查同口径：本轮修复已如实标记“无自动策略”的中度问题
+            # 不再反复触发修复，避免同一问题耗尽审计循环后转入人工并最终超时
+            if report.status == AuditStatus.MODERATE_ISSUES:
+                manual_codes = {
+                    str(item.get("issue_code") or "")
+                    for item in (
+                        (getattr(report, "metadata", {}) or {}).get(
+                            "requires_manual_fix"
+                        )
+                        or []
+                    )
+                    if isinstance(item, dict)
+                }
+                unresolved = [
+                    v
+                    for v in violations
+                    if v.severity == SeverityLevel.MODERATE
+                ]
+                if unresolved and all(
+                    (v.issue_code or "") in manual_codes for v in unresolved
+                ):
+                    warning(
+                        f"发现{len(unresolved)}个不可自动修复的质量问题，"
+                        "已标记人工项，继续执行"
+                    )
+                    return PipelineState.VALID
+
         # 审计状态到决策状态的映射
         decision_map = {
             AuditStatus.PASSED: PipelineState.SUCCESS,

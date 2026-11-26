@@ -426,10 +426,10 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
     def _fix_fragments_continuity(self, fragments: List[VideoFragment], shot: ShotInfo) -> List[VideoFragment]:
         """修复片段的连续性"""
         for fragment in fragments:
+            if not fragment.continuity_notes:
+                fragment.continuity_notes = {}
             if hasattr(shot, 'scene_id') and shot.scene_id:
                 fragment.continuity_notes["location"] = f"场景{shot.scene_id}"
-            if "continuity_notes" not in fragment.continuity_notes:
-                fragment.continuity_notes = {}
             fragment.continuity_notes["continuity_check"] = "passed"
         return fragments
 
@@ -593,6 +593,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
                 fragment = VideoFragment(
                     id=fragment_id,
                     shot_id=shot.id,
+                    scene_id=shot.scene_id,
                     element_ids=shot.element_ids,
                     shot_type=shot.shot_type.value
                     if hasattr(shot.shot_type, "value")
@@ -636,6 +637,7 @@ class LLMVideoSplitter(BaseVideoSplitter, BaseLLMAgent):
             fragment = VideoFragment(
                 id=fragment_id,
                 shot_id=shot.id,
+                scene_id=shot.scene_id,
                 element_ids=shot.element_ids,
                 shot_type=shot.shot_type.value
                 if hasattr(shot.shot_type, "value")

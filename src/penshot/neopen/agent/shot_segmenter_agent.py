@@ -392,9 +392,24 @@ class ShotSegmenterAgent(BaseRepairableAgent[ShotSequence, ParsedScript]):
 
         # 检查角色一致性
         characters_in_shots = set()
+        shot_element_ids = set()
         for shot in shots:
             if shot.main_character:
                 characters_in_shots.add(shot.main_character)
+            shot_element_ids.update(shot.element_ids or [])
+
+        # 画外音/电话声角色可能只以元素归属镜头（镜头主体是听者），
+        # 不能仅凭 main_character 判定缺席，否则仅声音角色会被反复误报
+        elements_by_id = {
+            elem.id: elem
+            for scene in structured_script.scenes
+            for elem in scene.elements
+            if getattr(elem, "id", None)
+        }
+        for element_id in shot_element_ids:
+            element = elements_by_id.get(element_id)
+            if element is not None and element.character:
+                characters_in_shots.add(element.character)
 
         if structured_script.characters:
             expected_chars = {c.name for c in structured_script.characters}
