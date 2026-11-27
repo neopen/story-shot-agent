@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="开发指南 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"开发指南","name":"开发指南","description":"PenShot 的本地开发环境、项目结构、双层状态机、启动方式，以及新增智能体、资产类型与提示词模板的扩展步骤。","url":"https://shot.helpenx.com/docs/dev-guide.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/dev-guide.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"开发指南, 本地开发, 项目结构, 状态机, 扩展点, 新增智能体, 资产类型, 提示词模板, PenShot 源码","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"开发指南","name":"开发指南","description":"PenShot 的本地开发环境、项目结构、双层状态机、启动方式，以及新增智能体、资产类型与提示词模板的扩展步骤。","url":"https://shot.helpenx.com/docs/dev-guide.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/dev-guide.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"开发指南, 本地开发, 项目结构, 状态机, 扩展点, 新增智能体, 资产类型, 提示词模板, PenShot 源码","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -143,7 +143,7 @@
           <h1>开发指南</h1>
           <p class="doc-deck">本地环境、项目结构、两级状态机与二次开发扩展点。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 21 分钟阅读</span>
           </div>
         </header>
@@ -305,7 +305,7 @@ python -m pytest tests/ -x -q
 <h2 id="sec-5">工作流装配</h2>
 <p>核心流水线由 <code>MultiAgentPipeline</code> 构建，LangGraph 图中注册了 12 个节点：8 个业务节点 <code>parse_script</code>、<code>generate_assets</code>、<code>segment_shot</code>、<code>split_video</code>、<code>convert_prompt</code>、<code>route_model</code>、<code>audit_quality</code>、<code>continuity_check</code>，以及 4 个控制节点 <code>loop_check</code>、<code>human_intervention</code>、<code>error_handler</code>、<code>generate_output</code>。终态使用 LangGraph 的 <code>END</code>，它不是注册节点。</p>
 <p><code>WorkflowOrchestrator</code> 只负责结构定义：<code>add_node(name, node)</code> 注册接收并返回 <code>WorkflowState</code> 的 callable，<code>add_edge</code> 定义固定流转，<code>add_conditional_edge(source, condition, mapping)</code> 按决策函数返回值选择目标。装配顺序为 <code>build(state_schema=WorkflowState)</code>、<code>validate()</code>、<code>compile(checkpointer=saver)</code>；入口固定为 <code>parse_script</code>，终点为 <code>END</code>。</p>
-<p>条件边使用 8 个决策状态：<code>success</code>、<code>valid</code>、<code>needs_retry</code>、<code>needs_repair</code>、<code>needs_human</code>、<code>needs_asset_edit</code>、<code>failed</code>、<code>abort</code>。质量审查不通过时回到 <code>convert_prompt</code> 修复；连续性检查按问题来源路由到解析、分段或转换；资产问题进入 <code>needs_asset_edit</code>，由人工干预收集资产提示词修改后重跑资产生成。</p>
+<p>条件边使用 8 个决策状态：<code>success</code>、<code>valid</code>、<code>needs_retry</code>、<code>needs_repair</code>、<code>needs_human</code>、<code>needs_asset_edit</code>、<code>failed</code>、<code>abort</code>。质量审查不通过时回到 <code>convert_prompt</code> 修复；连续性检查按问题来源路由到解析、拆分、切割或转换；资产问题进入 <code>needs_asset_edit</code>，由人工干预收集资产提示词修改后重跑资产生成。</p>
 <p><code>loop_check</code> 是统一的重入闸门：拆分、分段、转换、路由成功后先进入循环检查，再按决策结果跳回上游或继续审查。节点级上限为 2–5 次，阶段级为 2–3 次；全局上限取 <code>ShotConfig.max_total_loops × 2</code>，默认 20 × 2 = 40。超限后不再回退，转入错误处理或人工干预，避免无限重试。</p>
 <p>检查点按 <code>script_id</code> 与 <code>task_id</code> 隔离，保存的是 LangGraph 状态而非最终结果。当前没有“从检查点继续执行”的入口，检查点只用于写入留痕与诊断；修改 <code>WorkflowState</code> 结构后，旧检查点可能无法反序列化，开发阶段可切换 <code>checkpoint_mode=&quot;memory&quot;</code> 或清理对应目录。</p>
 <pre class="mermaid">graph TD
@@ -454,7 +454,7 @@ result = <span class="hljs-keyword">await</span> pipeline.run_process(raw_script
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

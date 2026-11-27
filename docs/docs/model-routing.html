@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="进阶能力">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="模型路由 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"模型路由","name":"模型路由","description":"PenShot 模型路由：五个视频模型能力表、确定性路由特征、规则优先级、兜底策略、route_plan 结构、模型专属提示词适配与配置扩展。","url":"https://shot.helpenx.com/docs/model-routing.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/model-routing.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"进阶能力","keywords":"模型路由, route_plan, ModelCapability, Runway Gen-4, Kling 3, Sora 2, Luma Dream, Pika 2, 提示词适配, 路由规则","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"模型路由","name":"模型路由","description":"PenShot 模型路由：五个视频模型能力表、确定性路由特征、规则优先级、兜底策略、route_plan 结构、模型专属提示词适配与配置扩展。","url":"https://shot.helpenx.com/docs/model-routing.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/model-routing.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"进阶能力","keywords":"模型路由, route_plan, ModelCapability, Runway Gen-4, Kling 3, Sora 2, Luma Dream, Pika 2, 提示词适配, 路由规则","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -143,13 +143,13 @@
           <h1>模型路由</h1>
           <p class="doc-deck">按片段特征在五个视频模型之间自动选型，输出可解释的 route_plan 与模型专属提示词。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 11 分钟阅读</span>
           </div>
         </header>
         <p>不同视频模型擅长的东西不一样：有的文字渲染准，有的长镜头稳，有的图生视频一致性好。PenShot 的模型路由节点在提示词生成之后，按<strong>确定性规则</strong>为每个片段选择目标模型与生成模式，输出一份可解释、可直接消费的 <code>route_plan</code>。</p>
 
-<blockquote>本页对应 v0.4.4 源码。路由只做选型与提示词适配，不调用任何视频生成接口；真实渲染仍由下游完成。</blockquote>
+<blockquote>本页对应 v0.4.9 源码。路由只做选型与提示词适配，不调用任何视频生成接口；真实渲染仍由下游完成。</blockquote>
 
 <h2 id="sec-1">30 秒了解</h2>
 <table>
@@ -210,7 +210,7 @@ route_plan = result.data[<span class="hljs-string">&quot;instructions&quot;</spa
 <tr><th style="text-align:left">特征</th><th style="text-align:left">判定方式</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align:left"><code>has_critical_text</code></td><td style="text-align:left">提示词明确要求呈现可读文字。中文词表含“文字、字迹、地址、手写、字幕、招牌、标牌、海报、书名、报纸、书信、标题”；英文按整词匹配 <code>text</code>、<code>readable</code>、<code>address</code>、<code>handwriting</code>、<code>subtitle</code>、<code>newspaper</code>、<code>poster</code>、<code>menu</code>、<code>title</code></td></tr>
+<tr><td style="text-align:left"><code>has_critical_text</code></td><td style="text-align:left">提示词明确要求呈现可读文字。中文词表含“文字、字迹、字样、写着、地址、手写、字幕、店名、海报、书名、报纸、书信、标题”；英文按整词匹配 <code>text</code>、<code>readable</code>、<code>address</code>、<code>handwriting</code>、<code>subtitle</code>、<code>newspaper</code>、<code>poster</code>、<code>menu</code>、<code>title</code>。场景中的招牌、标牌、屏幕只作氛围时不计入，只有明确要求呈现其上文字（写着 / 字样 / 店名）才判为需要文字渲染</td></tr>
 <tr><td style="text-align:left"><code>motion_complexity</code></td><td style="text-align:left">命中打斗、追逐、战斗、爆炸、舞蹈、奔跑、翻滚、旋转、飞跃等关键词为 <code>high</code>；命中走、转身、推、拿起、拥抱等为 <code>medium</code>；其余为 <code>low</code></td></tr>
 <tr><td style="text-align:left"><code>character_consistency_need</code></td><td style="text-align:left">主角在契约中登记了外观锚点为 <code>high</code>；有主角但无锚点为 <code>medium</code>；无主角为 <code>low</code></td></tr>
 <tr><td style="text-align:left"><code>style_bias</code></td><td style="text-align:left">从提示词风格与正文关键词判断 <code>anime</code>、<code>realistic</code> 或 <code>cinematic</code>，默认 <code>cinematic</code></td></tr>
@@ -340,7 +340,7 @@ register_model(
 )
 </code></pre>
 
-<p>注册表是进程内静态表，不会持久化；每个需要路由的进程都要完成注册。适配器注册表当前只内置上述五个模型：只注册能力而没有适配器时，工厂会回退到默认的 <code>runway_gen4</code> 适配器，提示词包的 <code>target_model</code> 也会变成 <code>runway_gen4</code>。要让自定义模型真正参与路由，需要同时提供并注册适配器。</p>
+<p>注册表是进程内静态表，不会持久化；每个需要路由的进程都要完成注册。适配器工厂会先归一模型名（忽略大小写，<code>runway</code>、<code>kling</code>、<code>sora</code>、<code>pika</code>、<code>luma</code> 等旧名映射到规范名），再查适配器注册表。当前只内置上述五个模型：只注册能力而没有适配器时，工厂会回退到默认的 <code>runway_gen4</code> 适配器，提示词包的 <code>target_model</code> 也会变成 <code>runway_gen4</code>。要让自定义模型真正参与路由，需要同时提供并注册适配器。</p>
 
 <h2 id="sec-11">边界与排查</h2>
 <table>
@@ -407,7 +407,7 @@ register_model(
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

@@ -1,4 +1,4 @@
-<p>PenShot（<code>story-shot-agent</code>）是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo、可灵等视频模型逐段生成的分镜提示词包，并附带资产计划与模型路由结果。当前版本 <strong>v0.4.4</strong>。</p>
+<p>PenShot（<code>story-shot-agent</code>）是一个基于 LangGraph 的开源剧本分镜智能体：输入任意长度的剧本，输出可直接交给 Sora、Runway、Veo、可灵等视频模型逐段生成的分镜提示词包，并附带资产计划与模型路由结果。当前版本 <strong>v0.4.9</strong>。</p>
 
 <h2>功能定位</h2>
 <p>主流视频模型单次通常只能生成 5–10 秒画面，更长的成片需要先拆分剧本、逐段生成再拼接。PenShot 处理其中最容易出错的一步：把剧本拆成符合时长限制的片段，并让片段之间在角色、场景、道具和动作上保持衔接。</p>
@@ -91,7 +91,7 @@
 <td style="text-align:left">连续性守护</td>
 <td style="text-align:left"><code>continuity_check</code></td>
 <td style="text-align:left">全阶段产物 → 校验结论</td>
-<td style="text-align:left">视觉、角色、场景、动作四类校验，按来源路由修复</td>
+<td style="text-align:left">六项基础检查叠加契约级校验（结构化锚点、跨块过渡、风格漂移）与状态快照，按问题来源路由修复</td>
 </tr>
 </tbody>
 </table>

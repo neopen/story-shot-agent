@@ -1,6 +1,6 @@
-<p>PenShot 用 LangGraph 检查点持久化工作流状态：每个 super-step 结束后把完整状态快照写入 saver，理论上可凭同一 <code>thread_id</code> 从最近快照恢复。当前版本只接通写入侧，断点续传尚未生效。</p>
+<p>PenShot 用 LangGraph 检查点持久化工作流状态：每个 super-step 结束后把完整状态快照写入 saver，同一任务用稳定的 <code>thread_id</code> 命中历史时间线。任务启动时若最近快照仍有未执行的节点，则以 <code>None</code> 为输入从断点续跑。</p>
 <blockquote>
-<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.4.4 源码。检查点文件只用于状态回溯，不能替代业务结果存档。</p>
+<p><strong>事实边界</strong>：本页描述 <code>WorkflowCheckpointer</code>（<code>workflow_checkpointer.py</code>）与 <code>MultiAgentPipeline</code> 的实际接线，对应 v0.4.9 源码。检查点保存的是过程态，不能替代业务结果存档；多副本共享同一 SQLite 文件仍不安全。</p>
 </blockquote>
 <h2>能力边界</h2>
 <table>
@@ -19,13 +19,13 @@
 </tr>
 <tr>
 <td style="text-align:left">状态查询</td>
-<td style="text-align:left">无入口</td>
-<td style="text-align:left">没有 <code>get_state</code> 调用；只能离线打开 <code>.db</code> 复盘</td>
+<td style="text-align:left">已实现</td>
+<td style="text-align:left">启动时通过 <code>get_state()</code> 判断最近快照是否仍有未执行的 <code>next</code> 节点</td>
 </tr>
 <tr>
 <td style="text-align:left">断点续传</td>
-<td style="text-align:left">未实现</td>
-<td style="text-align:left">执行时 <code>thread_id</code> 不稳定，历史快照无法命中</td>
+<td style="text-align:left">已实现</td>
+<td style="text-align:left"><code>thread_id</code> 固定为 <code>{script_id}_{task_id}</code>；存在未完成快照时以 <code>None</code> 续跑</td>
 </tr>
 <tr>
 <td style="text-align:left">任务迁移</td>
@@ -34,13 +34,13 @@
 </tr>
 <tr>
 <td style="text-align:left">旧检查点清理</td>
-<td style="text-align:left">未接线</td>
-<td style="text-align:left"><code>cleanup_old_checkpoints()</code> 无调用方</td>
+<td style="text-align:left">已接线</td>
+<td style="text-align:left">任务收尾按 <code>max_checkpoints_per_script</code> 清理，跳过仍被工厂持有的文件</td>
 </tr>
 <tr>
 <td style="text-align:left">连接释放</td>
-<td style="text-align:left">部分失效</td>
-<td style="text-align:left"><code>close()</code> 为异步方法，<code>__exit__</code> 调用时未 await</td>
+<td style="text-align:left">已实现</td>
+<td style="text-align:left"><code>close()</code> 为同步方法；管线 <code>close()</code> 与应用关闭钩子调用 <code>release</code> / <code>close_all</code></td>
 </tr>
 </tbody>
 </table>
@@ -71,7 +71,7 @@
     
     Workflow--&gt;&gt;User: 任务完成
 </pre>
-<p>上图是 LangGraph 的完整读写路径。PenShot 只执行其中的写入循环；“查询历史 → 恢复状态”这一段在代码中没有调用入口。</p>
+<p>上图是 LangGraph 的完整读写路径。PenShot 已接通写入循环与“查询历史 → 恢复状态”：同一任务重复执行时会复用最近时间线；若上一轮已正常跑完，则从新输入开始。</p>
 <p>检查点记录以 <code>(thread_id, checkpoint_ns, checkpoint_id)</code> 为联合主键。<code>checkpoint_ns</code> 是子图命名空间，顶层图默认为空字符串；<code>checkpoint_id</code> 按执行顺序递增。同一 <code>thread_id</code> 对应一条完整时间线，更换 <code>thread_id</code> 即产生新时间线。</p>
 <h2>存储模式与降级</h2>
 <table>
@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS writes (
 </pre>
 <h2>快照内容与观测</h2>
 <p>一条 <code>checkpoints</code> 记录包含执行后的通道值、父检查点 ID、序列化类型与元数据；<code>writes</code> 保存尚未合并进通道的 pending writes，用于重放同一 super-step 内已完成的节点输出。两者都由 LangGraph 序列化，业务代码不应直接解析 BLOB。</p>
-<p>观测以数据库为准。执行 <code>SELECT thread_id, COUNT(*) FROM checkpoints GROUP BY thread_id;</code> 可判断同一任务是否产生多条时间线；执行 <code>SELECT COUNT(*) FROM checkpoints;</code> 可确认写入是否真的发生。若 <code>thread_id</code> 种类随运行次数增长，说明标识不稳定，续传不可能命中。</p>
+<p>观测以数据库为准。执行 <code>SELECT thread_id, COUNT(*) FROM checkpoints GROUP BY thread_id;</code> 可确认同一任务的时间线数量；执行 <code>SELECT COUNT(*) FROM checkpoints;</code> 可确认写入是否真的发生。同一 <code>task_id</code> 重复运行应命中同一 <code>thread_id</code>；若时间线随运行次数持续增长，说明任务标识被重新分配。</p>
 <p>检查点不保存 LLM 请求与响应原文。需要复现提示词时，应结合业务日志、模板版本与输入剧本；磁盘占用随任务数与 super-step 数线性增长，长剧本单任务会产生较多快照。</p>
 <h2>WorkflowCheckpointer</h2>
 <p>门面类封装模式选择、存储路径与连接管理，对外提供 saver 和运行配置。</p>
@@ -229,12 +229,12 @@ CREATE TABLE IF NOT EXISTS writes (
 </tr>
 <tr>
 <td style="text-align:left"><code>close()</code></td>
-<td style="text-align:left"><code>async def</code>，关闭 SQLite 连接并置空 saver</td>
+<td style="text-align:left">同步关闭 SQLite 连接并置空 saver</td>
 </tr>
 </tbody>
 </table>
-<p><code>CheckpointerFactory</code> 以 <code>{script_id}_{task_id}</code> 为键、<code>threading.RLock</code> 加锁复用实例，避免重复创建 SQLite 连接。工厂的 <code>close_all()</code> 与实例的 <code>close()</code> 都没有调用方；<code>__exit__</code> 直接调用异步 <code>close()</code> 只会创建协程，连接不会真正关闭，并留下 <code>coroutine 'close' was never awaited</code> 警告。</p>
-<h2>调用链与 thread_id 缺口</h2>
+<p><code>CheckpointerFactory</code> 以 <code>{script_id}_{task_id}</code> 为键、<code>threading.RLock</code> 加锁复用实例，避免重复创建 SQLite 连接。管线 <code>close()</code> 调用 <code>release_checkpointer</code>；应用关闭钩子调用 <code>close_all_checkpointers()</code>，连接可以正常释放。</p>
+<h2>调用链与续跑判定</h2>
 <pre class="hljs"><code># workflow_pipeline.py —— 初始化时创建管理器
 self.checkpointer = create_checkpointer(self.script_id, self.task_id, config)
 
@@ -242,13 +242,14 @@ self.checkpointer = create_checkpointer(self.script_id, self.task_id, config)
 saver = self.checkpointer.get_saver()
 compiled_graph = orchestrator.graph.compile(checkpointer=saver)
 
-# workflow_output_fixer.py —— 执行时传入 thread_id 配置
-final_state = workflow.invoke(
-    initial_state,
-    config={&quot;configurable&quot;: {&quot;thread_id&quot;: f&quot;process_{id(initial_state)}&quot;}}
+# workflow_pipeline.py —— 执行时使用稳定标识
+workflow_config = self.checkpointer.get_config()
+resume = self._has_resumable_state(workflow_config)
+final_result = await self._enhanced_workflow_execution(
+    initial_state, workflow_config, resume
 )
 </code></pre>
-<p>前两处接线正确。第三处没有使用 <code>get_config()</code> 的稳定标识，而是使用 <code>f&quot;process_{id(initial_state)}&quot;</code>。<code>id()</code> 是 CPython 对象的内存地址，同一任务每次运行都会得到新值，因此每次执行都写入一条全新时间线。</p>
+<p>三处都使用 <code>get_config()</code> 的稳定标识 <code>{script_id}_{task_id}</code>。是否续跑由 <code>_has_resumable_state()</code> 判断：读取最近快照，只有当 <code>snapshot.next</code> 非空（仍有待执行节点）时才以 <code>None</code> 为输入续跑；上一轮已完成或没有快照时使用新输入从头执行。</p>
 <table>
 <thead>
 <tr>
@@ -266,42 +267,41 @@ final_state = workflow.invoke(
 <tr>
 <td style="text-align:left">标识</td>
 <td style="text-align:left">同一任务固定 <code>thread_id</code></td>
-<td style="text-align:left">每次运行使用对象内存地址</td>
+<td style="text-align:left"><code>{script_id}_{task_id}</code></td>
 </tr>
 <tr>
 <td style="text-align:left">读取</td>
 <td style="text-align:left">按 <code>thread_id</code> 查历史并恢复</td>
-<td style="text-align:left">无读取入口</td>
+<td style="text-align:left">启动时 <code>get_state()</code> 判定是否续跑</td>
 </tr>
 <tr>
 <td style="text-align:left">清理</td>
 <td style="text-align:left">定期删除旧检查点</td>
-<td style="text-align:left">方法存在，无调用方</td>
+<td style="text-align:left">任务收尾按保留数量清理，跳过活跃文件</td>
 </tr>
 <tr>
 <td style="text-align:left">释放</td>
 <td style="text-align:left">任务结束关闭连接</td>
-<td style="text-align:left">无调用方，且异步关闭失效</td>
+<td style="text-align:left">管线 <code>close()</code> 与关闭钩子均已接线</td>
 </tr>
 </tbody>
 </table>
 <pre class="mermaid">flowchart LR
-    subgraph WritePath[&quot;已接线的写入路径&quot;]
+    subgraph WritePath[&quot;写入路径&quot;]
         W1[任务执行] --&gt; W2[compile 时注入 saver]
         W2 --&gt; W3[每个 super-step 写入快照]
         W3 --&gt; W4[(任务 .db 文件)]
     end
 
-    subgraph ReadPath[&quot;未接线的恢复路径&quot;]
-        R1[任务启动] -.-&gt;|无 get_state 调用| R2[查询历史检查点]
-        R2 -.-&gt; R3[复用 thread_id 续跑]
-        R3 -.-&gt; R4[跳过已完成阶段]
+    subgraph ReadPath[&quot;续跑路径&quot;]
+        R1[任务启动] --&gt; R2[get_state 查询最近快照]
+        R2 --&gt;|next 非空| R3[以 None 续跑]
+        R2 --&gt;|无未执行节点| R4[按新输入从头执行]
     end
 
-    W4 -.-&gt;|thread_id 每次变化| X[历史时间线不可命中]
-    X -.-&gt; R2
+    W4 --&gt; R2
 </pre>
-<p>结果是一本“只进不出”的账：数据真实、完整、可离线回溯，但任务失败后仍从头执行，已落盘的快照不会被读取。检查点当前的价值集中在事后分析，而不是恢复执行。</p>
+<p>续跑只跳过已完成节点，不改变业务语义：若上一轮在人工干预或错误处理处停止，仍会按当前配置重新进入对应分支。检查点的价值因此从“事后分析”扩展为“失败任务继续执行”；但业务结果仍应单独存档。</p>
 <h2>异步执行边界</h2>
 <p><code>ainvoke</code> 会调用 saver 的 <code>aput</code> / <code>aget_tuple</code> / <code>alist</code>，同步版 <code>SqliteSaver</code> 对这三个方法一律抛出 <code>NotImplementedError</code>。项目因此把执行链路整体切回同步 <code>invoke</code>，并在回退路径中保留了被注释的 <code>await workflow.ainvoke(...)</code>。</p>
 <pre class="mermaid">flowchart LR
@@ -370,7 +370,7 @@ final_state = workflow.invoke(
 <tr>
 <td style="text-align:left"><code>max_checkpoints_per_script</code></td>
 <td style="text-align:left"><code>10</code></td>
-<td style="text-align:left">否，无消费方</td>
+<td style="text-align:left">是，任务收尾清理时作为保留数量</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>checkpoint_max_connections</code></td>
@@ -402,13 +402,13 @@ final_state = workflow.invoke(
 </tr>
 <tr>
 <td style="text-align:left">任务失败后从头重跑</td>
-<td style="text-align:left"><code>thread_id</code> 使用对象地址</td>
-<td style="text-align:left">改用 <code>checkpointer.get_config()</code>，并补续跑入口</td>
+<td style="text-align:left">最近快照没有未执行的 <code>next</code> 节点，或任务标识被重新分配</td>
+<td style="text-align:left">用同一 <code>task_id</code> 重试；检查 <code>get_state()</code> 是否返回待执行节点</td>
 </tr>
 <tr>
 <td style="text-align:left">目录持续增长</td>
-<td style="text-align:left">清理方法未接线，时间线只增不减</td>
-<td style="text-align:left">任务收尾显式调用清理；多进程下先确认无活跃写入</td>
+<td style="text-align:left">清理只保留最近 N 个任务文件，更早的历史不会自动汇总</td>
+<td style="text-align:left">按 <code>max_checkpoints_per_script</code> 调整保留量；归档或另行备份</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>ainvoke</code> 抛出 <code>NotImplementedError</code></td>
@@ -422,11 +422,11 @@ final_state = workflow.invoke(
 </tr>
 </tbody>
 </table>
-<h2>最小修复路径</h2>
+<h2>剩余边界</h2>
 <ol>
-<li>把执行路径的 <code>config</code> 换成 <code>self.checkpointer.get_config()</code>，让同一任务跨运行命中同一时间线。</li>
-<li>任务启动时以 <code>None</code> 为输入、复用同一 <code>thread_id</code> 续跑，把“从头执行”改为“从最近快照继续”。</li>
-<li>把 <code>cleanup_old_checkpoints()</code> 接入任务收尾，把 <code>CheckpointerFactory.close_all()</code> 接入服务关闭钩子，并修正 <code>close()</code> 的异步调用。</li>
+<li>续跑依赖最近快照。如果失败前最后一个 super-step 已把 <code>next</code> 清空，任务会按新输入从头执行；需要严格幂等时仍应在业务层做结果校验。</li>
+<li>清理只按任务文件数量截断，不按业务时间或剧本状态筛选；跨剧本保留策略需在上层运维处理。</li>
+<li>SQLite 仍是单机后端。多副本共享同一路径会争用写锁，不能当作分布式检查点使用。</li>
 </ol>
 <p>更远的方向是切换 <code>AsyncSqliteSaver</code> 以支持异步链路，或引入 Postgres / Redis 后端实现多机共享；这些属于后续版本范围，不是当前能力。</p>
 <h2>上线核对</h2>
@@ -435,5 +435,6 @@ final_state = workflow.invoke(
 <li><code>data/checkpoints</code> 存在且可写；容器部署时挂载持久卷，避免随镜像重建丢失。</li>
 <li>任务结束后 <code>.db</code> 可打开，<code>checkpoints</code> 记录数大于 0。</li>
 <li>显式设置 <code>checkpoint_mode</code>，避免 <code>auto</code> 在只读环境中静默退化为内存模式。</li>
+<li>用同一 <code>task_id</code> 人为中断并重试一次，确认日志出现“从最近快照继续执行”，且已完成阶段没有重复执行。</li>
 </ul>
-<p>修复顺序有依赖：先稳定标识，续跑才有意义；清理与释放可以独立接入，但应在确认无并发任务后执行。在续跑入口补齐之前，应把检查点视为审计日志，而不是恢复机制。</p>
+<p>检查点解决的是“过程态续跑”，业务结果的幂等、去重与归档仍需在上层任务系统完成。

@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="开始使用">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Docker 部署 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Docker 部署","name":"Docker 部署","description":"用官方镜像或 Docker Compose 部署 PenShot REST 服务：镜像入口、环境变量、Redis、数据持久化、健康检查与多副本边界。","url":"https://shot.helpenx.com/docs/docker.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/docker.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot Docker, Docker 部署, docker compose, REST 服务, Redis, 容器镜像, 健康检查, 数据持久化","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Docker 部署","name":"Docker 部署","description":"用官方镜像或 Docker Compose 部署 PenShot REST 服务：镜像入口、环境变量、Redis、数据持久化、健康检查与多副本边界。","url":"https://shot.helpenx.com/docs/docker.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/docker.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot Docker, Docker 部署, docker compose, REST 服务, Redis, 容器镜像, 健康检查, 数据持久化","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -143,7 +143,7 @@
           <h1>Docker 部署</h1>
           <p class="doc-deck">官方镜像与 Compose 启动 REST 服务，含 Redis、持久化与健康检查。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 10 分钟阅读</span>
           </div>
         </header>
@@ -330,7 +330,7 @@ docker run -d --name penshot \
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

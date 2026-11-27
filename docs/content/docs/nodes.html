@@ -139,13 +139,13 @@
 <td style="text-align:left">AUDIT_QUALITY</td>
 <td style="text-align:left"><code>AIVideoInstructions</code> + 路由</td>
 <td style="text-align:left"><code>QualityAuditReport</code></td>
-<td style="text-align:left">11 项规则 + LLM 审查、加权扣分</td>
+<td style="text-align:left">11 项规则 + LLM 审查、按严重度判定状态、修复结论</td>
 </tr>
 <tr>
 <td style="text-align:left">CONTINUITY_CHECK</td>
-<td style="text-align:left">各阶段产物</td>
+<td style="text-align:left">各阶段产物 + 契约</td>
 <td style="text-align:left"><code>ContinuityCheckResult</code></td>
-<td style="text-align:left">六维规则检查、签名去重、按来源修复</td>
+<td style="text-align:left">六项基础检查 + 契约锚点/跨块/风格漂移、签名去重、按来源修复</td>
 </tr>
 </tbody>
 </table>
@@ -461,6 +461,8 @@
 <h3>时长估算</h3>
 <p>LLM 给出的时长只作草案，拆分完成后 <code>estimator_factory.estimate_sequence()</code> 会覆写 <code>shot.duration</code>。动作估算器按中景基准 2.8 秒起算，叠加描述复杂度、速度关键词、场景情绪、角色特征，再与 <code>ActionDurationEstimatorTool</code> 结果按 0.4 : 0.6 加权，最后 clamp 到景别区间。<code>DurationEnhancer</code> 负责边界校准、情感特写至少 3.0 秒、开场/结尾 ×1.2、连续同型镜头错开 0.3 秒。</p>
 
+<p>时长估算后还会做一轮分镜自检：镜头类型是否单一、是否存在相邻重复镜头、角色是否都有镜头覆盖。角色覆盖不仅看 <code>main_character</code>，也统计镜头内元素归属的角色；画外音或电话另一端等“仅声音角色”按台词元素计入，不再被误报为缺席（<code>character_not_in_shots</code>）。</p>
+
 <p>失败与降级：估算器是关键词与固定系数规则，不感知语义；<code>merge_consecutive_actions=False</code> 会把连续动作拆成多个镜头；增强器中 climax / transition 的节奏系数尚未被引用，当前仅 opening / ending 生效。</p>
 
 <h2>片段切割 SPLIT_VIDEO</h2>
@@ -535,7 +537,9 @@
 
 <p><code>continuity_notes</code> 由分段节点写入：规则路径含 <code>main_character</code>、<code>location</code>（固定为 <code>场景{scene_id}</code>）、<code>main_action</code>、<code>split_type</code>；LLM 路径另含 <code>continuity_id</code>、<code>prev_fragment</code>、<code>split_reason</code>、<code>segment_part</code>、<code>continuity_hints</code> 等字段。</p>
 
-<p>失败与降级：LLM 切分抛异常时记录日志并自动降级为规则均分。LLM 模式下 <code>_should_use_llm_split</code> 末尾为无条件 <code>return True</code>，复杂镜头与对话关键词分支实际是死代码；规则均分最多 3 段，超长镜头仍可能超过 5.5 秒。</p>
+<p>分段完成后会做疑似重复合并与超长重切，结果写入 <code>metadata</code>：<code>dedupe_report.summary</code> 统计候选数、合并数、重切数与截断数，<code>manual_review_required</code> 标记是否有人工复核项；<code>fragment_id_map</code> 记录重编号前后的片段 ID。合并后仍超上限时回退为截断单片段，并把丢弃的尾部画面写入 <code>truncation_report</code>（含 <code>dropped_duration_total</code> 与逐片段的 <code>fragment_id</code>、<code>dropped_duration</code>、<code>truncate_reason</code>），便于下游与人工按片段核对。</p>
+
+<p>失败与降级：LLM 切分抛异常时记录日志并自动降级为规则均分。LLM 模式下 <code>_should_use_llm_split</code> 末尾为无条件 <code>return True</code>，复杂镜头与对话关键词分支实际是死代码；规则均分最多 3 段，超长镜头仍可能超过 5.5 秒；去重合并不可行时会截断尾部画面，需结合 <code>truncation_report</code> 复核。</p>
 
 <h2>提示词转换 CONVERT_PROMPT</h2>
 <p>把片段序列转换为面向视频模型与音频模型的提示词包，并召回可复用的模板；模型适配与路由交给下一节点，转换阶段不改写目标模型。</p>
@@ -581,6 +585,7 @@
 <li class="lvl-2"><p>音频与视频同批生成：台词 / 旁白默认 <code>XTTSv2</code>，背景声可用 <code>AudioLDM_3</code>，并以 <code>previous_audio_id</code> 串联音色。</p></li>
 <li class="lvl-2"><p>模板召回按相似度阈值、Top-K 与最多注入条数过滤，跨剧本模板只读复用；命中模板作为参考，不直接复制。</p></li>
 <li class="lvl-2"><p>片段时长沿用分段结果，转换阶段不重新估算，也不改变片段数量。</p></li>
+<li class="lvl-2"><p>视频片段补齐固定 seed：显式 <code>ShotConfig.video_seed</code> 优先，未配置时对剔除 <code>metadata</code> / <code>stats</code> 的解析剧本做 SHA-256 派生，保证同一剧本重复运行得到同一值，并随 <code>AIVideoPrompt.seed</code> 透传到模型适配参数。</p></li>
 </ul>
 
 <p>失败与降级：转换阶段不做格式强校验，合规性交给下游审计；模板召回失败时退化为无模板生成，不阻断任务。<code>AIAudioPrompt</code> 字段名为 <code>voice_character</code>，但 <code>get_model_specific_config()</code> 引用了不存在的 <code>voice_id</code>，调用该方法会抛 <code>AttributeError</code>。</p>
@@ -687,19 +692,19 @@
 <p>失败与降级：路由异常时 <code>route_plan</code> 置空，决策层记录告警并继续审计；能力注册表为静态数据，新模型需要扩展注册表后重新部署。</p>
 
 <h2>质量审计 AUDIT_QUALITY</h2>
-<p>对提示词包做最后一道程序化检查：11 项硬规则、按严重度加权扣分，再合并 LLM 深度审查，输出放行、修复或人工三种走向。规则版实现为 <code>RuleQualityAuditor</code>。</p>
+<p>对提示词包做最后一道程序化检查：11 项硬规则、按严重度判定状态并按检查通过率评分，再合并 LLM 深度审查，输出放行、修复或人工三种走向。规则版实现为 <code>RuleQualityAuditor</code>。</p>
 
 <pre class="mermaid">flowchart TD
     A[AI指令序列 + 路由结果] --&gt; B[逐项执行 11 项检查]
-    B --&gt; C[违规项记入 violations&lt;br/&gt;按严重度加权扣分]
+    B --&gt; C[违规项记入 violations&lt;br/&gt;按严重度判定状态]
     C --&gt; D[合并 LLM 审查报告]
-    D --&gt; E{score 分档}
-    E --&gt;|≥90| F[PASSED 放行]
-    E --&gt;|≥75| G[MINOR_ISSUES]
-    E --&gt;|≥60| H[MODERATE_ISSUES 修复]
-    E --&gt;|≥40| I[MAJOR_ISSUES 修复]
-    E --&gt;|≥20| J[CRITICAL_ISSUES 重试/人工]
-    E --&gt;|低于20| K[FAILED 重试/人工]
+    D --&gt; E{严重度规则}
+    E --&gt;|有 ERROR| F[FAILED]
+    E --&gt;|有 CRITICAL| G[CRITICAL_ISSUES 重试/人工]
+    E --&gt;|≥2 MAJOR 或 MAJOR+2 MODERATE| H[MAJOR_ISSUES 修复]
+    E --&gt;|有 MODERATE| I[MODERATE_ISSUES 修复]
+    E --&gt;|有 WARNING 或通过率<90%| J[MINOR_ISSUES]
+    E --&gt;|全清| K[PASSED 放行]
 </pre>
 
 <table>
@@ -712,7 +717,7 @@
 <tbody>
 <tr>
 <td style="text-align:left"><code>AIVideoInstructions</code>、<code>route_plan</code>、资产计划</td>
-<td style="text-align:left"><code>QualityAuditReport</code>：<code>status</code>、<code>checks[]</code>、<code>violations[]</code>、<code>stats</code>、<code>score</code>、<code>suggestions</code></td>
+<td style="text-align:left"><code>QualityAuditReport</code>：<code>status</code>、<code>checks[]</code>、<code>violations[]</code>、<code>stats</code>（<code>pass_rate</code>、<code>failed_check_names</code>）、<code>score</code> / <code>detection_score</code>、<code>post_repair_score</code>、<code>conclusion</code>、<code>suggestions</code></td>
 </tr>
 </tbody>
 </table>
@@ -753,8 +758,8 @@
 </tr>
 <tr>
 <td style="text-align:left">模型支持</td>
-<td style="text-align:left">模型名无法匹配支持列表</td>
-<td style="text-align:left">WARNING（建议含 runway_gen2 / sora / pika）</td>
+<td style="text-align:left">模型名经能力注册表 <code>parse_model_name</code> / <code>get_capability</code> 无法识别</td>
+<td style="text-align:left">WARNING（<code>kling_3</code>、<code>runway_gen4</code> 等已注册模型不再误判）</td>
 </tr>
 <tr>
 <td style="text-align:left">外观锚点污染</td>
@@ -789,26 +794,36 @@
 </tbody>
 </table>
 
-<p>扣分从 100 起算：warning 5、moderate 10、major 25、critical 40、error 60，下限 0。状态分档：≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，否则 FAILED。PASSED 放行；MINOR 默认放行，违规超过 3 个转修复；MODERATE / MAJOR 回 CONVERT_PROMPT；CRITICAL 重试或转人工。FAILED 但分数 ≥80 仍按 VALID 放行；存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>。</p>
+<p>状态由严重度规则判定，优先级从上到下：有 ERROR → <code>FAILED</code>；有 CRITICAL → <code>CRITICAL_ISSUES</code>；≥2 个 MAJOR 或 MAJOR+2 个 MODERATE → <code>MAJOR_ISSUES</code>；有 MODERATE → <code>MODERATE_ISSUES</code>；有 WARNING 或检查通过率 &lt;90% → <code>MINOR_ISSUES</code>；全清 → <code>PASSED</code>。</p>
 
-<p>报告中的违规项按 <code>PipelineNode</code> 转成修复参数，写入 <code>state.domain.repair_params</code>；下一轮 CONVERT_PROMPT 只读取属于自己的键，应用成功后可调用 <code>clear_repair_params()</code> 清理。LLM 深度审查失败时不阻断规则审查结论。</p>
+<p>评分为“检查通过率减去违规扣分”：以 <code>passed_checks / total_checks</code> 为基础分（0–1），按 INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100% 逐项扣减并按数量封顶（INFO/WARNING 最多 5 条，其他最多 3 条），下限 0；乘 100 后写入 <code>score</code> 与 <code>detection_score</code>。结论文本会同时列出警告数与未通过检查名（<code>failed_check_names</code>），避免出现“0 个警告问题”却未通过的矛盾描述。</p>
 
-<p>失败与降级：5.5 秒同时作为分段触发阈值与审查红线，分段漏切会在此处直接报 ERROR；规则检查只覆盖可程序化判定的是非问题，合规但平庸的提示词仍可通过。规则版审查不调用模型，LLM 不可用时仍能给出时长、空值与结构结论。</p>
+<p>决策映射：<code>PASSED</code> → SUCCESS；<code>MINOR_ISSUES</code> 违规 ≤3 个 → VALID，超过则修复；<code>MODERATE_ISSUES</code> / <code>MAJOR_ISSUES</code> → 回 CONVERT_PROMPT；<code>CRITICAL_ISSUES</code> 重试或转人工；<code>FAILED</code> 但分数 ≥80 仍按 VALID 放行，≥60 且可重试则重试。若中度问题全部落在 <code>requires_manual_fix</code>（无自动策略），记录告警并继续执行，不再反复修复直至循环超限。</p>
+
+<p>报告中的违规项按 <code>PipelineNode</code> 转成修复参数，写入 <code>state.domain.repair_params</code>；下一轮 CONVERT_PROMPT 只读取属于自己的键，应用成功后可调用 <code>clear_repair_params()</code> 清理。修复后 <code>repair_issue_count</code> 与 <code>repair_action_count</code> 分列，<code>repair_status</code> 取 <code>repaired</code> / <code>partial</code> / <code>manual_required</code> / <code>no_action_taken</code>；只有真正执行的修复动作才通过规则复检更新 <code>post_repair_score</code>，否则保持等于 <code>detection_score</code>。LLM 深度审查失败时不阻断规则审查结论。</p>
+
+<p>失败与降级：5.5 秒同时作为分段触发阈值与审查红线，分段漏切会在此处直接报 ERROR；规则检查只覆盖可程序化判定的是非问题，合规但平庸的提示词仍可通过。模型支持检查走能力注册表，<code>kling_3</code>、<code>runway_gen4</code> 等已注册模型不再被误判。规则版审查不调用模型，LLM 不可用时仍能给出时长、空值与结构结论。</p>
 
 <h2>连续性守护 CONTINUITY_CHECK</h2>
-<p>跨阶段检查角色、场景、动作、风格、时间、道具六类问题。实现为关键词与数值规则（<code>ContinuityGuardianChecker</code>），不是 LLM 语义审查；检查结果会驱动上游修复。</p>
+<p>跨阶段检查角色、场景、动作、风格、时间、道具六类问题，并在其上叠加契约级检查。基础实现为关键词与数值规则（<code>ContinuityGuardianChecker</code>），主链入口 <code>check_with_contract</code> 再追加结构化锚点、长剧本跨块校验与风格漂移检测，不是 LLM 语义审查；检查结果会驱动上游修复。</p>
 
 <pre class="mermaid">flowchart LR
     subgraph Input
-        A[解析/拆分/分段/指令&lt;br/&gt;各阶段产物]
+        A[解析/拆分/分段/指令&lt;br/&gt;各阶段产物 + 契约]
     end
 
-    subgraph Process[六项检查]
-        B[角色连续性&lt;br/&gt;出现对照+外观词表] --&gt; C[场景连续性&lt;br/&gt;跳转次数占比]
-        C --&gt; D[动作连续性&lt;br/&gt;动作词表]
+    subgraph Process[六项基础检查]
+        B[角色连续性&lt;br/&gt;出现对照+外观/配色] --&gt; C[场景连续性&lt;br/&gt;跳转占比]
+        C --&gt; D[动作连续性&lt;br/&gt;相邻同角色动作]
         D --&gt; E[风格连续性&lt;br/&gt;风格种类数]
         E --&gt; F[时间连续性&lt;br/&gt;起止时间差]
-        F --&gt; G[道具连续性&lt;br/&gt;道具动词表]
+        F --&gt; G[道具连续性&lt;br/&gt;持有/释放]
+    end
+
+    subgraph Contract[契约级叠加]
+        K[角色缺席 / 场景角色] --&gt; L[结构化锚点]
+        L --&gt; M[跨块校验]
+        M --&gt; N[风格漂移检测]
     end
 
     subgraph Dedup[后处理]
@@ -817,9 +832,12 @@
 
     subgraph Output
         J[问题列表&lt;br/&gt;含严重度+来源阶段+可修复标记]
+        O[状态快照&lt;br/&gt;snapshot_id / fragment_count]
     end
 
-    A --&gt; B --&gt; H --&gt; J
+    A --&gt; B --&gt; K
+    N --&gt; H --&gt; J
+    A --&gt; O
 </pre>
 
 <table>
@@ -848,18 +866,18 @@
 <tbody>
 <tr>
 <td style="text-align:left">角色</td>
-<td style="text-align:left">角色出现在场对照；服装 / 发型 / 配饰三类词表</td>
-<td style="text-align:left">有对话无镜头→<code>CHARACTER_MISSING</code>（MAJOR）；外观词变化→WARNING</td>
+<td style="text-align:left">角色出现在场对照（含画外音/仅声音角色按台词元素归属）；服装词与配色变化</td>
+<td style="text-align:left">有对话无镜头→<code>CHARACTER_MISSING</code>（MAJOR）；外观/配色变化→<code>CHARACTER_APPEARANCE_CHANGE</code> / <code>COLOR_INCONSISTENT</code>（WARNING）</td>
 </tr>
 <tr>
 <td style="text-align:left">场景</td>
-<td style="text-align:left">相邻镜头 <code>scene_id</code> 变化，统计跳变占比</td>
+<td style="text-align:left">相邻镜头 <code>scene_id</code> 变化，统计跳变占比；过渡镜头、同景别切点与已尝试修复的固有切换不重复上报</td>
 <td style="text-align:left">单次跳变→<code>SCENE_JUMP</code>（WARNING）；占比 &gt;30%→<code>SCENE_TOO_FREQUENT</code>（MODERATE）</td>
 </tr>
 <tr>
 <td style="text-align:left">动作</td>
-<td style="text-align:left">动作词表（走/跑/跳/转身/坐下/站起/拿起/放下）按角色追踪</td>
-<td style="text-align:left">同角色相邻动作词变化→<code>ACTION_BREAK</code>（MODERATE）</td>
+<td style="text-align:left">动作词表（走/跑/跳/转身/坐下/站起/拿起/放下）按角色追踪，仅比较相邻且同一主角镜头</td>
+<td style="text-align:left">同角色相邻动作词变化→<code>ACTION_BREAK</code>（MODERATE，无自动修复）</td>
 </tr>
 <tr>
 <td style="text-align:left">风格</td>
@@ -873,11 +891,15 @@
 </tr>
 <tr>
 <td style="text-align:left">道具</td>
-<td style="text-align:left">道具动词表（拿/举/抱/提/端/持/握）按角色统计</td>
-<td style="text-align:left">同角色动词变化→<code>PROP_CHANGE</code>（WARNING）</td>
+<td style="text-align:left">按元素追踪持有状态；放下/交给/撞倒/脱下后清空；台词提到的道具视为话题不计持有</td>
+<td style="text-align:left">持有道具变化→<code>PROP_CHANGE</code>（WARNING，无自动修复）</td>
 </tr>
 </tbody>
 </table>
+
+<p>六项基础检查之上，<code>check_with_contract</code> 叠加契约级校验：角色长期缺席（结构性，不可自动修复）、场景角色一致性（契约 <code>characters_in_scene</code> 对比镜头实际角色）、<code>build_anchors_from_contract</code> 生成的角色外观 / 场景 / 风格 <code>ContinuityAnchor</code> 比对，以及 <code>CrossChunkValidator</code> 的长剧本块间过渡检查。工作流随后调用 <code>PromptStyleGuardian.detect_style_drift</code>：关键词重叠度 &lt;0.3 判风格漂移（MODERATE）、&lt;0.6 告警（WARNING）。</p>
+
+<p>每轮检查前执行 <code>take_snapshot</code>，快照记录角色外观与当前片段进度，并通过 <code>check_result.metadata.snapshot</code> 回写 <code>snapshot_id</code>、时间戳与累计快照数；<code>StateTimeline.get_snapshot_at_time</code> 返回时间最近的快照，<code>get_latest_snapshot</code> 取最新。快照用于观测与回溯，不驱动状态回滚。</p>
 
 <p>通过判定：任一 CRITICAL，或 MAJOR 超过 3 个，即 <code>passed=False</code>；其余级别不改变结论。问题签名由“类型 + 片段 + 场景 + 严重度 + 位置 + 描述前 100 字”组成，同一位置同类问题只报一次；描述超过 500 字符截断。</p>
 

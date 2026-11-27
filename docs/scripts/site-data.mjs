@@ -5,8 +5,8 @@ export const site = {
   description:
     'PenShot 是一个基于 LangGraph 的开源剧本分镜智能体。自动解析剧本、拆分镜头、切割片段并生成中英双语视频提示词，附带资产计划与模型路由，输出可直接投喂 Sora、Veo、Runway、可灵的 5 秒级分镜脚本。',
   url: 'https://shot.helpenx.com',
-  version: 'v0.4.4',
-  license: 'MIT',
+  version: 'v0.4.9',
+  license: 'Apache-2.0',
   repo: 'https://github.com/neopen/story-shot-agent',
   pypi: 'https://pypi.org/project/penshot/',
   docker: 'https://hub.docker.com/r/neotems/penshot',

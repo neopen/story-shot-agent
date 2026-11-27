@@ -160,7 +160,7 @@ const header = ({ prefix = '', active = '', searchIndex }) => {
       <a href="${prefix}index.html#integrations">集成</a>
       <a href="${docsHome}"${active === 'docs' ? ' class="is-active"' : ''}>文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="${site.hub}" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）${icon('arrowUpRight', 11)}</a>
+      <a class="is-external" href="${site.hub}" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）${icon('arrowUpRight', 11)}</a>
       <a class="is-external" href="${site.blog}" target="_blank" rel="noopener">博客${icon('arrowUpRight', 11)}</a>
     </nav>
     <div class="header-actions">
@@ -182,7 +182,7 @@ const header = ({ prefix = '', active = '', searchIndex }) => {
   <a href="${prefix}index.html#workflow">工作流程</a>
   <a href="${prefix}index.html#integrations">集成方式</a>
   <a href="${docsHome}">文档</a>
-  <a href="${site.hub}" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="${site.hub}" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="${site.blog}" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="${quickStartHref}">快速开始</a>
@@ -224,7 +224,7 @@ const sidebar = (slug) => {
       <a href="${site.url}" target="_blank" rel="noopener">${icon('globe', 13)}产品官网</a>
       <a href="${site.issues}" target="_blank" rel="noopener">${icon('prompt', 13)}问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot ${site.version}<br>MIT License · ${contentDate}</div>
+    <div class="sidebar-foot">PenShot ${site.version}<br>${site.license} License · ${contentDate}</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>`;
 };
@@ -258,7 +258,7 @@ const pager = (slug) => {
 
 const docsFooter = () => `<footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>${today.slice(0, 4)}</span> PenShot · 文档基线 ${site.version} · MIT License</span>
+    <span>© <span data-year>${today.slice(0, 4)}</span> PenShot · 文档基线 ${site.version} · ${site.license} License</span>
     <div class="docs-footer__links">
       <a href="${site.url}">官网</a>
       <a href="changelog.html">更新日志</a>
@@ -495,7 +495,7 @@ ${header({ prefix: '../', active: 'docs', searchIndex: 'search-index.json' })}
               <span class="meta-chip"><b>${Object.keys(docs).length}</b> 篇文档</span>
               <span class="meta-chip"><b>8</b> 个业务节点</span>
               <span class="meta-chip"><b>3</b> 种接入方式</span>
-              <span class="meta-chip"><b>MIT</b> 开源协议</span>
+              <span class="meta-chip"><b>${site.license}</b> 开源协议</span>
             </div>
           </div>
           <span class="docs-hero__badge">${site.version} · 基于源码</span>

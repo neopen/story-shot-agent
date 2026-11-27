@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="进阶能力">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="首帧与图生视频 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"首帧与图生视频","name":"首帧与图生视频","description":"PenShot 首帧与图生视频：两段式触发条件、首帧提示词构建顺序、静态截面与动作拆分、资产引用角色、场景锚定替换与阻断、Gate 1 检查与下游调用方式。","url":"https://shot.helpenx.com/docs/first-frame.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/first-frame.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"进阶能力","keywords":"首帧, 图生视频, image_to_video, image_prompt, motion_prompt, first_frame_instruction, 场景锚点, 关键文字, Gate 1, 静态截面","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"首帧与图生视频","name":"首帧与图生视频","description":"PenShot 首帧与图生视频：两段式触发条件、首帧提示词构建顺序、静态截面与动作拆分、资产引用角色、场景锚定替换与阻断、Gate 1 检查与下游调用方式。","url":"https://shot.helpenx.com/docs/first-frame.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/first-frame.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"进阶能力","keywords":"首帧, 图生视频, image_to_video, image_prompt, motion_prompt, first_frame_instruction, 场景锚点, 关键文字, Gate 1, 静态截面","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -143,13 +143,13 @@
           <h1>首帧与图生视频</h1>
           <p class="doc-deck">关键文字与高一致性片段如何拆成“静态首帧 + 动作驱动”，含场景锚点的替换与阻断。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 10 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 11 分钟阅读</span>
           </div>
         </header>
         <p>当一个片段需要稳定的人物身份，或画面里必须出现清晰可读的文字，直接文生视频往往不够可控。PenShot 会把这类片段改为<strong>两段式生成</strong>：先生成一张静态首帧，再用它驱动视频。这样身份、构图和文字都在首帧阶段锁定，视频模型只负责动作。</p>
 
-<blockquote>本页对应 v0.4.4 源码。PenShot 只输出首帧提示词、动作提示词与资产引用，不调用图片或视频接口。</blockquote>
+<blockquote>本页对应 v0.4.9 源码。PenShot 只输出首帧提示词、动作提示词与资产引用，不调用图片或视频接口。</blockquote>
 
 <h2 id="sec-1">30 秒了解</h2>
 <table>
@@ -206,7 +206,7 @@ route_plan = result.data[<span class="hljs-string">&quot;instructions&quot;</spa
 <tr><th style="text-align:left">条件</th><th style="text-align:left">判定细节</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align:left">关键文字</td><td style="text-align:left">提示词明确要求呈现可读文字，如招牌、字幕、书信、报纸、手写地址</td></tr>
+<tr><td style="text-align:left">关键文字</td><td style="text-align:left">提示词明确要求呈现可读文字，如字幕、店名、书信、报纸、手写地址；招牌、标牌本身只作氛围时不计入</td></tr>
 <tr><td style="text-align:left">角色外观锚点</td><td style="text-align:left">片段主角在全局契约中登记了 <code>appearance_anchors</code></td></tr>
 <tr><td style="text-align:left">场景锚点覆盖</td><td style="text-align:left">片段所属场景已有对应的场景资产，具备可用的首帧视觉锚点</td></tr>
 </tbody>
@@ -214,7 +214,7 @@ route_plan = result.data[<span class="hljs-string">&quot;instructions&quot;</spa
 
 <p>只有外观锚点、既没有关键文字也没有场景首帧时，还要求契约中已声明该角色的三视图；否则无法兑现身份约束，片段保持文生视频。注意“已声明”不等于“已生成”，状态为 <code>pending</code> 的角色资产同样可以支撑两段式，由下游负责生成。</p>
 
-<p>文字判定使用固定词表：中文包含“文字、字迹、地址、手写、字幕、招牌、标牌、海报、书名、报纸、书信、标题”；英文按整词匹配 <code>text</code>、<code>readable</code>、<code>address</code>、<code>handwriting</code>、<code>subtitle</code>、<code>newspaper</code>、<code>poster</code>、<code>menu</code>、<code>title</code>。英文按词边界匹配，避免把 <code>texture</code>、<code>context</code> 误判成文字需求。</p>
+<p>文字判定使用固定词表：中文包含“文字、字迹、字样、写着、地址、手写、字幕、店名、海报、书名、报纸、书信、标题”；英文按整词匹配 <code>text</code>、<code>readable</code>、<code>address</code>、<code>handwriting</code>、<code>subtitle</code>、<code>newspaper</code>、<code>poster</code>、<code>menu</code>、<code>title</code>。招牌、标牌、屏幕作为场景物件出现时不再单独触发，只有明确要求呈现其上文字（写着 / 字样 / 店名）才计入；英文按词边界匹配，避免把 <code>texture</code>、<code>context</code> 误判成文字需求。</p>
 
 <pre class="mermaid">flowchart LR
     F[片段提示词] --&gt; T{关键文字?}
@@ -307,7 +307,7 @@ neo-noir, cinematic, moody lighting
 <p>第二种形态是声明式指令：PenShot 不生成图片，只把“先生成、再驱动”的完整步骤交给下游。下游若已有自己的首帧生成策略，也可以忽略这段文字，直接使用 <code>image_prompt</code> 与 <code>motion_prompt</code>。</p>
 
 <h2 id="sec-8">场景锚定：自动替换与阻断</h2>
-<p>片段所属场景是按“片段 → 镜头 → 契约场景”解析的，但文本里可能明确写了另一个地点。首帧资产与文本场景不一致时，路由会做一次确定性校验；对白引号内的内容不参与判断，场景地点词表覆盖常见中英文别名与同义称呼。</p>
+<p>片段所属场景是按“片段 → 镜头 → 契约场景”解析的，但文本里可能明确写了另一个地点。首帧资产与文本场景不一致时，路由会做一次确定性校验；对白引号内的内容不参与判断，场景地点词表覆盖常见中英文别名与同义称呼。同一地点的同族词（如咖啡店 / 咖啡厅 / 咖啡馆、街角 / 街景）会一并匹配，避免把正确地点判为冲突而阻断片段。</p>
 
 <table>
 <thead>
@@ -352,7 +352,7 @@ neo-noir, cinematic, moody lighting
 <tr><td style="text-align:left">片段被阻断</td><td style="text-align:left">文本场景与首帧资产无法唯一匹配；查看 <code>warnings</code> 中的候选场景，人工指定或补充场景资产</td></tr>
 <tr><td style="text-align:left">首帧是空镜</td><td style="text-align:left">片段只有广播、音效或画外音，没有可入画对象；这是兜底行为，补充视觉描述即可</td></tr>
 <tr><td style="text-align:left"><code>asset_ref</code> 为空</td><td style="text-align:left">清单未回填场景首帧，或清单声明了该资产但引用为空；按 <code>image_prompt</code> 生成，或提交新的 <code>asset_manifest</code></td></tr>
-<tr><td style="text-align:left">关键文字片段没有文字证据</td><td style="text-align:left">首帧提示词缺少招牌、字幕等要求；在剧本或提示词中明确写出需要呈现的文字内容</td></tr>
+<tr><td style="text-align:left">关键文字片段没有文字证据</td><td style="text-align:left">首帧提示词缺少字幕、店名等文字要求；在剧本或提示词中明确写出需要呈现的文字内容</td></tr>
 </tbody>
 </table>
 
@@ -406,7 +406,7 @@ neo-noir, cinematic, moody lighting
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

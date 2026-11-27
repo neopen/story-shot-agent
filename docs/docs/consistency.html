@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>一致性策略 · PenShot 文档</title>
-  <meta name="description" content="PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。">
+  <meta name="description" content="PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、六项基础规则检查、契约级结构化锚点与跨块校验、风格漂移检测、状态快照与固定视频种子，降低跨片段角色、场景、动作与风格漂移。">
   <meta name="keywords" content="一致性策略,一致性契约,角色一致性,场景连贯,资产锚点,提示词约束,向量检索,修复回路,分镜">
   <meta name="author" content="PenShot Team">
   <meta name="application-name" content="PenShot">
@@ -15,19 +15,19 @@
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="article">
   <meta property="og:title" content="一致性策略 · PenShot 文档">
-  <meta property="og:description" content="PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。">
+  <meta property="og:description" content="PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、六项基础规则检查、契约级结构化锚点与跨块校验、风格漂移检测、状态快照与固定视频种子，降低跨片段角色、场景、动作与风格漂移。">
   <meta property="og:url" content="https://shot.helpenx.com/docs/consistency.html">
   <meta property="og:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="一致性策略 · PenShot 文档">
-  <meta name="twitter:description" content="PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。">
+  <meta name="twitter:description" content="PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、六项基础规则检查、契约级结构化锚点与跨块校验、风格漂移检测、状态快照与固定视频种子，降低跨片段角色、场景、动作与风格漂移。">
   <meta name="twitter:image" content="https://shot.helpenx.com/assets/img/og-cover.png">
   <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"一致性策略","name":"一致性策略","description":"PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、规则检查与向量检索，降低跨片段角色、场景、动作与风格漂移。","url":"https://shot.helpenx.com/docs/consistency.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/consistency.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"一致性策略, 一致性契约, 角色一致性, 场景连贯, 资产锚点, 提示词约束, 向量检索, 修复回路, 分镜","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"一致性策略","name":"一致性策略","description":"PenShot 如何通过一致性契约、全局元数据、资产锚点、提示词约束、六项基础规则检查、契约级结构化锚点与跨块校验、风格漂移检测、状态快照与固定视频种子，降低跨片段角色、场景、动作与风格漂移。","url":"https://shot.helpenx.com/docs/consistency.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/consistency.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"一致性策略, 一致性契约, 角色一致性, 场景连贯, 资产锚点, 提示词约束, 向量检索, 修复回路, 分镜","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -133,8 +133,8 @@
       <button type="button" data-search-open><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
     </div>
     <details class="toc-mobile">
-      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 10 节</summary>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">策略构成</a></li><li class="toc-depth-2"><a href="#sec-2">全局一致性契约</a></li><li class="toc-depth-2"><a href="#sec-3">资产锚点与回填</a></li><li class="toc-depth-2"><a href="#sec-4">全局元数据与连续性锚点</a></li><li class="toc-depth-2"><a href="#sec-5">提示词约束</a></li><li class="toc-depth-2"><a href="#sec-6">六项规则检查</a></li><li class="toc-depth-2"><a href="#sec-7">修复回路</a></li><li class="toc-depth-2"><a href="#sec-8">RAG 模板召回</a></li><li class="toc-depth-2"><a href="#sec-9">种子建议</a></li><li class="toc-depth-2"><a href="#sec-10">当前限制</a></li></ul>
+      <summary><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录 · 11 节</summary>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">策略构成</a></li><li class="toc-depth-2"><a href="#sec-2">全局一致性契约</a></li><li class="toc-depth-2"><a href="#sec-3">资产锚点与回填</a></li><li class="toc-depth-2"><a href="#sec-4">全局元数据与连续性锚点</a></li><li class="toc-depth-2"><a href="#sec-5">提示词约束</a></li><li class="toc-depth-2"><a href="#sec-6">六项基础检查</a></li><li class="toc-depth-2"><a href="#sec-7">契约级检查与快照</a></li><li class="toc-depth-2"><a href="#sec-8">修复回路</a></li><li class="toc-depth-2"><a href="#sec-9">RAG 模板召回</a></li><li class="toc-depth-2"><a href="#sec-10">固定视频种子</a></li><li class="toc-depth-2"><a href="#sec-11">当前限制</a></li></ul>
     </details>
     <div class="docs-layout">
       <article class="doc-body">
@@ -143,13 +143,13 @@
           <h1>一致性策略</h1>
           <p class="doc-deck">一致性契约、资产锚点与修复回路，如何压制跨片段的角色、场景与风格漂移。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 12 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 15 分钟阅读</span>
           </div>
         </header>
-        <p>PenShot 的一致性由六条已接线的通道共同保障：全局一致性契约、外观与资产锚点、连续性注释、提示词约束、规则检查加修复回路、跨剧本模板召回。快照回滚与结构化锚点仍未接入主链。</p>
+        <p>PenShot 的一致性由多条已在主链接通的通道共同保障：全局一致性契约、外观与资产锚点、连续性注释、提示词约束、六项基础规则检查加修复回路、契约级结构化锚点与跨块校验、风格漂移检测、固定视频种子，以及跨剧本模板召回。状态快照已接入主链，用途是观测与按时间回溯，不承担回滚。</p>
 
-<p>这些通道都在主链内部完成，不额外引入生成模型：契约、锚点与注释是结构化透传，规则检查是确定性判定，检索只读取已有向量库。因此一致性保障的边际成本主要是提示词长度，而不是额外推理调用。</p>
+<p>这些通道都在主链内部完成，不额外引入生成模型：契约、锚点与注释是结构化透传，规则检查是确定性判定，风格漂移用关键词重叠度估算，检索只读取已有向量库。因此一致性保障的边际成本主要是提示词长度，而不是额外推理调用。</p>
 
 <h2 id="sec-1">策略构成</h2>
 <table>
@@ -187,14 +187,29 @@
 <td style="text-align:left">发现违规并生成修复参数，按来源阶段回流</td>
 </tr>
 <tr>
+<td style="text-align:left">结构化锚点与跨块校验</td>
+<td style="text-align:left">CONTINUITY_CHECK，<code>check_with_contract</code></td>
+<td style="text-align:left">契约转为 <code>ContinuityAnchor</code>；长剧本检查块间过渡</td>
+</tr>
+<tr>
+<td style="text-align:left">风格漂移检测</td>
+<td style="text-align:left"><code>PromptStyleGuardian</code></td>
+<td style="text-align:left">按关键词重叠度识别片段风格偏离全局画像</td>
+</tr>
+<tr>
+<td style="text-align:left">状态快照</td>
+<td style="text-align:left"><code>take_snapshot</code> / <code>StateTimeline</code></td>
+<td style="text-align:left">记录角色外观与片段进度，供观测与按时间回溯</td>
+</tr>
+<tr>
 <td style="text-align:left">检索增强</td>
 <td style="text-align:left">模板召回（RAG）</td>
 <td style="text-align:left">复用本剧本与其他剧本的活跃模板</td>
 </tr>
 <tr>
-<td style="text-align:left">种子建议</td>
-<td style="text-align:left"><code>execution_suggestions</code>、资产 <code>consistency.seed</code></td>
-<td style="text-align:left">提示执行层固定随机种子；视频提示词本身无 seed 字段</td>
+<td style="text-align:left">固定视频种子</td>
+<td style="text-align:left"><code>AIVideoPrompt.seed</code>、<code>ShotConfig.video_seed</code></td>
+<td style="text-align:left">为所有片段补齐稳定 seed，显式配置优先</td>
 </tr>
 </tbody>
 </table>
@@ -220,6 +235,7 @@
         C1[拼装全剧上下文]
         C2[消费修复参数]
         C3[召回成功提示词模板]
+        C4[补齐固定视频 seed]
     end
 
     subgraph Route[模型路由节点]
@@ -230,12 +246,13 @@
 
     subgraph Audit[质量审计节点]
         A1[11 项规则 + LLM 审查]
-        A2[生成修复参数]
+        A2[按严重度判定状态 + 修复参数]
     end
 
     subgraph Continuity[连续性守护节点]
-        G1[六项词表规则检查]
-        G2[生成修复参数并按来源路由]
+        G1[六项基础检查]
+        G2[契约锚点 / 跨块 / 风格漂移]
+        G3[快照记录 + 按来源路由修复]
     end
 
     Parse --&gt; Assets --&gt; Split --&gt; Convert --&gt; Route --&gt; Audit --&gt; Continuity
@@ -256,7 +273,7 @@
 <tr>
 <td style="text-align:left"><code>characters</code></td>
 <td style="text-align:left">角色首次/末次场景、出场列表、外观锚点、服装序列、持有道具</td>
-<td style="text-align:left">资产计划、提示词、审计</td>
+<td style="text-align:left">资产计划、提示词、审计、连续性锚点</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>scenes</code></td>
@@ -266,7 +283,7 @@
 <tr>
 <td style="text-align:left"><code>style_anchor</code></td>
 <td style="text-align:left">全局风格锚点</td>
-<td style="text-align:left">资产提示词、转换模板</td>
+<td style="text-align:left">资产提示词、转换模板、风格守护</td>
 </tr>
 <tr>
 <td style="text-align:left"><code>style_anchor_provenance</code></td>
@@ -424,8 +441,8 @@
 
 <p>四段内容装入模板的【全剧上下文】区块，并在生成指令中追加【重要约束】：人物外观、道具、场景与上下文保持一致。冲突时以上下文为准，而非模型自由发挥。场景过滤的依据是 <code>appears_in</code>；该字段缺失或没有命中时，段落退回全量列表，宁可多给上下文也不省略约束。</p>
 
-<h2 id="sec-6">六项规则检查</h2>
-<p>连续性守护节点以关键词和数值规则检查六个维度，不调用 LLM。</p>
+<h2 id="sec-6">六项基础检查</h2>
+<p>连续性守护节点先执行六项以关键词和数值规则为主的检查，不调用 LLM；契约级检查在其上叠加。</p>
 
 <table>
 <thead>
@@ -438,18 +455,18 @@
 <tbody>
 <tr>
 <td style="text-align:left">角色</td>
-<td style="text-align:left">有对话的角色是否出现在镜头；服装 / 发型 / 配饰词表</td>
-<td style="text-align:left"><code>CHARACTER_MISSING</code>（MAJOR）、外观变化（WARNING）</td>
+<td style="text-align:left">有对白的角色是否有镜头（含画外音/仅声音角色按台词元素归属）；服装词与配色是否漂移</td>
+<td style="text-align:left"><code>CHARACTER_MISSING</code>（MAJOR）、<code>CHARACTER_APPEARANCE_CHANGE</code> / <code>COLOR_INCONSISTENT</code>（WARNING）</td>
 </tr>
 <tr>
 <td style="text-align:left">场景</td>
-<td style="text-align:left">相邻镜头 <code>scene_id</code> 跳变及占比</td>
+<td style="text-align:left">相邻镜头 <code>scene_id</code> 跳变及占比；过渡镜头、同景别切点与已尝试修复的固有切换不再重复上报</td>
 <td style="text-align:left"><code>SCENE_JUMP</code>（WARNING）、<code>SCENE_TOO_FREQUENT</code>（&gt;30%，MODERATE）</td>
 </tr>
 <tr>
 <td style="text-align:left">动作</td>
-<td style="text-align:left">走/跑/跳/转身/坐下/站起/拿起/放下 按角色追踪</td>
-<td style="text-align:left"><code>ACTION_BREAK</code>（MODERATE）</td>
+<td style="text-align:left">走/跑/跳/转身/坐下/站起/拿起/放下，仅比较相邻且同一主角镜头，跨镜头的正常动作推进不计断裂</td>
+<td style="text-align:left"><code>ACTION_BREAK</code>（MODERATE，无自动修复）</td>
 </tr>
 <tr>
 <td style="text-align:left">风格</td>
@@ -463,17 +480,57 @@
 </tr>
 <tr>
 <td style="text-align:left">道具</td>
-<td style="text-align:left">拿/举/抱/提/端/持/握 按角色统计</td>
-<td style="text-align:left"><code>PROP_CHANGE</code>（WARNING）</td>
+<td style="text-align:left">按角色追踪持有道具；放下/放在/递给/交给/扔/丢/摔/碰倒/打翻/脱下/摘下后清空持有；台词提到的道具视为话题不计持有</td>
+<td style="text-align:left"><code>PROP_CHANGE</code>（WARNING，无自动修复）</td>
 </tr>
 </tbody>
 </table>
 
 <p>通过条件为 <code>critical_count == 0</code> 且 <code>major_count ≤ 3</code>；任一 CRITICAL 或 MAJOR 超过 3 个即不通过，其余级别只记录。问题签名由类型、片段、场景、严重度、位置与描述前 100 字组成，同一位置同类问题只报一次；描述超过 500 字符截断。每条问题带 <code>source_stage</code>、<code>auto_fixable</code> 与 <code>suggestion</code>，供修复路由使用。</p>
 
-<p>误报边界：词表法会把“拿手机→握手机”判为道具变化，“转头”不在动作词表；缺少分镜或片段时对应检查直接跳过。规则检查不依赖 LLM，配额耗尽时仍可运行，代价是对近义表达与隐含动作不敏感。</p>
+<p>误报边界：词表法对近义表达与隐含动作不敏感；“转头”不在动作词表；缺少分镜或片段时对应检查直接跳过。动作、道具与场景频率类检查标记为 <code>auto_fixable=False</code>，避免用重跑分镜的空转去“修复”启发式判定。</p>
 
-<h2 id="sec-7">修复回路</h2>
+<h2 id="sec-7">契约级检查与快照</h2>
+<p>主链入口是 <code>check_with_contract(context, contract)</code>：先跑六项基础检查，再叠加契约校验、结构化锚点、跨块校验，最后由工作流追加风格漂移检测并记录状态快照。</p>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left">检查</th>
+<th style="text-align:left">行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">角色长期缺席</td>
+<td style="text-align:left"><code>contract.get_character_appearance_consistency()</code> 报告长期不出现的角色，结构性不可自动修复</td>
+</tr>
+<tr>
+<td style="text-align:left">场景角色一致</td>
+<td style="text-align:left">契约场景的 <code>characters_in_scene</code> 与镜头 <code>scene_id</code> 实际角色对比，缺失触发 <code>CHARACTER_MISSING</code></td>
+</tr>
+<tr>
+<td style="text-align:left">结构化锚点</td>
+<td style="text-align:left"><code>build_anchors_from_contract</code> 生成角色外观 / 场景 / 风格 <code>ContinuityAnchor</code>，逐片段比对并登记到时间线</td>
+</tr>
+<tr>
+<td style="text-align:left">长剧本跨块</td>
+<td style="text-align:left"><code>CrossChunkValidator</code> 检查块间角色突然消失/出现与场景过渡</td>
+</tr>
+<tr>
+<td style="text-align:left">风格漂移</td>
+<td style="text-align:left"><code>PromptStyleGuardian</code> 以关键词重叠度对比全局画像：&lt;0.3 判漂移、&lt;0.6 告警</td>
+</tr>
+<tr>
+<td style="text-align:left">状态快照</td>
+<td style="text-align:left">每轮 <code>take_snapshot</code> 记录角色外观与片段进度；<code>get_snapshot_at_time</code> 返回时间最近者，<code>get_latest_snapshot</code> 取最新</td>
+</tr>
+</tbody>
+</table>
+
+<p>锚点与快照只用于校验和观测：快照不会驱动状态回滚，契约冲突也不会改写已确认的剧本事实，而是转为修复参数或人工项。风格画像优先取自契约的 <code>style_anchor</code>，缺失时按类型推断或检索知识库。</p>
+
+<h2 id="sec-8">修复回路</h2>
 <p>质量审计与连续性守护都会把问题转换为修复参数，但回流路径不同：审计固定回转换节点，连续性按问题来源回到解析、拆分、切割或转换。</p>
 
 <pre class="mermaid">flowchart TB
@@ -481,10 +538,10 @@
     Parse --&gt; Assets[资产计划&lt;br/&gt;资产锚点]
     Assets --&gt; Segment[镜头拆分]
     Segment --&gt; Split[片段切割&lt;br/&gt;continuity_notes]
-    Split --&gt; Convert[提示词转换&lt;br/&gt;全剧上下文 + 模板参考]
+    Split --&gt; Convert[提示词转换&lt;br/&gt;全剧上下文 + 模板参考 + seed]
     Convert --&gt; Route[模型路由&lt;br/&gt;首帧引用 + usage 回填]
     Route --&gt; Audit[质量审计&lt;br/&gt;11 项规则 + LLM]
-    Audit --&gt;|通过| Continuity[连续性守护&lt;br/&gt;六项词表检查]
+    Audit --&gt;|通过| Continuity[连续性守护&lt;br/&gt;基础检查 + 契约锚点 + 跨块 + 风格]
     Audit -.-&gt;|NEEDS_REPAIR / RETRY| Convert
     Continuity -.-&gt;|按来源修复| Parse
     Continuity -.-&gt;|按来源修复| Segment
@@ -495,9 +552,13 @@
 
 <p>修复参数按 <code>PipelineNode</code> 写入 <code>state.domain.repair_params</code>，节点只读取自己的键；连续性节点同时设置 <code>needs_continuity_repair</code> 与来源阶段，决策函数返回节点名完成动态路由。修复最多 3 轮（<code>max_continuity_retries</code>），轮次耗尽、存在 CRITICAL 或无法定位来源时转人工。</p>
 
-<p>审查扣分从 100 起算，warning 5、moderate 10、major 25、critical 40、error 60；≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，否则 FAILED。PASSED 直接放行，MINOR 违规不超过 3 个也放行；MODERATE / MAJOR 带修复参数回到 CONVERT_PROMPT；CRITICAL 重试或转人工。审查的 NEEDS_RETRY 与 NEEDS_REPAIR 都回到 CONVERT_PROMPT，因为审查本身不产生内容。</p>
+<p>审计状态由严重度规则判定，而不是固定扣到某条分数线：有 ERROR → <code>FAILED</code>；有 CRITICAL → <code>CRITICAL_ISSUES</code>；≥2 个 MAJOR 或 MAJOR+2 个 MODERATE → <code>MAJOR_ISSUES</code>；有 MODERATE → <code>MODERATE_ISSUES</code>；有 WARNING 或检查通过率 &lt;90% → <code>MINOR_ISSUES</code>；全清 → <code>PASSED</code>。</p>
 
-<h2 id="sec-8">RAG 模板召回</h2>
+<p>评分改为“检查通过率减去违规扣分”：基础分为通过率（0–1），按 INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100% 逐项扣减并按数量封顶，最低为 0；乘 100 后写入 <code>score</code> 与 <code>detection_score</code>。结论文本会同时列出警告数与未通过检查名，不再出现“0 个警告问题”却未通过的矛盾描述。</p>
+
+<p>修复结论可核对：<code>repair_issue_count</code> 与 <code>repair_action_count</code> 分列，只有真正执行的修复动作才会通过规则复检更新 <code>post_repair_score</code>，否则保持等于检测分；<code>repair_status</code> 取 <code>repaired</code> / <code>partial</code> / <code>manual_required</code> / <code>no_action_taken</code>，聚合优先级为“空转 &gt; 人工 &gt; 部分/完成”。无自动策略的问题进入 <code>requires_manual_fix</code>，不再反复触发修复循环；有自动策略却零动作会被如实标记为空转。</p>
+
+<h2 id="sec-9">RAG 模板召回</h2>
 <p>提示词模板库按相似度检索成功案例，供转换节点参考；默认先查本剧本，名额未满时只读回退到其他剧本的活跃模板。</p>
 
 <table>
@@ -536,12 +597,14 @@
 
 <p>跨剧本召回是只读的：不会把其他剧本的模板写回当前剧本，也不会修改对方的审计状态。向量库为空、索引不可用或检索异常时返回空结果，不阻断主流程。详细构建流程见<a href="rag-knowledge-base.html">RAG 知识库</a>。</p>
 
-<h2 id="sec-9">种子建议</h2>
-<p><code>global_settings</code> 只包含 <code>style_consistency: True</code> 与 <code>use_common_negative_prompt: True</code>，没有种子字段。<code>execution_suggestions</code> 输出三条执行建议：按顺序生成片段、保持相同种子值以获得一致性、生成后检查片段衔接。资产规格中的 <code>consistency.seed</code> 是可选的建议值，供下游生成静态资产时使用，不会自动写入视频提示词。</p>
+<h2 id="sec-10">固定视频种子</h2>
+<p>0.4.8 起视频提示词带 <code>seed</code> 字段。转换节点在输出前调用 <code>_apply_video_seed</code>，为所有尚未设置 seed 的片段补齐同一个值：显式配置 <code>ShotConfig.video_seed</code> 时优先采用；未配置时对剔除 <code>metadata</code> / <code>stats</code> 的解析剧本做 SHA-256 取前 8 位十六进制并限制在 2^31-1 内，保证同一剧本重复运行得到同一 seed。</p>
 
-<p>建议文案不进入模型请求，也不会被校验。执行层若固定种子，应在同一任务内复用同一值，并自行记录以便复现；跨任务沿用同一值只会重现画面风格，不能保证内容正确。</p>
+<p><code>global_settings</code> 仍只包含 <code>style_consistency</code> 与 <code>use_common_negative_prompt</code>，seed 不写在这里，而是逐片段落在 <code>AIVideoPrompt.seed</code>；模型适配器再把它透传到下游参数（<code>model_adapter</code> 各模型的参数包都带 <code>seed</code>）。资产规格中的 <code>consistency.seed</code> 是独立建议值，供静态资产生成使用。</p>
 
-<h2 id="sec-10">当前限制</h2>
+<p>固定 seed 只稳定同一剧本内的随机性，跨任务沿用同一值只能重现画面风格，不能保证内容正确；执行层若需复现，应记录实际使用的 seed 与模型版本。</p>
+
+<h2 id="sec-11">当前限制</h2>
 <table>
 <thead>
 <tr>
@@ -551,24 +614,24 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align:left">快照未接入</td>
-<td style="text-align:left"><code>take_snapshot</code> 无调用方；<code>get_snapshot_at_time(t)</code> 取第一个不早于 t 的快照，而非时间最近者</td>
+<td style="text-align:left">快照仅观测</td>
+<td style="text-align:left"><code>take_snapshot</code> 已接入主链，但快照用于记录与回溯，不驱动状态回滚</td>
 </tr>
 <tr>
-<td style="text-align:left">结构化锚点未启用</td>
-<td style="text-align:left"><code>ContinuityAnchor</code>、<code>CrossChunkValidator</code> 无调用方；<code>check_with_contract</code> 已定义但主链仍走原有六项检查</td>
+<td style="text-align:left">锚点为结构校验</td>
+<td style="text-align:left">契约锚点比对字段与文本，不生成图像，也不纠正上游已确认的剧本事实</td>
 </tr>
 <tr>
-<td style="text-align:left">视频提示词无固定种子</td>
-<td style="text-align:left">只在 <code>execution_suggestions</code> 与资产规格中给出建议，视频片段没有 seed 字段</td>
+<td style="text-align:left">风格漂移基于关键词</td>
+<td style="text-align:left"><code>PromptStyleGuardian</code> 以英文关键词重叠度估算，中文为主或措辞差异大时会误判</td>
 </tr>
 <tr>
-<td style="text-align:left">关键词误报</td>
-<td style="text-align:left">近义动作、道具动词变化会被判为不一致，需要人工忽略</td>
+<td style="text-align:left">词表法启发式</td>
+<td style="text-align:left">近义动作、道具动词变化仍可能误报；相关检查标记为不可自动修复</td>
 </tr>
 <tr>
-<td style="text-align:left">风格守护未实例化</td>
-<td style="text-align:left"><code>PromptStyleGuardian</code> 未创建，风格一致性主要依赖契约锚点与规则检查</td>
+<td style="text-align:left">跨块校验偏保守</td>
+<td style="text-align:left">只在长剧本分块时检查块间角色与场景过渡，单块任务不触发</td>
 </tr>
 <tr>
 <td style="text-align:left">跨剧本只读</td>
@@ -598,7 +661,7 @@
       <aside class="doc-toc" aria-label="本页目录">
         <div class="toc-inner">
           <div class="toc-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>本页目录</div>
-      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">策略构成</a></li><li class="toc-depth-2"><a href="#sec-2">全局一致性契约</a></li><li class="toc-depth-2"><a href="#sec-3">资产锚点与回填</a></li><li class="toc-depth-2"><a href="#sec-4">全局元数据与连续性锚点</a></li><li class="toc-depth-2"><a href="#sec-5">提示词约束</a></li><li class="toc-depth-2"><a href="#sec-6">六项规则检查</a></li><li class="toc-depth-2"><a href="#sec-7">修复回路</a></li><li class="toc-depth-2"><a href="#sec-8">RAG 模板召回</a></li><li class="toc-depth-2"><a href="#sec-9">种子建议</a></li><li class="toc-depth-2"><a href="#sec-10">当前限制</a></li></ul>
+      <ul class="toc-nav"><li class="toc-depth-2"><a href="#sec-1">策略构成</a></li><li class="toc-depth-2"><a href="#sec-2">全局一致性契约</a></li><li class="toc-depth-2"><a href="#sec-3">资产锚点与回填</a></li><li class="toc-depth-2"><a href="#sec-4">全局元数据与连续性锚点</a></li><li class="toc-depth-2"><a href="#sec-5">提示词约束</a></li><li class="toc-depth-2"><a href="#sec-6">六项基础检查</a></li><li class="toc-depth-2"><a href="#sec-7">契约级检查与快照</a></li><li class="toc-depth-2"><a href="#sec-8">修复回路</a></li><li class="toc-depth-2"><a href="#sec-9">RAG 模板召回</a></li><li class="toc-depth-2"><a href="#sec-10">固定视频种子</a></li><li class="toc-depth-2"><a href="#sec-11">当前限制</a></li></ul>
           <a class="toc-back" href="#main"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>回到顶部</a>
         </div>
       </aside>
@@ -608,7 +671,7 @@
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

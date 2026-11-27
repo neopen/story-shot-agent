@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="核心设计">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="核心实现 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"核心实现","name":"核心实现","description":"PenShot 的多厂商 LLM 客户端、YAML 提示词管理、资产生成与模型适配、重试与循环控制、任务池与上下文窗口管理的实现要点。","url":"https://shot.helpenx.com/docs/core-implementation.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/core-implementation.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"核心实现, LLM 客户端, 提示词管理, 资产生成, 模型适配, 重试机制, 循环控制, 任务池, YAML","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"核心实现","name":"核心实现","description":"PenShot 的多厂商 LLM 客户端、YAML 提示词管理、资产生成与模型适配、重试与循环控制、任务池与上下文窗口管理的实现要点。","url":"https://shot.helpenx.com/docs/core-implementation.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/core-implementation.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"核心设计","keywords":"核心实现, LLM 客户端, 提示词管理, 资产生成, 模型适配, 重试机制, 循环控制, 任务池, YAML","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -143,13 +143,13 @@
           <h1>核心实现</h1>
           <p class="doc-deck">LLM 客户端、提示词管理、资产生成、模型适配、循环控制与任务调度的实现要点。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
             <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 21 分钟阅读</span>
           </div>
         </header>
         <p>PenShot 的核心实现由七类基础件组成：可插拔 LLM 客户端、版本化 YAML 提示词、资产计划与回填、模型能力路由、调用重试与循环控制、任务池调度、上下文窗口约束。它们共同决定一条剧本能否稳定跑完并产出可用的分镜提示词。</p>
 <blockquote>
-<p><strong>事实边界</strong>：本页对应 v0.4.4 源码。三层记忆见 <a href="memory.html">记忆系统</a>；一致性契约与修复回路见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
+<p><strong>事实边界</strong>：本页对应 v0.4.9 源码。三层记忆见 <a href="memory.html">记忆系统</a>；一致性契约与修复回路见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
 </blockquote>
 <h2 id="sec-1">模块划分</h2>
 <table>
@@ -576,7 +576,7 @@ agent.cancel_task(task_id)
 <tr><td>提示词内容</td><td>提示词为空</td></tr>
 <tr><td>提示词长度</td><td>超出 <code>max_prompt_length</code> 或低于 <code>min_prompt_length</code></td></tr>
 <tr><td>片段数量</td><td>没有任何片段</td></tr>
-<tr><td>模型支持</td><td>模型不在支持列表</td></tr>
+<tr><td>模型支持</td><td>模型既不在能力注册表，也不在基础模型枚举中</td></tr>
 <tr><td>外观锚点污染</td><td>片段提示词改写了契约中的外观锚点</td></tr>
 <tr><td>契约违规</td><td>违反全局一致性契约的约束</td></tr>
 <tr><td>景别一致性</td><td>结构化景别与提示词描述不一致</td></tr>
@@ -585,7 +585,7 @@ agent.cancel_task(task_id)
 <tr><td>资产使用</td><td>计划中的资产未被片段引用</td></tr>
 </tbody>
 </table>
-<p>扣分从 100 起算：warning 5、moderate 10、major 25、critical 40、error 60，下限 0。存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；修复参数写入 <code>state.domain.repair_params</code>，由下一轮转换节点消费。连续性检查提供六项交叉校验，并在问题出现时按来源阶段路由修复；审查与守护的具体阈值见 <a href="consistency.html">一致性策略</a>。</p>
+<p>状态按严重度规则判定：有 ERROR → <code>FAILED</code>，有 CRITICAL → <code>CRITICAL_ISSUES</code>，两个 MAJOR 或一个 MAJOR 加两个 MODERATE → <code>MAJOR_ISSUES</code>，有 MODERATE → <code>MODERATE_ISSUES</code>，有 WARNING 或检查通过率低于 90% → <code>MINOR_ISSUES</code>，全清 → <code>PASSED</code>。评分为检查通过率减去违规扣分（INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100%，按数量封顶，下限 0）。存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；修复参数写入 <code>state.domain.repair_params</code>，由下一轮转换节点消费。连续性检查提供六项基础交叉校验，并叠加契约锚点、跨块过渡与风格漂移，在问题出现时按来源阶段路由修复；审查与守护的具体阈值见 <a href="consistency.html">一致性策略</a>。</p>
 <h2 id="sec-15">上下文窗口</h2>
 <p>PenShot 没有独立的 <code>ContextWindowManager</code>，也不做重要度评分或相似度去重。实际落地的是四条确定性规则：</p>
 <table>
@@ -714,7 +714,7 @@ agent.cancel_task(task_id)
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

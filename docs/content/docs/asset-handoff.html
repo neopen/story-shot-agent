@@ -1,6 +1,6 @@
 <p>PenShot 默认不调用任何文生图或文生视频接口。它把角色三视图、关键道具与场景锚点写成一份<strong>声明式资产计划</strong>（<code>asset_plan</code>），由下游选择图片供应商生成，再把真实引用交回 PenShot 或直接用于视频生成。本页说明这套交接机制的字段、两种接入方式与常见降级行为。</p>
 
-<blockquote>本页对应 v0.4.4 源码。资产计划只描述“要生成什么”，不负责“用哪个模型生成”。如果显式开启 <code>image.enabled</code> 或注入 <code>AssetExecutionAdapter</code>，资产节点也可以调用执行器生图并产出回填清单；默认关闭，本文以声明式交接为主。</blockquote>
+<blockquote>本页对应 v0.4.9 源码。资产计划只描述“要生成什么”，不负责“用哪个模型生成”。如果显式开启 <code>image.enabled</code> 或注入 <code>AssetExecutionAdapter</code>，资产节点也可以调用执行器生图并产出回填清单；默认关闭，本文以声明式交接为主。</blockquote>
 
 <h2>30 秒了解</h2>
 <table>

@@ -22,8 +22,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PenShot：把剧本拆成连贯的 AI 视频片段">
-  <meta property="article:published_time" content="2026-11-14T00:00:00+08:00">
-  <meta property="article:modified_time" content="2026-11-14T00:00:00+08:00">
+  <meta property="article:published_time" content="2026-11-27T00:00:00+08:00">
+  <meta property="article:modified_time" content="2026-11-27T00:00:00+08:00">
   <meta property="article:section" content="开始使用">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="快速开始 · PenShot 文档">
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="../assets/css/docs.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script>document.documentElement.classList.add('js');</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"快速开始","name":"快速开始","description":"从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例、资产清单传入与常见配置项。","url":"https://shot.helpenx.com/docs/quick-start.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/quick-start.html"},"datePublished":"2026-11-14","dateModified":"2026-11-14","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot 安装, penshot pip, 快速开始, LLM 配置, 嵌入模型, 剧本分镜, Python SDK, 任务提交, asset_manifest","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"快速开始","name":"快速开始","description":"从安装 penshot、配置 LLM 与嵌入模型，到运行第一个剧本分镜任务并读取输出。包含同步/异步调用示例、资产清单传入与常见配置项。","url":"https://shot.helpenx.com/docs/quick-start.html","mainEntityOfPage":{"@type":"WebPage","@id":"https://shot.helpenx.com/docs/quick-start.html"},"datePublished":"2026-11-27","dateModified":"2026-11-27","inLanguage":"zh-CN","articleSection":"开始使用","keywords":"PenShot 安装, penshot pip, 快速开始, LLM 配置, 嵌入模型, 剧本分镜, Python SDK, 任务提交, asset_manifest","image":"https://shot.helpenx.com/assets/img/og-cover.png","author":{"@type":"Organization","name":"PenShot Team","url":"https://shot.helpenx.com"},"publisher":{"@type":"Organization","name":"PenShot","url":"https://shot.helpenx.com","logo":{"@type":"ImageObject","url":"https://shot.helpenx.com/assets/img/logo-512.png"},"sameAs":["https://github.com/neopen/story-shot-agent","https://pypi.org/project/penshot/"]},"isPartOf":{"@type":"WebSite","name":"PenShot","url":"https://shot.helpenx.com"}}</script>
 </head>
 <body class="docs-page" data-search-index="search-index.json">
 <a class="skip-link" href="#main">跳到正文</a>
@@ -53,7 +53,7 @@
       <a href="../index.html#integrations">集成</a>
       <a href="index.html" class="is-active">文档</a>
       <span class="site-nav__sep" aria-hidden="true"></span>
-      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+      <a class="is-external" href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
       <a class="is-external" href="https://pengline.cn" target="_blank" rel="noopener">博客<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
     </nav>
     <div class="header-actions">
@@ -75,7 +75,7 @@
   <a href="../index.html#workflow">工作流程</a>
   <a href="../index.html#integrations">集成方式</a>
   <a href="index.html">文档</a>
-  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵工坊）</a>
+  <a href="https://helpenx.com/" target="_blank" rel="noopener">HelpEnx Hub（星阵万象）</a>
   <a href="https://pengline.cn" target="_blank" rel="noopener">技术博客</a>
   <div class="mobile-nav__cta">
     <a class="btn btn--primary" href="quick-start.html">快速开始</a>
@@ -118,7 +118,7 @@
       <a href="https://shot.helpenx.com" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></svg>产品官网</a>
       <a href="https://github.com/neopen/story-shot-agent/issues" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M8 9h8M8 13h5"/></svg>问题反馈</a>
     </div>
-    <div class="sidebar-foot">PenShot v0.4.4<br>MIT License · 2026-11-14</div>
+    <div class="sidebar-foot">PenShot v0.4.9<br>Apache-2.0 License · 2026-11-27</div>
   </aside>
   <div class="sidebar-overlay" data-sidebar-overlay></div>
   <div class="docs-main">
@@ -143,11 +143,11 @@
           <h1>快速开始</h1>
           <p class="doc-deck">从安装、配置到跑通第一个分镜任务，完整走一遍最小可用链路。</p>
           <div class="doc-meta-row">
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-14</span>
-            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 18 分钟阅读</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>更新 2026-11-27</span>
+            <span><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>约 19 分钟阅读</span>
           </div>
         </header>
-        <p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。当前版本 <strong>v0.4.4</strong>。</p>
+        <p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。当前版本 <strong>v0.4.9</strong>。</p>
 
 <h2 id="sec-1">前置条件</h2>
 <table>
@@ -503,7 +503,7 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left">连续性守护</td>
 <td style="text-align:left"><code>continuity_check</code></td>
 <td style="text-align:left">校验结论与修复路由</td>
-<td style="text-align:left">六项检查，最多 3 轮修复</td>
+<td style="text-align:left">六项基础检查 + 契约校验，最多 3 轮修复</td>
 </tr>
 </tbody>
 </table>
@@ -609,14 +609,14 @@ agent = create_penshot_agent(config=config)</code></pre>
 <pre class="mermaid">flowchart TB
     A[各阶段产物] --&gt; B[11 项规则检查]
     B --&gt; C[LLM 深度审查]
-    C --&gt; D{分数分档}
+    C --&gt; D{按严重度定状态}
     D --&gt;|PASSED/MINOR| E[放行]
     D --&gt;|MODERATE/MAJOR| F[生成修复参数&lt;br/&gt;回转换节点]
     D --&gt;|CRITICAL/FAILED| G[重试或人工]
     E --&gt; H[连续性守护&lt;br/&gt;按来源路由修复]
     H --&gt; I[最终输出]
 </pre>
-<p>质量审计的 11 项规则检查覆盖片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突与资产使用，另加 LLM 深度审查。评分从 100 分起按 warning 5、moderate 10、major 25、critical 40、error 60 扣减；存在 critical 或 major 超过 2 条时置位 <code>needs_human_review</code>。修复参数会回到提示词转换节点，连续性问题的修复目标按来源阶段动态决定，形成闭环。</p>
+<p>质量审计的 11 项规则检查覆盖片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突与资产使用，另加 LLM 深度审查。状态按严重度规则判定：有 ERROR 记 <code>FAILED</code>，有 CRITICAL 记 <code>CRITICAL_ISSUES</code>，两个 MAJOR 或一个 MAJOR 加两个 MODERATE 记 <code>MAJOR_ISSUES</code>，有 MODERATE 记 <code>MODERATE_ISSUES</code>，有 WARNING 或检查通过率低于 90% 记 <code>MINOR_ISSUES</code>，全清记 <code>PASSED</code>。评分以检查通过率为基础分，按严重度扣减（INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100%，同类按数量封顶）。修复参数回到提示词转换节点，连续性问题的修复目标按来源阶段动态决定，形成闭环；报告同时给出 <code>repair_status</code> 与 <code>post_repair_score</code>，critical 或 major 超过 2 条时置位 <code>needs_human_review</code>。</p>
 <pre class="mermaid">flowchart TB
     subgraph Short["短期记忆（会话窗口）"]
         S1[消息缓冲 deque&lt;br/&gt;maxlen=20]
@@ -636,7 +636,7 @@ agent = create_penshot_agent(config=config)</code></pre>
     Medium -.-&gt;|阶段摘要| Output
     Short -.-&gt;|即时上下文| Output
 </pre>
-<p>三层记忆的默认参数：短期保留 20 条消息、TTL 3600 秒；中期摘要上限 500 tokens；长期检索 <code>k=3</code>、相似度阈值 0.7。跨片段的角色与道具衔接主要来自一致性契约、资产锚点、镜头时间轴与 <code>continuity_notes</code>，记忆系统提供的是增强而非唯一来源。</p>
+<p>三层记忆的默认参数：短期保留 20 条消息、TTL 3600 秒；中期摘要上限 500 tokens，会话历史为空时回退到磁盘恢复的摘要；长期检索 <code>k=3</code>、相似度阈值 0.7，向量库保留上限 500 条，超出后清理最旧记录。三层统一继承 <code>BaseMemoryLayer</code>，按 key 的读写与精确命中在 0.4.8 已接通。跨片段的角色与道具衔接主要来自一致性契约、资产锚点、镜头时间轴与 <code>continuity_notes</code>，记忆系统提供的是增强而非唯一来源。</p>
 
 <h2 id="sec-15">故障排查</h2>
 <table>
@@ -752,7 +752,7 @@ docker run -d --name penshot -p 8000:8000 --env-file .env neotems/penshot:latest
 </main>
 <footer class="docs-footer">
   <div class="docs-footer__inner">
-    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.4 · MIT License</span>
+    <span>© <span data-year>2026</span> PenShot · 文档基线 v0.4.9 · Apache-2.0 License</span>
     <div class="docs-footer__links">
       <a href="https://shot.helpenx.com">官网</a>
       <a href="changelog.html">更新日志</a>

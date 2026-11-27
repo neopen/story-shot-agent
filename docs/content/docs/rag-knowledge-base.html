@@ -1,7 +1,7 @@
-<p>PenShot 0.4.4 的知识库与检索层分成两条独立链路：提示词模板按角色/场景锚点召回，默认阈值 0.80、单次取 2 条、最多注入 6 条，并在本剧本名额未满时只读补位其他剧本；剧本内容索引仍由 <code>ScriptKnowledgeBase</code> 承载，用手动余弦服务连续性检查。三层记忆是第三条链路，只在工作流节点与两者交界。</p>
+<p>PenShot 的知识库与检索层分成两条独立链路：提示词模板按角色/场景锚点召回，默认阈值 0.80、单次取 2 条、最多注入 6 条，并在本剧本名额未满时只读补位其他剧本；剧本内容索引仍由 <code>ScriptKnowledgeBase</code> 承载，用手动余弦服务连续性检查。三层记忆是第三条链路，只在工作流节点与两者交界。</p>
 
 <h2>能力与接线状态</h2>
-<p>模板链路挂在提示词模板管理器 <code>PromptTemplateManager</code>（<code>prompts/prompt_template_manager.py</code>）之下，工作流节点不直接访问向量存储。下表给出各能力的实现位置与 0.4.4 的真实状态。</p>
+<p>模板链路挂在提示词模板管理器 <code>PromptTemplateManager</code>（<code>prompts/prompt_template_manager.py</code>）之下，工作流节点不直接访问向量存储。下表给出各能力的实现位置与当前（v0.4.9）的真实状态。</p>
 <table>
 <thead>
 <tr>
@@ -417,9 +417,9 @@
 <p>审计结果的 <code>metadata.quality_gate</code> 会记录 <code>status</code>（判定原因）、<code>score</code>、<code>blocking=false</code>、<code>ingestion_allowed</code> 与 <code>audit_status</code>。未达入库门槛不等同于任务失败：产物仍会输出，只是携带“仅供预览”的标记。</p>
 
 <h3>锚点召回与注入</h3>
-<p>0.4.4 的提示词转换节点不再对整段提示词调用 <code>enhance_prompt</code>，而是逐片段构建锚点查询：主角色的名称与契约外观锚点，加上所属场景的地点与时间；无契约或无角色/场景锚点的片段计入 <code>queries_skipped</code>，不发查询。每条查询调用一次 <code>search_similar_detailed</code>（<code>top_k=2</code>），命中结果跨片段去重后截断到 <code>max_injected_patterns=6</code>，再追加长期记忆中的成功模式，通过 <code>apply_historical_context</code> 交给转换器。</p>
+<p>提示词转换节点不对整段提示词调用 <code>enhance_prompt</code>，而是逐片段构建锚点查询：主角色的名称与契约外观锚点，加上所属场景的地点与时间；无契约或无角色/场景锚点的片段计入 <code>queries_skipped</code>，不发查询。每条查询调用一次 <code>search_similar_detailed</code>（<code>top_k=2</code>），命中结果跨片段去重后截断到 <code>max_injected_patterns=6</code>，再追加长期记忆中的成功模式，通过 <code>apply_historical_context</code> 交给转换器。</p>
 <p>召回统计写入 <code>instructions.metadata.anchor_recall</code>：<code>fragments</code>、<code>queries</code>、<code>queries_skipped</code>、<code>attempted</code>、<code>hits</code>、<code>injected</code>、<code>status</code>、<code>kb</code>、<code>min_score</code>、<code>max_score</code>、<code>top_k</code>、<code>error</code>，发生索引重建时另有 <code>rebuilt</code>。多片段查询的状态按“有命中优先、失败按严重度”聚合。</p>
-<p>注入规模有上限，但渲染仍保守：LLM 转换路径的 <code>history_hint</code> 当前只取首条召回文本的前 100 字符作为“参考成功模式”。因此 <code>anchor_recall.injected</code> 记录的是交给转换器的条数，不等于模型实际读到的全文条数。<code>enhance_prompt</code>、<code>get_best_match</code> 仍保留为管理器公开方法（后者等价于 <code>top_k=1</code> 的检索），但 0.4.4 生产链路没有调用方。</p>
+<p>注入规模有上限，但渲染仍保守：LLM 转换路径的 <code>history_hint</code> 当前只取首条召回文本的前 100 字符作为“参考成功模式”。因此 <code>anchor_recall.injected</code> 记录的是交给转换器的条数，不等于模型实际读到的全文条数。<code>enhance_prompt</code>、<code>get_best_match</code> 仍保留为管理器公开方法（后者等价于 <code>top_k=1</code> 的检索），但当前生产链路没有调用方。</p>
 <pre class="mermaid">flowchart TD
     A[片段集合与一致性契约] --&gt; B{片段有角色或场景锚点?}
     B --&gt;|否| S[计入 queries_skipped]

@@ -1,4 +1,4 @@
-<p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。当前版本 <strong>v0.4.4</strong>。</p>
+<p>以下是从安装、配置到跑通第一个分镜任务的最小链路，示例使用 Python SDK；REST 与 MCP 调用见 <a href="integration.html">集成指南</a>，容器部署见 <a href="docker.html">Docker 部署</a>。当前版本 <strong>v0.4.9</strong>。</p>
 
 <h2>前置条件</h2>
 <table>
@@ -354,7 +354,7 @@ agent = create_penshot_agent(config=config)</code></pre>
 <td style="text-align:left">连续性守护</td>
 <td style="text-align:left"><code>continuity_check</code></td>
 <td style="text-align:left">校验结论与修复路由</td>
-<td style="text-align:left">六项检查，最多 3 轮修复</td>
+<td style="text-align:left">六项基础检查 + 契约校验，最多 3 轮修复</td>
 </tr>
 </tbody>
 </table>
@@ -460,14 +460,14 @@ agent = create_penshot_agent(config=config)</code></pre>
 <pre class="mermaid">flowchart TB
     A[各阶段产物] --&gt; B[11 项规则检查]
     B --&gt; C[LLM 深度审查]
-    C --&gt; D{分数分档}
+    C --&gt; D{按严重度定状态}
     D --&gt;|PASSED/MINOR| E[放行]
     D --&gt;|MODERATE/MAJOR| F[生成修复参数&lt;br/&gt;回转换节点]
     D --&gt;|CRITICAL/FAILED| G[重试或人工]
     E --&gt; H[连续性守护&lt;br/&gt;按来源路由修复]
     H --&gt; I[最终输出]
 </pre>
-<p>质量审计的 11 项规则检查覆盖片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突与资产使用，另加 LLM 深度审查。评分从 100 分起按 warning 5、moderate 10、major 25、critical 40、error 60 扣减；存在 critical 或 major 超过 2 条时置位 <code>needs_human_review</code>。修复参数会回到提示词转换节点，连续性问题的修复目标按来源阶段动态决定，形成闭环。</p>
+<p>质量审计的 11 项规则检查覆盖片段时长、提示词内容与长度、片段数量、模型支持、外观锚点污染、契约违规、景别/镜头运动一致性、风格光照冲突与资产使用，另加 LLM 深度审查。状态按严重度规则判定：有 ERROR 记 <code>FAILED</code>，有 CRITICAL 记 <code>CRITICAL_ISSUES</code>，两个 MAJOR 或一个 MAJOR 加两个 MODERATE 记 <code>MAJOR_ISSUES</code>，有 MODERATE 记 <code>MODERATE_ISSUES</code>，有 WARNING 或检查通过率低于 90% 记 <code>MINOR_ISSUES</code>，全清记 <code>PASSED</code>。评分以检查通过率为基础分，按严重度扣减（INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100%，同类按数量封顶）。修复参数回到提示词转换节点，连续性问题的修复目标按来源阶段动态决定，形成闭环；报告同时给出 <code>repair_status</code> 与 <code>post_repair_score</code>，critical 或 major 超过 2 条时置位 <code>needs_human_review</code>。</p>
 <pre class="mermaid">flowchart TB
     subgraph Short["短期记忆（会话窗口）"]
         S1[消息缓冲 deque&lt;br/&gt;maxlen=20]
@@ -487,7 +487,7 @@ agent = create_penshot_agent(config=config)</code></pre>
     Medium -.-&gt;|阶段摘要| Output
     Short -.-&gt;|即时上下文| Output
 </pre>
-<p>三层记忆的默认参数：短期保留 20 条消息、TTL 3600 秒；中期摘要上限 500 tokens；长期检索 <code>k=3</code>、相似度阈值 0.7。跨片段的角色与道具衔接主要来自一致性契约、资产锚点、镜头时间轴与 <code>continuity_notes</code>，记忆系统提供的是增强而非唯一来源。</p>
+<p>三层记忆的默认参数：短期保留 20 条消息、TTL 3600 秒；中期摘要上限 500 tokens，会话历史为空时回退到磁盘恢复的摘要；长期检索 <code>k=3</code>、相似度阈值 0.7，向量库保留上限 500 条，超出后清理最旧记录。三层统一继承 <code>BaseMemoryLayer</code>，按 key 的读写与精确命中在 0.4.8 已接通。跨片段的角色与道具衔接主要来自一致性契约、资产锚点、镜头时间轴与 <code>continuity_notes</code>，记忆系统提供的是增强而非唯一来源。</p>
 
 <h2>故障排查</h2>
 <table>

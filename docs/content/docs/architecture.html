@@ -1,4 +1,4 @@
-<p>PenShot（<code>story-shot-agent</code>）是基于 LangGraph 的剧本分镜工作流：接入层接收剧本，任务层排队调度，<strong>八个业务节点</strong>顺序生成分镜提示词、资产计划与模型路由结果，四个控制节点负责循环计数、错误回退、人工干预与结果收口。当前版本 <strong>v0.4.4</strong>。</p>
+<p>PenShot（<code>story-shot-agent</code>）是基于 LangGraph 的剧本分镜工作流：接入层接收剧本，任务层排队调度，<strong>八个业务节点</strong>顺序生成分镜提示词、资产计划与模型路由结果，四个控制节点负责循环计数、错误回退、人工干预与结果收口。当前版本 <strong>v0.4.9</strong>。</p>
 
 <h2>分层架构</h2>
 <p>系统按接入、任务、工作流、智能体、记忆五层划分，各层可独立降级；输出端由 WorkflowOutputFixer 修复片段序列后以 JSON 返回。</p>
@@ -223,12 +223,12 @@
 </tr>
 <tr>
 <td style="text-align:left">AUDIT_QUALITY</td>
-<td style="text-align:left">11 项规则检查、LLM 深度审查与加权评分</td>
+<td style="text-align:left">11 项规则检查、LLM 深度审查、按严重度判定状态并按通过率评分</td>
 <td style="text-align:left"><code>QualityAuditReport</code></td>
 </tr>
 <tr>
 <td style="text-align:left">CONTINUITY_CHECK</td>
-<td style="text-align:left">视觉、角色、场景、动作四类连续性检查</td>
+<td style="text-align:left">六项基础检查，叠加契约锚点、跨块过渡与风格漂移</td>
 <td style="text-align:left"><code>ContinuityCheckResult</code></td>
 </tr>
 </tbody>
@@ -801,9 +801,9 @@
 </tbody>
 </table>
 
-<p>11 项规则检查覆盖：片段时长、提示词内容、提示词长度、片段数量、模型支持、外观锚点污染、契约违规、景别与提示词一致性、镜头运动与提示词一致性、风格光照冲突、资产使用。规则报告与 LLM 报告合并后计算加权分数。</p>
+<p>11 项规则检查覆盖：片段时长、提示词内容、提示词长度、片段数量、模型支持、外观锚点污染、契约违规、景别与提示词一致性、镜头运动与提示词一致性、风格光照冲突、资产使用。规则报告与 LLM 报告合并后，按严重度规则判定状态，并按检查通过率计算分数。</p>
 
-<p>修复参数按 <code>PipelineNode</code> 写入 <code>state.domain.repair_params</code>，节点只读取自己的键；应用成功后清理实例状态。修复重试同时计入阶段级与全局级计数器，不会无限回炉。评分分档：≥90 PASSED、≥75 MINOR_ISSUES、≥60 MODERATE_ISSUES、≥40 MAJOR_ISSUES、≥20 CRITICAL_ISSUES，其余 FAILED；MINOR 且违规不超过 3 个时放行，FAILED 但分数 ≥80 同样放行；存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>。</p>
+<p>修复参数按 <code>PipelineNode</code> 写入 <code>state.domain.repair_params</code>，节点只读取自己的键；应用成功后清理实例状态。修复重试同时计入阶段级与全局级计数器，不会无限回炉。状态按严重度规则判定：有 ERROR → <code>FAILED</code>，有 CRITICAL → <code>CRITICAL_ISSUES</code>，两个 MAJOR 或一个 MAJOR 加两个 MODERATE → <code>MAJOR_ISSUES</code>，有 MODERATE → <code>MODERATE_ISSUES</code>，有 WARNING 或检查通过率低于 90% → <code>MINOR_ISSUES</code>，全清 → <code>PASSED</code>。评分为检查通过率减去违规扣分（INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100%，按数量封顶）。MINOR 且违规不超过 3 个时放行，FAILED 但分数 ≥80 同样放行；0.4.9 起，本轮修复已如实标记“无自动策略”的中度问题不再反复触发修复；critical 或 major 超过 2 条时置 <code>needs_human_review</code>。</p>
 
 <h2>错误处理</h2>
 <p>ERROR_HANDLER 定义七类错误（NETWORK / TIMEOUT / RATE_LIMIT / VALIDATION / CONFIG / BUSINESS / UNKNOWN）、四级严重度（LOW~CRITICAL）与六种动作（RETRY / DELAY_RETRY / REPAIR / HUMAN / ABORT / IGNORE）。回退目标按错误来源映射：审查或连续性失败→CONVERT_PROMPT；循环检查失败或未知来源→PARSE_SCRIPT。资产与路由来源未列入映射表，默认回退到 PARSE_SCRIPT。</p>

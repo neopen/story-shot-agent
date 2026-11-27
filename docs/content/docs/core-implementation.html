@@ -1,6 +1,6 @@
 <p>PenShot 的核心实现由七类基础件组成：可插拔 LLM 客户端、版本化 YAML 提示词、资产计划与回填、模型能力路由、调用重试与循环控制、任务池调度、上下文窗口约束。它们共同决定一条剧本能否稳定跑完并产出可用的分镜提示词。</p>
 <blockquote>
-<p><strong>事实边界</strong>：本页对应 v0.4.4 源码。三层记忆见 <a href="memory.html">记忆系统</a>；一致性契约与修复回路见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
+<p><strong>事实边界</strong>：本页对应 v0.4.9 源码。三层记忆见 <a href="memory.html">记忆系统</a>；一致性契约与修复回路见 <a href="consistency.html">一致性策略</a>；节点级输入输出见 <a href="nodes.html">工作流节点</a>。</p>
 </blockquote>
 <h2>模块划分</h2>
 <table>
@@ -427,7 +427,7 @@ agent.cancel_task(task_id)
 <tr><td>提示词内容</td><td>提示词为空</td></tr>
 <tr><td>提示词长度</td><td>超出 <code>max_prompt_length</code> 或低于 <code>min_prompt_length</code></td></tr>
 <tr><td>片段数量</td><td>没有任何片段</td></tr>
-<tr><td>模型支持</td><td>模型不在支持列表</td></tr>
+<tr><td>模型支持</td><td>模型既不在能力注册表，也不在基础模型枚举中</td></tr>
 <tr><td>外观锚点污染</td><td>片段提示词改写了契约中的外观锚点</td></tr>
 <tr><td>契约违规</td><td>违反全局一致性契约的约束</td></tr>
 <tr><td>景别一致性</td><td>结构化景别与提示词描述不一致</td></tr>
@@ -436,7 +436,7 @@ agent.cancel_task(task_id)
 <tr><td>资产使用</td><td>计划中的资产未被片段引用</td></tr>
 </tbody>
 </table>
-<p>扣分从 100 起算：warning 5、moderate 10、major 25、critical 40、error 60，下限 0。存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；修复参数写入 <code>state.domain.repair_params</code>，由下一轮转换节点消费。连续性检查提供六项交叉校验，并在问题出现时按来源阶段路由修复；审查与守护的具体阈值见 <a href="consistency.html">一致性策略</a>。</p>
+<p>状态按严重度规则判定：有 ERROR → <code>FAILED</code>，有 CRITICAL → <code>CRITICAL_ISSUES</code>，两个 MAJOR 或一个 MAJOR 加两个 MODERATE → <code>MAJOR_ISSUES</code>，有 MODERATE → <code>MODERATE_ISSUES</code>，有 WARNING 或检查通过率低于 90% → <code>MINOR_ISSUES</code>，全清 → <code>PASSED</code>。评分为检查通过率减去违规扣分（INFO 1%、WARNING 5%、MODERATE 15%、MAJOR 30%、CRITICAL 50%、ERROR 100%，按数量封顶，下限 0）。存在 critical 或 major 超过 2 条时置 <code>needs_human_review</code>；修复参数写入 <code>state.domain.repair_params</code>，由下一轮转换节点消费。连续性检查提供六项基础交叉校验，并叠加契约锚点、跨块过渡与风格漂移，在问题出现时按来源阶段路由修复；审查与守护的具体阈值见 <a href="consistency.html">一致性策略</a>。</p>
 <h2>上下文窗口</h2>
 <p>PenShot 没有独立的 <code>ContextWindowManager</code>，也不做重要度评分或相似度去重。实际落地的是四条确定性规则：</p>
 <table>
